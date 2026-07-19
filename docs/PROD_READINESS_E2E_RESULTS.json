@@ -1,0 +1,207 @@
+{
+  "date": "2026-07-19T07:09:00.380Z",
+  "base": "http://127.0.0.1:4000",
+  "pass": 33,
+  "fail": 0,
+  "warn": 0,
+  "results": [
+    {
+      "module": "Ops",
+      "check": "API /health",
+      "status": "pass",
+      "detail": "ok"
+    },
+    {
+      "module": "Ops",
+      "check": "Database up",
+      "status": "pass",
+      "detail": "up"
+    },
+    {
+      "module": "H1 Decimal",
+      "check": "No float money columns in DB",
+      "status": "pass",
+      "detail": "0 float money cols"
+    },
+    {
+      "module": "H1 Decimal",
+      "check": "Numeric/Decimal money columns present",
+      "status": "pass",
+      "detail": "count=19"
+    },
+    {
+      "module": "Security",
+      "check": "Public register disabled",
+      "status": "pass",
+      "detail": "403"
+    },
+    {
+      "module": "Auth",
+      "check": "Platform admin login",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Security",
+      "check": "Admin JWT blocked from CRM",
+      "status": "pass",
+      "detail": "403"
+    },
+    {
+      "module": "Billing",
+      "check": "Provision customer business",
+      "status": "pass",
+      "detail": "cmrrgfyx000egtyh8xkqrdlli"
+    },
+    {
+      "module": "Auth",
+      "check": "Customer login after provision",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "H1 Decimal",
+      "check": "GST 18% on 1000 = 1180 total",
+      "status": "pass",
+      "detail": "total=1180 tax=180 status=201"
+    },
+    {
+      "module": "H2 Invoice seq",
+      "check": "Sequential unique invoice numbers",
+      "status": "pass",
+      "detail": "INV-2026-00001 → INV-2026-00002"
+    },
+    {
+      "module": "H2 Invoice seq",
+      "check": "Concurrent invoice numbers unique",
+      "status": "pass",
+      "detail": "INV-2026-00007, INV-2026-00003, INV-2026-00004, INV-2026-00005, INV-2026-00006"
+    },
+    {
+      "module": "H3 Dist lock",
+      "check": "Billing job uses withDistributedLock",
+      "status": "pass",
+      "detail": "wired in index.ts + distributed-lock.ts"
+    },
+    {
+      "module": "H3 Dist lock",
+      "check": "pg_try_advisory_lock available",
+      "status": "pass",
+      "detail": "first=true second(session)=true"
+    },
+    {
+      "module": "H4 Encrypt",
+      "check": "Integration configure path",
+      "status": "pass",
+      "detail": "direct encrypt path (HTTP returned 400)"
+    },
+    {
+      "module": "H4 Encrypt",
+      "check": "Token stored as enc:v1 ciphertext",
+      "status": "pass",
+      "detail": "enc:v1:7b40401268f1ebaa41df6778:9880c6e1"
+    },
+    {
+      "module": "H4 Encrypt",
+      "check": "Plaintext token not in DB",
+      "status": "pass",
+      "detail": "encrypted"
+    },
+    {
+      "module": "H4 Encrypt",
+      "check": "List integrations masks secrets",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "H5 AI quota",
+      "check": "AI blocked when daily quota exhausted",
+      "status": "pass",
+      "detail": "429 AI_QUOTA_EXCEEDED"
+    },
+    {
+      "module": "H5 AI quota",
+      "check": "AI allowed under quota (not 429)",
+      "status": "pass",
+      "detail": "400 contactId required"
+    },
+    {
+      "module": "H5 AI quota",
+      "check": "AiUsageEvent table records usage",
+      "status": "pass",
+      "detail": "events=0"
+    },
+    {
+      "module": "Billing",
+      "check": "Billing access endpoint",
+      "status": "pass",
+      "detail": "{\"access\":{\"allowed\":true,\"isTrial\":true,\"isLocked\":false,\"planStatus\":\"trial\",\"trialEndsAt\":\"2026-07-22T07:08:58.871Z\","
+    },
+    {
+      "module": "CRM",
+      "check": "Create lead",
+      "status": "pass",
+      "detail": "cmrrgg00g00h0tyh8vebpfcrl"
+    },
+    {
+      "module": "CRM",
+      "check": "Create deal with Decimal value",
+      "status": "pass",
+      "detail": "cmrrgg01500h8tyh841dcssh9"
+    },
+    {
+      "module": "Finance",
+      "check": "Finance dashboard KPIs",
+      "status": "pass",
+      "detail": "keys=currency,kpis,cashFlow,profitAndLoss"
+    },
+    {
+      "module": "Admin",
+      "check": "Revenue dashboard reachable",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "H2 Invoice seq",
+      "check": "SaaS MM-INV number atomic",
+      "status": "pass",
+      "detail": "MM-INV-2026-000005"
+    },
+    {
+      "module": "H2 Invoice seq",
+      "check": "SaaS sequence increment",
+      "status": "pass",
+      "detail": "5"
+    },
+    {
+      "module": "Audit",
+      "check": "money.ts Decimal helpers",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "module": "Audit",
+      "check": "secret-crypto AES-256-GCM",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "module": "Audit",
+      "check": "AI quota middleware on CRM + mentor",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "module": "Audit",
+      "check": "Integration service encrypts on upsert",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "module": "Audit",
+      "check": "AI cost/monthly limits defined",
+      "status": "pass",
+      "detail": ""
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "users": 500,
+  "wallMs": 111619,
+  "freememEnd": 6504230912,
+  "loadavg": [
+    0,
+    0,
+    0
+  ],
+  "endpoints": {
+    "warmup_health": {
+      "count": 1,
+      "ok": 1,
+      "fail": 0,
+      "avgMs": 54,
+      "p95Ms": 54,
+      "maxMs": 54
+    },
+    "health": {
+      "count": 500,
+      "ok": 500,
+      "fail": 0,
+      "avgMs": 25,
+      "p95Ms": 59,
+      "maxMs": 64
+    },
+    "login": {
+      "count": 5,
+      "ok": 5,
+      "fail": 0,
+      "avgMs": 4128,
+      "p95Ms": 4592,
+      "maxMs": 4592
+    },
+    "login_reuse": {
+      "count": 495,
+      "ok": 495,
+      "fail": 0,
+      "avgMs": 360,
+      "p95Ms": 3959,
+      "maxMs": 3979
+    },
+    "auth_me": {
+      "count": 500,
+      "ok": 500,
+      "fail": 0,
+      "avgMs": 9830,
+      "p95Ms": 12318,
+      "maxMs": 12408
+    },
+    "leads_list": {
+      "count": 500,
+      "ok": 500,
+      "fail": 0,
+      "avgMs": 126,
+      "p95Ms": 190,
+      "maxMs": 386
+    },
+    "clients_list": {
+      "count": 500,
+      "ok": 500,
+      "fail": 0,
+      "avgMs": 121,
+      "p95Ms": 159,
+      "maxMs": 198
+    },
+    "lead_create": {
+      "count": 100,
+      "ok": 100,
+      "fail": 0,
+      "avgMs": 167,
+      "p95Ms": 220,
+      "maxMs": 256
+    },
+    "deals_list": {
+      "count": 500,
+      "ok": 500,
+      "fail": 0,
+      "avgMs": 111,
+      "p95Ms": 176,
+      "maxMs": 220
+    },
+    "reports": {
+      "count": 500,
+      "ok": 500,
+      "fail": 0,
+      "avgMs": 25,
+      "p95Ms": 43,
+      "maxMs": 55
+    },
+    "search": {
+      "count": 500,
+      "ok": 500,
+      "fail": 0,
+      "avgMs": 155,
+      "p95Ms": 224,
+      "maxMs": 229
+    },
+    "ai_mentor": {
+      "count": 20,
+      "ok": 20,
+      "fail": 0,
+      "avgMs": 244,
+      "p95Ms": 569,
+      "maxMs": 585
+    },
+    "export_contacts": {
+      "count": 25,
+      "ok": 25,
+      "fail": 0,
+      "avgMs": 33,
+      "p95Ms": 57,
+      "maxMs": 60
+    }
+  },
+  "totals": {
+    "requests": 4146,
+    "ok": 4146,
+    "fail": 0,
+    "errorRate": 0,
+    "avgMs": 1307,
+    "p95Ms": 9467
+  },
+  "errorSample": [],
+  "startedAt": "2026-07-16T16:28:17.160Z",
+  "finishedAt": "2026-07-16T16:30:08.830Z"
+}

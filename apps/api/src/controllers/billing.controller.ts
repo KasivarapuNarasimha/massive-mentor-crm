@@ -1,0 +1,177 @@
+import { Response, Request } from "express";
+import type { AuthenticatedRequest } from "@/middleware/auth";
+import * as billing from "@/services/saas-billing.service";
+import { evaluateBillingAccess } from "@/services/billing-access.service";
+import { listActivePlans } from "@/services/subscription-plan.service";
+import { processRazorpayWebhook } from "@/services/billing-webhook.service";
+import { validateCoupon } from "@/services/billing-coupon.service";
+import { prisma } from "@/lib/prisma";
+import fs from "node:fs";
+
+export async function getAccess(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const access = await evaluateBillingAccess(req.user.id);
+    res.json({ success: true, data: { access } });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
+  }
+}
+
+export async function getOverview(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const data = await billing.getBillingOverview(req.user.id);
+    res.json({ success: true, data });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
+  }
+}
+
+export async function listPlans(_req: AuthenticatedRequest, res: Response) {
+  try {
+    const plans = await listActivePlans();
+    res.json({
+      success: true,
+      data: {
+        plans,
+        razorpayKeyId: billing.getRazorpayPublicKey(),
+        razorpayEnabled: billing.razorpayConfigured(),
+      },
+    });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
+  }
+}
+
+export async function createOrder(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const planCode = String(req.body?.planCode || "");
+    if (!planCode) return res.status(400).json({ success: false, error: "planCode is required" });
+    const purpose = req.body?.purpose as billing.CheckoutPurpose | undefined;
+    const data = await billing.createCheckoutOrder(req.user.id, planCode, {
+      couponCode: req.body?.couponCode ? String(req.body.couponCode) : undefined,
+      purpose: purpose || "checkout",
+      previousPaymentId: req.body?.previousPaymentId
+        ? String(req.body.previousPaymentId)
+        : undefined,
+    });
+    res.status(201).json({ success: true, data });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
+  }
+}
+
+/** Client callback — does not activate; webhook does */
+export async function verifyPayment(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const data = await billing.acknowledgeCheckoutPayment(req.user.id, {
+      razorpay_order_id: String(req.body?.razorpay_order_id || ""),
+      razorpay_payment_id: String(req.body?.razorpay_payment_id || ""),
+      razorpay_signature: String(req.body?.razorpay_signature || ""),
+      paymentId: req.body?.paymentId ? String(req.body.paymentId) : undefined,
+    });
+    res.json({ success: true, data });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Payment verification failed" });
+  }
+}
+
+export async function paymentStatus(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const data = await billing.getPaymentStatus(req.user.id, String(req.params.id));
+    res.json({ success: true, data });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
+  }
+}
+
+export async function retryPayment(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const data = await billing.retryPayment(req.user.id, String(req.body?.paymentId || req.params.id));
+    res.status(201).json({ success: true, data });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
+  }
+}
+
+export async function validateCouponHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const planCode = String(req.body?.planCode || "");
+    const code = String(req.body?.code || "");
+    const plans = await listActivePlans();
+    const plan = plans.find((p) => p.code === planCode);
+    if (!plan) return res.status(400).json({ success: false, error: "Invalid plan" });
+    const data = await validateCoupon({
+      code,
+      planCode,
+      basePrice: plan.price,
+    });
+    res.json({ success: data.ok, data, error: data.error });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
+  }
+}
+
+export async function downloadInvoicePdf(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const { getUserBusinessId } = await import("@/services/field-engine.service");
+    const businessId = await getUserBusinessId(req.user.id);
+    if (!businessId) {
+      return res.status(403).json({ success: false, error: "Business context required" });
+    }
+    const payment = await prisma.billingPayment.findFirst({
+      where: { id: String(req.params.id), businessId },
+    });
+    if (!payment) {
+      return res.status(404).json({ success: false, error: "Invoice not found" });
+    }
+    if (!payment.invoicePdfPath || !fs.existsSync(payment.invoicePdfPath)) {
+      const { generateBillingInvoicePdf } = await import("@/services/billing-invoice-pdf.service");
+      if (payment.status === "paid") {
+        const pdf = await generateBillingInvoicePdf(payment.id);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${pdf.invoiceNumber}.pdf"`
+        );
+        return fs.createReadStream(pdf.absolutePath).pipe(res);
+      }
+      return res.status(404).json({ success: false, error: "Invoice PDF not found" });
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${payment.invoiceNumber || payment.id}.pdf"`
+    );
+    fs.createReadStream(payment.invoicePdfPath).pipe(res);
+  } catch (e) {
+    res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
+  }
+}
+
+/** Raw body webhook — mounted with express.raw */
+export async function razorpayWebhook(req: Request, res: Response) {
+  try {
+    const signature = String(req.headers["x-razorpay-signature"] || "");
+    const rawBody = (req as Request & { body: Buffer | string }).body;
+    const result = await processRazorpayWebhook({
+      rawBody: rawBody || "",
+      signature,
+      headers: req.headers as Record<string, string | string[] | undefined>,
+    });
+    if (!result.ok && result.message === "Invalid webhook signature") {
+      return res.status(400).json({ success: false, error: result.message });
+    }
+    res.json({ success: result.ok, ...result });
+  } catch (e) {
+    console.error("[razorpay webhook]", e);
+    res.status(500).json({ success: false, error: "Webhook error" });
+  }
+}

@@ -1,0 +1,207 @@
+{
+  "version": "1.0.0-rc.1",
+  "date": "2026-07-19T07:11:06.637Z",
+  "base": "http://127.0.0.1:4000",
+  "pass": 33,
+  "fail": 0,
+  "results": [
+    {
+      "module": "Ops",
+      "check": "API health",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "module": "Ops",
+      "check": "Database up",
+      "ok": true,
+      "detail": "up"
+    },
+    {
+      "module": "Ops",
+      "check": "Ready probe",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Security",
+      "check": "Public register blocked",
+      "ok": true,
+      "detail": "403"
+    },
+    {
+      "module": "Auth",
+      "check": "Super Admin login",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Security",
+      "check": "Admin JWT blocked from CRM",
+      "ok": true,
+      "detail": "403"
+    },
+    {
+      "module": "Super Admin",
+      "check": "Platform me",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Onboarding",
+      "check": "Provision customer",
+      "ok": true,
+      "detail": "201"
+    },
+    {
+      "module": "Auth",
+      "check": "Customer login",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Billing",
+      "check": "Trial access allowed",
+      "ok": true,
+      "detail": "days=3 status=trial"
+    },
+    {
+      "module": "Billing",
+      "check": "Trial days ≤ 3",
+      "ok": true,
+      "detail": "3"
+    },
+    {
+      "module": "Billing",
+      "check": "Plans catalog",
+      "ok": true,
+      "detail": "plans=6"
+    },
+    {
+      "module": "Dashboard",
+      "check": "Reports KPIs numeric",
+      "ok": true,
+      "detail": "leads=0 dealValue=0 type=number"
+    },
+    {
+      "module": "Dashboard",
+      "check": "Config dashboard loads",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "CRM",
+      "check": "Create lead",
+      "ok": true,
+      "detail": "cmrrgiodb003ytypwtukzwr99"
+    },
+    {
+      "module": "CRM",
+      "check": "Create client",
+      "ok": true,
+      "detail": "cmrrgiodz0044typw52sx8579"
+    },
+    {
+      "module": "CRM",
+      "check": "Create deal",
+      "ok": true,
+      "detail": "cmrrgioex004ctypwlxphsijk"
+    },
+    {
+      "module": "CRM",
+      "check": "Create task",
+      "ok": true,
+      "detail": "201"
+    },
+    {
+      "module": "CRM",
+      "check": "Create meeting",
+      "ok": true,
+      "detail": "201"
+    },
+    {
+      "module": "CRM",
+      "check": "List leads",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "CRM",
+      "check": "List deals",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Finance",
+      "check": "Finance dashboard",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Finance",
+      "check": "Create invoice Decimal GST",
+      "ok": true,
+      "detail": "total=1180 number=INV-2026-00001"
+    },
+    {
+      "module": "AI",
+      "check": "AI next-action responds (not 500)",
+      "ok": true,
+      "detail": "400 entityType and entityId required"
+    },
+    {
+      "module": "Notifications",
+      "check": "List notifications",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Audit",
+      "check": "Activity timeline",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Team",
+      "check": "Team list",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Settings",
+      "check": "Profile",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Security",
+      "check": "Evil origin request handled",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Security",
+      "check": "Invalid JWT rejected",
+      "ok": true,
+      "detail": "401"
+    },
+    {
+      "module": "Super Admin",
+      "check": "Revenue",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "module": "Auth",
+      "check": "Reject bad password",
+      "ok": true,
+      "detail": "401"
+    },
+    {
+      "module": "Razorpay",
+      "check": "Checkout order create",
+      "ok": true,
+      "detail": "201"
+    }
+  ]
+}

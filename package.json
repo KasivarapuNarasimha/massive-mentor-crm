@@ -1,0 +1,34 @@
+{
+  "name": "massive-mentor",
+  "version": "1.0.0-rc.1",
+  "private": true,
+  "description": "Massive Mentor CRM — AI-powered multi-tenant SaaS (Release Candidate)",
+  "scripts": {
+    "dev": "concurrently -n \"API,WEB\" -c \"cyan,green\" \"pnpm --filter @massivementor/api dev\" \"pnpm --filter @massivementor/web dev\"",
+    "dev:api": "pnpm --filter @massivementor/api dev",
+    "dev:web": "pnpm --filter @massivementor/web dev",
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter @massivementor/api build",
+    "build:web": "pnpm --filter @massivementor/web build",
+    "db:up": "docker-compose up -d",
+    "db:down": "docker-compose down",
+    "db:push": "pnpm --filter @massivementor/api db:push",
+    "db:migrate": "pnpm --filter @massivementor/api db:migrate",
+    "db:seed": "pnpm --filter @massivementor/api db:seed",
+    "db:reset": "pnpm --filter @massivementor/api db:reset",
+    "prisma:generate": "pnpm --filter @massivementor/api prisma:generate",
+    "lint": "pnpm -r lint",
+    "test:rc": "node scripts/rc1-regression.mjs",
+    "test:e2e": "node scripts/prelaunch-e2e.mjs",
+    "test:prod-readiness": "node scripts/prod-readiness-e2e.mjs",
+    "clean": "pnpm -r clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

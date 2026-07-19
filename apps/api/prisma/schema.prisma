@@ -1,0 +1,1495 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  role          String    @default("sales_executive") // business-facing legacy role: admin | manager | sales_executive
+  /// Platform-level role (not business membership). user | super_admin
+  platformRole  String    @default("user")
+  /// Soft-disable: cannot login
+  isDisabled    Boolean   @default(false)
+  /// Incremented on password change — JWT must match or session is revoked
+  tokenVersion  Int       @default(0)
+  /// Enterprise security: last successful login
+  lastLoginAt   DateTime?
+  lastLoginIp   String?
+  /// Password lifecycle (MFA-ready security profile)
+  passwordChangedAt DateTime?
+  /// Future MFA flags — no OTP flow yet; columns reserved for 2FA without redesign
+  mfaEnabled    Boolean   @default(false)
+  mfaEnrolledAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  passwordResetTokens PasswordResetToken[]
+  sessions      UserSession[]
+  loginEvents   LoginEvent[]
+  profile       BusinessProfile?
+  healthScores  HealthScore[]
+  swotAnalyses  SWOTAnalysis[]
+  roadmaps      Roadmap[]
+  chatMessages       ChatMessage[]
+  marketingContents  MarketingContent[]
+
+  // Phase 3 - Core CRM (unified Contact supports Leads + Clients)
+  contacts Contact[]
+  deals    Deal[]
+  tasks    Task[]
+  meetings Meeting[]
+  notes    Note[]
+  documents Document[]
+
+  activities Activity[]
+  notifications Notification[]
+  teamMemberships TeamMember[]
+  integrations Integration[]
+  aiGenerations AiGeneration[]
+  aiRecommendations AiRecommendation[]
+  aiRecommendationActions AiRecommendationAction[]
+
+  // Field sales location tracking
+  locationEvents       LocationEvent[]
+  fieldWorkSessions    FieldWorkSession[]
+  meetingAttendances   MeetingAttendance[]
+  locationLiveState    UserLocationState?
+
+  // AI Business OS — tenancy (Phase 1)
+  ownedBusinesses  Business[]       @relation("BusinessOwner")
+  businessMembers  BusinessMember[]
+  auditLogs        AuditLog[]       @relation("AuditActor")
+
+  invoices         Invoice[]
+  expenses         Expense[]
+  payments         Payment[]
+  whatsappMessages WhatsAppMessage[]
+  approvalRequestsCreated ApprovalRequest[] @relation("ApprovalRequester")
+  approvalActions         ApprovalAction[]
+}
+
+/// Active login sessions (one row per device/browser). JWT carries session id (sid).
+model UserSession {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId      String?
+  /// customer | admin | demo
+  portal          String    @default("customer")
+  /// Human-readable device label (e.g. Chrome on Windows)
+  deviceName      String?
+  browser         String?
+  os              String?
+  userAgent       String?   @db.Text
+  ipAddress       String?
+  /// IP-based approx location (city/region/country when available)
+  locationLabel   String?
+  countryCode     String?
+  createdAt       DateTime  @default(now())
+  lastActivityAt  DateTime  @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  /// logout | force_logout | session_limit | password_change | disabled | expired | takeover
+  revokedReason   String?
+  /// Support-mode / MFA challenge flags (JSON) — future-ready
+  meta            Json?
+
+  @@index([userId, revokedAt])
+  @@index([businessId, revokedAt])
+  @@index([expiresAt])
+  @@index([lastActivityAt])
+}
+
+/// Append-only security login history (not soft-deleted)
+model LoginEvent {
+  id            String   @id @default(cuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  businessId    String?
+  sessionId     String?
+  /// login | logout | failed_login | password_changed | new_device | force_logout | session_limit | mfa_challenge (future)
+  eventType     String
+  success       Boolean  @default(true)
+  ipAddress     String?
+  userAgent     String?  @db.Text
+  deviceName    String?
+  browser       String?
+  os            String?
+  locationLabel String?
+  countryCode   String?
+  /// Extra context (email attempted, reason, actor admin id)
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([businessId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([ipAddress, createdAt])
+}
+
+/// One-time password reset tokens (store hash only — never raw token)
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 hex of the raw token sent by email
+  tokenHash String   @unique
+  /// customer | admin — portal that requested the reset
+  portal    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  requestIp String?
+  userAgent String?
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+model BusinessProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  businessName  String
+  industry      String
+  description   String   @db.Text
+  employeeCount Int?
+  /// ISO 4217 code: INR, USD, EUR, GBP, AED, SAR, SGD, AUD, CAD
+  currency      String   @default("INR")
+  /// Display range for selected currency (e.g. "₹5–₹25 Lakhs" or "$50K - $200K")
+  annualRevenue String?
+  stage         String?
+  targetMarket  String?
+  mainProduct   String?
+  location      String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model HealthScore {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  overallScore  Int
+  breakdown     Json
+  insights      String[]
+  calculatedAt  DateTime @default(now())
+}
+
+model SWOTAnalysis {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  strengths     String[]
+  weaknesses    String[]
+  opportunities String[]
+  threats       String[]
+  summary       String   @db.Text
+  aiModel       String
+  createdAt     DateTime @default(now())
+}
+
+model Roadmap {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title         String
+  days          Json
+  generatedAt   DateTime @default(now())
+  aiModel       String
+}
+
+model ChatMessage {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role          String
+  content       String   @db.Text
+  createdAt     DateTime @default(now())
+}
+
+model MarketingContent {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // User-provided inputs at generation time
+  businessName     String?
+  industry         String?
+  location         String?
+  targetAudience   String?
+  goal             String?
+
+  // Generated content
+  reelIdeas        String[] // 10 reel ideas
+  adCopies         Json     // { facebook: string[], instagram: string[], google: string[] }
+  hashtags         String[] // 20 hashtags
+  marketingPlan    Json     // Week-by-week plan structure
+
+  aiModel          String
+  createdAt        DateTime @default(now())
+}
+
+// =====================================================
+// AI Business OS — Tenancy (Phase 1)
+// Business is the multi-tenant root. Dual-scope period:
+// CRM still filters by userId; businessId is backfilled
+// and attached for future template/config phases.
+// =====================================================
+
+model Business {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String?
+  ownerUserId      String
+  owner            User     @relation("BusinessOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  /// Installed IndustryTemplate (Phase 2)
+  templateId       String?
+  template         IndustryTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateVersion  Int?
+  templateSlug     String?
+  status           String   @default("active") // active | suspended | deleted
+  settings         Json?
+
+  // —— SaaS portal isolation (production multi-portal architecture) ——
+  /// customer = real tenant workspace; demo = product demo only (never mix with customers)
+  portalKind       String   @default("customer") // customer | demo
+  isDemo           Boolean  @default(false)
+  /// trial | starter | professional | enterprise (legacy: basic maps to starter)
+  plan             String   @default("trial")
+  /// trial | active | past_due | cancelled | expired | suspended | locked
+  planStatus       String   @default("trial")
+  trialEndsAt      DateTime?
+  trialStartDate   DateTime?
+  /// Configured trial length (default 3 days per SaaS product rules)
+  trialDays        Int      @default(3)
+  isTrial          Boolean  @default(true)
+  /// Hard lock — CRM blocked until subscribe / Super Admin unlock
+  isLocked         Boolean  @default(false)
+  /// Days after subscriptionEndsAt before hard lock (renewal grace)
+  gracePeriodDays  Int      @default(3)
+  maxUsers         Int      @default(5)
+  ownerPhone       String?
+  gstNumber        String?
+  country          String?  @default("IN")
+  timezone         String?  @default("Asia/Kolkata")
+  address          String?  @db.Text
+  subscriptionEndsAt DateTime?
+  setupFeePaid     Boolean  @default(false)
+  billingEmail     String?
+  /// White-label: { logoUrl, companyName, theme, customDomain, branding }
+  whiteLabel       Json?
+  licenseKey       String?
+  /// trial | active | expired
+  licenseStatus    String   @default("trial")
+  suspendedAt      DateTime?
+  suspendedReason  String?
+  /// Usage counters snapshot (updated by platform jobs)
+  usageSnapshot    Json?
+  lastDemoResetAt  DateTime?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  members   BusinessMember[]
+  config    BusinessConfig?
+  installs  TemplateInstall[]
+  contacts  Contact[]
+  deals     Deal[]
+  tasks     Task[]
+  meetings  Meeting[]
+  auditLogs AuditLog[]
+  locationEvents     LocationEvent[]
+  fieldWorkSessions  FieldWorkSession[]
+  meetingAttendances MeetingAttendance[]
+  locationLiveStates UserLocationState[]
+  platformInvoices   PlatformInvoice[]
+  supportTickets     SupportTicket[]
+  subscriptionEvents SubscriptionEvent[]
+  backups            BackupRecord[]
+  approvalWorkflows  ApprovalWorkflow[]
+  approvalRequests   ApprovalRequest[]
+  subscriptions      Subscription[]
+  billingPayments    BillingPayment[]
+  currentPlanId      String?
+  currentPlan        SubscriptionPlan? @relation(fields: [currentPlanId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId])
+  @@index([status])
+  @@index([templateId])
+  @@index([portalKind])
+  @@index([isDemo])
+  @@index([plan, planStatus])
+  @@index([isLocked, trialEndsAt])
+}
+
+// =====================================================
+// Platform (Super Admin) — customer metadata & ops
+// Separate from customer CRM workspace data access paths.
+// =====================================================
+
+model PlatformInvoice {
+  id            String   @id @default(cuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  number        String
+  kind          String   // setup | subscription | renewal | adjustment
+  amount        Decimal  @db.Decimal(18, 2)
+  currency      String   @default("INR")
+  status        String   @default("open") // open | paid | void | overdue
+  plan          String?
+  periodStart   DateTime?
+  periodEnd     DateTime?
+  paidAt        DateTime?
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([number])
+  @@index([businessId, createdAt])
+  @@index([status])
+}
+
+model SubscriptionEvent {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  actorUserId String?
+  action      String   // activate | upgrade | downgrade | renew | cancel | trial_extend
+  fromPlan    String?
+  toPlan      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, createdAt])
+}
+
+model SupportTicket {
+  id            String   @id @default(cuid())
+  businessId    String?
+  business      Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  subject       String
+  body          String   @db.Text
+  status        String   @default("open") // open | in_progress | resolved | closed
+  priority      String   @default("normal") // low | normal | high | urgent
+  createdByUserId String?
+  assignedToUserId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([businessId])
+}
+
+// =====================================================
+// Phase 2 — Industry Template Engine (configuration-driven)
+// Templates are data packages. No industry-specific code paths.
+// =====================================================
+
+model IndustryTemplate {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  description   String?  @db.Text
+  category      String?  // catalog label only (not used in code switches)
+  version       Int      @default(1)
+  schemaVersion Int      @default(1)
+  isPublished   Boolean  @default(true)
+  isSystem      Boolean  @default(true)
+  isMarketplace Boolean  @default(false)
+  authorName    String?
+  iconUrl       String?
+  screenshots   Json?
+  /// Full IndustryTemplateManifest JSON (modules, fields, pipelines, AI pack, etc.)
+  manifest      Json
+  packageHash   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  businesses Business[]
+  installs   TemplateInstall[]
+
+  @@index([isPublished])
+  @@index([category])
+}
+
+/// Cloned + customized copy of a template for one business
+model BusinessConfig {
+  id              String   @id @default(cuid())
+  businessId      String   @unique
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  schemaVersion   Int      @default(1)
+  version         Int      @default(1) // bump on admin edit
+  modules         Json     @default("[]")
+  fields          Json     @default("[]")
+  pipelines       Json     @default("[]")
+  dashboards      Json     @default("[]")
+  reports         Json     @default("[]")
+  automations     Json     @default("[]")
+  notifications   Json     @default("[]")
+  aiPromptPack    Json     @default("{}")
+  roles           Json     @default("[]")
+  importMappings  Json     @default("[]")
+  /// Role portals: menus, home, dashboards, actions (Phase 6)
+  portals         Json     @default("[]")
+  feedback        Json?
+  plugins         Json?
+  whiteLabelDefaults Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/// Marketplace / onboarding install history
+model TemplateInstall {
+  id               String   @id @default(cuid())
+  businessId       String
+  business         Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  templateId       String
+  template         IndustryTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateVersion  Int
+  source           String   // seed | onboarding | marketplace | import | ensure_default
+  installedByUserId String?
+  createdAt        DateTime @default(now())
+
+  @@index([businessId])
+  @@index([templateId])
+}
+
+model BusinessMember {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Business role key (config-driven later). owner | admin | manager | sales_executive
+  role        String   @default("owner")
+  permissions Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([businessId, userId])
+  @@index([userId])
+}
+
+/// Append-only audit trail (Phase 1: login + tenancy events; expanded later)
+model AuditLog {
+  id          String   @id @default(cuid())
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  actorUserId String?
+  actor       User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action      String   // login | logout | register | create | update | delete | import | export | ai | config_change | ensure_business
+  entityType  String?
+  entityId    String?
+  metadata    Json?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+}
+
+// =====================================================
+// Phase 3: Core CRM Models
+// Unified Contact model supports both Leads and Clients
+// via `type` + flexible `status` for scalability.
+// =====================================================
+
+model Contact {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Tenant scope (nullable during dual-scope migration; backfilled by ensureDefaultBusiness)
+  businessId      String?
+  business        Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  // Unified type for Leads and Clients
+  type            String   @default("lead") // "lead" | "client"
+  // Flexible status for pipeline movement
+  status          String   @default("new")  // e.g. new, contacted, qualified, proposal, won, lost, active, churned
+
+  name            String
+  email           String?
+  phone           String?
+  company         String?
+  source          String?
+  value           Decimal? @db.Decimal(18, 2) // potential or lifetime value
+  description     String?  @db.Text
+  lastContactedAt DateTime?
+
+  // Future-ready fields for AI Business OS (Phase 3+)
+  aiScore         Int?      // 0-100, AI-generated lead/client score
+  priority        String?   // low | medium | high | urgent
+  assignedTo      String?   // userId or team member (for future RBAC)
+  nextFollowUp    DateTime?
+  whatsapp        String?
+  website         String?
+  industry        String?
+  tags            String[]  // simple scalable tagging; can evolve to join table later
+  /// Industry/template custom attributes (Phase 3 FieldEngine). Empty object by default.
+  customFields    Json      @default("{}")
+
+  /// Soft delete (trash). Null = active. Lists exclude non-null by default.
+  deletedAt       DateTime?
+  deletedByUserId String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  deals     Deal[]
+  tasks     Task[]
+  meetings  Meeting[]
+  aiGenerations AiGeneration[]
+  // notes and documents are fetched polymorphically via entityType/entityId (see crm.service)
+
+  @@index([businessId])
+  @@index([userId, type])
+  @@index([deletedAt])
+  @@index([businessId, deletedAt, type])
+  @@index([businessId, status])
+  @@index([businessId, type, status])
+  @@index([assignedTo])
+}
+
+model AiGeneration {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  feature   String   // "whatsapp" | "email" | "proposal" | ...
+  tone      String?
+  language  String?
+  content   String   @db.Text
+  metadata  Json?
+
+  createdAt DateTime @default(now())
+}
+
+/// Persistent AI Follow-up Engine recommendations (not ephemeral insights)
+model AiRecommendation {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId   String?
+
+  /// contact | deal
+  entityType   String
+  entityId     String
+  contactId    String?
+  dealId       String?
+
+  /// call | whatsapp | email | proposal | meeting | wait | high_priority | overdue | close_opportunity
+  actionType   String
+  /// Stable key so we do not re-spam the same advice after completion
+  reasonCode   String
+  fingerprint  String
+
+  title        String
+  reason       String   @db.Text
+  /// high | medium | low
+  priority     String   @default("medium")
+  /// red | yellow | green
+  urgency      String   @default("yellow")
+  confidence   Float?
+  /// Sort weight (higher = more urgent)
+  rankScore    Int      @default(0)
+
+  /// active | completed | dismissed | expired | superseded
+  status       String   @default("active")
+
+  metadata     Json?
+  notifiedAt   DateTime?
+  completedAt  DateTime?
+  dismissedAt  DateTime?
+  expiresAt    DateTime?
+  lastSignalAt DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  actions      AiRecommendationAction[]
+
+  @@unique([userId, fingerprint])
+  @@index([userId, status, rankScore])
+  @@index([userId, contactId, status])
+  @@index([userId, entityType, entityId, status])
+  @@index([userId, actionType, status])
+}
+
+/// History of user responses to AI recommendations
+model AiRecommendationAction {
+  id               String   @id @default(cuid())
+  recommendationId String
+  recommendation   AiRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// call | whatsapp | email | proposal | meeting | dismiss | complete | snooze
+  actionTaken      String
+  notes            String?
+  createdAt        DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([recommendationId])
+}
+
+model Deal {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  businessId    String?
+  business      Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  contactId     String?
+  contact       Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  title         String
+  value         Decimal? @db.Decimal(18, 2)
+  stage         String   @default("lead") // lead, qualified, proposal, negotiation, closed_won, closed_lost
+  expectedClose DateTime?
+  probability   Int?     // 0-100 for AI forecasting
+  notes         String?  @db.Text
+  customFields  Json     @default("{}")
+
+  tasks    Task[]
+  meetings Meeting[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([businessId, stage])
+  @@index([contactId])
+  @@index([userId, stage])
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String?
+  dueDate     DateTime?
+  status      String   @default("todo") // todo, in_progress, done
+  priority    String?  // low, medium, high
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([businessId, status])
+  @@index([userId, status])
+  @@index([dueDate])
+}
+
+model Meeting {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  contactId   String?
+  contact     Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  dealId      String?
+  deal        Deal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  title       String
+  scheduledAt DateTime
+  durationMin Int?
+  notes       String?  @db.Text
+  outcome     String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attendances MeetingAttendance[]
+
+  @@index([businessId])
+}
+
+// =====================================================
+// Field Sales Location Tracking
+// Precise GPS only when browser grants permission.
+// IP fallback stores city/state/country only — never fabricated locality.
+// =====================================================
+
+/// Immutable audit trail of location-related events
+model LocationEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId String?
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  /// login | logout | field_start | field_end | meeting_checkin | meeting_checkout | heartbeat
+  eventType  String
+  recordedAt DateTime @default(now())
+
+  /// Precise coordinates — only when source=gps
+  latitude   Float?
+  longitude  Float?
+  accuracyM  Float?
+  /// gps | ip | unknown
+  source     String   @default("unknown")
+
+  fullAddress String?  @db.Text
+  /// Area/locality — only from reverse-geocode of GPS (never from IP)
+  locality    String?
+  city        String?
+  state       String?
+  country     String?
+
+  publicIp    String?
+  userAgent   String?  @db.Text
+  browser     String?
+  device      String?
+  os          String?
+
+  meetingId       String?
+  fieldSessionId  String?
+  fieldSession    FieldWorkSession? @relation(fields: [fieldSessionId], references: [id], onDelete: SetNull)
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, recordedAt])
+  @@index([businessId, recordedAt])
+  @@index([businessId, eventType, recordedAt])
+  @@index([meetingId])
+  @@index([fieldSessionId])
+}
+
+/// Open/closed field work day session
+model FieldWorkSession {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId String?
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  /// active | ended
+  status     String   @default("active")
+  startedAt  DateTime @default(now())
+  endedAt    DateTime?
+
+  startLat      Float?
+  startLng      Float?
+  startLocality String?
+  startAddress  String?  @db.Text
+  startSource   String?
+
+  endLat      Float?
+  endLng      Float?
+  endLocality String?
+  endAddress  String?  @db.Text
+  endSource   String?
+
+  /// Haversine km between start/end when both GPS
+  distanceKm Float?
+
+  events LocationEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([businessId, startedAt])
+}
+
+/// Per-meeting check-in / check-out for a user
+model MeetingAttendance {
+  id         String   @id @default(cuid())
+  meetingId  String
+  meeting    Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId String?
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  checkInAt       DateTime?
+  checkInLat      Float?
+  checkInLng      Float?
+  checkInLocality String?
+  checkInAddress  String?  @db.Text
+  checkInSource   String?
+
+  checkOutAt       DateTime?
+  checkOutLat      Float?
+  checkOutLng      Float?
+  checkOutLocality String?
+  checkOutAddress  String?  @db.Text
+  checkOutSource   String?
+
+  durationMin Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([meetingId, userId])
+  @@index([userId, checkInAt])
+  @@index([businessId, checkInAt])
+}
+
+/// Live snapshot for team map widget (one row per user)
+model UserLocationState {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessId String?
+  business   Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  /// online | in_field | meeting | offline
+  status          String   @default("offline")
+  lastEventType   String?
+  lastLocality    String?
+  lastCity        String?
+  lastState       String?
+  lastCountry     String?
+  lastFullAddress String?  @db.Text
+  lastLat         Float?
+  lastLng         Float?
+  /// gps | ip | unknown
+  lastSource      String?
+  lastUpdatedAt   DateTime @default(now())
+
+  activeFieldSessionId String?
+  activeMeetingId      String?
+
+  @@index([businessId, status])
+  @@index([businessId, lastUpdatedAt])
+}
+
+model Note {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Polymorphic attachment - queried via entityType + entityId in service layer
+  entityType  String   // "contact" | "deal" | "meeting" | ...
+  entityId    String
+  content     String   @db.Text
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, entityType, entityId])
+  @@index([entityType, entityId])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Polymorphic attachment - queried via entityType + entityId
+  entityType  String?  // optional attachment to any entity
+  entityId    String?
+  title       String
+  url         String?  // external link or future storage key
+  mimeType    String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+}
+
+// =====================================================
+// Batch 5: Automation, Integrations, Team, Reports, Activity
+// =====================================================
+
+model Activity {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  entityType  String   // "contact" | "deal" | "task" | ...
+  entityId    String
+  action      String   // "created" | "updated" | "email_sent" | "whatsapp_sent" | ...
+  details     Json?    // e.g. { "oldStatus": "...", "newStatus": "..." }
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        String   // "reminder" | "activity" | "integration"
+  title       String
+  message     String
+  entityType  String?
+  entityId    String?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Integration {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider    String   // "whatsapp" | "gmail" | "google_calendar"
+  config      Json     // tokens etc. (never return secrets to non-admin clients)
+  isActive    Boolean  @default(true)
+  /// Last successful credential validation timestamp
+  lastValidatedAt DateTime?
+  /// Connected | not_connected | error
+  status      String   @default("not_connected")
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     TeamMember[]
+}
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  teamId      String
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String   // "admin" | "manager" | "sales_executive"
+  createdAt   DateTime @default(now())
+
+  @@unique([teamId, userId])
+}
+
+// =====================================================
+// Phase 4 — Finance (production)
+// =====================================================
+
+model Invoice {
+  id          String    @id @default(cuid())
+  businessId  String
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  number      String
+  contactId   String?
+  clientName  String?
+  description String?   @db.Text
+  amount      Decimal  @db.Decimal(18, 2)
+  taxRate     Decimal  @default(0) @db.Decimal(8, 4)
+  taxAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  total       Decimal  @db.Decimal(18, 2)
+  currency    String    @default("INR")
+  status      String    @default("draft") // draft | sent | paid | overdue | cancelled
+  issueDate   DateTime  @default(now())
+  dueDate     DateTime?
+  paidAt      DateTime?
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  payments    Payment[]
+
+  @@unique([businessId, number])
+  @@index([businessId, status])
+  @@index([userId])
+  @@index([dueDate])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  businessId  String
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  category    String   @default("general")
+  amount      Decimal  @db.Decimal(18, 2)
+  taxAmount   Decimal  @default(0) @db.Decimal(18, 2)
+  total       Decimal  @db.Decimal(18, 2)
+  currency    String   @default("INR")
+  expenseDate DateTime @default(now())
+  vendor      String?
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([businessId, expenseDate])
+  @@index([userId])
+  @@index([category])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  businessId  String
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoiceId   String?
+  invoice     Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  amount      Decimal  @db.Decimal(18, 2)
+  method      String   @default("bank") // bank | cash | upi | card | other
+  reference   String?
+  paidAt      DateTime @default(now())
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, paidAt])
+  @@index([invoiceId])
+  @@index([userId])
+}
+
+/// WhatsApp Cloud API conversation history (real send + inbound)
+model WhatsAppMessage {
+  id            String   @id @default(cuid())
+  businessId    String?
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contactId     String?
+  to            String
+  from          String?
+  body          String   @db.Text
+  direction     String   // outbound | inbound
+  status        String   @default("queued") // queued | sent | delivered | read | failed
+  waMessageId   String?
+  templateName  String?
+  error         String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([contactId, createdAt])
+  @@index([waMessageId])
+  @@index([businessId, createdAt])
+}
+
+// =====================================================
+// Enterprise Backup & Restore
+// =====================================================
+
+/// Encrypted backup artifact metadata (file stored on disk under BACKUP_DIR)
+model BackupRecord {
+  id               String   @id @default(cuid())
+  /// full | business
+  type             String
+  /// Set when type=business
+  businessId       String?
+  business         Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  /// pending | running | completed | failed | verified | deleted
+  status           String   @default("pending")
+  /// manual | daily | weekly | monthly | schedule
+  trigger          String   @default("manual")
+  fileName         String?
+  /// Relative path under backup root (never expose absolute path to non-admin)
+  storageKey       String?
+  sizeBytes        BigInt   @default(0)
+  /// SHA-256 of ciphertext (or plaintext if unencrypted)
+  checksumSha256   String?
+  encrypted        Boolean  @default(true)
+  /// AES-256-GCM IV (hex)
+  encryptionIv     String?
+  /// AES-256-GCM auth tag (hex)
+  encryptionTag    String?
+  compression      String   @default("gzip")
+  /// 0–100
+  progress         Int      @default(0)
+  rowCounts        Json?
+  errorMessage     String?  @db.Text
+  verifiedAt       DateTime?
+  verificationOk   Boolean?
+  createdByUserId  String?
+  /// For failure notifications
+  notifyEmail      String?
+  expiresAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  restores BackupRestoreRecord[]
+
+  @@index([type, status, createdAt])
+  @@index([businessId, createdAt])
+  @@index([trigger, createdAt])
+  @@index([status, createdAt])
+}
+
+model BackupRestoreRecord {
+  id                    String   @id @default(cuid())
+  backupId              String
+  backup                BackupRecord @relation(fields: [backupId], references: [id], onDelete: Cascade)
+  /// pending_confirm | running | completed | failed | cancelled
+  status                String   @default("pending_confirm")
+  /// full | business
+  scope                 String
+  businessId            String?
+  /// One-time confirmation token (hashed)
+  confirmationTokenHash String?
+  confirmationExpiresAt DateTime?
+  confirmedAt           DateTime?
+  verifiedBeforeRestore Boolean  @default(false)
+  progress              Int      @default(0)
+  actorUserId           String?
+  errorMessage          String?  @db.Text
+  startedAt             DateTime?
+  completedAt           DateTime?
+  metadata              Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([backupId, createdAt])
+  @@index([status, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+/// Automatic backup cadence (Super Admin managed)
+model BackupSchedule {
+  id            String   @id @default(cuid())
+  /// daily | weekly | monthly
+  cadence       String
+  enabled       Boolean  @default(true)
+  /// 0–23 UTC
+  hourUtc       Int      @default(2)
+  /// 0–6 for weekly (Sun=0)
+  dayOfWeek     Int?
+  /// 1–28 for monthly
+  dayOfMonth    Int?
+  /// full | business_all (each customer business)
+  backupType    String   @default("full")
+  retentionDays Int      @default(30)
+  lastRunAt     DateTime?
+  nextRunAt     DateTime?
+  lastError     String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([cadence])
+  @@index([enabled, nextRunAt])
+}
+
+// =====================================================
+// Approval Workflow Engine (enterprise multi-level)
+// Types: discount | proposal | invoice | expense | leave | purchase | custom
+// Status: pending | approved | rejected | cancelled
+// =====================================================
+
+model ApprovalWorkflow {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  /// discount | proposal | invoice | expense | leave | purchase | custom
+  type        String
+  name        String
+  description String?  @db.Text
+  enabled     Boolean  @default(true)
+  /// e.g. { minAmount: 10000, currency: "INR", stages: ["proposal"] }
+  rules       Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  steps    ApprovalStepDef[]
+  requests ApprovalRequest[]
+
+  @@unique([businessId, type, name])
+  @@index([businessId, type, enabled])
+}
+
+/// Ordered approval levels for a workflow (multi-level)
+model ApprovalStepDef {
+  id          String   @id @default(cuid())
+  workflowId  String
+  workflow    ApprovalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  /// 1-based level order
+  level       Int
+  name        String?
+  /// Approver role (business_admin, finance, manager, ceo, …) OR empty if userId set
+  approverRole String?
+  /// Specific approver user (optional override)
+  approverUserId String?
+  /// all = every approver at level must approve; any = first approval advances
+  mode        String   @default("any")
+  createdAt   DateTime @default(now())
+
+  @@unique([workflowId, level])
+  @@index([workflowId])
+}
+
+model ApprovalRequest {
+  id             String   @id @default(cuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  workflowId     String?
+  workflow       ApprovalWorkflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  /// discount | proposal | invoice | expense | leave | purchase | custom
+  type           String
+  /// Linked CRM entity (invoice, expense, deal, …)
+  entityType     String?
+  entityId       String?
+  title          String
+  description    String?  @db.Text
+  /// Amount threshold context (optional)
+  amount         Decimal? @db.Decimal(18, 2)
+  currency       String?  @default("INR")
+  /// pending | approved | rejected | cancelled
+  status         String   @default("pending")
+  currentLevel   Int      @default(1)
+  maxLevel       Int      @default(1)
+  requestedById  String
+  requestedBy    User     @relation("ApprovalRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  metadata       Json?
+  decidedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  actions ApprovalAction[]
+
+  @@index([businessId, status, createdAt])
+  @@index([businessId, type, status])
+  @@index([requestedById, createdAt])
+  @@index([entityType, entityId])
+}
+
+model ApprovalAction {
+  id          String   @id @default(cuid())
+  requestId   String
+  request     ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorUserId String
+  actor       User     @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+  level       Int
+  /// submit | approve | reject | cancel | comment
+  action      String
+  comment     String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  @@index([requestId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+// =====================================================
+// SaaS Billing — Subscription Plans, Subscriptions, Payments (Razorpay)
+// Separate from CRM finance Payment (customer invoices inside a tenant).
+// =====================================================
+
+model SubscriptionPlan {
+  id            String   @id @default(cuid())
+  /// starter_monthly | starter_annual | professional_monthly | ...
+  code          String   @unique
+  name          String
+  description   String?  @db.Text
+  /// monthly | annual
+  billingCycle  String
+  price         Decimal  @db.Decimal(18, 2)
+  currency      String   @default("INR")
+  maxUsers      Int      @default(5)
+  storageGb     Int      @default(5)
+  /// Feature flags / bullet list for UI
+  features      Json     @default("[]")
+  displayOrder  Int      @default(0)
+  /// active | archived
+  status        String   @default("active")
+  razorpayPlanId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions Subscription[]
+  payments      BillingPayment[]
+  businesses    Business[]
+
+  @@index([status, displayOrder])
+  @@index([billingCycle])
+}
+
+model Subscription {
+  id             String   @id @default(cuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  planId         String?
+  plan           SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  /// trial | active | past_due | expired | cancelled | suspended
+  status         String   @default("trial")
+  startDate      DateTime @default(now())
+  endDate        DateTime?
+  renewalDate    DateTime?
+  autoRenew      Boolean  @default(false)
+  paymentId      String?
+  createdById    String?
+  trialStartDate DateTime?
+  trialEndDate   DateTime?
+  notes          String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  payments BillingPayment[]
+
+  @@index([businessId, status])
+  @@index([endDate])
+  @@index([trialEndDate])
+}
+
+/// SaaS / Razorpay payments (platform billing) — not CRM client invoice payments
+model BillingPayment {
+  id                 String   @id @default(cuid())
+  businessId         String
+  business           Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId             String?
+  planId             String?
+  plan               SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  subscriptionId     String?
+  subscription       Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  couponId           String?
+  coupon             BillingCoupon? @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  /// monthly | annual
+  billingCycle       String?
+  /// Total charged (incl. GST)
+  amount             Decimal  @db.Decimal(18, 2)
+  gst                Decimal  @default(0) @db.Decimal(18, 2)
+  discountAmount     Decimal  @default(0) @db.Decimal(18, 2)
+  currency           String   @default("INR")
+  razorpayOrderId    String?
+  razorpayPaymentId  String?  @unique
+  razorpaySignature  String?
+  invoiceNumber      String?
+  invoiceUrl         String?
+  /// Relative path under BACKUP_DIR/invoices or absolute
+  invoicePdfPath     String?
+  /// created | authorized | paid | failed | refunded | cancelled
+  status             String   @default("created")
+  /// checkout | upgrade | downgrade | renewal | retry
+  purpose            String   @default("checkout")
+  metadata           Json?
+  paidAt             DateTime?
+  activatedAt        DateTime?
+  /// Source of truth for activation: webhook | admin | system
+  activatedBy        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([invoiceNumber])
+  @@index([businessId, createdAt])
+  @@index([razorpayOrderId])
+  @@index([status])
+}
+
+/// Idempotent Razorpay webhook processing
+model RazorpayWebhookEvent {
+  id            String   @id @default(cuid())
+  /// Razorpay event id (x-razorpay-event-id) or hash of body
+  eventId       String   @unique
+  eventType     String
+  payload       Json
+  processed     Boolean  @default(false)
+  processedAt   DateTime?
+  result        String?
+  error         String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([processed, createdAt])
+}
+
+/// Discount coupons (percentage or flat)
+model BillingCoupon {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  /// percent | flat
+  discountType    String
+  discountValue   Decimal  @db.Decimal(18, 4)
+  currency        String   @default("INR")
+  maxUses         Int?
+  usedCount       Int      @default(0)
+  minAmount       Decimal? @db.Decimal(18, 2)
+  /// Optional plan codes JSON array
+  applicablePlans Json?
+  expiresAt       DateTime?
+  /// active | disabled
+  status          String   @default("active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  payments    BillingPayment[]
+  redemptions CouponRedemption[]
+
+  @@index([status, expiresAt])
+}
+
+model CouponRedemption {
+  id         String   @id @default(cuid())
+  couponId   String
+  coupon     BillingCoupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  businessId String
+  paymentId  String?
+  userId     String?
+  createdAt  DateTime @default(now())
+
+  @@index([couponId, createdAt])
+  @@index([businessId])
+}
+
+/// Atomic counters for finance + SaaS invoice numbers (globally unique keys)
+model InvoiceSequence {
+  id         String   @id @default(cuid())
+  /// e.g. finance:{businessId}:2026 | saas:global:2026
+  key        String   @unique
+  prefix     String
+  lastValue  Int      @default(0)
+  businessId String?
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@index([businessId])
+}
+
+/// Per-request AI usage for quotas / cost control (business-scoped)
+model AiUsageEvent {
+  id         String   @id @default(cuid())
+  businessId String?
+  userId     String
+  /// mentor | lead_score | proposal | forecast | meeting_summary | ...
+  feature    String
+  tokens     Int      @default(0)
+  costUsd    Decimal  @default(0) @db.Decimal(12, 6)
+  model      String?
+  success    Boolean  @default(true)
+  /// YYYY-MM-DD for daily rollups
+  dayKey     String
+  /// YYYY-MM for monthly rollups
+  monthKey   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([businessId, dayKey])
+  @@index([businessId, monthKey])
+  @@index([userId, dayKey])
+  @@index([feature, createdAt])
+}

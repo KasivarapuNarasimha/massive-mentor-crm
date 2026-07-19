@@ -1,0 +1,360 @@
+{
+  "at": "2026-07-19T07:09:09.422Z",
+  "base": "http://127.0.0.1:4000",
+  "summary": {
+    "pass": 58,
+    "fail": 0,
+    "warn": 0,
+    "total": 58
+  },
+  "results": [
+    {
+      "module": "Database",
+      "check": "API /health",
+      "status": "pass",
+      "detail": "ok"
+    },
+    {
+      "module": "Database",
+      "check": "DB connectivity",
+      "status": "pass",
+      "detail": "up"
+    },
+    {
+      "module": "Email/SMTP",
+      "check": "SMTP configured",
+      "status": "pass",
+      "detail": "{\"configured\":true,\"host\":\"smtp.hostinger.com\",\"port\":465,\"secure\":true,\"user\":\"te***@massivementor.in\",\"from\":\"Massive Mentor <team@massivementor.in>\"}"
+    },
+    {
+      "module": "APIs",
+      "check": "/ready",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "module": "Authentication",
+      "check": "Demo login",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Authentication",
+      "check": "Reject bad password",
+      "status": "pass",
+      "detail": "401"
+    },
+    {
+      "module": "Super Admin Portal",
+      "check": "Platform login",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Multi-tenant isolation",
+      "check": "Admin JWT blocked from CRM",
+      "status": "pass",
+      "detail": "403"
+    },
+    {
+      "module": "Super Admin Portal",
+      "check": "/platform/auth/me",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Multi-tenant isolation",
+      "check": "Customer JWT blocked from platform",
+      "status": "pass",
+      "detail": "401"
+    },
+    {
+      "module": "Security",
+      "check": "CRM requires auth",
+      "status": "pass",
+      "detail": "401"
+    },
+    {
+      "module": "Customer Portal",
+      "check": "GET /auth/me",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Demo Portal",
+      "check": "GET /portal/current",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Leads",
+      "check": "List leads",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Leads",
+      "check": "Create lead",
+      "status": "pass",
+      "detail": "201 "
+    },
+    {
+      "module": "Leads",
+      "check": "Get lead by id",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Leads",
+      "check": "Update lead",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Clients",
+      "check": "List clients",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Deals",
+      "check": "List deals",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Deals",
+      "check": "Create deal",
+      "status": "pass",
+      "detail": "201 "
+    },
+    {
+      "module": "Tasks",
+      "check": "List tasks",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Tasks",
+      "check": "Create task",
+      "status": "pass",
+      "detail": "201 "
+    },
+    {
+      "module": "Meetings",
+      "check": "List meetings",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Meetings",
+      "check": "Create meeting",
+      "status": "pass",
+      "detail": "201 "
+    },
+    {
+      "module": "Finance",
+      "check": "Dashboard",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Finance",
+      "check": "List invoices",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Finance",
+      "check": "List expenses",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Reports",
+      "check": "Dashboard",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Notifications",
+      "check": "List notifications",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Notifications",
+      "check": "Activity feed",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "AI Modules",
+      "check": "AI test endpoint",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "AI Modules",
+      "check": "Mentor chat",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "AI Sales Intelligence",
+      "check": "Next action",
+      "status": "pass",
+      "detail": "400"
+    },
+    {
+      "module": "AI Follow-up",
+      "check": "Generate follow-up",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Field Sales Tracking",
+      "check": "GET /location/me",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "GPS",
+      "check": "Post location event",
+      "status": "pass",
+      "detail": "200 "
+    },
+    {
+      "module": "Field Sales Tracking",
+      "check": "Live locations",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Role Permissions",
+      "check": "List teams",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Role Permissions",
+      "check": "Get role",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "White Label",
+      "check": "Business current",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Backup & Restore",
+      "check": "Tenant list backups",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "APIs",
+      "check": "Contact search",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Security",
+      "check": "Contact IDOR (missing id)",
+      "status": "pass",
+      "detail": "404"
+    },
+    {
+      "module": "Security",
+      "check": "Team IDOR blocked",
+      "status": "pass",
+      "detail": "400"
+    },
+    {
+      "module": "Super Admin Portal",
+      "check": "List businesses",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Billing",
+      "check": "Analytics/usage surface",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Billing",
+      "check": "Platform invoices",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Billing",
+      "check": "Licenses",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Super Admin Portal",
+      "check": "Platform health",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Security",
+      "check": "Audit log",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Backup & Restore",
+      "check": "List platform backups",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Backup & Restore",
+      "check": "Backup schedules",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "White Label",
+      "check": "Update white-label",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Security",
+      "check": "X-Frame-Options",
+      "status": "pass",
+      "detail": "DENY"
+    },
+    {
+      "module": "Security",
+      "check": "X-Content-Type-Options",
+      "status": "pass",
+      "detail": "nosniff"
+    },
+    {
+      "module": "Security",
+      "check": "Invalid JWT",
+      "status": "pass",
+      "detail": "401"
+    },
+    {
+      "module": "Authentication",
+      "check": "Forgot password anti-enumeration",
+      "status": "pass",
+      "detail": "200"
+    },
+    {
+      "module": "Security",
+      "check": "CORS rejects evil origin",
+      "status": "pass",
+      "detail": "null"
+    }
+  ]
+}

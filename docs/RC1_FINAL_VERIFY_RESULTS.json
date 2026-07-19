@@ -1,0 +1,365 @@
+{
+  "version": "1.0.0-rc.1",
+  "date": "2026-07-19T07:14:52.457Z",
+  "base": "http://127.0.0.1:4000",
+  "pass": 50,
+  "fail": 0,
+  "findings": {
+    "critical": [],
+    "high": [],
+    "medium": [],
+    "low": []
+  },
+  "results": [
+    {
+      "area": "Ops",
+      "check": "API health",
+      "ok": true,
+      "severity": "critical",
+      "detail": "ok"
+    },
+    {
+      "area": "Ops",
+      "check": "Database up",
+      "ok": true,
+      "severity": "critical",
+      "detail": "up"
+    },
+    {
+      "area": "Auth",
+      "check": "Super Admin login",
+      "ok": true,
+      "severity": "critical",
+      "detail": "200"
+    },
+    {
+      "area": "Auth",
+      "check": "Super Admin rejects bad password",
+      "ok": true,
+      "severity": "high",
+      "detail": "401"
+    },
+    {
+      "area": "Auth",
+      "check": "Forgot password customer anti-enumeration",
+      "ok": true,
+      "severity": "high",
+      "detail": "200"
+    },
+    {
+      "area": "Auth",
+      "check": "Forgot password Super Admin",
+      "ok": true,
+      "severity": "medium",
+      "detail": "200"
+    },
+    {
+      "area": "Auth",
+      "check": "Session expiry / invalid JWT rejected",
+      "ok": true,
+      "severity": "critical",
+      "detail": "401"
+    },
+    {
+      "area": "Onboarding",
+      "check": "Create customer",
+      "ok": true,
+      "severity": "critical",
+      "detail": "cmrrgneuc00e9typwlay9j3cp"
+    },
+    {
+      "area": "Onboarding",
+      "check": "Login with provisioned password",
+      "ok": true,
+      "severity": "critical",
+      "detail": "200"
+    },
+    {
+      "area": "Onboarding",
+      "check": "Trial start (isTrial + allowed)",
+      "ok": true,
+      "severity": "critical",
+      "detail": "days=3 status=trial"
+    },
+    {
+      "area": "Onboarding",
+      "check": "Trial countdown ≤ 3 days",
+      "ok": true,
+      "severity": "high",
+      "detail": "3"
+    },
+    {
+      "area": "Onboarding",
+      "check": "Welcome path (provision success implies email attempted)",
+      "ok": true,
+      "severity": "medium",
+      "detail": "SMTP delivery not asserted in automated verify"
+    },
+    {
+      "area": "CRM",
+      "check": "Lead create",
+      "ok": true,
+      "severity": "critical",
+      "detail": "cmrrgnfhw00fctypwykudpo7m"
+    },
+    {
+      "area": "CRM",
+      "check": "Client create",
+      "ok": true,
+      "severity": "critical",
+      "detail": "cmrrgnfig00fktypw6cf2qxz1"
+    },
+    {
+      "area": "CRM",
+      "check": "Deal create",
+      "ok": true,
+      "severity": "critical",
+      "detail": "cmrrgnfiy00fqtypwzicws661"
+    },
+    {
+      "area": "CRM",
+      "check": "Task create",
+      "ok": true,
+      "severity": "high",
+      "detail": "201"
+    },
+    {
+      "area": "CRM",
+      "check": "Meeting create",
+      "ok": true,
+      "severity": "high",
+      "detail": "201"
+    },
+    {
+      "area": "CRM",
+      "check": "Notes create",
+      "ok": true,
+      "severity": "medium",
+      "detail": "201"
+    },
+    {
+      "area": "CRM",
+      "check": "Documents create",
+      "ok": true,
+      "severity": "medium",
+      "detail": "201"
+    },
+    {
+      "area": "CRM",
+      "check": "List leads",
+      "ok": true,
+      "severity": "high",
+      "detail": ""
+    },
+    {
+      "area": "CRM",
+      "check": "List deals",
+      "ok": true,
+      "severity": "high",
+      "detail": ""
+    },
+    {
+      "area": "AI",
+      "check": "Proposal Generator",
+      "ok": true,
+      "severity": "high",
+      "detail": "200 "
+    },
+    {
+      "area": "AI",
+      "check": "SWOT endpoint",
+      "ok": true,
+      "severity": "high",
+      "detail": "200"
+    },
+    {
+      "area": "AI",
+      "check": "Sales Forecast",
+      "ok": true,
+      "severity": "high",
+      "detail": "200 "
+    },
+    {
+      "area": "AI",
+      "check": "Next Best Action",
+      "ok": true,
+      "severity": "high",
+      "detail": "200 "
+    },
+    {
+      "area": "AI",
+      "check": "Marketing AI",
+      "ok": true,
+      "severity": "high",
+      "detail": "400 Missing required fields: businessName, industry, targetAudience, and goal ar"
+    },
+    {
+      "area": "Finance",
+      "check": "Dashboard",
+      "ok": true,
+      "severity": "high",
+      "detail": "200"
+    },
+    {
+      "area": "Finance",
+      "check": "Invoice create",
+      "ok": true,
+      "severity": "high",
+      "detail": "total=2360"
+    },
+    {
+      "area": "Finance",
+      "check": "Expense create",
+      "ok": true,
+      "severity": "high",
+      "detail": "201"
+    },
+    {
+      "area": "Finance",
+      "check": "Income/payment against invoice",
+      "ok": true,
+      "severity": "high",
+      "detail": "201"
+    },
+    {
+      "area": "Reports",
+      "check": "Dashboard KPIs",
+      "ok": true,
+      "severity": "high",
+      "detail": "leads=1 deals=1"
+    },
+    {
+      "area": "Billing",
+      "check": "Billing page overview",
+      "ok": true,
+      "severity": "critical",
+      "detail": "plans=6"
+    },
+    {
+      "area": "Billing",
+      "check": "Plans available for upgrade",
+      "ok": true,
+      "severity": "high",
+      "detail": "6"
+    },
+    {
+      "area": "Billing",
+      "check": "Trial countdown present",
+      "ok": true,
+      "severity": "high",
+      "detail": "3"
+    },
+    {
+      "area": "Billing",
+      "check": "Razorpay checkout order",
+      "ok": true,
+      "severity": "critical",
+      "detail": "order=order_TFH7E1ZJHZJbmg"
+    },
+    {
+      "area": "Billing",
+      "check": "Payment status endpoint",
+      "ok": true,
+      "severity": "high",
+      "detail": "{\"id\":\"cmrrgnh5a00hwtypwv018s4cq\",\"status\":\"created\",\"activated\":false,\"activate"
+    },
+    {
+      "area": "Billing",
+      "check": "Payment failure / bad signature rejected",
+      "ok": true,
+      "severity": "high",
+      "detail": "400"
+    },
+    {
+      "area": "Billing",
+      "check": "Payment history surface",
+      "ok": true,
+      "severity": "medium",
+      "detail": "count=0"
+    },
+    {
+      "area": "Billing",
+      "check": "Invoice PDF endpoint (pre-paid safe)",
+      "ok": true,
+      "severity": "medium",
+      "detail": "404"
+    },
+    {
+      "area": "Security",
+      "check": "Invoice PDF blocks admin portal JWT",
+      "ok": true,
+      "severity": "high",
+      "detail": "403"
+    },
+    {
+      "area": "Security",
+      "check": "Tenant isolation (contact IDOR blocked)",
+      "ok": true,
+      "severity": "critical",
+      "detail": "404"
+    },
+    {
+      "area": "Security",
+      "check": "Role permissions (admin ≠ CRM)",
+      "ok": true,
+      "severity": "critical",
+      "detail": "403"
+    },
+    {
+      "area": "Security",
+      "check": "Subscription / signup enforcement (register 403)",
+      "ok": true,
+      "severity": "critical",
+      "detail": "403"
+    },
+    {
+      "area": "Security",
+      "check": "AI route gated (auth + quota middleware)",
+      "ok": true,
+      "severity": "medium",
+      "detail": "200"
+    },
+    {
+      "area": "Dashboard",
+      "check": "Charts/widgets API",
+      "ok": true,
+      "severity": "high",
+      "detail": "200"
+    },
+    {
+      "area": "Dashboard",
+      "check": "KPIs via reports",
+      "ok": true,
+      "severity": "high",
+      "detail": ""
+    },
+    {
+      "area": "Auth",
+      "check": "Logout model (client-side token discard + invalid token fails)",
+      "ok": true,
+      "severity": "medium",
+      "detail": "stateless JWT"
+    },
+    {
+      "area": "UI",
+      "check": "Web login page loads",
+      "ok": true,
+      "severity": "medium",
+      "detail": "200"
+    },
+    {
+      "area": "UI",
+      "check": "Dashboard route responds",
+      "ok": true,
+      "severity": "medium",
+      "detail": "200"
+    },
+    {
+      "area": "UI",
+      "check": "Billing route responds",
+      "ok": true,
+      "severity": "medium",
+      "detail": "200"
+    }
+  ]
+}
