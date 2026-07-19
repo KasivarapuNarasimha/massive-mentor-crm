@@ -5,6 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/config/env";
+import { toMoneyNumber } from "@/lib/money";
 
 function invoicesDir(): string {
   const base = env.BACKUP_DIR || path.join(process.cwd(), "storage");
@@ -75,8 +76,11 @@ export async function generateBillingInvoicePdf(paymentId: string): Promise<{
   if (payment.business.address) doc.text(payment.business.address);
   doc.moveDown();
 
-  // Line items table
-  const base = payment.amount - payment.gst;
+  // Line items table — coerce Prisma Decimal → number for arithmetic/display
+  const amountN = toMoneyNumber(payment.amount);
+  const gstN = toMoneyNumber(payment.gst);
+  const discountN = toMoneyNumber(payment.discountAmount);
+  const base = amountN - gstN;
   const y = doc.y;
   doc.fontSize(10).fillColor("#18181b");
   doc.text("Description", 50, y);
@@ -93,9 +97,9 @@ export async function generateBillingInvoicePdf(paymentId: string): Promise<{
   doc.text(base.toFixed(2), 420, doc.y - 12, { width: 120, align: "right" });
   doc.moveDown(0.5);
 
-  if (payment.discountAmount > 0) {
+  if (discountN > 0) {
     doc.text("Discount", 50);
-    doc.text(`- ${payment.discountAmount.toFixed(2)}`, 420, doc.y - 12, {
+    doc.text(`- ${discountN.toFixed(2)}`, 420, doc.y - 12, {
       width: 120,
       align: "right",
     });
@@ -103,10 +107,10 @@ export async function generateBillingInvoicePdf(paymentId: string): Promise<{
   }
 
   doc.text(`GST (18%)`, 50);
-  doc.text(payment.gst.toFixed(2), 420, doc.y - 12, { width: 120, align: "right" });
+  doc.text(gstN.toFixed(2), 420, doc.y - 12, { width: 120, align: "right" });
   doc.moveDown();
   doc.fontSize(12).fillColor("#18181b").text("Total Paid", 50);
-  doc.text(payment.amount.toFixed(2), 420, doc.y - 14, { width: 120, align: "right" });
+  doc.text(amountN.toFixed(2), 420, doc.y - 14, { width: 120, align: "right" });
   doc.moveDown(2);
 
   doc.fontSize(9).fillColor("#71717a");

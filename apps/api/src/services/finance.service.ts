@@ -340,7 +340,10 @@ export async function updateInvoice(
     await notifyUser(userId, {
       type: "finance",
       title: "Invoice Paid",
-      message: `Invoice ${invoice.number} marked as paid (${formatCurrency(invoice.total, cur)})`,
+      message: `Invoice ${invoice.number} marked as paid (${formatCurrency(
+        Number(invoice.total),
+        cur
+      )})`,
       entityType: "invoice",
       entityId: invoice.id,
     });

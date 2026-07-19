@@ -86,14 +86,6 @@ type FinanceKpis = {
   profit?: number;
 };
 
-type ContactLite = {
-  id: string;
-  source?: string | null;
-  type?: string;
-  status?: string;
-  createdAt?: string;
-};
-
 /* ── Pipeline stages (display order) ───────────────────────── */
 
 const PIPELINE_STAGES: { key: string; label: string; match: string[] }[] = [
@@ -128,10 +120,6 @@ function firstName(name?: string | null): string {
 function trendFromCounts(current: number, previous: number): number | null {
   if (previous <= 0) return current > 0 ? 100 : null;
   return Math.round(((current - previous) / previous) * 100);
-}
-
-function ChartSkeleton() {
-  return <div className="h-[180px] animate-pulse rounded-xl bg-zinc-800/60" />;
 }
 
 function EmptyBlock({

@@ -190,11 +190,13 @@ async function sumEntity(
 ): Promise<number> {
   if (entity === "deal" && field === "value") {
     const agg = await prisma.deal.aggregate({ where: where as never, _sum: { value: true } });
-    return agg._sum.value || 0;
+    const { toMoneyNumber } = await import("@/lib/money");
+    return toMoneyNumber(agg._sum.value);
   }
   if (entity === "contact" && field === "value") {
     const agg = await prisma.contact.aggregate({ where: where as never, _sum: { value: true } });
-    return agg._sum.value || 0;
+    const { toMoneyNumber } = await import("@/lib/money");
+    return toMoneyNumber(agg._sum.value);
   }
   return 0;
 }

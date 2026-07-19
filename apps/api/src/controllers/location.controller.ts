@@ -285,7 +285,6 @@ export async function getReport(req: AuthenticatedRequest, res: Response) {
     }
 
     if (format === "pdf") {
-      // @ts-expect-error pdfkit has no types in this workspace
       const PDFDocument = (await import("pdfkit")).default;
       const doc = new PDFDocument({ margin: 40, size: "A4" });
       res.setHeader("Content-Type", "application/pdf");

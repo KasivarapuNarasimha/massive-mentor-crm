@@ -6,19 +6,39 @@ import { Prisma } from "@prisma/client";
 
 export type MoneyInput = number | string | Prisma.Decimal | null | undefined;
 
-/** Convert any money input to Prisma.Decimal (2 d.p. for currency). */
-export function toDecimal(value: MoneyInput, scale = 2): Prisma.Decimal {
+function isDecimal(value: unknown): value is Prisma.Decimal {
+  return (
+    value instanceof Prisma.Decimal ||
+    (!!value &&
+      typeof value === "object" &&
+      typeof (value as { toNumber?: unknown }).toNumber === "function" &&
+      typeof (value as { toFixed?: unknown }).toFixed === "function")
+  );
+}
+
+/** Convert any money input (incl. raw SQL unknown) to Prisma.Decimal (2 d.p.). */
+export function toDecimal(value: MoneyInput | unknown, scale = 2): Prisma.Decimal {
   if (value == null || value === "") return new Prisma.Decimal(0);
-  if (value instanceof Prisma.Decimal) {
-    return value.toDecimalPlaces(scale);
+  if (isDecimal(value)) {
+    try {
+      return new Prisma.Decimal(value.toString()).toDecimalPlaces(scale);
+    } catch {
+      return new Prisma.Decimal(0);
+    }
   }
-  const n = typeof value === "number" ? value : Number(String(value).replace(/,/g, ""));
+  if (typeof value === "bigint") {
+    return new Prisma.Decimal(value.toString()).toDecimalPlaces(scale);
+  }
+  const n =
+    typeof value === "number"
+      ? value
+      : Number(String(value).replace(/,/g, "").trim());
   if (!Number.isFinite(n)) return new Prisma.Decimal(0);
   return new Prisma.Decimal(n).toDecimalPlaces(scale);
 }
 
-/** Serialize for JSON / frontend (number, 2 d.p.). */
-export function toMoneyNumber(value: MoneyInput): number {
+/** Serialize for JSON / frontend (number, 2 d.p.). Accepts raw SQL unknown. */
+export function toMoneyNumber(value: MoneyInput | unknown): number {
   return toDecimal(value).toNumber();
 }
 

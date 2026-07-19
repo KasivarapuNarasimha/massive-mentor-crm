@@ -9,7 +9,7 @@ import {
 } from "@/controllers/auth.controller";
 import { passwordResetLimiter, loginLimiter } from "@/middleware/rateLimiter";
 
-const router = Router();
+const router: Router = Router();
 
 // Separate Super Admin authentication (not customer login) — rate-limited against brute force
 router.post("/auth/login", loginLimiter, ctrl.platformLogin);

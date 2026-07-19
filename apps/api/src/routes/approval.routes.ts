@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "@/middleware/auth";
 import * as ctrl from "@/controllers/approval.controller";
 
-const router = Router();
+const router: Router = Router();
 
 router.get("/workflows", requireAuth, ctrl.listWorkflows);
 router.put("/workflows", requireAuth, ctrl.upsertWorkflow);

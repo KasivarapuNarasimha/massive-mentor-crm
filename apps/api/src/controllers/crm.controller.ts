@@ -1048,7 +1048,7 @@ export async function aiFollowupEngineSummary(req: AuthenticatedRequest, res: Re
 export async function aiFollowupEngineContact(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const contactId = req.params.id;
+    const contactId = String(req.params.id || "");
     if (!contactId) return res.status(400).json({ success: false, error: "contact id required" });
     const force = String(req.query.force || "") === "1";
     const { getContactFollowupRecommendation } = await import("@/services/followup-engine.service");
@@ -1077,7 +1077,7 @@ export async function aiFollowupEngineRefresh(req: AuthenticatedRequest, res: Re
 export async function aiFollowupEngineAct(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const id = req.params.id;
+    const id = String(req.params.id || "");
     const { actionTaken, notes } = req.body as { actionTaken?: string; notes?: string };
     if (!id || !actionTaken) {
       return res.status(400).json({ success: false, error: "id and actionTaken required" });

@@ -977,7 +977,7 @@ export async function exportModulePdf(
   userId: string,
   module: ExportModule,
   filters: ExportFilters | undefined,
-  res: { pipe: (doc: unknown) => void }
+  res: NodeJS.WritableStream
 ): Promise<void> {
   const { headers, rows, title } = await fetchExportRows(userId, module, filters);
   const PDF = await getPDFDocument();

@@ -60,6 +60,7 @@ import {
   syncFromLeadStatusChange,
   type PipelineSyncResult,
 } from "@/services/pipeline-sync.service";
+import { toMoneyNumber } from "@/lib/money";
 
 // =====================================================
 // Core CRM Service (Phase 3 Foundation)
@@ -501,7 +502,7 @@ export async function updateContact(
           name: contact.name,
           type: contact.type,
           status: contact.status,
-          value: contact.value,
+          value: contact.value == null ? null : toMoneyNumber(contact.value),
           company: contact.company,
           businessId: contact.businessId,
           userId: contact.userId,
@@ -601,7 +602,7 @@ export async function bulkEditLeads(
   userId: string,
   ids: string[],
   patch: BulkLeadEditPatch
-): Promise<{ updated: number; failed: number; ids: string[] }> {
+): Promise<{ updated: number; failed: number; ids: string[]; pipelineSyncCount: number }> {
   if (!(await canBulkEditLeads(userId))) {
     throw new Error("You do not have permission to bulk-edit leads");
   }
@@ -670,7 +671,7 @@ export async function bulkEditLeads(
               name: contact.name,
               type: contact.type,
               status: nextStatus,
-              value: contact.value,
+              value: contact.value == null ? null : toMoneyNumber(contact.value),
               company: contact.company,
               businessId: contact.businessId,
               userId: contact.userId,
@@ -1875,7 +1876,7 @@ export async function generateReminders(
   }
 
   if (opts.dealId) {
-    deal = await prisma.deal.findFirst({
+    const dealRow = await prisma.deal.findFirst({
       where: andTenant(scope.where, { id: opts.dealId }) as never,
       select: {
         id: true,
@@ -1886,7 +1887,11 @@ export async function generateReminders(
         notes: true,
       },
     });
-    if (!deal) throw new Error("Deal not found");
+    if (!dealRow) throw new Error("Deal not found");
+    deal = {
+      ...dealRow,
+      value: dealRow.value == null ? null : toMoneyNumber(dealRow.value),
+    };
   }
 
   if (!contact && !deal && !meeting) {

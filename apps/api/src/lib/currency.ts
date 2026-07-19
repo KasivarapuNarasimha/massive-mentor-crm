@@ -86,10 +86,16 @@ const SYMBOL_BY_CODE: Record<CurrencyCode, string> = {
 
 /** Server-side money format (invoices, PDF/CSV exports, notifications). */
 export function formatCurrency(
-  amount: number | string | null | undefined,
+  amount: number | string | null | undefined | { toNumber?: () => number },
   currencyCode?: string | null
 ): string {
-  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  let num: number | null | undefined;
+  if (amount == null) num = null;
+  else if (typeof amount === "string") num = parseFloat(amount);
+  else if (typeof amount === "number") num = amount;
+  else if (typeof amount === "object" && typeof amount.toNumber === "function") {
+    num = amount.toNumber();
+  } else num = Number(amount);
   const code: CurrencyCode = isCurrencyCode(currencyCode || "")
     ? (currencyCode as CurrencyCode)
     : "INR";

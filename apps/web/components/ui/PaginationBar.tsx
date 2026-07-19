@@ -27,7 +27,7 @@ export function PaginationBar({
   const pages: number[] = [];
   const windowSize = 5;
   let start = Math.max(1, page - Math.floor(windowSize / 2));
-  let end = Math.min(safeTotalPages, start + windowSize - 1);
+  const end = Math.min(safeTotalPages, start + windowSize - 1);
   start = Math.max(1, end - windowSize + 1);
   for (let i = start; i <= end; i++) pages.push(i);
 

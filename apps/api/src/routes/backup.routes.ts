@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "@/middleware/auth";
 import * as ctrl from "@/controllers/backup.controller";
 
-const router = Router();
+const router: Router = Router();
 
 /** Business Admin — own tenant backups only (no cross-tenant access) */
 router.get("/", requireAuth, ctrl.tenantListBackups);

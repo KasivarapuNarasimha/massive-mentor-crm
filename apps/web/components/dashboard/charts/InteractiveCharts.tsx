@@ -483,8 +483,9 @@ export function InteractiveBarChart({
   height = 200,
   currency = "INR",
   onDrill,
-  valueIsMoney = false,
+  valueIsMoney: _valueIsMoney = false,
 }: CommonProps) {
+  void _valueIsMoney;
   const [tip, setTip] = useState<Tip | null>(null);
   if (!series.length || series.every((s) => !s.value)) return <EmptyChart />;
   const max = Math.max(...series.map((s) => s.value), 1);
@@ -580,10 +581,9 @@ export function InteractiveDonutChart({
               className="cursor-pointer transition-all hover:opacity-90"
               style={{ filter: `drop-shadow(0 0 6px ${s.color}66)` }}
               onMouseEnter={(e) => {
-                const pr = (e.currentTarget.closest(".relative") as HTMLElement)?.parentElement
-                  ?.getBoundingClientRect();
-                const box = (e.currentTarget.closest(".relative.flex") as HTMLElement)?.getBoundingClientRect();
-                const parent = box;
+                const parent = (
+                  e.currentTarget.closest(".relative.flex") as HTMLElement | null
+                )?.getBoundingClientRect();
                 if (!parent) return;
                 setTip({
                   x: e.clientX - parent.left,
@@ -635,14 +635,14 @@ export function InteractiveFunnelChart({
   const [tip, setTip] = useState<Tip | null>(null);
   if (!series.length || series.every((s) => !s.value)) return <EmptyChart label="No funnel data" />;
   const max = Math.max(...series.map((s) => s.value), 1);
-  const total = series[0]?.value || series.reduce((s, p) => s + p.value, 0) || 1;
+  const funnelBase = series[0]?.value || 1;
 
   return (
     <div className="relative space-y-2 py-1">
       {series.map((s, i) => {
         const color = PALETTE[i % PALETTE.length];
         const widthPct = Math.max(18, (s.value / max) * 100);
-        const conv = i === 0 ? 100 : (s.value / (series[0].value || 1)) * 100;
+        const conv = i === 0 ? 100 : (s.value / funnelBase) * 100;
         return (
           <button
             type="button"

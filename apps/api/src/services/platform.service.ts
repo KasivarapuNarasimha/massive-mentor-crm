@@ -6,6 +6,8 @@ import {
   userHasActiveCustomerBusiness,
 } from "@/services/customer-owner.service";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
+import { toMoneyNumber } from "@/lib/money";
 
 const PLANS = ["trial", "basic", "professional", "enterprise"] as const;
 export type PlanKey = (typeof PLANS)[number];
@@ -1048,7 +1050,7 @@ export async function platformUsageDashboard() {
     },
     _sum: { value: true },
   });
-  totalRevenue = won._sum.value || 0;
+  totalRevenue = toMoneyNumber(won._sum.value);
 
   // Daily login trend (last 14 days)
   const since = new Date(Date.now() - 14 * 86400000);

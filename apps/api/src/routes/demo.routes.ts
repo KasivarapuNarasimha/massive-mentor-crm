@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireDemoAuth } from "@/middleware/auth";
 import * as ctrl from "@/controllers/demo.controller";
 
-const router = Router();
+const router: Router = Router();
 
 // Demo-only auth — never production
 router.post("/auth/login", ctrl.demoLogin);

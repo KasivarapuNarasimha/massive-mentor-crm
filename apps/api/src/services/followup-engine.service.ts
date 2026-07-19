@@ -7,6 +7,7 @@
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/services/notification.service";
 import { buildTenantScope, andTenant } from "@/services/tenant-scope.service";
+import { toMoneyNumber, type MoneyInput } from "@/lib/money";
 
 export type FollowupActionType =
   | "call"
@@ -87,7 +88,7 @@ function analyzeContact(ctx: {
     phone: string | null;
     email: string | null;
     company: string | null;
-    value: number | null;
+    value: MoneyInput;
     aiScore: number | null;
     priority: string | null;
     lastContactedAt: Date | null;
@@ -97,7 +98,14 @@ function analyzeContact(ctx: {
   };
   openTasks: Array<{ id: string; dueDate: Date | null; status: string; title: string }>;
   meetings: Array<{ id: string; scheduledAt: Date; outcome: string | null }>;
-  deals: Array<{ id: string; title: string; stage: string; value: number | null; updatedAt: Date; expectedClose: Date | null }>;
+  deals: Array<{
+    id: string;
+    title: string;
+    stage: string;
+    value: MoneyInput;
+    updatedAt: Date;
+    expectedClose: Date | null;
+  }>;
   lastAiGenAt: Date | null;
   lastWhatsappAt: Date | null;
   lastEmailAt: Date | null;
@@ -113,7 +121,7 @@ function analyzeContact(ctx: {
   const lastTouch = c.lastContactedAt || c.updatedAt;
   const silentDays = daysSince(lastTouch, now) ?? daysSince(c.createdAt, now) ?? 0;
   const score = c.aiScore ?? 0;
-  const value = c.value ?? 0;
+  const value = toMoneyNumber(c.value);
   const hasPhone = !!(c.phone && c.phone.replace(/\D/g, "").length >= 7);
   const hasEmail = !!(c.email && c.email.includes("@"));
 
@@ -130,7 +138,7 @@ function analyzeContact(ctx: {
   const hotDeal = deals.find(
     (d) =>
       isNegotiation(d.stage) ||
-      (isProposalStage(d.stage) && (d.value || 0) >= 50000) ||
+      (isProposalStage(d.stage) && toMoneyNumber(d.value) >= 50000) ||
       (daysUntil(d.expectedClose, now) !== null &&
         (daysUntil(d.expectedClose, now) as number) <= 7 &&
         !isTerminalStatus(d.stage))
@@ -255,7 +263,11 @@ function analyzeContact(ctx: {
       reasonCode: "close_window",
       title: `⭐ Opportunity to close: ${display}`,
       reason: deal
-        ? `Deal “${deal.title}” is in ${deal.stage}${deal.value ? ` (₹${Math.round(deal.value).toLocaleString()})` : ""} — push for decision.`
+        ? `Deal “${deal.title}” is in ${deal.stage}${
+            toMoneyNumber(deal.value) > 0
+              ? ` (₹${Math.round(toMoneyNumber(deal.value)).toLocaleString()})`
+              : ""
+          } — push for decision.`
         : `Lead is in ${c.status} — high chance to close if you follow up now.`,
       priority: "high",
       urgency: "red",
@@ -434,7 +446,7 @@ function analyzeDealOnly(ctx: {
     id: string;
     title: string;
     stage: string;
-    value: number | null;
+    value: MoneyInput;
     probability: number | null;
     expectedClose: Date | null;
     updatedAt: Date;
@@ -482,7 +494,11 @@ function analyzeDealOnly(ctx: {
       actionType: "close_opportunity",
       reasonCode: "deal_close_push",
       title: `⭐ Opportunity to close: ${label}`,
-      reason: `Stage “${d.stage}”${d.probability != null ? `, win probability ${d.probability}%` : ""}${d.value ? `, value ₹${Math.round(d.value).toLocaleString()}` : ""}.`,
+      reason: `Stage “${d.stage}”${d.probability != null ? `, win probability ${d.probability}%` : ""}${
+        toMoneyNumber(d.value) > 0
+          ? `, value ₹${Math.round(toMoneyNumber(d.value)).toLocaleString()}`
+          : ""
+      }.`,
       priority: "high",
       urgency: "red",
       confidence: 0.84,

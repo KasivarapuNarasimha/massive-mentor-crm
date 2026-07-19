@@ -168,7 +168,7 @@ export async function recordAiUsage(opts: {
       success: opts.success !== false,
       dayKey: dayKey(now),
       monthKey: monthKey(now),
-      metadata: opts.metadata || undefined,
+      metadata: (opts.metadata ?? undefined) as object | undefined,
     },
   });
 }

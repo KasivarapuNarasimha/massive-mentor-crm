@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "@/middleware/auth";
 import * as ctrl from "@/controllers/billing.controller";
 
-const router = Router();
+const router: Router = Router();
 
 router.get("/access", requireAuth, ctrl.getAccess);
 router.get("/overview", requireAuth, ctrl.getOverview);

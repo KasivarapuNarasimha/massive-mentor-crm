@@ -107,10 +107,11 @@ export async function validateCouponHandler(req: AuthenticatedRequest, res: Resp
     const plans = await listActivePlans();
     const plan = plans.find((p) => p.code === planCode);
     if (!plan) return res.status(400).json({ success: false, error: "Invalid plan" });
+    const { toMoneyNumber } = await import("@/lib/money");
     const data = await validateCoupon({
       code,
       planCode,
-      basePrice: plan.price,
+      basePrice: toMoneyNumber(plan.price),
     });
     res.json({ success: data.ok, data, error: data.error });
   } catch (e) {
