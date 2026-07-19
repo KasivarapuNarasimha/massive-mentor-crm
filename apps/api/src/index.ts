@@ -21,11 +21,13 @@ if (env.TRUST_PROXY || isProd) {
   app.set("trust proxy", 1);
 }
 
-// Security headers (helmet) — CSP relaxed for API JSON; clickjacking denied
+// Security headers (helmet) — API must allow cross-origin browser clients.
+// Default CORP "same-origin" can interfere with credentialed cross-origin fetches.
 app.use(
   helmet({
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
     frameguard: { action: "deny" },
     hsts: isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
     referrerPolicy: { policy: "no-referrer" },
@@ -33,36 +35,91 @@ app.use(
 );
 app.disable("x-powered-by");
 
-const allowedOrigins = (env.FRONTEND_URL || "http://localhost:3000")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
+/**
+ * CORS allowlist for browser SPA clients.
+ * credentials:true requires reflecting the request Origin (never "*").
+ * FRONTEND_URL / CORS_ORIGINS / APP_URL must include the UI origin (e.g. http://200.141.0.25:3000).
+ */
+function collectAllowedOrigins(): Set<string> {
+  const set = new Set<string>();
+  const add = (raw?: string | null) => {
+    if (!raw) return;
+    for (const part of String(raw).split(",")) {
+      const o = part.trim().replace(/\/$/, "");
+      if (o) set.add(o);
+    }
+  };
+
+  // Explicit env lists
+  add(env.FRONTEND_URL);
+  add(process.env.CORS_ORIGINS);
+  // App public URLs (often the same host the SPA is served from)
+  add(env.APP_URL);
+  add(env.CUSTOMER_APP_URL);
+  add(env.ADMIN_APP_URL);
+
+  // Local defaults
+  add("http://localhost:3000");
+  add("http://localhost:3001");
+  add("http://127.0.0.1:3000");
+  add("http://127.0.0.1:3001");
+
+  // Deployed CRM UI (this VPS) — required when FRONTEND_URL was only localhost
+  add("http://200.141.0.25:3000");
+  add("http://200.141.0.25:3001");
+
+  return set;
+}
+
+const allowedOrigins = collectAllowedOrigins();
+
+function isOriginAllowed(origin: string | undefined): boolean {
+  // Non-browser clients (curl, server-to-server, same-origin proxy) send no Origin
+  if (!origin) return true;
+  if (allowedOrigins.has(origin)) return true;
+
+  // Allow any port on the known public host when UI is re-bound (3000/3001/etc.)
+  try {
+    const u = new URL(origin);
+    if (u.hostname === "200.141.0.25" && u.protocol === "http:") return true;
+    if (!isProd) {
+      const isLocal =
+        u.hostname === "localhost" ||
+        u.hostname === "127.0.0.1" ||
+        u.hostname === "::1";
+      if (isLocal) return true;
+    }
+  } catch {
+    /* invalid origin */
+  }
+  return false;
+}
+
+if (!isProd) {
+  console.log(
+    `[cors] allowed origins (${allowedOrigins.size}): ${[...allowedOrigins].join(", ")}`
+  );
+} else {
+  console.log(`[cors] allowlist size=${allowedOrigins.size} (includes FRONTEND_URL + 200.141.0.25:3000)`);
+}
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
+      if (isOriginAllowed(origin)) {
+        // Reflect the request Origin so Access-Control-Allow-Origin is set
+        // on both preflight (OPTIONS) and the actual POST/GET response.
+        return callback(null, origin || true);
       }
-      // Dev convenience: localhost ports
-      if (!isProd && origin) {
-        try {
-          const u = new URL(origin);
-          const isLocalHost =
-            u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "::1";
-          const isDevPort = ["3000", "3001", "3002"].includes(u.port || "80");
-          if (isLocalHost && isDevPort) {
-            return callback(null, true);
-          }
-        } catch {
-          /* fall through */
-        }
-      }
+      console.warn(`[cors] blocked origin=${origin || "(none)"}`);
       return callback(null, false);
     },
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Content-Disposition"],
+    optionsSuccessStatus: 204,
+    preflightContinue: false,
     maxAge: 86400,
   })
 );

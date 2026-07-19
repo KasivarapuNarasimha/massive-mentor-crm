@@ -35,7 +35,15 @@ const envSchema = z.object({
   // Server
   PORT: z.coerce.number().default(4000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  FRONTEND_URL: z.string().optional().default('http://localhost:3000,http://localhost:3001'),
+  // Comma-separated browser origins allowed by CORS (must include the SPA origin)
+  FRONTEND_URL: z
+    .string()
+    .optional()
+    .default(
+      'http://localhost:3000,http://localhost:3001,http://200.141.0.25:3000'
+    ),
+  /// Extra CORS origins (comma-separated), merged with FRONTEND_URL
+  CORS_ORIGINS: z.string().optional(),
 
   // Customer portal public URL (password reset / login links)
   // APP_URL is preferred in emails; falls back to CUSTOMER_APP_URL
