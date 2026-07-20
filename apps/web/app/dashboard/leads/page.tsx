@@ -12,6 +12,10 @@ import {
   type ImportPreview as CsvImportPreview,
 } from "@/components/import/CsvImportWizard";
 import {
+  buildClientCsvPreview,
+  isCsvLikeFilename,
+} from "@/lib/csv-import-preview";
+import {
   AiLeadRecommendationBadge,
   type AiFollowupRec,
 } from "@/components/ai/AiFollowupCenter";
@@ -447,20 +451,56 @@ export default function LeadsPage() {
     setImportFile(file);
     toast.message(`Analyzing ${file.name}…`);
 
-    // Always preview first so user can confirm auto-mapping (production SaaS UX)
-    const previewRes = await api.previewImportFile(file, token);
-    if (!previewRes.success || !previewRes.data) {
-      toast.error(previewRes.error || "Could not read file");
-      setImporting(false);
-      setImportFile(null);
-      e.target.value = "";
-      return;
+    const statuses =
+      statusOptions.map((s) => s.key).length > 0
+        ? statusOptions.map((s) => s.key)
+        : ["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost"];
+
+    let preview: CsvImportPreview | null = null;
+
+    // CSV/TSV: map columns in-browser (no full-file upload for preview — avoids proxy timeouts)
+    if (isCsvLikeFilename(file.name)) {
+      try {
+        preview = (await buildClientCsvPreview(file, statuses)) as CsvImportPreview;
+      } catch (err) {
+        console.warn("[import] client CSV preview failed", err);
+      }
     }
 
-    const preview = previewRes.data as CsvImportPreview;
-    setImportPreview(preview);
+    // Excel (or CSV fallback): fast server preview (first ~40 rows only on API)
+    if (!preview) {
+      const previewRes = await api.previewImportFile(file, token);
+      if (previewRes.success && previewRes.data) {
+        preview = previewRes.data as CsvImportPreview;
+      } else if (isCsvLikeFilename(file.name)) {
+        // Last resort: client parse if server preview transport failed
+        try {
+          preview = (await buildClientCsvPreview(file, statuses)) as CsvImportPreview;
+        } catch {
+          /* ignore */
+        }
+      }
 
-    // High confidence + name mapped → still show wizard so user can confirm/save mapping
+      if (!preview) {
+        // Preview never commits leads — never claim the server "processed" the file
+        const err = previewRes.error || "";
+        toast.error(
+          err && !/connection interrupted|timed out|Cannot reach|Try CSV/i.test(err)
+            ? err
+            : "Could not read file headers. Try CSV, or a smaller Excel export.",
+          {
+            description: "Import was not started. Fix the file and try again.",
+          }
+        );
+        setImporting(false);
+        setImportFile(null);
+        e.target.value = "";
+        return;
+      }
+    }
+
+    setImportPreview(preview);
+    // Always show wizard so user confirms mapping before commit
     setWizardOpen(true);
     setImporting(false);
     e.target.value = "";

@@ -284,26 +284,51 @@ async function loadXlsx() {
 
 export async function rowsFromSheetBuffer(
   buffer: Buffer,
-  filename?: string
+  filename?: string,
+  opts?: { /** When set, only first N data rows are parsed (fast preview). */ maxRows?: number }
 ): Promise<Record<string, unknown>[]> {
   const XLSX = await loadXlsx();
   const lower = (filename || "").toLowerCase();
   const isCsv = lower.endsWith(".csv") || lower.endsWith(".tsv");
+  // sheetRows includes header row — +1 so maxRows data rows are available
+  const sheetRows =
+    opts?.maxRows && opts.maxRows > 0 ? opts.maxRows + 1 : undefined;
   const wb = XLSX.read(buffer, {
     type: "buffer",
     raw: false,
     cellDates: true,
     codepage: 65001,
+    ...(sheetRows ? { sheetRows } : {}),
     ...(isCsv ? { FS: lower.endsWith(".tsv") ? "\t" : "," } : {}),
   });
   const sheetName = wb.SheetNames[0];
   if (!sheetName) return [];
   const sheet = wb.Sheets[sheetName];
-  return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
     defval: "",
     raw: false,
     blankrows: false,
   });
+  if (opts?.maxRows && rows.length > opts.maxRows) {
+    return rows.slice(0, opts.maxRows);
+  }
+  return rows;
+}
+
+/** Rough data-row count for CSV/TSV without full XLSX parse (preview total). */
+function estimateCsvDataRows(buffer: Buffer): number {
+  try {
+    const text = buffer.toString("utf8").replace(/^\uFEFF/, "");
+    if (!text.trim()) return 0;
+    // Count non-empty lines minus header
+    let n = 0;
+    for (const line of text.split(/\r?\n/)) {
+      if (line.trim()) n++;
+    }
+    return Math.max(0, n - 1);
+  } catch {
+    return 0;
+  }
 }
 
 export async function rowsFromCsvText(csv: string): Promise<Record<string, unknown>[]> {
@@ -680,15 +705,22 @@ export async function previewImportFromCsv(
   return preview;
 }
 
+/**
+ * Fast preview: only first PREVIEW_MAX_ROWS are parsed so the HTTP response
+ * returns in milliseconds even for multi‑thousand-row Excel/CSV files.
+ * Full-file parse happens only on /import/file (commit).
+ */
+const PREVIEW_MAX_ROWS = 40;
+
 export async function previewImportFromFile(
   userId: string,
   buffer: Buffer,
   filename: string
 ): Promise<ImportPreview> {
   const lower = filename.toLowerCase();
+  const isCsv = lower.endsWith(".csv") || lower.endsWith(".tsv");
   const isSpreadsheet =
-    lower.endsWith(".csv") ||
-    lower.endsWith(".tsv") ||
+    isCsv ||
     lower.endsWith(".xlsx") ||
     lower.endsWith(".xls") ||
     lower.endsWith(".xlsm");
@@ -711,7 +743,8 @@ export async function previewImportFromFile(
 
   let rows: Record<string, unknown>[] = [];
   try {
-    rows = await rowsFromSheetBuffer(buffer, filename);
+    // Critical: do NOT parse entire workbook for preview (was causing nginx/client timeouts)
+    rows = await rowsFromSheetBuffer(buffer, filename, { maxRows: PREVIEW_MAX_ROWS });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return {
@@ -733,6 +766,19 @@ export async function previewImportFromFile(
   const { savedMappings, allowedStatuses } = await loadImportContext(userId);
   const preview = buildImportPreview(rows, savedMappings);
   preview.allowedStatuses = allowedStatuses.map((s) => s.key);
+
+  // Prefer real-ish totals for UI without loading all rows into memory as objects
+  if (isCsv) {
+    const estimated = estimateCsvDataRows(buffer);
+    if (estimated > preview.parsedRows) preview.parsedRows = estimated;
+  } else if (rows.length >= PREVIEW_MAX_ROWS) {
+    // Excel: we only sampled — indicate more rows exist
+    preview.parsedRows = Math.max(preview.parsedRows, PREVIEW_MAX_ROWS);
+    preview.message =
+      (preview.message ? preview.message + " " : "") +
+      `Showing first ${PREVIEW_MAX_ROWS} rows for mapping; full file is processed on Import.`;
+  }
+
   return preview;
 }
 

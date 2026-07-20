@@ -711,14 +711,21 @@ class ApiClient {
       const isAbort =
         error instanceof Error &&
         (error.name === "AbortError" || /aborted|timeout/i.test(error.message));
-      // Multipart imports often finish server-side after the browser loses the socket.
-      // Never report that as "Cannot reach API" — import callers re-verify via list refresh.
-      const message = isAbort
-        ? `Upload timed out after ${Math.round(timeoutMs / 1000)}s. The server may still have saved the file — refresh the list to verify.`
-        : typeof navigator !== "undefined" && navigator.onLine === false
-          ? "You appear offline. Reconnect and try again."
-          : `Upload connection interrupted (${path}). The server may still have processed the file — refresh the list to verify.`;
-      // Do not flip global connectivity banner for long upload transport glitches
+      const isPreview = path.includes("/import/preview");
+      // Preview never commits rows — do not say the server "processed" the file.
+      // Import (/import/file) may have committed; callers re-verify via list refresh.
+      let message: string;
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        message = "You appear offline. Reconnect and try again.";
+      } else if (isPreview) {
+        message = isAbort
+          ? `Preview timed out after ${Math.round(timeoutMs / 1000)}s. Try CSV or a smaller file.`
+          : "Could not load import preview (connection interrupted). Try CSV format.";
+      } else if (isAbort) {
+        message = `Upload timed out after ${Math.round(timeoutMs / 1000)}s. Refresh the leads list — rows may already be saved.`;
+      } else {
+        message = `Upload connection interrupted (${path}). Refresh the leads list to verify whether rows were saved.`;
+      }
       console.warn("[ApiClient] formData:", message, error);
       return {
         success: false,
@@ -732,6 +739,7 @@ class ApiClient {
   async previewImportFile(file: File, token: string) {
     const fd = new FormData();
     fd.append("file", file);
+    // Server only samples first ~40 rows now — 60s is ample (was 90s full-file parse)
     return this.postFormData<{
       headers: string[];
       sampleRows: Record<string, string>[];
@@ -750,7 +758,7 @@ class ApiClient {
       allowedStatuses: string[];
       autoMappings: Array<{ sourceHeader: string; fieldKey: string }>;
       message?: string;
-    }>("/reports/import/preview", fd, token, { timeoutMs: 90_000 });
+    }>("/reports/import/preview", fd, token, { timeoutMs: 60_000 });
   }
 
   async importContactsFile(
