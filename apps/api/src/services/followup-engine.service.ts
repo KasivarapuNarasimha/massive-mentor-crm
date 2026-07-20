@@ -4,10 +4,10 @@
  * Rules analyze real CRM signals (contacts, deals, tasks, meetings, AI history).
  * No mock data. Recommendations are persisted and de-duplicated via fingerprint.
  */
-import { prisma } from "@/lib/prisma";
-import { createNotification } from "@/services/notification.service";
-import { buildTenantScope, andTenant } from "@/services/tenant-scope.service";
-import { toMoneyNumber, type MoneyInput } from "@/lib/money";
+import { prisma } from "../lib/prisma.js";
+import { createNotification } from "./notification.service.js";
+import { buildTenantScope, andTenant } from "./tenant-scope.service.js";
+import { toMoneyNumber, type MoneyInput } from "../lib/money.js";
 
 export type FollowupActionType =
   | "call"

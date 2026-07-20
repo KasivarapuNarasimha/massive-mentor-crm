@@ -1,10 +1,10 @@
-import { prisma } from "@/lib/prisma";
-import { getAllSeedManifests, getSeedManifestBySlug } from "@/templates/seed-catalog";
+import { prisma } from "../lib/prisma.js";
+import { getAllSeedManifests, getSeedManifestBySlug } from "../templates/seed-catalog.js";
 import {
   industryTemplateManifestSchema,
   type IndustryTemplateManifest,
-} from "@/types/template-manifest";
-import { recordAudit } from "@/services/audit.service";
+} from "../types/template-manifest.js";
+import { recordAudit } from "./audit.service.js";
 import { createHash } from "crypto";
 
 export type TemplateListItem = {

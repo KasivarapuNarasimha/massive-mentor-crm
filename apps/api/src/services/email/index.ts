@@ -15,7 +15,7 @@ export {
   getAppUrl,
   getLoginUrl,
   type BuiltEmail,
-} from "@/services/email/templates";
+} from "./templates.js";
 export {
   getSupportEmail,
   getSupportWhatsApp,
@@ -24,4 +24,4 @@ export {
   formatMoneyInr,
   escapeHtml,
   EMAIL_BRAND,
-} from "@/services/email/brand";
+} from "./brand.js";

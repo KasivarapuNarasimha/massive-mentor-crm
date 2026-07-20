@@ -1,9 +1,9 @@
 /**
  * Per-business AI usage quotas, rate limits, and cost controls.
  */
-import { prisma } from "@/lib/prisma";
-import { getUserBusinessId } from "@/services/field-engine.service";
-import { env } from "@/config/env";
+import { prisma } from "../lib/prisma.js";
+import { getUserBusinessId } from "./field-engine.service.js";
+import { env } from "../config/env.js";
 
 export type AiFeature =
   | "mentor"

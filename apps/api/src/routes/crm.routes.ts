@@ -44,9 +44,9 @@ import {
   bulkEditLeadsHandler,
   bulkDeleteLeadsHandler,
   bulkRestoreLeadsHandler,
-} from "@/controllers/crm.controller";
-import { requireAuth, requireRole } from "@/middleware/auth";
-import { requireAiQuota } from "@/middleware/aiQuota";
+} from "../controllers/crm.controller.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAiQuota } from "../middleware/aiQuota.js";
 
 const router: Router = Router();
 

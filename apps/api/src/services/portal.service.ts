@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/prisma";
-import { ensureDefaultBusiness } from "@/services/business.service";
-import { ensureBusinessConfig, getBusinessConfig } from "@/services/template.service";
+import { prisma } from "../lib/prisma.js";
+import { ensureDefaultBusiness } from "./business.service.js";
+import { ensureBusinessConfig, getBusinessConfig } from "./template.service.js";
 
 export type PortalMenu = {
   key: string;

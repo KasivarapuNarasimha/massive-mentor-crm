@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "@/middleware/auth";
+import { requireAuth } from "../middleware/auth.js";
 import {
   createUser,
   listUsers,
@@ -8,7 +8,7 @@ import {
   disableUser,
   removeUser,
   listAssignableRoles,
-} from "@/controllers/user-admin.controller";
+} from "../controllers/user-admin.controller.js";
 
 const router: Router = Router();
 

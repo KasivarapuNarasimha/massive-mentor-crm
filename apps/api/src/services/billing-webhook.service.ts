@@ -3,11 +3,11 @@
  * Idempotent via RazorpayWebhookEvent.eventId.
  */
 import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
-import { env } from "@/config/env";
-import { activateSubscriptionFromPayment } from "@/services/billing-activation.service";
-import { recordAudit } from "@/services/audit.service";
-import { notifySuperAdmins } from "@/services/billing-notify.service";
+import { prisma } from "../lib/prisma.js";
+import { env } from "../config/env.js";
+import { activateSubscriptionFromPayment } from "./billing-activation.service.js";
+import { recordAudit } from "./audit.service.js";
+import { notifySuperAdmins } from "./billing-notify.service.js";
 
 export function verifyWebhookSignature(rawBody: Buffer | string, signature: string): boolean {
   // Production: require dedicated webhook secret (never fall back to API key secret)

@@ -4,14 +4,14 @@
  *
  * Flow: preview → mapping wizard (if needed) → import with optional saved mappings.
  */
-import { prisma } from "@/lib/prisma";
-import { getBusinessConfig } from "@/services/template.service";
+import { prisma } from "../lib/prisma.js";
+import { getBusinessConfig } from "./template.service.js";
 import {
   applyContactFieldDefs,
   getContactFieldDefs,
   getLeadPipelineStatuses,
-} from "@/services/field-engine.service";
-import type { FieldDef } from "@/types/template-manifest";
+} from "./field-engine.service.js";
+import type { FieldDef } from "../types/template-manifest.js";
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -604,7 +604,7 @@ function formatRowError(e: ImportRowError): string {
 async function loadImportContext(userId: string) {
   // Same resolver as CRM list / billing so import never targets a different tenant
   const { getUserBusinessId, reclaimContactsFromDeletedBusinesses } = await import(
-    "@/services/field-engine.service"
+    "./field-engine.service.js"
   );
   let businessId = await getUserBusinessId(userId);
   if (businessId) {

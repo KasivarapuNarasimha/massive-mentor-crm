@@ -1,6 +1,6 @@
 import { Response } from "express";
-import type { AuthenticatedRequest } from "@/middleware/auth";
-import * as approval from "@/services/approval.service";
+import type { AuthenticatedRequest } from "../middleware/auth.js";
+import * as approval from "../services/approval.service.js";
 
 export async function listWorkflows(req: AuthenticatedRequest, res: Response) {
   try {

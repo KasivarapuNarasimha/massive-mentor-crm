@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
-import { loginUser, getUserById, loginSchema } from "@/services/auth.service";
+import { loginUser, getUserById, loginSchema } from "../services/auth.service.js";
 // registerUser intentionally not imported — public signup is permanently disabled
-import { AuthenticatedRequest } from "@/middleware/auth";
-import { ensureDefaultBusiness } from "@/services/business.service";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import { ensureDefaultBusiness } from "../services/business.service.js";
 import {
   forgotPasswordSchema,
   resetPasswordSchema,
@@ -10,8 +10,8 @@ import {
   validateResetToken,
   completePasswordReset,
   type ResetPortal,
-} from "@/services/password-reset.service";
-import { SessionLimitError } from "@/services/session.service";
+} from "../services/password-reset.service.js";
+import { SessionLimitError } from "../services/session.service.js";
 
 /**
  * Public self-registration is disabled for production SaaS sales model.
@@ -97,7 +97,7 @@ export async function logout(req: AuthenticatedRequest, res: Response) {
     if (!req.user) {
       return res.status(401).json({ success: false, error: "Not authenticated" });
     }
-    const { revokeSession } = await import("@/services/session.service");
+    const { revokeSession } = await import("../services/session.service.js");
     if (req.sessionId) {
       await revokeSession(req.sessionId, "logout", req.user.id);
     }

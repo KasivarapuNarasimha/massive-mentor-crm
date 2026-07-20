@@ -4,12 +4,12 @@
  * Resolves JWT itself (runs before route-level requireAuth).
  */
 import { Response, NextFunction } from "express";
-import type { AuthenticatedRequest } from "@/middleware/auth";
-import { verifyToken } from "@/services/auth.service";
+import type { AuthenticatedRequest } from "./auth.js";
+import { verifyToken } from "../services/auth.service.js";
 import {
   evaluateBillingAccess,
   enforceLockIfNeeded,
-} from "@/services/billing-access.service";
+} from "../services/billing-access.service.js";
 
 const ALLOW_PREFIXES = [
   "/api/auth",

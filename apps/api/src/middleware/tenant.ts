@@ -1,6 +1,6 @@
 import { Response, NextFunction } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
-import { resolveTenantContext } from "@/services/business.service";
+import { AuthenticatedRequest } from "./auth.js";
+import { resolveTenantContext } from "../services/business.service.js";
 
 /**
  * Ensures default business exists and attaches TenantContext to the request.

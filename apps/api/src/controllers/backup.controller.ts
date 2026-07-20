@@ -1,9 +1,9 @@
 import { Response } from "express";
 import fs from "node:fs";
-import type { AuthenticatedRequest } from "@/middleware/auth";
-import * as backup from "@/services/backup.service";
-import { resolveTenantContext } from "@/services/business.service";
-import { resolveActorRole } from "@/services/tenant-scope.service";
+import type { AuthenticatedRequest } from "../middleware/auth.js";
+import * as backup from "../services/backup.service.js";
+import { resolveTenantContext } from "../services/business.service.js";
+import { resolveActorRole } from "../services/tenant-scope.service.js";
 
 function clientMeta(req: AuthenticatedRequest) {
   return {

@@ -2,7 +2,7 @@
  * PostgreSQL advisory locks for multi-instance scheduled jobs.
  * Session-level locks via pg_try_advisory_lock — safe across API replicas.
  */
-import { prisma } from "@/lib/prisma";
+import { prisma } from "./prisma.js";
 
 /** Stable 64-bit key from a string name (two int4 for pg_try_advisory_lock). */
 function lockKeys(name: string): [number, number] {

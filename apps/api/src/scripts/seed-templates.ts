@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { seedIndustryTemplates } from "@/services/template.service";
+import { seedIndustryTemplates } from "../services/template.service.js";
 
 async function main() {
   const result = await seedIndustryTemplates();

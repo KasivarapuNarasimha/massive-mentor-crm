@@ -1,10 +1,10 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
   ensureDefaultBusiness,
   getCurrentBusinessForUser,
   resolveTenantContext,
-} from "@/services/business.service";
+} from "../services/business.service.js";
 
 export async function getCurrentBusiness(req: AuthenticatedRequest, res: Response) {
   try {

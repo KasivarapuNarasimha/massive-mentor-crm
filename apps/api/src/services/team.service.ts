@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 
 export const ROLES = ["admin", "manager", "sales_executive"] as const;
 export type Role = (typeof ROLES)[number];

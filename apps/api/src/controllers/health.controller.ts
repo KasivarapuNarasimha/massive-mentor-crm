@@ -3,8 +3,8 @@ import {
   getLatestHealthScore, 
   getRecentHealthScores,
   calculateAndStoreHealthScore 
-} from "@/services/health.service";
-import { AuthenticatedRequest } from "@/middleware/auth";
+} from "../services/health.service.js";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 
 export async function getHealthScore(req: AuthenticatedRequest, res: Response) {
   try {

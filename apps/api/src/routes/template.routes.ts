@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "@/middleware/auth";
+import { requireAuth } from "../middleware/auth.js";
 import {
   listTemplates,
   listTemplateCatalog,
@@ -7,7 +7,7 @@ import {
   installTemplate,
   getCurrentConfig,
   reseedTemplates,
-} from "@/controllers/template.controller";
+} from "../controllers/template.controller.js";
 
 const router: Router = Router();
 

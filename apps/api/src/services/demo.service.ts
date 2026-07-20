@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/prisma";
-import { createBusinessWithTemplate } from "@/services/business.service";
-import { recordAudit } from "@/services/audit.service";
+import { prisma } from "../lib/prisma.js";
+import { createBusinessWithTemplate } from "./business.service.js";
+import { recordAudit } from "./audit.service.js";
 import bcrypt from "bcryptjs";
 
 /** Demo portal credentials (product demo only — never production customers) */

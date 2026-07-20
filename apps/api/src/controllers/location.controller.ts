@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
   recordLocationEvent,
   startFieldWork,
@@ -15,7 +15,7 @@ import {
   reportToCsv,
   type LocationPayload,
   type DeviceContext,
-} from "@/services/location.service";
+} from "../services/location.service.js";
 
 function clientIp(req: AuthenticatedRequest): string | null {
   const xf = req.headers["x-forwarded-for"];

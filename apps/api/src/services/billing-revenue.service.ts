@@ -1,8 +1,8 @@
 /**
  * Super Admin SaaS revenue analytics (MRR/ARR, trials, renewals).
  */
-import { prisma } from "@/lib/prisma";
-import { toMoneyNumber } from "@/lib/money";
+import { prisma } from "../lib/prisma.js";
+import { toMoneyNumber } from "../lib/money.js";
 
 function startOfDay(d = new Date()) {
   const x = new Date(d);

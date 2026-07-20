@@ -3,15 +3,15 @@
  * Run: npx tsx src/scripts/verify-password-reset.ts
  */
 import "dotenv/config";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 import {
   requestPasswordReset,
   completePasswordReset,
   validateResetToken,
   hashResetToken,
-} from "@/services/password-reset.service";
-import { loginUser, loginPlatformAdmin, verifyToken, getUserById } from "@/services/auth.service";
-import { requireAuth } from "@/middleware/auth";
+} from "../services/password-reset.service.js";
+import { loginUser, loginPlatformAdmin, verifyToken, getUserById } from "../services/auth.service.js";
+import { requireAuth } from "../middleware/auth.js";
 
 async function main() {
   console.log("=== Password reset verification ===\n");
@@ -108,7 +108,7 @@ async function main() {
 
     // Simulate old session (tv = previous)
     const jwt = await import("jsonwebtoken");
-    const { env } = await import("@/config/env");
+    const { env } = await import("../config/env.js");
     const oldToken = jwt.default.sign(
       { userId: customer.id, portal: "customer", tv: beforeUser?.tokenVersion ?? 0 },
       env.JWT_SECRET,

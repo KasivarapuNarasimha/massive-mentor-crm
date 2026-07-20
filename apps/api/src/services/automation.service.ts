@@ -1,6 +1,6 @@
-import { prisma } from "@/lib/prisma";
-import { createNotification } from "./notification.service";
-import { logActivity } from "./activity.service";
+import { prisma } from "../lib/prisma.js";
+import { createNotification } from "./notification.service.js";
+import { logActivity } from "./activity.service.js";
 
 // Simple reminder check - in real would be cron
 export async function checkAndSendReminders(userId: string) {

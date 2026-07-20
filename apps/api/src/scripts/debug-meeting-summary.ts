@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/prisma";
-import { generateMeetingSummary } from "@/services/crm.service";
+import { prisma } from "../lib/prisma.js";
+import { generateMeetingSummary } from "../services/crm.service.js";
 
 async function main() {
   const m = await prisma.meeting.findFirst({

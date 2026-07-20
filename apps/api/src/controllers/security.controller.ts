@@ -2,16 +2,16 @@
  * Enterprise security dashboard + session administration.
  */
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
-import { assertCanManageUsers } from "@/services/user-admin.service";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import { assertCanManageUsers } from "../services/user-admin.service.js";
 import {
   getSecurityDashboard,
   listActiveSessionsForUser,
   revokeSession,
   revokeAllUserSessions,
   getSessionById,
-} from "@/services/session.service";
-import { prisma } from "@/lib/prisma";
+} from "../services/session.service.js";
+import { prisma } from "../lib/prisma.js";
 
 /** GET /api/security/dashboard — business admins */
 export async function securityDashboard(req: AuthenticatedRequest, res: Response) {

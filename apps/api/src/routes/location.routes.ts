@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "@/middleware/auth";
+import { requireAuth } from "../middleware/auth.js";
 import {
   postLocationEvent,
   postFieldStart,
@@ -12,7 +12,7 @@ import {
   getInsights,
   putOffice,
   getReport,
-} from "@/controllers/location.controller";
+} from "../controllers/location.controller.js";
 
 const router: Router = Router();
 

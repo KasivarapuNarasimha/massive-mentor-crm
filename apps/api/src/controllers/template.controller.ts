@@ -1,13 +1,13 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
   listPublishedTemplates,
   getTemplateByIdOrSlug,
   provisionTemplateToBusiness,
   getBusinessConfigOrEnsure,
   seedIndustryTemplates,
-} from "@/services/template.service";
-import { ensureDefaultBusiness } from "@/services/business.service";
+} from "../services/template.service.js";
+import { ensureDefaultBusiness } from "../services/business.service.js";
 import { z } from "zod";
 
 export async function listTemplates(req: AuthenticatedRequest, res: Response) {

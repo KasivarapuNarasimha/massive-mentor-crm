@@ -1,7 +1,7 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
-import { listBusinessPortals, resolveUserPortal } from "@/services/portal.service";
-import { listEnabledAiFeatures } from "@/services/ai-pack.service";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import { listBusinessPortals, resolveUserPortal } from "../services/portal.service.js";
+import { listEnabledAiFeatures } from "../services/ai-pack.service.js";
 
 export async function getCurrentPortal(req: AuthenticatedRequest, res: Response) {
   try {

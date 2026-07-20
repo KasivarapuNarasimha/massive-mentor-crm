@@ -4,17 +4,17 @@
  */
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { recordAudit } from "@/services/audit.service";
+import { prisma } from "../lib/prisma.js";
+import { recordAudit } from "./audit.service.js";
 import {
   sendEmail,
   buildWelcomeAccountEmail,
   getLoginUrl,
-} from "@/services/email.service";
-import { createBusinessWithTemplate } from "@/services/business.service";
-import { resolveOrCreateCustomerOwner } from "@/services/customer-owner.service";
-import { startTrialForBusiness, trialDaysDefault } from "@/services/saas-billing.service";
-import { ensureSubscriptionPlans } from "@/services/subscription-plan.service";
+} from "./email.service.js";
+import { createBusinessWithTemplate } from "./business.service.js";
+import { resolveOrCreateCustomerOwner } from "./customer-owner.service.js";
+import { startTrialForBusiness, trialDaysDefault } from "./saas-billing.service.js";
+import { ensureSubscriptionPlans } from "./subscription-plan.service.js";
 
 function generateTempPassword(): string {
   // Readable + strong enough (12 chars)
@@ -190,7 +190,7 @@ export async function provisionCustomer(input: CreateCustomerInput) {
   }).catch(() => undefined);
 
   try {
-    const { notifySuperAdmins } = await import("@/services/billing-notify.service");
+    const { notifySuperAdmins } = await import("./billing-notify.service.js");
     await notifySuperAdmins({
       title: "New customer created",
       message: `${company} · ${email} · ${trialDays}-day trial`,

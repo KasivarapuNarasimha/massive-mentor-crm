@@ -3,9 +3,9 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { prisma } from "@/lib/prisma";
-import { env } from "@/config/env";
-import { toMoneyNumber } from "@/lib/money";
+import { prisma } from "../lib/prisma.js";
+import { env } from "../config/env.js";
+import { toMoneyNumber } from "../lib/money.js";
 
 function invoicesDir(): string {
   const base = env.BACKUP_DIR || path.join(process.cwd(), "storage");

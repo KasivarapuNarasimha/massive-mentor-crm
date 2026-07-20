@@ -2,7 +2,7 @@
  * SaaS subscription plan catalog (Starter / Professional / Enterprise × Monthly / Annual).
  * Pricing display + seed only — checkout still uses plan.price from DB.
  */
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 
 export const DEFAULT_PLANS = [
   {

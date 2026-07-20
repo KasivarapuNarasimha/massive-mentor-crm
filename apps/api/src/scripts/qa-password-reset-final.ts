@@ -5,16 +5,16 @@
 import "dotenv/config";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import { prisma } from "@/lib/prisma";
-import { env } from "@/config/env";
+import { prisma } from "../lib/prisma.js";
+import { env } from "../config/env.js";
 import {
   requestPasswordReset,
   completePasswordReset,
   validateResetToken,
   hashResetToken,
   GENERIC_OK,
-} from "@/services/password-reset.service";
-import { loginUser, loginPlatformAdmin, verifyToken, getUserById } from "@/services/auth.service";
+} from "../services/password-reset.service.js";
+import { loginUser, loginPlatformAdmin, verifyToken, getUserById } from "../services/auth.service.js";
 
 const results: Array<{ check: string; pass: boolean; detail: string }> = [];
 

@@ -1,10 +1,10 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 import { z } from "zod";
 import {
   detectDefaultCurrency,
   isCurrencyCode,
   SUPPORTED_CURRENCY_CODES,
-} from "@/lib/currency";
+} from "../lib/currency.js";
 
 export const profileSchema = z.object({
   businessName: z.string().min(2, "Business name must be at least 2 characters"),

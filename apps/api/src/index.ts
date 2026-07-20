@@ -10,7 +10,7 @@ import helmet from "helmet";
 import type { Server } from "node:http";
 
 // Validate all environment variables using Zod (fail fast)
-import { env } from "./config/env";
+import { env } from "./config/env.js";
 
 const app = express();
 const PORT = env.PORT;
@@ -148,7 +148,7 @@ app.post(
   "/api/payments/razorpay/webhook",
   express.raw({ type: "application/json" }),
   async (req, res) => {
-    const { razorpayWebhook } = await import("@/controllers/billing.controller");
+    const { razorpayWebhook } = await import("./controllers/billing.controller.js");
     return razorpayWebhook(req, res);
   }
 );
@@ -166,7 +166,7 @@ app.get("/health", async (_req, res) => {
 
   let dbOk = false;
   try {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("./lib/prisma.js");
     await prisma.$queryRaw`SELECT 1`;
     dbOk = true;
   } catch {
@@ -194,7 +194,7 @@ app.get("/health", async (_req, res) => {
 
 app.get("/ready", async (_req, res) => {
   try {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("./lib/prisma.js");
     await prisma.$queryRaw`SELECT 1`;
     res.json({ ready: true });
   } catch {
@@ -203,39 +203,39 @@ app.get("/ready", async (_req, res) => {
 });
 
 // Import routes
-import authRoutes from "@/routes/auth.routes";
-import profileRoutes from "@/routes/profile.routes";
-import healthRoutes from "@/routes/health.routes";
-import aiRoutes from "@/routes/ai.routes";
-import swotRoutes from "@/routes/swot.routes";
-import mentorRoutes from "@/routes/mentor.routes";
-import roadmapRoutes from "@/routes/roadmap.routes";
-import marketingRoutes from "@/routes/marketing.routes";
-import crmRoutes from "@/routes/crm.routes";
-import automationRoutes from "@/routes/automation.routes";
-import integrationRoutes from "@/routes/integration.routes";
-import teamRoutes from "@/routes/team.routes";
-import reportRoutes from "@/routes/report.routes";
-import businessRoutes from "@/routes/business.routes";
-import templateRoutes from "@/routes/template.routes";
-import dashboardRoutes from "@/routes/dashboard.routes";
-import portalRoutes from "@/routes/portal.routes";
-import userAdminRoutes from "@/routes/user-admin.routes";
-import financeRoutes from "@/routes/finance.routes";
-import locationRoutes from "@/routes/location.routes";
-import platformRoutes from "@/routes/platform.routes";
-import demoRoutes from "@/routes/demo.routes";
-import leadsRoutes from "@/routes/leads.routes";
-import backupRoutes from "@/routes/backup.routes";
-import approvalRoutes from "@/routes/approval.routes";
-import billingRoutes from "@/routes/billing.routes";
-import securityRoutes from "@/routes/security.routes";
-import { seedIndustryTemplates } from "@/services/template.service";
-import { startBackupScheduler, stopBackupScheduler } from "@/services/backup.service";
-import { apiGeneralLimiter } from "@/middleware/rateLimiter";
-import { requireBillingAccess } from "@/middleware/requireBillingAccess";
-import { ensureSubscriptionPlans } from "@/services/subscription-plan.service";
-import { runDailyBillingJobs } from "@/services/saas-billing.service";
+import authRoutes from "./routes/auth.routes.js";
+import profileRoutes from "./routes/profile.routes.js";
+import healthRoutes from "./routes/health.routes.js";
+import aiRoutes from "./routes/ai.routes.js";
+import swotRoutes from "./routes/swot.routes.js";
+import mentorRoutes from "./routes/mentor.routes.js";
+import roadmapRoutes from "./routes/roadmap.routes.js";
+import marketingRoutes from "./routes/marketing.routes.js";
+import crmRoutes from "./routes/crm.routes.js";
+import automationRoutes from "./routes/automation.routes.js";
+import integrationRoutes from "./routes/integration.routes.js";
+import teamRoutes from "./routes/team.routes.js";
+import reportRoutes from "./routes/report.routes.js";
+import businessRoutes from "./routes/business.routes.js";
+import templateRoutes from "./routes/template.routes.js";
+import dashboardRoutes from "./routes/dashboard.routes.js";
+import portalRoutes from "./routes/portal.routes.js";
+import userAdminRoutes from "./routes/user-admin.routes.js";
+import financeRoutes from "./routes/finance.routes.js";
+import locationRoutes from "./routes/location.routes.js";
+import platformRoutes from "./routes/platform.routes.js";
+import demoRoutes from "./routes/demo.routes.js";
+import leadsRoutes from "./routes/leads.routes.js";
+import backupRoutes from "./routes/backup.routes.js";
+import approvalRoutes from "./routes/approval.routes.js";
+import billingRoutes from "./routes/billing.routes.js";
+import securityRoutes from "./routes/security.routes.js";
+import { seedIndustryTemplates } from "./services/template.service.js";
+import { startBackupScheduler, stopBackupScheduler } from "./services/backup.service.js";
+import { apiGeneralLimiter } from "./middleware/rateLimiter.js";
+import { requireBillingAccess } from "./middleware/requireBillingAccess.js";
+import { ensureSubscriptionPlans } from "./services/subscription-plan.service.js";
+import { runDailyBillingJobs } from "./services/saas-billing.service.js";
 
 // General API abuse protection
 app.use("/api", apiGeneralLimiter);
@@ -332,7 +332,7 @@ server = app.listen(PORT, () => {
   seedIndustryTemplates().catch((err) => {
     console.error("[templates] boot seed failed:", err instanceof Error ? err.message : err);
   });
-  import("@/scripts/seed-portals")
+  import("./scripts/seed-portals.js")
     .then((m) => m.seedPortals())
     .catch((err) => {
       console.error("[portals] boot seed failed:", err instanceof Error ? err.message : err);
@@ -346,7 +346,7 @@ server = app.listen(PORT, () => {
   // Daily SaaS billing job — multi-instance safe via Postgres advisory lock
   const runBilling = async () => {
     try {
-      const { withDistributedLock } = await import("@/lib/distributed-lock");
+      const { withDistributedLock } = await import("./lib/distributed-lock.js");
       const { ran, result } = await withDistributedLock("saas-billing-daily", () =>
         runDailyBillingJobs()
       );
@@ -374,7 +374,7 @@ async function shutdown(signal: string) {
     setTimeout(resolve, 10000);
   });
   try {
-    const { prisma } = await import("@/lib/prisma");
+    const { prisma } = await import("./lib/prisma.js");
     await prisma.$disconnect();
   } catch {
     /* ignore */

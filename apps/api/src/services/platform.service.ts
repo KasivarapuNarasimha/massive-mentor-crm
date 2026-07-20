@@ -1,13 +1,13 @@
-import { prisma } from "@/lib/prisma";
-import { recordAudit } from "@/services/audit.service";
-import { createBusinessWithTemplate } from "@/services/business.service";
+import { prisma } from "../lib/prisma.js";
+import { recordAudit } from "./audit.service.js";
+import { createBusinessWithTemplate } from "./business.service.js";
 import {
   resolveOrCreateCustomerOwner,
   userHasActiveCustomerBusiness,
-} from "@/services/customer-owner.service";
+} from "./customer-owner.service.js";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { toMoneyNumber } from "@/lib/money";
+import { toMoneyNumber } from "../lib/money.js";
 
 const PLANS = ["trial", "basic", "professional", "enterprise"] as const;
 export type PlanKey = (typeof PLANS)[number];

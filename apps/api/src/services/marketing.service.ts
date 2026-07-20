@@ -1,5 +1,5 @@
-import { getAIService } from "@/services/ai.service";
-import { sanitizePromptInput } from "@/utils/sanitize";
+import { getAIService } from "./ai.service.js";
+import { sanitizePromptInput } from "../utils/sanitize.js";
 
 export interface MarketingInputs {
   businessName: string;

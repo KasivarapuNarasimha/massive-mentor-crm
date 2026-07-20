@@ -1,5 +1,5 @@
-import { getBusinessConfig } from "@/services/template.service";
-import { getUserBusinessId } from "@/services/field-engine.service";
+import { getBusinessConfig } from "./template.service.js";
+import { getUserBusinessId } from "./field-engine.service.js";
 
 export type AiFeatureDef = {
   key: string;

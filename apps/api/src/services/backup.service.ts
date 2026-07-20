@@ -12,10 +12,10 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import zlib from "node:zlib";
 import { promisify } from "node:util";
-import { prisma } from "@/lib/prisma";
-import { env } from "@/config/env";
-import { recordAudit } from "@/services/audit.service";
-import { sendEmail } from "@/services/email.service";
+import { prisma } from "../lib/prisma.js";
+import { env } from "../config/env.js";
+import { recordAudit } from "./audit.service.js";
+import { sendEmail } from "./email.service.js";
 
 const gzip = promisify(zlib.gzip);
 const gunzip = promisify(zlib.gunzip);

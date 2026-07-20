@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/prisma";
-import { getUserBusinessId } from "@/services/field-engine.service";
+import { prisma } from "../lib/prisma.js";
+import { getUserBusinessId } from "./field-engine.service.js";
 
 /** Roles that may only see records they own or are assigned to */
 const OWN_DATA_ONLY_ROLES = new Set([

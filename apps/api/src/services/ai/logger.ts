@@ -1,4 +1,4 @@
-import { AIUsage } from './types';
+import { AIUsage } from './types.js';
 
 const isProd = () => process.env.NODE_ENV === "production";
 

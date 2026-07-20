@@ -1,11 +1,11 @@
-import { prisma } from "@/lib/prisma";
-import { recordAudit } from "@/services/audit.service";
+import { prisma } from "../lib/prisma.js";
+import { recordAudit } from "./audit.service.js";
 import {
   ensureBusinessConfig,
   seedIndustryTemplates,
   provisionTemplateToBusiness,
-} from "@/services/template.service";
-import type { PlatformRole, TenantContext } from "@/types/tenant";
+} from "./template.service.js";
+import type { PlatformRole, TenantContext } from "../types/tenant.js";
 
 export type BusinessSummary = {
   id: string;

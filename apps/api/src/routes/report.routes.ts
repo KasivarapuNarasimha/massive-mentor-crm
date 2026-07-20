@@ -11,8 +11,8 @@ import {
   previewImportFile,
   backupDb,
   restoreDb,
-} from "@/controllers/report.controller";
-import { requireAuth, requireRole } from "@/middleware/auth";
+} from "../controllers/report.controller.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router: Router = Router();
 

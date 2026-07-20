@@ -1,6 +1,6 @@
 import net from "node:net";
 import tls from "node:tls";
-import { env } from "@/config/env";
+import { env } from "../config/env.js";
 
 export type SendEmailInput = {
   to: string;
@@ -376,7 +376,7 @@ export {
   buildRenewalReminderEmail,
   getAppUrl,
   getLoginUrl,
-} from "@/services/email/templates";
+} from "./email/templates.js";
 
 /** Test SMTP connectivity (for diagnostics). Never logs password. */
 export async function testSmtpConnection(): Promise<{

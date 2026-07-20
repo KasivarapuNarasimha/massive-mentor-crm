@@ -2,7 +2,7 @@
  * Massive Mentor email brand tokens + URL helpers.
  * Inline-CSS safe; no runtime CSS frameworks.
  */
-import { env } from "@/config/env";
+import { env } from "../../config/env.js";
 
 export const EMAIL_BRAND = {
   name: "Massive Mentor CRM",

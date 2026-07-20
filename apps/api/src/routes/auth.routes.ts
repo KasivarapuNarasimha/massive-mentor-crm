@@ -7,9 +7,9 @@ import {
   forgotPasswordCustomer,
   validatePasswordResetToken,
   resetPasswordWithToken,
-} from "@/controllers/auth.controller";
-import { requireAuth } from "@/middleware/auth";
-import { loginLimiter, registerLimiter, passwordResetLimiter } from "@/middleware/rateLimiter";
+} from "../controllers/auth.controller.js";
+import { requireAuth } from "../middleware/auth.js";
+import { loginLimiter, registerLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js";
 
 const router: Router = Router();
 

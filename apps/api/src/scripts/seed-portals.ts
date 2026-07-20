@@ -11,8 +11,8 @@
  *   DEMO_PASSWORD default: 123456789
  */
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { ensureDemoWorkspace, DEMO_EMAIL } from "@/services/demo.service";
+import { prisma } from "../lib/prisma.js";
+import { ensureDemoWorkspace, DEMO_EMAIL } from "../services/demo.service.js";
 
 export const SUPER_ADMIN_EMAIL = (
   process.env.SUPER_ADMIN_EMAIL || "team@massivementor.in"

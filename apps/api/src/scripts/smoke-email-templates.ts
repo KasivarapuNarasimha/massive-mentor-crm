@@ -11,7 +11,7 @@ import {
   buildInvoiceGeneratedEmail,
   buildInvitationEmail,
   getAppUrl,
-} from "@/services/email/templates";
+} from "../services/email/templates.js";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(`FAIL: ${msg}`);

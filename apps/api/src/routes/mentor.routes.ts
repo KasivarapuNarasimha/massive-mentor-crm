@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { chatWithMentor, getMentorHistory } from "@/controllers/mentor.controller";
-import { requireAuth } from "@/middleware/auth";
-import { mentorChatLimiter } from "@/middleware/rateLimiter";
-import { requireAiQuota } from "@/middleware/aiQuota";
+import { chatWithMentor, getMentorHistory } from "../controllers/mentor.controller.js";
+import { requireAuth } from "../middleware/auth.js";
+import { mentorChatLimiter } from "../middleware/rateLimiter.js";
+import { requireAiQuota } from "../middleware/aiQuota.js";
 
 const router: Router = Router();
 

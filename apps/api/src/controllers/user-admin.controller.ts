@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { z } from "zod";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
   createBusinessUser,
   listBusinessUsers,
@@ -9,9 +9,9 @@ import {
   setBusinessUserDisabled,
   deleteBusinessUser,
   ASSIGNABLE_ROLES,
-} from "@/services/user-admin.service";
-import { getBusinessConfig } from "@/services/template.service";
-import { ensureDefaultBusiness } from "@/services/business.service";
+} from "../services/user-admin.service.js";
+import { getBusinessConfig } from "../services/template.service.js";
+import { ensureDefaultBusiness } from "../services/business.service.js";
 
 const createUserSchema = z.object({
   email: z.string().email(),

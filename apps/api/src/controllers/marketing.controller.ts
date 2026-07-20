@@ -1,6 +1,6 @@
 import { Response } from "express";
-import { generateMarketingContent, MarketingInputs } from "@/services/marketing.service";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { generateMarketingContent, MarketingInputs } from "../services/marketing.service.js";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 
 export async function generateMarketing(req: AuthenticatedRequest, res: Response) {
   try {

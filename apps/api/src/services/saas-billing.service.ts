@@ -3,26 +3,26 @@
  * Extends platform PlatformInvoice + SubscriptionEvent for ops history.
  */
 import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
-import { env } from "@/config/env";
-import { recordAudit } from "@/services/audit.service";
+import { prisma } from "../lib/prisma.js";
+import { env } from "../config/env.js";
+import { recordAudit } from "./audit.service.js";
 import {
   sendEmail,
   buildTrialExpiredEmail,
   buildTrialExpiryReminderEmail,
   buildRenewalReminderEmail,
-} from "@/services/email.service";
-import { notifyUser } from "@/services/notification.service";
-import { getUserBusinessId } from "@/services/field-engine.service";
+} from "./email.service.js";
+import { notifyUser } from "./notification.service.js";
+import { getUserBusinessId } from "./field-engine.service.js";
 import {
   ensureSubscriptionPlans,
   getPlanByCode,
   getPlanById,
   listActivePlans,
-} from "@/services/subscription-plan.service";
-import { evaluateBillingAccess } from "@/services/billing-access.service";
-import { validateCoupon } from "@/services/billing-coupon.service";
-import { notifySuperAdmins } from "@/services/billing-notify.service";
+} from "./subscription-plan.service.js";
+import { evaluateBillingAccess } from "./billing-access.service.js";
+import { validateCoupon } from "./billing-coupon.service.js";
+import { notifySuperAdmins } from "./billing-notify.service.js";
 
 const GST_RATE = 0.18;
 
@@ -39,7 +39,7 @@ export function getRazorpayPublicKey(): string | null {
 }
 
 async function nextInvoiceNumber(): Promise<string> {
-  const { nextSaaSInvoiceNumber } = await import("@/services/invoice-sequence.service");
+  const { nextSaaSInvoiceNumber } = await import("./invoice-sequence.service.js");
   return nextSaaSInvoiceNumber();
 }
 
@@ -461,7 +461,7 @@ export async function acknowledgeCheckoutPayment(
   const webhookSecret = (env.RAZORPAY_WEBHOOK_SECRET || "").trim();
   if (!webhookSecret && env.NODE_ENV !== "production") {
     const { activateSubscriptionFromPayment } = await import(
-      "@/services/billing-activation.service"
+      "./billing-activation.service.js"
     );
     await activateSubscriptionFromPayment({
       paymentId: payment.id,

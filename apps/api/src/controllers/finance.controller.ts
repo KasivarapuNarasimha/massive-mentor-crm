@@ -1,6 +1,6 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
-import * as finance from "@/services/finance.service";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import * as finance from "../services/finance.service.js";
 
 function q(req: AuthenticatedRequest, key: string) {
   const v = req.query[key];

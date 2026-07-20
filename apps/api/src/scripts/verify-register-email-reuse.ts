@@ -2,9 +2,9 @@
  * Register → soft-delete → register again (same email) must reuse User, not fail.
  * Run: node --import tsx src/scripts/verify-register-email-reuse.ts
  */
-import { prisma } from "@/lib/prisma";
-import { registerUser } from "@/services/auth.service";
-import * as platform from "@/services/platform.service";
+import { prisma } from "../lib/prisma.js";
+import { registerUser } from "../services/auth.service.js";
+import * as platform from "../services/platform.service.js";
 
 async function main() {
   const stamp = Date.now();
@@ -62,7 +62,7 @@ async function main() {
   if (uEnabled?.isDisabled) throw new Error("User should be re-enabled");
 
   console.log("4) Login with new password");
-  const { loginUser } = await import("@/services/auth.service");
+  const { loginUser } = await import("../services/auth.service.js");
   const login = await loginUser({ email, password: "NewPass456!" });
   console.log("   login ok", login.user.id);
 

@@ -2,20 +2,20 @@
  * Single path to activate a paid SaaS subscription after trusted payment confirmation.
  * Called from Razorpay webhook (production) — not from untrusted frontend alone.
  */
-import { prisma } from "@/lib/prisma";
-import { recordAudit } from "@/services/audit.service";
+import { prisma } from "../lib/prisma.js";
+import { recordAudit } from "./audit.service.js";
 import {
   sendEmail,
   buildPaymentSuccessEmail,
   buildSubscriptionActivatedEmail,
   buildInvoiceGeneratedEmail,
-} from "@/services/email.service";
-import { notifyUser } from "@/services/notification.service";
-import { getPlanById } from "@/services/subscription-plan.service";
-import { generateBillingInvoicePdf } from "@/services/billing-invoice-pdf.service";
-import { notifySuperAdmins } from "@/services/billing-notify.service";
+} from "./email.service.js";
+import { notifyUser } from "./notification.service.js";
+import { getPlanById } from "./subscription-plan.service.js";
+import { generateBillingInvoicePdf } from "./billing-invoice-pdf.service.js";
+import { notifySuperAdmins } from "./billing-notify.service.js";
 import fs from "node:fs";
-import { recordCouponRedemption } from "@/services/billing-coupon.service";
+import { recordCouponRedemption } from "./billing-coupon.service.js";
 
 function addMonths(d: Date, n: number): Date {
   const x = new Date(d);

@@ -1,10 +1,10 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 import { z } from "zod";
-import { getAIService } from "@/services/ai.service";
-import { sanitizePromptInput } from "@/utils/sanitize";
-import { logActivity } from "@/services/activity.service";
-import { notifyUser } from "@/services/notification.service";
-import { scheduleFollowupRefresh } from "@/services/followup-engine.service";
+import { getAIService } from "./ai.service.js";
+import { sanitizePromptInput } from "../utils/sanitize.js";
+import { logActivity } from "./activity.service.js";
+import { notifyUser } from "./notification.service.js";
+import { scheduleFollowupRefresh } from "./followup-engine.service.js";
 
 /** Persist activity + in-app notification for CRM mutations */
 async function notifyCrmCreated(
@@ -45,22 +45,22 @@ import {
   getContactFieldDefs,
   getUserBusinessId,
   mergeCustomFields,
-} from "@/services/field-engine.service";
+} from "./field-engine.service.js";
 import {
   andTenant,
   buildCrmScope,
   buildOwnedEntityScope,
   buildTenantScope,
   resolveActorRole,
-} from "@/services/tenant-scope.service";
-import { paginated, skipTake, type PaginatedResult } from "@/services/pagination";
-import { recordAudit } from "@/services/audit.service";
+} from "./tenant-scope.service.js";
+import { paginated, skipTake, type PaginatedResult } from "./pagination.js";
+import { recordAudit } from "./audit.service.js";
 import {
   syncFromDealStageChange,
   syncFromLeadStatusChange,
   type PipelineSyncResult,
-} from "@/services/pipeline-sync.service";
-import { toMoneyNumber } from "@/lib/money";
+} from "./pipeline-sync.service.js";
+import { toMoneyNumber } from "../lib/money.js";
 
 // =====================================================
 // Core CRM Service (Phase 3 Foundation)
@@ -252,7 +252,7 @@ export async function buildContactListWhere(
   // Reclaim imports stranded on soft-deleted workspaces (same user)
   try {
     const { getUserBusinessId, reclaimContactsFromDeletedBusinesses } = await import(
-      "@/services/field-engine.service"
+      "./field-engine.service.js"
     );
     const activeBiz = await getUserBusinessId(userId);
     if (activeBiz) {

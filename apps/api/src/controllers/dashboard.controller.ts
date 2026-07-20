@@ -1,9 +1,9 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
-import { evaluateDashboard, listDashboardsForUser } from "@/services/dashboard-engine.service";
-import { ensureDefaultBusiness } from "@/services/business.service";
-import { ensureBusinessConfig } from "@/services/template.service";
-import { prisma } from "@/lib/prisma";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import { evaluateDashboard, listDashboardsForUser } from "../services/dashboard-engine.service.js";
+import { ensureDefaultBusiness } from "../services/business.service.js";
+import { ensureBusinessConfig } from "../services/template.service.js";
+import { prisma } from "../lib/prisma.js";
 
 const WORKSPACE_ADMIN = new Set(["business_admin", "admin", "owner", "ceo", "super_admin"]);
 

@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
   getReportsDashboard,
   exportContactsToCsv,
@@ -17,7 +17,7 @@ import {
   type ExportFilters,
   type ImportReport,
   type ColumnMapping,
-} from "@/services/report.service";
+} from "../services/report.service.js";
 
 export async function getDashboardReports(req: AuthenticatedRequest, res: Response) {
   try {

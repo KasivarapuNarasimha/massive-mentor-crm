@@ -4,12 +4,12 @@
  * - IP fallback: city/state/country only — never fabricate locality/area
  * - Tenant-scoped via businessId
  */
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 import {
   buildOwnedEntityScope,
   resolveActorRole,
-} from "@/services/tenant-scope.service";
-import { getUserBusinessId } from "@/services/field-engine.service";
+} from "./tenant-scope.service.js";
+import { getUserBusinessId } from "./field-engine.service.js";
 
 export type LocationPayload = {
   eventType?: string;

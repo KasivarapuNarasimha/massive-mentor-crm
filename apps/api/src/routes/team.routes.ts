@@ -6,8 +6,8 @@ import {
   addMember,
   listTeamMembers,
   listMyTeams,
-} from "@/controllers/team.controller";
-import { requireAuth, requireRole } from "@/middleware/auth";
+} from "../controllers/team.controller.js";
+import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router: Router = Router();
 

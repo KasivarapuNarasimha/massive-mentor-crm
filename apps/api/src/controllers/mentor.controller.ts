@@ -1,6 +1,6 @@
 import { Response } from "express";
-import { sendChatMessage, getChatHistory } from "@/services/mentor.service";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { sendChatMessage, getChatHistory } from "../services/mentor.service.js";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 
 export async function chatWithMentor(req: AuthenticatedRequest, res: Response) {
   try {

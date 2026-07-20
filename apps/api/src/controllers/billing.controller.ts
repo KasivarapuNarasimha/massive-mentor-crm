@@ -1,11 +1,11 @@
 import { Response, Request } from "express";
-import type { AuthenticatedRequest } from "@/middleware/auth";
-import * as billing from "@/services/saas-billing.service";
-import { evaluateBillingAccess } from "@/services/billing-access.service";
-import { listActivePlans } from "@/services/subscription-plan.service";
-import { processRazorpayWebhook } from "@/services/billing-webhook.service";
-import { validateCoupon } from "@/services/billing-coupon.service";
-import { prisma } from "@/lib/prisma";
+import type { AuthenticatedRequest } from "../middleware/auth.js";
+import * as billing from "../services/saas-billing.service.js";
+import { evaluateBillingAccess } from "../services/billing-access.service.js";
+import { listActivePlans } from "../services/subscription-plan.service.js";
+import { processRazorpayWebhook } from "../services/billing-webhook.service.js";
+import { validateCoupon } from "../services/billing-coupon.service.js";
+import { prisma } from "../lib/prisma.js";
 import fs from "node:fs";
 
 export async function getAccess(req: AuthenticatedRequest, res: Response) {
@@ -107,7 +107,7 @@ export async function validateCouponHandler(req: AuthenticatedRequest, res: Resp
     const plans = await listActivePlans();
     const plan = plans.find((p) => p.code === planCode);
     if (!plan) return res.status(400).json({ success: false, error: "Invalid plan" });
-    const { toMoneyNumber } = await import("@/lib/money");
+    const { toMoneyNumber } = await import("../lib/money.js");
     const data = await validateCoupon({
       code,
       planCode,
@@ -122,7 +122,7 @@ export async function validateCouponHandler(req: AuthenticatedRequest, res: Resp
 export async function downloadInvoicePdf(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const { getUserBusinessId } = await import("@/services/field-engine.service");
+    const { getUserBusinessId } = await import("../services/field-engine.service.js");
     const businessId = await getUserBusinessId(req.user.id);
     if (!businessId) {
       return res.status(403).json({ success: false, error: "Business context required" });
@@ -134,7 +134,7 @@ export async function downloadInvoicePdf(req: AuthenticatedRequest, res: Respons
       return res.status(404).json({ success: false, error: "Invoice not found" });
     }
     if (!payment.invoicePdfPath || !fs.existsSync(payment.invoicePdfPath)) {
-      const { generateBillingInvoicePdf } = await import("@/services/billing-invoice-pdf.service");
+      const { generateBillingInvoicePdf } = await import("../services/billing-invoice-pdf.service.js");
       if (payment.status === "paid") {
         const pdf = await generateBillingInvoicePdf(payment.id);
         res.setHeader("Content-Type", "application/pdf");

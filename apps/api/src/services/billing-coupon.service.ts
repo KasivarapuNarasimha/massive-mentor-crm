@@ -1,5 +1,5 @@
-import { prisma } from "@/lib/prisma";
-import { toMoneyNumber } from "@/lib/money";
+import { prisma } from "../lib/prisma.js";
+import { toMoneyNumber } from "../lib/money.js";
 
 export type CouponValidation = {
   ok: boolean;

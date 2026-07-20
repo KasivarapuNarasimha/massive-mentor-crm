@@ -3,10 +3,10 @@
  * Usage: npx tsx src/scripts/diagnose-password-reset-email.ts [email]
  */
 import "dotenv/config";
-import { env } from "@/config/env";
-import { prisma } from "@/lib/prisma";
-import { requestPasswordReset } from "@/services/password-reset.service";
-import { testSmtpConnection } from "@/services/email.service";
+import { env } from "../config/env.js";
+import { prisma } from "../lib/prisma.js";
+import { requestPasswordReset } from "../services/password-reset.service.js";
+import { testSmtpConnection } from "../services/email.service.js";
 
 async function main() {
   const emailArg = process.argv[2];

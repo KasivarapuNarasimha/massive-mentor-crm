@@ -1,8 +1,8 @@
-import { AIProvider, AIResponse, GenerateOptions } from './ai/types';
-import { AIProviderNotConfiguredError } from './ai/errors';
-import { PromptTemplates, fillTemplate } from './ai/prompt-templates';
-import { logAIError } from './ai/logger';
-import { env } from '@/config/env';
+import { AIProvider, AIResponse, GenerateOptions } from './ai/types.js';
+import { AIProviderNotConfiguredError } from './ai/errors.js';
+import { PromptTemplates, fillTemplate } from './ai/prompt-templates.js';
+import { logAIError } from './ai/logger.js';
+import { env } from '../config/env.js';
 
 function isValidOpenAIKey(key: string | undefined): boolean {
   if (!key) return false;
@@ -61,7 +61,7 @@ export class AIService {
         throw new AIProviderNotConfiguredError('openai');
       }
 
-      const { OpenAIProvider } = await import('./ai/providers/openai.provider');
+      const { OpenAIProvider } = await import('./ai/providers/openai.provider.js');
       console.log(`[AI] OpenAI provider initialized successfully (model: ${model})`);
       this.provider = new OpenAIProvider(apiKey!, model);
 
@@ -85,7 +85,7 @@ export class AIService {
         throw new AIProviderNotConfiguredError('groq');
       }
 
-      const { GroqProvider } = await import('./ai/providers/groq.provider');
+      const { GroqProvider } = await import('./ai/providers/groq.provider.js');
       console.log(`[AI] Groq provider initialized successfully (model: ${model})`);
       this.provider = new GroqProvider(apiKey!, model);
 

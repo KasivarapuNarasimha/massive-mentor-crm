@@ -1,9 +1,9 @@
 import { Response } from "express";
 import { z } from "zod";
-import { AuthenticatedRequest } from "@/middleware/auth";
-import * as platform from "@/services/platform.service";
-import { loginPlatformAdmin, issueSupportCustomerToken } from "@/services/auth.service";
-import { loginSchema } from "@/services/auth.service";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import * as platform from "../services/platform.service.js";
+import { loginPlatformAdmin, issueSupportCustomerToken } from "../services/auth.service.js";
+import { loginSchema } from "../services/auth.service.js";
 
 export async function platformLogin(req: AuthenticatedRequest, res: Response) {
   try {
@@ -92,7 +92,7 @@ export async function createBusiness(req: AuthenticatedRequest, res: Response) {
 
     // New provision path (auto password + trial + emails)
     if (!body.ownerPassword) {
-      const { provisionCustomer } = await import("@/services/customer-provision.service");
+      const { provisionCustomer } = await import("../services/customer-provision.service.js");
       const data = await provisionCustomer({
         actorUserId: req.user.id,
         companyName,
@@ -134,7 +134,7 @@ export async function extendTrial(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const days = Number(req.body?.days || 3);
-    const { adminExtendTrial } = await import("@/services/saas-billing.service");
+    const { adminExtendTrial } = await import("../services/saas-billing.service.js");
     const data = await adminExtendTrial(req.user.id, String(req.params.id), days);
     res.json({ success: true, data });
   } catch (e) {
@@ -145,7 +145,7 @@ export async function extendTrial(req: AuthenticatedRequest, res: Response) {
 export async function resetTrial(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const { adminResetTrial } = await import("@/services/saas-billing.service");
+    const { adminResetTrial } = await import("../services/saas-billing.service.js");
     const data = await adminResetTrial(req.user.id, String(req.params.id));
     res.json({ success: true, data });
   } catch (e) {
@@ -156,7 +156,7 @@ export async function resetTrial(req: AuthenticatedRequest, res: Response) {
 export async function revenueDashboard(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const { getSaaSRevenueDashboard } = await import("@/services/billing-revenue.service");
+    const { getSaaSRevenueDashboard } = await import("../services/billing-revenue.service.js");
     const data = await getSaaSRevenueDashboard();
     res.json({ success: true, data });
   } catch (e) {

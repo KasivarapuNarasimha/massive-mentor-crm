@@ -7,7 +7,7 @@
  * reuse that user when they have no active customer workspace.
  */
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 
 /** True when user has at least one non-deleted customer business (member or owner). */
 export async function userHasActiveCustomerBusiness(userId: string): Promise<boolean> {

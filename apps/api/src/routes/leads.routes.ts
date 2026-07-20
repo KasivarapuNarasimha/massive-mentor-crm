@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { requireAuth } from "@/middleware/auth";
+import { requireAuth } from "../middleware/auth.js";
 import {
   bulkEditLeadsHandler,
   bulkDeleteLeadsHandler,
   bulkRestoreLeadsHandler,
-} from "@/controllers/crm.controller";
+} from "../controllers/crm.controller.js";
 
 /**
  * Enterprise Leads bulk APIs

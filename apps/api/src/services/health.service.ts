@@ -1,8 +1,8 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 import { BusinessProfile, type Prisma } from "@prisma/client";
-import { getAIService } from "@/services/ai.service";
-import { sanitizePromptInput } from "@/utils/sanitize";
-import { scoreAnnualRevenueRange } from "@/lib/currency";
+import { getAIService } from "./ai.service.js";
+import { sanitizePromptInput } from "../utils/sanitize.js";
+import { scoreAnnualRevenueRange } from "../lib/currency.js";
 
 export interface HealthScoreBreakdown {
   profile: number;

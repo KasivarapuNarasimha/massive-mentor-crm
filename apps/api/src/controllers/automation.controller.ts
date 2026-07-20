@@ -1,11 +1,11 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
   checkAndSendReminders,
   logCrmActivity,
-} from "@/services/automation.service";
-import { createNotification, getNotifications, markAsRead, markAllAsRead } from "@/services/notification.service";
-import { logActivity, getActivityTimeline } from "@/services/activity.service";
+} from "../services/automation.service.js";
+import { createNotification, getNotifications, markAsRead, markAllAsRead } from "../services/notification.service.js";
+import { logActivity, getActivityTimeline } from "../services/activity.service.js";
 
 export async function triggerReminders(req: AuthenticatedRequest, res: Response) {
   try {
@@ -24,7 +24,7 @@ export async function getUserNotifications(req: AuthenticatedRequest, res: Respo
     const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
     const pageSize = req.query.pageSize ? parseInt(String(req.query.pageSize), 10) : 30;
     // Process due reminders on poll (lightweight real-time)
-    const { processDueReminders } = await import("@/services/notification.service");
+    const { processDueReminders } = await import("../services/notification.service.js");
     await processDueReminders(req.user.id).catch(() => {});
     const result = await getNotifications(req.user.id, {
       unreadOnly,
@@ -89,7 +89,7 @@ export async function listActivities(req: AuthenticatedRequest, res: Response) {
     const entityId = (Array.isArray(ei) ? ei[0] : ei) as string | undefined;
     const activities = await getActivityTimeline(req.user.id, entityType, entityId);
     // Full audit log (create/update/delete/login/etc.)
-    const { searchAuditLog } = await import("@/services/activity.service");
+    const { searchAuditLog } = await import("../services/activity.service.js");
     const audit = await searchAuditLog(req.user.id, {
       action: req.query.action ? String(req.query.action) : undefined,
       entityType: entityType,

@@ -1,6 +1,6 @@
-import type { FieldDef } from "@/types/template-manifest";
-import { getBusinessConfig } from "@/services/template.service";
-import { prisma } from "@/lib/prisma";
+import type { FieldDef } from "../types/template-manifest.js";
+import { getBusinessConfig } from "./template.service.js";
+import { prisma } from "../lib/prisma.js";
 
 export type CoreContactFields = {
   name?: string;

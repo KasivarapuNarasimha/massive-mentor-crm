@@ -2,7 +2,7 @@
  * Atomic, globally unique invoice / platform invoice number generation.
  * Uses Postgres advisory locks + InvoiceSequence row upsert.
  */
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 
 /**
  * Next number for tenant finance invoices: INV-YYYY-00001 (unique per business).

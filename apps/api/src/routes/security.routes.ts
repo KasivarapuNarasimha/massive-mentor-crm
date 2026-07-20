@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "@/middleware/auth";
+import { requireAuth } from "../middleware/auth.js";
 import {
   securityDashboard,
   mySessions,
@@ -7,7 +7,7 @@ import {
   terminateOtherSessions,
   loginHistory,
   mySecurityProfile,
-} from "@/controllers/security.controller";
+} from "../controllers/security.controller.js";
 
 const router: Router = Router();
 

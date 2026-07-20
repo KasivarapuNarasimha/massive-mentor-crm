@@ -8,8 +8,8 @@ import {
   sendGmailHandler,
   createCalendarEventHandler,
   validateWhatsAppHandler,
-} from "@/controllers/integration.controller";
-import { requireAuth } from "@/middleware/auth";
+} from "../controllers/integration.controller.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router: Router = Router();
 

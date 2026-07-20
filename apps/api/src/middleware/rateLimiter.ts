@@ -1,6 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import type { Request, Response } from 'express';
-import type { AuthenticatedRequest } from './auth';
+import type { AuthenticatedRequest } from './auth.js';
 
 /**
  * Lightweight rate limiters for sensitive / costly endpoints.

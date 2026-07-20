@@ -1,9 +1,9 @@
-import { prisma } from "@/lib/prisma";
-import { getUserBusinessId } from "@/services/field-engine.service";
-import { getIntegration } from "@/services/integration.service";
-import { recordAudit } from "@/services/audit.service";
-import { notifyUser } from "@/services/notification.service";
-import { env } from "@/config/env";
+import { prisma } from "../lib/prisma.js";
+import { getUserBusinessId } from "./field-engine.service.js";
+import { getIntegration } from "./integration.service.js";
+import { recordAudit } from "./audit.service.js";
+import { notifyUser } from "./notification.service.js";
+import { env } from "../config/env.js";
 
 type WaConfig = {
   accessToken?: string;

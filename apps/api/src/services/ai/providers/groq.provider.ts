@@ -1,7 +1,7 @@
 import Groq from 'groq-sdk';
-import { AIProvider, AIResponse, GenerateOptions, AIUsage } from '../types';
-import { AIError, AIRateLimitError, AIInvalidResponseError } from '../errors';
-import { logAIUsage, logAIError } from '../logger';
+import { AIProvider, AIResponse, GenerateOptions, AIUsage } from '../types.js';
+import { AIError, AIRateLimitError, AIInvalidResponseError } from '../errors.js';
+import { logAIUsage, logAIError } from '../logger.js';
 
 export class GroqProvider implements AIProvider {
   private client: Groq;

@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
   listIntegrations,
   upsertIntegration,
@@ -8,7 +8,7 @@ import {
   sendGmail,
   createCalendarEvent,
   configureAndValidateWhatsApp,
-} from "@/services/integration.service";
+} from "../services/integration.service.js";
 
 export async function getIntegrations(req: AuthenticatedRequest, res: Response) {
   try {
@@ -69,7 +69,7 @@ export async function validateWhatsAppHandler(req: AuthenticatedRequest, res: Re
       phoneNumberId?: string;
       apiVersion?: string;
     };
-    const { validateWhatsAppCredentials } = await import("@/services/integration.service");
+    const { validateWhatsAppCredentials } = await import("../services/integration.service.js");
     if (!accessToken || !phoneNumberId) {
       return res.status(400).json({ success: false, error: "accessToken and phoneNumberId required" });
     }
@@ -119,7 +119,7 @@ export async function sendWhatsApp(req: AuthenticatedRequest, res: Response) {
 export async function listWhatsAppHistory(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const { listWhatsAppHistory: list } = await import("@/services/whatsapp.service");
+    const { listWhatsAppHistory: list } = await import("../services/whatsapp.service.js");
     const contactId = req.query.contactId ? String(req.query.contactId) : undefined;
     const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
     const data = await list(req.user.id, { contactId, page, pageSize: 50 });

@@ -1,12 +1,12 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
-import { loginDemoUser, loginSchema } from "@/services/auth.service";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import { loginDemoUser, loginSchema } from "../services/auth.service.js";
 import {
   ensureDemoWorkspace,
   resetDemoData,
   DEMO_EMAIL,
   DEMO_PASSWORD,
-} from "@/services/demo.service";
+} from "../services/demo.service.js";
 
 export async function demoLogin(req: AuthenticatedRequest, res: Response) {
   try {

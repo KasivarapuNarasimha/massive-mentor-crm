@@ -3,9 +3,9 @@
  * Tracks devices, concurrent session limits by plan, login history, force logout.
  * MFA-ready: session meta + User.mfaEnabled reserved; login can later return mfaRequired.
  */
-import { prisma } from "@/lib/prisma";
-import { notifyUser } from "@/services/notification.service";
-import { recordAudit } from "@/services/audit.service";
+import { prisma } from "../lib/prisma.js";
+import { notifyUser } from "./notification.service.js";
+import { recordAudit } from "./audit.service.js";
 
 export type DeviceInfo = {
   userAgent?: string | null;

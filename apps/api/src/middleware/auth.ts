@@ -1,7 +1,7 @@
 import { Response, NextFunction } from "express";
 import { Request } from "express";
-import { verifyToken, getUserById, type PortalAudience } from "@/services/auth.service";
-import type { TenantContext } from "@/types/tenant";
+import { verifyToken, getUserById, type PortalAudience } from "../services/auth.service.js";
+import type { TenantContext } from "../types/tenant.js";
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -49,7 +49,7 @@ async function loadAndValidateUser(
   // Enterprise session binding (JWT sid). Legacy tokens without sid still accepted once.
   if (sessionId) {
     try {
-      const { touchSession } = await import("@/services/session.service");
+      const { touchSession } = await import("../services/session.service.js");
       const ok = await touchSession(sessionId);
       if (!ok) {
         return {
@@ -195,7 +195,7 @@ export function requireRole(allowedRoles: string[]) {
         return res.status(401).json({ success: false, error: "Not authenticated" });
       }
       try {
-        const { resolveActorRole } = await import("@/services/tenant-scope.service");
+        const { resolveActorRole } = await import("../services/tenant-scope.service.js");
         const role = await resolveActorRole(req.user.id);
         if (
           role === "super_admin" ||

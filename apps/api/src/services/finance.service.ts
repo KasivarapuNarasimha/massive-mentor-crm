@@ -1,17 +1,17 @@
-import { prisma } from "@/lib/prisma";
-import { getUserBusinessId } from "@/services/field-engine.service";
-import { resolveActorRole } from "@/services/tenant-scope.service";
-import { paginated, skipTake } from "@/services/pagination";
-import { recordAudit } from "@/services/audit.service";
-import { notifyUser } from "@/services/notification.service";
+import { prisma } from "../lib/prisma.js";
+import { getUserBusinessId } from "./field-engine.service.js";
+import { resolveActorRole } from "./tenant-scope.service.js";
+import { paginated, skipTake } from "./pagination.js";
+import { recordAudit } from "./audit.service.js";
+import { notifyUser } from "./notification.service.js";
 import {
   detectDefaultCurrency,
   formatCurrency,
   isCurrencyCode,
   type CurrencyCode,
-} from "@/lib/currency";
-import { toDecimal, toMoneyNumber, moneyGte } from "@/lib/money";
-import { nextFinanceInvoiceNumber } from "@/services/invoice-sequence.service";
+} from "../lib/currency.js";
+import { toDecimal, toMoneyNumber, moneyGte } from "../lib/money.js";
+import { nextFinanceInvoiceNumber } from "./invoice-sequence.service.js";
 
 const FINANCE_ROLES = new Set([
   "ceo",
@@ -260,7 +260,7 @@ export async function createInvoice(
 
   // Optional multi-level approval when amount exceeds workflow threshold
   try {
-    const { maybeSubmitInvoiceApproval } = await import("@/services/approval.service");
+    const { maybeSubmitInvoiceApproval } = await import("./approval.service.js");
     await maybeSubmitInvoiceApproval(userId, {
       id: invoice.id,
       number: invoice.number,
@@ -441,7 +441,7 @@ export async function createExpense(
   });
 
   try {
-    const { maybeSubmitExpenseApproval } = await import("@/services/approval.service");
+    const { maybeSubmitExpenseApproval } = await import("./approval.service.js");
     await maybeSubmitExpenseApproval(userId, {
       id: expense.id,
       title: expense.title,

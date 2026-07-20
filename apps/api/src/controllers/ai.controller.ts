@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { getAIService } from '@/services/ai.service';
-import { PromptTemplates } from '@/services/ai/prompt-templates';
-import { AuthenticatedRequest } from '@/middleware/auth';
+import { getAIService } from '../services/ai.service.js';
+import { PromptTemplates } from '../services/ai/prompt-templates.js';
+import { AuthenticatedRequest } from '../middleware/auth.js';
 
 export async function testAI(req: AuthenticatedRequest, res: Response) {
   try {

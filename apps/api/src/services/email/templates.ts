@@ -11,7 +11,7 @@ import {
   getSupportEmail,
   getSupportWebsite,
   getSupportWhatsApp,
-} from "@/services/email/brand";
+} from "./brand.js";
 import {
   ctaButton,
   detailCard,
@@ -20,7 +20,7 @@ import {
   paragraph,
   renderEmailLayout,
   securityNotice,
-} from "@/services/email/layout";
+} from "./layout.js";
 
 export type BuiltEmail = {
   subject: string;

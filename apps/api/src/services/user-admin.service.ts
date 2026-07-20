@@ -1,8 +1,8 @@
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { ensureDefaultBusiness } from "@/services/business.service";
-import { recordAudit } from "@/services/audit.service";
-import { getBusinessConfig } from "@/services/template.service";
+import { prisma } from "../lib/prisma.js";
+import { ensureDefaultBusiness } from "./business.service.js";
+import { recordAudit } from "./audit.service.js";
+import { getBusinessConfig } from "./template.service.js";
 
 /** Roles Business Admin may assign (from portal/config — not industry-specific) */
 export const ASSIGNABLE_ROLES = [
@@ -205,7 +205,7 @@ export async function listBusinessUsers(actorUserId: string): Promise<{
     orderBy: { createdAt: "asc" },
   });
 
-  const { getUserSessionStats } = await import("@/services/session.service");
+  const { getUserSessionStats } = await import("./session.service.js");
   const stats = await getUserSessionStats(members.map((m) => m.user.id));
 
   return {
@@ -293,7 +293,7 @@ export async function updateBusinessUser(opts: {
   if (opts.password) {
     try {
       const { revokeAllUserSessions, recordLoginEvent } = await import(
-        "@/services/session.service"
+        "./session.service.js"
       );
       await revokeAllUserSessions(opts.userId, "password_change");
       await recordLoginEvent({
@@ -367,7 +367,7 @@ export async function setBusinessUserDisabled(opts: {
 
   if (opts.disabled) {
     try {
-      const { revokeAllUserSessions } = await import("@/services/session.service");
+      const { revokeAllUserSessions } = await import("./session.service.js");
       await revokeAllUserSessions(opts.userId, "disabled");
     } catch {
       /* non-fatal */

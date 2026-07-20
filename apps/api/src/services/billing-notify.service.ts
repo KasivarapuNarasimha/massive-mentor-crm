@@ -1,18 +1,18 @@
 /**
  * Super Admin notifications for SaaS billing lifecycle events.
  */
-import { prisma } from "@/lib/prisma";
-import { notifyUser } from "@/services/notification.service";
-import { sendEmail } from "@/services/email.service";
-import { env } from "@/config/env";
+import { prisma } from "../lib/prisma.js";
+import { notifyUser } from "./notification.service.js";
+import { sendEmail } from "./email.service.js";
+import { env } from "../config/env.js";
 import {
   ctaButton,
   heading,
   pText,
   paragraph,
   renderEmailLayout,
-} from "@/services/email/layout";
-import { escapeHtml, getLoginUrl } from "@/services/email/brand";
+} from "./email/layout.js";
+import { escapeHtml, getLoginUrl } from "./email/brand.js";
 
 function buildPlatformNotifyEmail(opts: { title: string; message: string }) {
   const adminUrl = getLoginUrl("/admin");

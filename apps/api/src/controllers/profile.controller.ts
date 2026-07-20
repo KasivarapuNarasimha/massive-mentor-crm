@@ -1,6 +1,6 @@
 import { Response } from "express";
-import { getProfile, upsertProfile, profileSchema } from "@/services/profile.service";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { getProfile, upsertProfile, profileSchema } from "../services/profile.service.js";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 
 export async function getBusinessProfile(req: AuthenticatedRequest, res: Response) {
   try {

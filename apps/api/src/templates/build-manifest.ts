@@ -1,4 +1,4 @@
-import type { IndustryTemplateManifest } from "@/types/template-manifest";
+import type { IndustryTemplateManifest } from "../types/template-manifest.js";
 
 const DEFAULT_PERMISSIONS = [
   "contacts.read",

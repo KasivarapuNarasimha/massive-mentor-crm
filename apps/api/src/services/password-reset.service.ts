@@ -1,10 +1,10 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { env } from "@/config/env";
-import { recordAudit } from "@/services/audit.service";
-import { buildPasswordResetEmail, sendEmail } from "@/services/email.service";
+import { prisma } from "../lib/prisma.js";
+import { env } from "../config/env.js";
+import { recordAudit } from "./audit.service.js";
+import { buildPasswordResetEmail, sendEmail } from "./email.service.js";
 
 export type ResetPortal = "customer" | "admin";
 
@@ -252,7 +252,7 @@ export async function completePasswordReset(opts: {
 
   try {
     const { revokeAllUserSessions, recordLoginEvent } = await import(
-      "@/services/session.service"
+      "./session.service.js"
     );
     await revokeAllUserSessions(row.userId, "password_change");
     await recordLoginEvent({

@@ -1,6 +1,6 @@
 import { Response } from "express";
-import { generateAndSaveRoadmap, getRoadmap } from "@/services/roadmap.service";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { generateAndSaveRoadmap, getRoadmap } from "../services/roadmap.service.js";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 
 export async function generateRoadmap(req: AuthenticatedRequest, res: Response) {
   try {

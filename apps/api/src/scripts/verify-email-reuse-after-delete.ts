@@ -3,8 +3,8 @@
  * Run: node --import tsx src/scripts/verify-email-reuse-after-delete.ts
  */
 import "dotenv/config";
-import { prisma } from "@/lib/prisma";
-import * as platform from "@/services/platform.service";
+import { prisma } from "../lib/prisma.js";
+import * as platform from "../services/platform.service.js";
 
 async function main() {
   const stamp = Date.now();

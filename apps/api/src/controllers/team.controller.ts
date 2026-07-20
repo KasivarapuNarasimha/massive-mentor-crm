@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
   createTeam,
   addTeamMember,
@@ -8,7 +8,7 @@ import {
   getUserRole,
   ROLES,
   getUserTeams,
-} from "@/services/team.service";
+} from "../services/team.service.js";
 
 export async function getCurrentUserRole(req: AuthenticatedRequest, res: Response) {
   try {

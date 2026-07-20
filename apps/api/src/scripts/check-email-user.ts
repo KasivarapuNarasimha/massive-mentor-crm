@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 
 const email = (process.argv[2] || "").toLowerCase().trim();
 if (!email) {

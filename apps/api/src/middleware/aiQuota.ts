@@ -2,8 +2,8 @@
  * Enforce per-business AI quotas before expensive LLM routes.
  */
 import { Response, NextFunction } from "express";
-import type { AuthenticatedRequest } from "@/middleware/auth";
-import { checkAiQuota, recordAiUsage, type AiFeature } from "@/services/ai-quota.service";
+import type { AuthenticatedRequest } from "./auth.js";
+import { checkAiQuota, recordAiUsage, type AiFeature } from "../services/ai-quota.service.js";
 
 export function requireAiQuota(feature: AiFeature | string = "other") {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {

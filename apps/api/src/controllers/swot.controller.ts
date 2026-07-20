@@ -1,6 +1,6 @@
 import { Response } from "express";
-import { generateAndSaveSWOT, getLatestSWOT } from "@/services/swot.service";
-import { AuthenticatedRequest } from "@/middleware/auth";
+import { generateAndSaveSWOT, getLatestSWOT } from "../services/swot.service.js";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 
 export async function generateSWOT(req: AuthenticatedRequest, res: Response) {
   try {

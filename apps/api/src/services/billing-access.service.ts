@@ -2,8 +2,8 @@
  * Trial / subscription access evaluation for multi-tenant SaaS lock.
  * Super Admin + demo workspaces always allowed.
  */
-import { prisma } from "@/lib/prisma";
-import { getUserBusinessId } from "@/services/field-engine.service";
+import { prisma } from "../lib/prisma.js";
+import { getUserBusinessId } from "./field-engine.service.js";
 
 export type BillingAccess = {
   allowed: boolean;

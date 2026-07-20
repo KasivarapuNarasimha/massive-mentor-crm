@@ -1,7 +1,7 @@
-import { prisma } from "@/lib/prisma";
-import { getAIService } from "@/services/ai.service";
+import { prisma } from "../lib/prisma.js";
+import { getAIService } from "./ai.service.js";
 import { BusinessProfile } from "@prisma/client";
-import { sanitizePromptInput } from "@/utils/sanitize";
+import { sanitizePromptInput } from "../utils/sanitize.js";
 
 interface SWOTResult {
   strengths: string[];

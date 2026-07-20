@@ -6,8 +6,8 @@ import {
   markAllRead,
   logActivityHandler,
   listActivities,
-} from "@/controllers/automation.controller";
-import { requireAuth } from "@/middleware/auth";
+} from "../controllers/automation.controller.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router: Router = Router();
 

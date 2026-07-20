@@ -1,8 +1,8 @@
-import { prisma } from "@/lib/prisma";
-import { getBusinessConfig } from "@/services/template.service";
-import { getUserBusinessId } from "@/services/field-engine.service";
-import { buildCrmScope, buildOwnedEntityScope } from "@/services/tenant-scope.service";
-import { countContacts } from "@/services/crm.service";
+import { prisma } from "../lib/prisma.js";
+import { getBusinessConfig } from "./template.service.js";
+import { getUserBusinessId } from "./field-engine.service.js";
+import { buildCrmScope, buildOwnedEntityScope } from "./tenant-scope.service.js";
+import { countContacts } from "./crm.service.js";
 
 export type DateRangeQuery = {
   preset?: "all" | "7d" | "30d" | "90d" | "ytd" | "custom";
@@ -190,12 +190,12 @@ async function sumEntity(
 ): Promise<number> {
   if (entity === "deal" && field === "value") {
     const agg = await prisma.deal.aggregate({ where: where as never, _sum: { value: true } });
-    const { toMoneyNumber } = await import("@/lib/money");
+    const { toMoneyNumber } = await import("../lib/money.js");
     return toMoneyNumber(agg._sum.value);
   }
   if (entity === "contact" && field === "value") {
     const agg = await prisma.contact.aggregate({ where: where as never, _sum: { value: true } });
-    const { toMoneyNumber } = await import("@/lib/money");
+    const { toMoneyNumber } = await import("../lib/money.js");
     return toMoneyNumber(agg._sum.value);
   }
   return 0;

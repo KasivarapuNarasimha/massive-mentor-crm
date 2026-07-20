@@ -5,12 +5,12 @@
  * Used by: updateContact, bulkEditLeads, updateDeal.
  * Avoids circular updates via `source` flag.
  */
-import { prisma } from "@/lib/prisma";
-import { notifyUser } from "@/services/notification.service";
-import { logActivity } from "@/services/activity.service";
-import { recordAudit } from "@/services/audit.service";
-import { scheduleFollowupRefresh } from "@/services/followup-engine.service";
-import { getUserBusinessId } from "@/services/field-engine.service";
+import { prisma } from "../lib/prisma.js";
+import { notifyUser } from "./notification.service.js";
+import { logActivity } from "./activity.service.js";
+import { recordAudit } from "./audit.service.js";
+import { scheduleFollowupRefresh } from "./followup-engine.service.js";
+import { getUserBusinessId } from "./field-engine.service.js";
 
 export type PipelineSyncResult = {
   dealsUpdated: number;

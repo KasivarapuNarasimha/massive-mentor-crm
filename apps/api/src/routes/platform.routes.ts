@@ -1,13 +1,13 @@
 import { Router } from "express";
-import { requirePlatformAdmin } from "@/middleware/auth";
-import * as ctrl from "@/controllers/platform.controller";
-import * as backupCtrl from "@/controllers/backup.controller";
+import { requirePlatformAdmin } from "../middleware/auth.js";
+import * as ctrl from "../controllers/platform.controller.js";
+import * as backupCtrl from "../controllers/backup.controller.js";
 import {
   forgotPasswordAdmin,
   validatePasswordResetToken,
   resetPasswordWithToken,
-} from "@/controllers/auth.controller";
-import { passwordResetLimiter, loginLimiter } from "@/middleware/rateLimiter";
+} from "../controllers/auth.controller.js";
+import { passwordResetLimiter, loginLimiter } from "../middleware/rateLimiter.js";
 
 const router: Router = Router();
 

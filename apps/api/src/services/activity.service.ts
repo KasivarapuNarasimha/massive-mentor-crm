@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 
 export interface LogActivityInput {
   userId: string;
@@ -43,7 +43,7 @@ export async function searchAuditLog(
     pageSize?: number;
   }
 ) {
-  const { getUserBusinessId } = await import("@/services/field-engine.service");
+  const { getUserBusinessId } = await import("./field-engine.service.js");
   const businessId = await getUserBusinessId(userId);
   const page = opts?.page && opts.page > 0 ? opts.page : 1;
   const pageSize = opts?.pageSize ? Math.min(200, opts.pageSize) : 50;

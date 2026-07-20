@@ -1,5 +1,5 @@
-import { buildManifest, type SeedTemplateMeta } from "@/templates/build-manifest";
-import type { IndustryTemplateManifest } from "@/types/template-manifest";
+import { buildManifest, type SeedTemplateMeta } from "./build-manifest.js";
+import type { IndustryTemplateManifest } from "../types/template-manifest.js";
 
 /**
  * Seed catalog definitions — pure data.

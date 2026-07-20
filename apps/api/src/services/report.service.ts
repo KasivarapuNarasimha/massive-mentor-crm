@@ -1,10 +1,10 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 import {
   andTenant,
   buildCrmScope,
   buildOwnedEntityScope,
-} from "@/services/tenant-scope.service";
-import { toMoneyNumber } from "@/lib/money";
+} from "./tenant-scope.service.js";
+import { toMoneyNumber } from "../lib/money.js";
 
 let PDFDocument: any = null;
 async function getPDFDocument() {
@@ -23,7 +23,7 @@ export async function getReportsDashboard(userId: string) {
   // Align tenant with list/import (reclaim deleted-workspace contacts first)
   try {
     const { getUserBusinessId, reclaimContactsFromDeletedBusinesses } = await import(
-      "@/services/field-engine.service"
+      "./field-engine.service.js"
     );
     const activeBiz = await getUserBusinessId(userId);
     if (activeBiz) await reclaimContactsFromDeletedBusinesses(userId, activeBiz);
@@ -520,13 +520,13 @@ export type {
   ImportOptions,
   CrmImportField,
   ColumnSuggestion,
-} from "@/services/import-contacts.service";
+} from "./import-contacts.service.js";
 export {
   importContactsFromCsv,
   importContactsFromFile,
   previewImportFromCsv,
   previewImportFromFile,
-} from "@/services/import-contacts.service";
+} from "./import-contacts.service.js";
 
 export async function exportContactsToPdf(userId: string, type?: "lead" | "client", res?: any) {
   const where: any = { userId };
@@ -827,7 +827,7 @@ export async function fetchExportRows(
       };
     }
     case "invoices": {
-      const { getUserBusinessId } = await import("@/services/field-engine.service");
+      const { getUserBusinessId } = await import("./field-engine.service.js");
       const businessId = await getUserBusinessId(userId);
       const where: Record<string, unknown> = businessId
         ? { businessId }
@@ -874,7 +874,7 @@ export async function fetchExportRows(
       };
     }
     case "expenses": {
-      const { getUserBusinessId } = await import("@/services/field-engine.service");
+      const { getUserBusinessId } = await import("./field-engine.service.js");
       const businessId = await getUserBusinessId(userId);
       const where: Record<string, unknown> = businessId
         ? { businessId }
@@ -902,7 +902,7 @@ export async function fetchExportRows(
       };
     }
     case "payments": {
-      const { getUserBusinessId } = await import("@/services/field-engine.service");
+      const { getUserBusinessId } = await import("./field-engine.service.js");
       const businessId = await getUserBusinessId(userId);
       const where: Record<string, unknown> = businessId
         ? { businessId }

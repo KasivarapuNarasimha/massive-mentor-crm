@@ -9,7 +9,7 @@ import {
   getSupportEmail,
   getSupportWebsite,
   getSupportWhatsApp,
-} from "@/services/email/brand";
+} from "./brand.js";
 
 export type EmailLayoutOpts = {
   /** Preheader text (inbox preview) */

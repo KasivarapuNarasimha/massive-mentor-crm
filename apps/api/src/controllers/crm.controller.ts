@@ -31,8 +31,8 @@ import {
   meetingSchema,
   noteSchema,
   documentSchema,
-} from "@/services/crm.service";
-import { AuthenticatedRequest } from "@/middleware/auth";
+} from "../services/crm.service.js";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 
 // Safe query param extractor (handles string | string[] | ParsedQs)
 function getQueryParam(req: AuthenticatedRequest, key: string): string | undefined {
@@ -204,7 +204,7 @@ export async function bulkEditLeadsHandler(req: AuthenticatedRequest, res: Respo
     const patch = (req.body?.patch || req.body?.fields || {}) as Record<string, unknown>;
     const {
       bulkEditLeads,
-    } = await import("@/services/crm.service");
+    } = await import("../services/crm.service.js");
     const data = await bulkEditLeads(req.user.id, ids, {
       status: typeof patch.status === "string" ? patch.status : undefined,
       assignedTo:
@@ -253,7 +253,7 @@ export async function bulkDeleteLeadsHandler(req: AuthenticatedRequest, res: Res
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const ids = Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : [];
     const permanent = !!req.body?.permanent;
-    const { bulkSoftDeleteLeads } = await import("@/services/crm.service");
+    const { bulkSoftDeleteLeads } = await import("../services/crm.service.js");
     const data = await bulkSoftDeleteLeads(req.user.id, ids, { permanent });
     res.json({ success: true, data });
   } catch (error: unknown) {
@@ -267,7 +267,7 @@ export async function bulkRestoreLeadsHandler(req: AuthenticatedRequest, res: Re
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const ids = Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : [];
-    const { bulkRestoreLeads } = await import("@/services/crm.service");
+    const { bulkRestoreLeads } = await import("../services/crm.service.js");
     const data = await bulkRestoreLeads(req.user.id, ids);
     res.json({ success: true, data });
   } catch (error: unknown) {
@@ -784,7 +784,7 @@ export async function aiLeadScore(req: AuthenticatedRequest, res: Response) {
     const { contactId } = req.body;
     if (!contactId) return res.status(400).json({ success: false, error: "contactId required" });
 
-    const result = await (await import("@/services/crm.service")).generateLeadScore(req.user.id, contactId);
+    const result = await (await import("../services/crm.service.js")).generateLeadScore(req.user.id, contactId);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed";
@@ -798,7 +798,7 @@ export async function aiFollowUpSuggestions(req: AuthenticatedRequest, res: Resp
     const { contactId } = req.body;
     if (!contactId) return res.status(400).json({ success: false, error: "contactId required" });
 
-    const result = await (await import("@/services/crm.service")).generateFollowUpSuggestions(req.user.id, contactId);
+    const result = await (await import("../services/crm.service.js")).generateFollowUpSuggestions(req.user.id, contactId);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: "Failed to generate suggestions" });
@@ -811,7 +811,7 @@ export async function aiWhatsApp(req: AuthenticatedRequest, res: Response) {
     const { contactId, tone, language } = req.body;
     if (!contactId) return res.status(400).json({ success: false, error: "contactId required" });
 
-    const { generateWhatsAppMessage, logAiGeneration } = await import("@/services/crm.service");
+    const { generateWhatsAppMessage, logAiGeneration } = await import("../services/crm.service.js");
 
     const result = await generateWhatsAppMessage(
       req.user.id,
@@ -844,7 +844,7 @@ export async function aiEmail(req: AuthenticatedRequest, res: Response) {
     const { contactId, goal } = req.body;
     if (!contactId) return res.status(400).json({ success: false, error: "contactId required" });
 
-    const result = await (await import("@/services/crm.service")).generateEmail(req.user.id, contactId, goal);
+    const result = await (await import("../services/crm.service.js")).generateEmail(req.user.id, contactId, goal);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: "Failed" });
@@ -857,7 +857,7 @@ export async function aiProposal(req: AuthenticatedRequest, res: Response) {
     const { dealId } = req.body;
     if (!dealId) return res.status(400).json({ success: false, error: "dealId required" });
 
-    const result = await (await import("@/services/crm.service")).generateProposal(req.user.id, dealId);
+    const result = await (await import("../services/crm.service.js")).generateProposal(req.user.id, dealId);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: "Failed to generate proposal" });
@@ -867,7 +867,7 @@ export async function aiProposal(req: AuthenticatedRequest, res: Response) {
 export async function aiSalesForecast(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const result = await (await import("@/services/crm.service")).generateSalesForecast(req.user.id);
+    const result = await (await import("../services/crm.service.js")).generateSalesForecast(req.user.id);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
     res.status(500).json({ success: false, error: "Failed to forecast" });
@@ -880,7 +880,7 @@ export async function aiNextBestAction(req: AuthenticatedRequest, res: Response)
     const { entityType, entityId } = req.body;
     if (!entityType || !entityId) return res.status(400).json({ success: false, error: "entityType and entityId required" });
 
-    const result = await (await import("@/services/crm.service")).generateNextBestAction(req.user.id, entityType, entityId);
+    const result = await (await import("../services/crm.service.js")).generateNextBestAction(req.user.id, entityType, entityId);
     res.json({ success: true, ...result });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed";
@@ -896,7 +896,7 @@ export async function aiMeetingSummary(req: AuthenticatedRequest, res: Response)
       return res.status(400).json({ success: false, error: "Select a meeting to summarize" });
     }
 
-    const result = await (await import("@/services/crm.service")).generateMeetingSummary(
+    const result = await (await import("../services/crm.service.js")).generateMeetingSummary(
       req.user.id,
       meetingId.trim()
     );
@@ -957,7 +957,7 @@ export async function aiReminders(req: AuthenticatedRequest, res: Response) {
       });
     }
 
-    const result = await (await import("@/services/crm.service")).generateReminders(req.user.id, {
+    const result = await (await import("../services/crm.service.js")).generateReminders(req.user.id, {
       contactId,
       dealId,
       meetingId,
@@ -996,7 +996,7 @@ export async function aiWhatsappHistory(req: AuthenticatedRequest, res: Response
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const contactId = (req.query.contactId as string) || undefined;
 
-    const { getAiGenerations } = await import("@/services/crm.service");
+    const { getAiGenerations } = await import("../services/crm.service.js");
     const history = await getAiGenerations(req.user.id, {
       contactId,
       feature: "whatsapp",
@@ -1019,7 +1019,7 @@ export async function aiFollowupEngineList(req: AuthenticatedRequest, res: Respo
     const force = String(req.query.force || "") === "1" || String(req.query.force || "") === "true";
     const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 40;
     const contactId = req.query.contactId ? String(req.query.contactId) : undefined;
-    const { listFollowupRecommendations } = await import("@/services/followup-engine.service");
+    const { listFollowupRecommendations } = await import("../services/followup-engine.service.js");
     const items = await listFollowupRecommendations(req.user.id, {
       limit: Number.isFinite(limit) ? limit : 40,
       contactId,
@@ -1036,7 +1036,7 @@ export async function aiFollowupEngineList(req: AuthenticatedRequest, res: Respo
 export async function aiFollowupEngineSummary(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const { getTodayAiActionsSummary } = await import("@/services/followup-engine.service");
+    const { getTodayAiActionsSummary } = await import("../services/followup-engine.service.js");
     const data = await getTodayAiActionsSummary(req.user.id);
     res.json({ success: true, data });
   } catch (error: unknown) {
@@ -1051,7 +1051,7 @@ export async function aiFollowupEngineContact(req: AuthenticatedRequest, res: Re
     const contactId = String(req.params.id || "");
     if (!contactId) return res.status(400).json({ success: false, error: "contact id required" });
     const force = String(req.query.force || "") === "1";
-    const { getContactFollowupRecommendation } = await import("@/services/followup-engine.service");
+    const { getContactFollowupRecommendation } = await import("../services/followup-engine.service.js");
     const data = await getContactFollowupRecommendation(req.user.id, contactId, {
       forceRefresh: force,
     });
@@ -1065,7 +1065,7 @@ export async function aiFollowupEngineContact(req: AuthenticatedRequest, res: Re
 export async function aiFollowupEngineRefresh(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const { refreshFollowupEngine } = await import("@/services/followup-engine.service");
+    const { refreshFollowupEngine } = await import("../services/followup-engine.service.js");
     const result = await refreshFollowupEngine(req.user.id, { force: true });
     res.json({ success: true, data: result });
   } catch (error: unknown) {
@@ -1082,7 +1082,7 @@ export async function aiFollowupEngineAct(req: AuthenticatedRequest, res: Respon
     if (!id || !actionTaken) {
       return res.status(400).json({ success: false, error: "id and actionTaken required" });
     }
-    const { completeRecommendation } = await import("@/services/followup-engine.service");
+    const { completeRecommendation } = await import("../services/followup-engine.service.js");
     const result = await completeRecommendation(req.user.id, id, actionTaken, notes);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
@@ -1098,7 +1098,7 @@ export async function aiFollowupEngineMap(req: AuthenticatedRequest, res: Respon
     if (!Array.isArray(ids)) {
       return res.status(400).json({ success: false, error: "contactIds array required" });
     }
-    const { mapRecommendationsForContacts } = await import("@/services/followup-engine.service");
+    const { mapRecommendationsForContacts } = await import("../services/followup-engine.service.js");
     const map = await mapRecommendationsForContacts(req.user.id, ids.slice(0, 200));
     res.json({ success: true, data: map });
   } catch (error: unknown) {

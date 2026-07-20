@@ -1,8 +1,8 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 import {
   decryptConfigSecrets,
   encryptConfigSecrets,
-} from "@/lib/secret-crypto";
+} from "../lib/secret-crypto.js";
 
 export type IntegrationProvider = "whatsapp" | "gmail" | "google_calendar";
 
@@ -220,7 +220,7 @@ export async function sendWhatsAppMessage(
   message: string,
   opts?: { contactId?: string; templateName?: string; templateParams?: string[] }
 ) {
-  const { sendWhatsAppCloudMessage } = await import("@/services/whatsapp.service");
+  const { sendWhatsAppCloudMessage } = await import("./whatsapp.service.js");
   const record = await sendWhatsAppCloudMessage({
     userId,
     to,

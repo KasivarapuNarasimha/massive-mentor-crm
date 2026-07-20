@@ -1,13 +1,13 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 import { z } from "zod";
-import { env } from "@/config/env";
-import { ensureDefaultBusiness, createBusinessWithTemplate } from "@/services/business.service";
-import { recordAudit } from "@/services/audit.service";
-import { seedIndustryTemplates, getTemplateByIdOrSlug } from "@/services/template.service";
-import { resolveOrCreateCustomerOwner } from "@/services/customer-owner.service";
-import type { PortalAudience } from "@/types/portal";
+import { env } from "../config/env.js";
+import { ensureDefaultBusiness, createBusinessWithTemplate } from "./business.service.js";
+import { recordAudit } from "./audit.service.js";
+import { seedIndustryTemplates, getTemplateByIdOrSlug } from "./template.service.js";
+import { resolveOrCreateCustomerOwner } from "./customer-owner.service.js";
+import type { PortalAudience } from "../types/portal.js";
 
 export type { PortalAudience };
 
@@ -217,7 +217,7 @@ export async function loginUser(
     createUserSession,
     recordLoginEvent,
     SessionLimitError,
-  } = await import("@/services/session.service");
+  } = await import("./session.service.js");
 
   const email = input.email.toLowerCase().trim();
   const deviceMeta = {
@@ -387,7 +387,7 @@ export async function loginPlatformAdmin(input: LoginInput): Promise<AuthRespons
     );
   }
 
-  const { createUserSession } = await import("@/services/session.service");
+  const { createUserSession } = await import("./session.service.js");
   // Super Admin: allow multiple ops sessions (enterprise unlimited)
   const created = await createUserSession({
     userId: user.id,
@@ -422,7 +422,7 @@ export async function loginPlatformAdmin(input: LoginInput): Promise<AuthRespons
 
 /** Demo portal login — sample workspace only */
 export async function loginDemoUser(input: LoginInput): Promise<AuthResponse> {
-  const { ensureDemoWorkspace, DEMO_EMAIL } = await import("@/services/demo.service");
+  const { ensureDemoWorkspace, DEMO_EMAIL } = await import("./demo.service.js");
   await ensureDemoWorkspace();
 
   const user = await prisma.user.findUnique({
@@ -454,7 +454,7 @@ export async function loginDemoUser(input: LoginInput): Promise<AuthResponse> {
     );
   }
 
-  const { createUserSession } = await import("@/services/session.service");
+  const { createUserSession } = await import("./session.service.js");
   const created = await createUserSession({
     userId: user.id,
     businessId: demoMember.businessId,
@@ -500,7 +500,7 @@ export async function issueSupportCustomerToken(opts: {
   supportActorId: string;
   businessId: string;
 }): Promise<string> {
-  const { createUserSession } = await import("@/services/session.service");
+  const { createUserSession } = await import("./session.service.js");
   const created = await createUserSession({
     userId: opts.targetUserId,
     businessId: opts.businessId,

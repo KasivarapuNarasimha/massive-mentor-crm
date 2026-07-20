@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { generateSWOT, getLatestSWOTAnalysis } from "@/controllers/swot.controller";
-import { requireAuth } from "@/middleware/auth";
+import { generateSWOT, getLatestSWOTAnalysis } from "../controllers/swot.controller.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router: Router = Router();
 

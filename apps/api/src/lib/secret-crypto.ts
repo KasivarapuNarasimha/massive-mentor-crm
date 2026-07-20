@@ -3,7 +3,7 @@
  * Key derived from TOKEN_ENCRYPTION_KEY || BACKUP_ENCRYPTION_KEY || JWT_SECRET.
  */
 import crypto from "node:crypto";
-import { env } from "@/config/env";
+import { env } from "../config/env.js";
 
 const PREFIX = "enc:v1:";
 

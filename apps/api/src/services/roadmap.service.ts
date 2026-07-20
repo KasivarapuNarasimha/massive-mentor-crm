@@ -1,7 +1,7 @@
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma.js";
 import type { Prisma } from "@prisma/client";
-import { getAIService } from "@/services/ai.service";
-import { sanitizePromptInput } from "@/utils/sanitize";
+import { getAIService } from "./ai.service.js";
+import { sanitizePromptInput } from "../utils/sanitize.js";
 
 interface RoadmapWeek {
   week: number;
