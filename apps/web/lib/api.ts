@@ -708,13 +708,18 @@ class ApiClient {
       }
       return { success: true, data: data as T };
     } catch (error) {
-      const message = networkErrorMessage(error, url);
-      // Only mark global connectivity banner for real offline/CORS failures
       const isAbort =
         error instanceof Error &&
         (error.name === "AbortError" || /aborted|timeout/i.test(error.message));
-      if (!isAbort) this.lastNetworkError = message;
-      console.warn("[ApiClient] formData:", message);
+      // Multipart imports often finish server-side after the browser loses the socket.
+      // Never report that as "Cannot reach API" — import callers re-verify via list refresh.
+      const message = isAbort
+        ? `Upload timed out after ${Math.round(timeoutMs / 1000)}s. The server may still have saved the file — refresh the list to verify.`
+        : typeof navigator !== "undefined" && navigator.onLine === false
+          ? "You appear offline. Reconnect and try again."
+          : `Upload connection interrupted (${path}). The server may still have processed the file — refresh the list to verify.`;
+      // Do not flip global connectivity banner for long upload transport glitches
+      console.warn("[ApiClient] formData:", message, error);
       return {
         success: false,
         error: message,

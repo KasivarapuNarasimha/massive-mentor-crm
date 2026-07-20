@@ -223,9 +223,9 @@ export default function LeadsPage() {
     );
   }, [teamMembers, teamSearch]);
 
-  const loadLeads = useCallback(async (opts?: { page?: number }) => {
-    if (!token) return;
-    setIsLoading(true);
+  const loadLeads = useCallback(async (opts?: { page?: number; silent?: boolean }) => {
+    if (!token) return { ok: false as const, total: 0 };
+    if (!opts?.silent) setIsLoading(true);
     const pageNum = opts?.page && opts.page > 0 ? opts.page : page;
     // Server-side pagination (API caps pageSize at 200). Total from server is authoritative.
     const q = new URLSearchParams({
@@ -248,15 +248,14 @@ export default function LeadsPage() {
     } | undefined;
     if (apiRes.success && data?.contacts) {
       setLeads(data.contacts);
-      // Prefer paginated total from API — never use page length as "Total Leads"
-      setServerTotal(
-        typeof data.total === "number" ? data.total : data.contacts.length
-      );
+      const total =
+        typeof data.total === "number" ? data.total : data.contacts.length;
+      setServerTotal(total);
       if (typeof data.page === "number" && data.page !== page) {
         setPage(data.page);
       }
       setSelectedIds(new Set());
-      // Load AI Follow-up Engine recommendations for visible leads (never block list UX)
+      // AI map is best-effort — never toast; never block import UX
       const ids = data.contacts.map((c) => c.id);
       if (ids.length) {
         api
@@ -270,22 +269,19 @@ export default function LeadsPage() {
           })
           .catch(() => {});
       }
-    } else if (!apiRes.success) {
-      // Soft failure — do not use scary "Cannot reach API" after a successful import
-      const soft =
-        apiRes.error &&
-        (/timed out|timeout|offline/i.test(apiRes.error) ||
-          /Cannot reach API/i.test(apiRes.error));
-      if (soft) {
-        toast.message("Could not refresh leads list", {
-          description: "Import may still have succeeded. Pull to refresh or reload the page.",
-        });
-      } else {
-        toast.error(apiRes.error || "Failed to load leads");
-      }
+      if (!opts?.silent) setIsLoading(false);
+      return { ok: true as const, total };
     }
-    setIsLoading(false);
-  }, [token, page, search, statusFilter]);
+
+    // List refresh failed — never surface raw "Cannot reach API" on this path
+    if (!apiRes.success && !opts?.silent) {
+      toast.message("Could not refresh leads list", {
+        description: "Reload the page if the table looks out of date.",
+      });
+    }
+    if (!opts?.silent) setIsLoading(false);
+    return { ok: false as const, total: serverTotal };
+  }, [token, page, search, statusFilter, serverTotal]);
 
   const fieldDefs: FieldDef[] = useMemo(() => {
     const fromConfig = contactFieldsFromConfig(bizConfig);
@@ -299,11 +295,21 @@ export default function LeadsPage() {
     return fromConfig.length ? fromConfig : FALLBACK_LEAD_STATUSES;
   }, [bizConfig]);
 
-  const applyImportResult = async (res: {
-    success: boolean;
-    error?: string;
-    data?: Partial<ImportReport> & { needsMapping?: boolean; mappingPreview?: CsvImportPreview };
-  }) => {
+  const isTransportError = (msg?: string) =>
+    !!msg &&
+    (/Cannot reach API/i.test(msg) ||
+      /timed out|timeout|aborted/i.test(msg) ||
+      /offline|Failed to fetch|Network error|network request failed/i.test(msg) ||
+      /Import finished but response was not JSON/i.test(msg));
+
+  const applyImportResult = async (
+    res: {
+      success: boolean;
+      error?: string;
+      data?: Partial<ImportReport> & { needsMapping?: boolean; mappingPreview?: CsvImportPreview };
+    },
+    opts?: { totalBefore?: number }
+  ) => {
     const data = res.data;
     // Backend asked for mapping wizard
     if (data?.needsMapping && data.mappingPreview) {
@@ -331,15 +337,43 @@ export default function LeadsPage() {
     setImportFile(null);
     setImportPreview(null);
 
-    const written = report.imported + (report.updated || 0);
+    const writtenFromApi = report.imported + (report.updated || 0);
     const errorPreview = (report.errors || [])
       .slice(0, 3)
       .map(formatImportError)
       .join(" · ");
+    const totalBefore = opts?.totalBefore ?? serverTotal;
 
-    if (res.success && written > 0) {
+    // Always refresh table after import attempt (silent — no error toasts)
+    setPage(1);
+    const refreshed = await loadLeads({ page: 1, silent: true });
+    const totalAfter = refreshed.ok ? refreshed.total : serverTotal;
+    const delta =
+      Number.isFinite(totalBefore) && Number.isFinite(totalAfter)
+        ? Math.max(0, totalAfter - totalBefore)
+        : 0;
+
+    // Server wrote rows, but client transport failed (timeout / connection drop after write)
+    const recoveredFromTransport =
+      !res.success && isTransportError(res.error) && (writtenFromApi > 0 || delta > 0 || refreshed.ok);
+
+    const effectiveWritten =
+      writtenFromApi > 0 ? writtenFromApi : recoveredFromTransport && delta > 0 ? delta : writtenFromApi;
+
+    const importSucceeded =
+      (res.success && writtenFromApi > 0) ||
+      recoveredFromTransport ||
+      (writtenFromApi > 0 && isTransportError(res.error));
+
+    if (importSucceeded && (effectiveWritten > 0 || recoveredFromTransport)) {
+      const countLabel =
+        effectiveWritten > 0
+          ? effectiveWritten
+          : delta > 0
+            ? delta
+            : report.imported || report.parsedRows || 0;
       toast.success(
-        `${written.toLocaleString()} lead${written === 1 ? "" : "s"} imported successfully`,
+        `${Math.max(countLabel, 1).toLocaleString()} lead${countLabel === 1 ? "" : "s"} imported successfully`,
         {
           description: [
             report.imported ? `${report.imported} created` : null,
@@ -349,27 +383,26 @@ export default function LeadsPage() {
             report.skippedDuplicates
               ? `${report.skippedDuplicates} duplicates skipped`
               : null,
+            recoveredFromTransport && !res.success
+              ? "Response dropped after write — table refreshed from server"
+              : null,
           ]
             .filter(Boolean)
             .join(" · "),
           duration: 8000,
         }
       );
-      // Refresh list — failures here must NOT look like import failure
-      try {
-        await loadLeads({ page: 1 });
-        setPage(1);
-      } catch {
-        toast.message("Import saved. Refresh the page if leads do not appear yet.");
-      }
+      // Defer secondary dashboard refresh so it cannot race and toast over import success
       try {
         const { emitDataChanged } = await import("@/lib/data-events");
-        emitDataChanged({ module: "all", action: "create" });
-        emitDataChanged({ module: "contact", action: "create" });
+        emitDataChanged({ module: "contact", action: "import" });
       } catch {
         /* non-fatal */
       }
-    } else if (res.success && written === 0) {
+      return;
+    }
+
+    if (res.success && writtenFromApi === 0) {
       toast.message("Import finished with no new rows written", {
         description:
           errorPreview ||
@@ -377,27 +410,34 @@ export default function LeadsPage() {
           "All rows may be duplicates or empty. See Import Report.",
         duration: 10000,
       });
-      try {
-        await loadLeads();
-      } catch {
-        /* ignore */
-      }
-    } else {
-      // Real import failure (timeout / auth / server error) — do not call loadLeads error path as "import"
-      toast.error(res.error || "Import failed", {
-        description:
-          errorPreview ||
-          report.report?.split("\n").slice(0, 4).join(" · ") ||
-          "See Import Report for details. If the request timed out, refresh leads — rows may still have been saved.",
-        duration: 14000,
-      });
-      // Best-effort refresh in case server finished after client timeout
-      try {
-        await loadLeads();
-      } catch {
-        /* ignore */
-      }
+      return;
     }
+
+    // True import failure (validation / auth / server) — never use "Cannot reach API" wording
+    if (isTransportError(res.error)) {
+      if (refreshed.ok) {
+        toast.message("Import response was incomplete", {
+          description:
+            "The table was refreshed from the server. If new leads are listed, the import succeeded.",
+          duration: 10000,
+        });
+      } else {
+        toast.message("Could not confirm import result", {
+          description:
+            "Reload the Leads page to verify. Large files can finish on the server after the browser times out.",
+          duration: 12000,
+        });
+      }
+      return;
+    }
+
+    toast.error(res.error || "Import failed", {
+      description:
+        errorPreview ||
+        report.report?.split("\n").slice(0, 4).join(" · ") ||
+        "See Import Report for details.",
+      duration: 12000,
+    });
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -434,17 +474,21 @@ export default function LeadsPage() {
     if (!importFile || !token) return;
     setImporting(true);
     toast.message(`Importing ${importFile.name}…`);
+    const totalBefore = serverTotal;
     const res = await api.importContactsFile(importFile, token, opts);
-    await applyImportResult({
-      success: res.success,
-      error: res.error,
-      data: res.data
-        ? {
-            ...res.data,
-            mappingPreview: res.data.mappingPreview as CsvImportPreview | undefined,
-          }
-        : undefined,
-    });
+    await applyImportResult(
+      {
+        success: res.success,
+        error: res.error,
+        data: res.data
+          ? {
+              ...res.data,
+              mappingPreview: res.data.mappingPreview as CsvImportPreview | undefined,
+            }
+          : undefined,
+      },
+      { totalBefore }
+    );
     setImporting(false);
   };
 
