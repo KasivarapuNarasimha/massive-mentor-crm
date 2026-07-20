@@ -392,6 +392,38 @@ export async function createContact(userId: string, input: ContactInput | Record
       message: `${kind} "${contact.name}" was added`,
       notifType: contact.type === "client" ? "activity" : "lead_assigned",
     });
+    // Notify assignee when created already assigned to someone else
+    if (contact.assignedTo && contact.assignedTo !== userId) {
+      await notifyUser(contact.assignedTo, {
+        type: "lead_assigned",
+        title: "Lead assigned to you",
+        message: `"${contact.name}" was assigned to you`,
+        entityType: "contact",
+        entityId: contact.id,
+      }).catch(() => {});
+    }
+    // Sync deals if created with a late-stage status (e.g. Proposal Sent)
+    try {
+      const status = String(contact.status || "new");
+      if (status && status !== "new") {
+        await syncFromLeadStatusChange(
+          userId,
+          {
+            id: contact.id,
+            name: contact.name,
+            type: contact.type,
+            status: contact.status,
+            value: contact.value == null ? null : toMoneyNumber(contact.value),
+            company: contact.company,
+            businessId: contact.businessId,
+            userId: contact.userId,
+          },
+          "new"
+        );
+      }
+    } catch (err) {
+      console.error("[createContact] pipeline sync failed", err);
+    }
     scheduleFollowupRefresh(userId);
     return contact;
   });
@@ -491,6 +523,28 @@ export async function updateContact(
       customFields: mergedCustom as object,
     },
   });
+
+  // Assignment notifications (store userId, not free-text name)
+  const prevAssignee = existing.assignedTo || null;
+  const nextAssignee = contact.assignedTo || null;
+  if (nextAssignee && nextAssignee !== prevAssignee && nextAssignee !== userId) {
+    await notifyUser(nextAssignee, {
+      type: "lead_assigned",
+      title: "Lead assigned to you",
+      message: `"${contact.name}" was assigned to you`,
+      entityType: "contact",
+      entityId: contact.id,
+    }).catch(() => {});
+  }
+  if (prevAssignee && prevAssignee !== nextAssignee && prevAssignee !== userId) {
+    await notifyUser(prevAssignee, {
+      type: "activity",
+      title: "Lead reassigned",
+      message: `"${contact.name}" is no longer assigned to you`,
+      entityType: "contact",
+      entityId: contact.id,
+    }).catch(() => {});
+  }
 
   let pipelineSync: PipelineSyncResult | null = null;
   if (statusChanged) {

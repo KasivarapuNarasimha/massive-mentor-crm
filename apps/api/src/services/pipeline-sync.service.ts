@@ -43,7 +43,10 @@ const LEAD_STATUS_TO_DEAL_STAGE: Record<string, string> = {
   contacted: "lead",
   qualified: "qualified",
   proposal: "proposal",
+  proposal_sent: "proposal",
+  proposalsent: "proposal",
   negotiation: "negotiation",
+  negotiating: "negotiation",
   won: "closed_won",
   lost: "closed_lost",
   // client lifecycle
@@ -304,10 +307,16 @@ export async function syncFromLeadStatusChange(
   }
 
   if (deals.length === 0) {
-    const shouldCreate =
-      settings.autoCreateDeal &&
-      (isWonStatus(contact.status) ||
-        ["qualified", "proposal", "negotiation"].includes(next));
+    // Auto-create from Proposal Sent onward (and won/lost) — not for early "new/contacted"
+    const stageCreatesDeal =
+      targetStage === "proposal" ||
+      targetStage === "negotiation" ||
+      targetStage === "qualified" ||
+      targetStage === "closed_won" ||
+      targetStage === "closed_lost" ||
+      ["proposal", "proposal_sent", "negotiation", "qualified", "won", "lost"].includes(next);
+
+    const shouldCreate = settings.autoCreateDeal && stageCreatesDeal;
 
     if (shouldCreate) {
       const title =

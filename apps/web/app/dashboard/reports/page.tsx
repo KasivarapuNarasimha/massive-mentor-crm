@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api, API_BASE_URL } from "@/lib/api";
 import { toast } from "sonner";
-import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { useDataVersion } from "@/lib/data-events";
+import { AnalyticsDashboard } from "@/components/dashboard/AnalyticsDashboard";
 
 type ImportReportData = {
   parsedRows: number;
@@ -20,38 +20,35 @@ type ImportReportData = {
   needsMapping?: boolean;
 };
 
-function formatImportError(e: { row: number; column?: string; reason: string; suggestedFix?: string }): string {
+function formatImportError(e: {
+  row: number;
+  column?: string;
+  reason: string;
+  suggestedFix?: string;
+}): string {
   if (e.reason.toLowerCase().startsWith("row ")) return e.reason;
   const base = `Row ${e.row}: ${e.reason}`;
   return e.suggestedFix ? `${base} → ${e.suggestedFix}` : base;
 }
 
-const MONEY_KEYS =
-  /revenue|value|amount|invoic|expense|profit|paid|outstanding|tax|gst|pipeline|payment|cost|forecast/i;
-
 export default function ReportsPage() {
-  const { token, role } = useAuth();
-  const { money } = useBusinessCurrency();
+  const { token } = useAuth();
   const dataVersion = useDataVersion();
-  const [reports, setReports] = useState<unknown>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [importCsvText, setImportCsvText] = useState("");
   const [importReport, setImportReport] = useState<ImportReportData | null>(null);
   const [importing, setImporting] = useState(false);
+  // Force remount of analytics when CRM data changes
+  const [chartKey, setChartKey] = useState(0);
 
-  const load = async () => {
-    if (!token) return;
-    setIsLoading(true);
-    const res = await api.get("/reports/dashboard", token);
-    if (res.success) setReports(res.data);
-    setIsLoading(false);
-  };
+  useEffect(() => {
+    setChartKey((k) => k + 1);
+  }, [dataVersion]);
 
-  // Refresh when Lead/Deal/CRM data changes (pipeline sync, etc.)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [token, dataVersion]);
-
-  const showImportResult = (data: ImportReportData | undefined | null, success: boolean, errorMsg?: string) => {
+  const showImportResult = (
+    data: ImportReportData | undefined | null,
+    success: boolean,
+    errorMsg?: string
+  ) => {
     if (data) setImportReport(data);
     const preview = (data?.errors || []).slice(0, 3).map(formatImportError).join(" · ");
     const written = (data?.imported ?? 0) + (data?.updated ?? 0);
@@ -66,7 +63,7 @@ export default function ReportsPage() {
     }
     if (success && data && written > 0) {
       toast.success(
-        `Imported ${data.imported}${data.updated ? ` · Updated ${data.updated}` : ""} of ${data.parsedRows}`,
+        `${written.toLocaleString()} record${written === 1 ? "" : "s"} imported successfully`,
         {
           description:
             data.failed > 0
@@ -75,10 +72,13 @@ export default function ReportsPage() {
           duration: 8000,
         }
       );
-      load();
+      setChartKey((k) => k + 1);
     } else {
       toast.error(errorMsg || "Import did not insert any records", {
-        description: preview || data?.report?.split("\n").slice(0, 4).join(" · ") || "Check the Import Report below.",
+        description:
+          preview ||
+          data?.report?.split("\n").slice(0, 4).join(" · ") ||
+          "Check the Import Report below.",
         duration: 12000,
       });
     }
@@ -91,9 +91,7 @@ export default function ReportsPage() {
     try {
       const response = await fetch(url, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {
         toast.error("Export failed");
@@ -120,9 +118,7 @@ export default function ReportsPage() {
     try {
       const response = await fetch(url, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {
         toast.error("Export failed");
@@ -144,13 +140,17 @@ export default function ReportsPage() {
   };
 
   const importCsv = async () => {
-    if (!importCsvText) return;
-    if (!token) return;
+    if (!importCsvText || !token) return;
     setImporting(true);
-    const res = await api.post<ImportReportData>("/reports/import/csv", { csv: importCsvText }, token);
+    const res = await api.post<ImportReportData>(
+      "/reports/import/csv",
+      { csv: importCsvText },
+      token
+    );
     const data = (res.data || null) as ImportReportData | null;
-    showImportResult(data, !!res.success && (data?.imported ?? 0) > 0, res.error);
-    if (res.success && (data?.imported ?? 0) > 0) setImportCsvText("");
+    const written = (data?.imported ?? 0) + (data?.updated ?? 0);
+    showImportResult(data, !!res.success && written > 0, res.error);
+    if (res.success && written > 0) setImportCsvText("");
     setImporting(false);
   };
 
@@ -158,10 +158,11 @@ export default function ReportsPage() {
     const file = e.target.files?.[0];
     if (!file || !token) return;
     setImporting(true);
-    toast.message(`Parsing ${file.name}…`);
+    toast.message(`Importing ${file.name}…`);
     const res = await api.importContactsFile(file, token);
     const data = (res.data || null) as ImportReportData | null;
-    showImportResult(data, !!res.success && (data?.imported ?? 0) > 0, res.error);
+    const written = (data?.imported ?? 0) + (data?.updated ?? 0);
+    showImportResult(data, !!res.success && written > 0, res.error);
     setImporting(false);
     e.target.value = "";
   };
@@ -177,71 +178,77 @@ export default function ReportsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const doBackup = async () => {
-    if (!token) return;
-    const res = await api.get("/reports/backup", token);
-    if (res.success) {
-      const blob = new Blob([JSON.stringify(res.data)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "db-backup.json";
-      a.click();
-      toast.success("Backup downloaded");
-    } else toast.error("Backup failed");
-  };
-
-  const doRestore = async () => {
-    if (!token) return;
-    const res = await api.post("/reports/restore", {}, token);
-    if (res.success) toast.success("Restore completed");
-    else toast.error("Restore failed");
-  };
-
   return (
-    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <h1 className="text-2xl sm:text-3xl font-semibold mb-5 sm:mb-6">Reports & Analytics</h1>
+    <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
+      <h1 className="text-2xl sm:text-3xl font-semibold mb-2">Reports & Analytics</h1>
+      <p className="text-sm text-zinc-500 mb-6">
+        Live charts for your workspace — never raw JSON. Empty series show &quot;No Data Available&quot;.
+      </p>
 
-      {isLoading ? (
-        <div className="h-96 bg-zinc-900 rounded-2xl animate-pulse" />
-      ) : !!reports ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
-          {Object.entries(reports as Record<string, unknown>).map(([k, v]) => (
-            <div key={k} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 sm:p-4 min-w-0">
-              <div className="text-[10px] sm:text-xs text-zinc-500 leading-snug">
-                {k.replace(/([A-Z])/g, " $1")}
-              </div>
-              <div className="text-lg sm:text-2xl font-semibold tabular-nums truncate">
-                {typeof v === "number"
-                  ? MONEY_KEYS.test(k)
-                    ? money(v)
-                    : v.toLocaleString()
-                  : JSON.stringify(v)}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6 mb-6">
-        <h3 className="font-semibold mb-2">Workspace analytics</h3>
-        <p className="text-xs text-zinc-500">
-          KPI cards above use live data from your business workspace only. Open Overview for full
-          role-based charts and drill-down analytics.
-        </p>
+      {/* Interactive charts (same engine as Overview analytics) */}
+      <div className="mb-8" key={chartKey}>
+        <AnalyticsDashboard />
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6 mb-6">
         <h3 className="font-semibold mb-4">Export</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 sm:gap-3">
-          <button type="button" onClick={() => exportCsv("lead")} className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation">Export Leads CSV</button>
-          <button type="button" onClick={() => exportCsv("client")} className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation">Export Clients CSV</button>
-          <button type="button" onClick={() => exportCsv("deal")} className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation">Export Deals CSV</button>
-          <button type="button" onClick={() => exportCsv()} className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation">Export All CSV</button>
-          <button type="button" onClick={() => exportPdf("lead")} className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation">Export Leads PDF</button>
-          <button type="button" onClick={() => exportPdf("client")} className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation">Export Clients PDF</button>
-          <button type="button" onClick={() => exportPdf("deal")} className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation">Export Deals PDF</button>
-          <button type="button" onClick={() => exportPdf()} className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation">Export All PDF</button>
+          <button
+            type="button"
+            onClick={() => exportCsv("lead")}
+            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+          >
+            Export Leads CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => exportCsv("client")}
+            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+          >
+            Export Clients CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => exportCsv("deal")}
+            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+          >
+            Export Deals CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => exportCsv()}
+            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+          >
+            Export All CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => exportPdf("lead")}
+            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+          >
+            Export Leads PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => exportPdf("client")}
+            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+          >
+            Export Clients PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => exportPdf("deal")}
+            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+          >
+            Export Deals PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => exportPdf()}
+            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+          >
+            Export All PDF
+          </button>
         </div>
       </div>
 
@@ -276,10 +283,8 @@ export default function ReportsPage() {
           </label>
         </div>
         <p className="text-xs mt-2 text-zinc-500">
-          Supports CSV and Excel (.xlsx). Required: <span className="text-zinc-300">name</span>. Optional: phone, email,
-          company, status, value, source, type, description, district, group. Status accepts labels or keys (e.g.{" "}
-          <span className="font-mono text-zinc-400">New</span> → <span className="font-mono text-zinc-400">new</span>
-          ). Success only when rows are actually inserted.
+          Prefer <span className="text-zinc-300">Leads → Import</span> for the column-mapping wizard on
+          large files. Large imports can take a few minutes.
         </p>
 
         {importReport && (
@@ -287,7 +292,11 @@ export default function ReportsPage() {
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-semibold">Import Report</h4>
               {importReport.report && (
-                <button onClick={downloadReport} className="text-xs px-3 py-1 bg-white/10 rounded-lg">
+                <button
+                  type="button"
+                  onClick={downloadReport}
+                  className="text-xs px-3 py-1 bg-white/10 rounded-lg"
+                >
                   Download report
                 </button>
               )}
@@ -302,63 +311,32 @@ export default function ReportsPage() {
                 <div className="text-xl font-semibold text-emerald-400">{importReport.imported}</div>
               </div>
               <div>
-                <div className="text-zinc-500 text-xs">Updated existing</div>
+                <div className="text-zinc-500 text-xs">Updated</div>
                 <div className="text-xl font-semibold text-sky-400">{importReport.updated ?? 0}</div>
               </div>
               <div>
-                <div className="text-zinc-500 text-xs">Duplicates skipped</div>
-                <div className="text-xl font-semibold text-amber-400">{importReport.skippedDuplicates}</div>
+                <div className="text-zinc-500 text-xs">Duplicates</div>
+                <div className="text-xl font-semibold text-amber-400">
+                  {importReport.skippedDuplicates}
+                </div>
               </div>
               <div>
-                <div className="text-zinc-500 text-xs">Failed rows</div>
+                <div className="text-zinc-500 text-xs">Failed</div>
                 <div className="text-xl font-semibold text-red-400">{importReport.failed}</div>
               </div>
             </div>
-            {importReport.allowedStatuses && importReport.allowedStatuses.length > 0 && (
-              <p className="text-xs text-zinc-500 mb-2">
-                Allowed status values:{" "}
-                <span className="font-mono text-zinc-400">{importReport.allowedStatuses.join(", ")}</span>
-              </p>
-            )}
             {importReport.errors && importReport.errors.length > 0 && (
               <ul className="mb-3 max-h-48 overflow-auto space-y-1.5 text-sm font-mono bg-zinc-900 border border-zinc-800 rounded-lg p-3">
                 {importReport.errors.map((e, i) => (
                   <li key={`${e.row}-${i}`} className="text-red-300/90">
                     {formatImportError(e)}
-                    {e.column ? (
-                      <span className="ml-2 text-[10px] uppercase text-zinc-500">[{e.column}]</span>
-                    ) : null}
                   </li>
                 ))}
               </ul>
             )}
-            {importReport.report && (
-              <details className="text-xs text-zinc-500">
-                <summary className="cursor-pointer hover:text-zinc-300">Full report text</summary>
-                <pre className="mt-2 text-xs text-zinc-400 whitespace-pre-wrap font-mono bg-zinc-900 rounded-lg p-3 max-h-40 overflow-auto">
-                  {importReport.report}
-                </pre>
-              </details>
-            )}
-            {importReport.imported > 0 && (
-              <p className="mt-3 text-sm text-emerald-400">
-                Leads were inserted into the database. Open the Leads page to see them.
-              </p>
-            )}
           </div>
         )}
       </div>
-
-      {(role === "admin") && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-          <h3 className="font-semibold mb-4">Database (Admin)</h3>
-          <div className="flex gap-3">
-            <button onClick={doBackup} className="px-5 py-2 bg-white/10 rounded-xl">Backup DB</button>
-            <button onClick={doRestore} className="px-5 py-2 bg-white/10 rounded-xl">Restore DB</button>
-          </div>
-          <p className="text-xs text-zinc-500 mt-2">Admin only. Real backup would use pg_dump.</p>
-        </div>
-      )}
     </div>
   );
 }

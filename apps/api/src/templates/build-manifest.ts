@@ -226,9 +226,10 @@ const DEFAULT_LEAD_PIPELINE: IndustryTemplateManifest["pipelines"][0] = {
     { key: "new", label: "New", color: "#3b82f6", order: 1 },
     { key: "contacted", label: "Contacted", color: "#8b5cf6", order: 2 },
     { key: "qualified", label: "Qualified", color: "#06b6d4", order: 3 },
-    { key: "proposal", label: "Proposal", color: "#f59e0b", order: 4 },
-    { key: "won", label: "Won", color: "#22c55e", isWon: true, order: 5 },
-    { key: "lost", label: "Lost", color: "#ef4444", isLost: true, order: 6 },
+    { key: "proposal", label: "Proposal Sent", color: "#f59e0b", order: 4 },
+    { key: "negotiation", label: "Negotiation", color: "#f97316", order: 5 },
+    { key: "won", label: "Won", color: "#22c55e", isWon: true, order: 6 },
+    { key: "lost", label: "Lost", color: "#ef4444", isLost: true, order: 7 },
   ],
 };
 

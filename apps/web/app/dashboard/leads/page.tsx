@@ -167,6 +167,13 @@ export default function LeadsPage() {
     customKey: "",
     customValue: "",
   });
+  /** Active workspace users for Assign To (id = assignedTo userId) */
+  const [teamMembers, setTeamMembers] = useState<
+    Array<{ id: string; name: string | null; email: string; isDisabled?: boolean }>
+  >([]);
+  const [teamSearch, setTeamSearch] = useState("");
+  /** assignedTo on create/edit form (userId) */
+  const [formAssigneeId, setFormAssigneeId] = useState("");
 
   const loadConfig = useCallback(async () => {
     if (!token) return;
@@ -176,6 +183,45 @@ export default function LeadsPage() {
       setTemplateSlug(res.data.business?.templateSlug || null);
     }
   }, [token]);
+
+  const loadTeam = useCallback(async () => {
+    if (!token) return;
+    const res = await api.listBusinessUsers(token);
+    if (res.success && res.data?.users) {
+      setTeamMembers(
+        res.data.users
+          .filter((u) => !u.isDisabled && u.status !== "disabled")
+          .map((u) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            isDisabled: u.isDisabled,
+          }))
+      );
+    }
+  }, [token]);
+
+  const assigneeLabel = useCallback(
+    (userId: string | null | undefined) => {
+      if (!userId) return "Unassigned";
+      const m = teamMembers.find((t) => t.id === userId);
+      if (m) return m.name?.trim() || m.email;
+      // Legacy free-text values (name/email stored before userId fix)
+      if (userId.includes("@") || userId.length < 20) return userId;
+      return "Assigned user";
+    },
+    [teamMembers]
+  );
+
+  const filteredTeam = useMemo(() => {
+    const q = teamSearch.trim().toLowerCase();
+    if (!q) return teamMembers;
+    return teamMembers.filter(
+      (m) =>
+        (m.name || "").toLowerCase().includes(q) ||
+        m.email.toLowerCase().includes(q)
+    );
+  }, [teamMembers, teamSearch]);
 
   const loadLeads = useCallback(async (opts?: { page?: number }) => {
     if (!token) return;
@@ -210,18 +256,33 @@ export default function LeadsPage() {
         setPage(data.page);
       }
       setSelectedIds(new Set());
-      // Load AI Follow-up Engine recommendations for visible leads
+      // Load AI Follow-up Engine recommendations for visible leads (never block list UX)
       const ids = data.contacts.map((c) => c.id);
       if (ids.length) {
         api
-          .post<Record<string, AiFollowupRec>>("/crm/ai/followup-engine/map", { contactIds: ids }, token)
+          .post<Record<string, AiFollowupRec>>(
+            "/crm/ai/followup-engine/map",
+            { contactIds: ids },
+            token
+          )
           .then((r) => {
             if (r.success && r.data) setAiRecMap(r.data);
           })
           .catch(() => {});
       }
-    } else {
-      toast.error(apiRes.error || "Failed to load leads");
+    } else if (!apiRes.success) {
+      // Soft failure — do not use scary "Cannot reach API" after a successful import
+      const soft =
+        apiRes.error &&
+        (/timed out|timeout|offline/i.test(apiRes.error) ||
+          /Cannot reach API/i.test(apiRes.error));
+      if (soft) {
+        toast.message("Could not refresh leads list", {
+          description: "Import may still have succeeded. Pull to refresh or reload the page.",
+        });
+      } else {
+        toast.error(apiRes.error || "Failed to load leads");
+      }
     }
     setIsLoading(false);
   }, [token, page, search, statusFilter]);
@@ -278,19 +339,29 @@ export default function LeadsPage() {
 
     if (res.success && written > 0) {
       toast.success(
-        `Imported ${report.imported}${report.updated ? ` · Updated ${report.updated}` : ""} of ${report.parsedRows}`,
+        `${written.toLocaleString()} lead${written === 1 ? "" : "s"} imported successfully`,
         {
-          description:
-            report.failed > 0
-              ? `${report.failed} failed. ${errorPreview}`
-              : report.skippedDuplicates
-                ? `Duplicates skipped: ${report.skippedDuplicates}`
-                : "All set — leads are in your CRM.",
+          description: [
+            report.imported ? `${report.imported} created` : null,
+            report.updated ? `${report.updated} updated` : null,
+            report.parsedRows ? `of ${report.parsedRows} rows` : null,
+            report.failed ? `${report.failed} failed` : null,
+            report.skippedDuplicates
+              ? `${report.skippedDuplicates} duplicates skipped`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · "),
           duration: 8000,
         }
       );
-      await loadLeads();
-      // Refresh dashboard KPIs / Lead Sources / charts (full-tenant aggregates)
+      // Refresh list — failures here must NOT look like import failure
+      try {
+        await loadLeads({ page: 1 });
+        setPage(1);
+      } catch {
+        toast.message("Import saved. Refresh the page if leads do not appear yet.");
+      }
       try {
         const { emitDataChanged } = await import("@/lib/data-events");
         emitDataChanged({ module: "all", action: "create" });
@@ -298,14 +369,34 @@ export default function LeadsPage() {
       } catch {
         /* non-fatal */
       }
-    } else {
-      toast.error(res.error || "Import did not write any records", {
+    } else if (res.success && written === 0) {
+      toast.message("Import finished with no new rows written", {
         description:
           errorPreview ||
           report.report?.split("\n").slice(0, 4).join(" · ") ||
-          "See Import Report for row-level errors.",
-        duration: 12000,
+          "All rows may be duplicates or empty. See Import Report.",
+        duration: 10000,
       });
+      try {
+        await loadLeads();
+      } catch {
+        /* ignore */
+      }
+    } else {
+      // Real import failure (timeout / auth / server error) — do not call loadLeads error path as "import"
+      toast.error(res.error || "Import failed", {
+        description:
+          errorPreview ||
+          report.report?.split("\n").slice(0, 4).join(" · ") ||
+          "See Import Report for details. If the request timed out, refresh leads — rows may still have been saved.",
+        duration: 14000,
+      });
+      // Best-effort refresh in case server finished after client timeout
+      try {
+        await loadLeads();
+      } catch {
+        /* ignore */
+      }
     }
   };
 
@@ -387,7 +478,8 @@ export default function LeadsPage() {
 
   useEffect(() => {
     void loadConfig();
-  }, [loadConfig]);
+    void loadTeam();
+  }, [loadConfig, loadTeam]);
 
   useEffect(() => {
     if (showModal || assignModalOpen || followUpModalOpen || bulkEditOpen || bulkDeleteOpen) {
@@ -522,18 +614,33 @@ export default function LeadsPage() {
   const openCreate = () => {
     setEditingLead(null);
     setFormValues(contactToFormValues(fieldDefs, { status: statusOptions[0]?.key || "new" }));
+    setFormAssigneeId("");
+    setTeamSearch("");
     setShowModal(true);
   };
 
   const openEdit = (lead: Contact) => {
     setEditingLead(lead);
     setFormValues(contactToFormValues(fieldDefs, lead as Record<string, unknown>));
+    // Prefer userId match; legacy free-text names map if possible
+    const raw = lead.assignedTo || "";
+    const byId = teamMembers.find((t) => t.id === raw);
+    const byName = teamMembers.find(
+      (t) =>
+        (t.name && t.name === raw) ||
+        t.email === raw ||
+        (t.name && raw && t.name.toLowerCase() === raw.toLowerCase())
+    );
+    setFormAssigneeId(byId?.id || byName?.id || (raw.length > 20 ? raw : ""));
+    setTeamSearch("");
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
     setEditingLead(null);
+    setFormAssigneeId("");
+    setTeamSearch("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -545,6 +652,8 @@ export default function LeadsPage() {
       toast.error("Name is required");
       return;
     }
+    // Always store userId (or null), never free-text name/email
+    payload.assignedTo = formAssigneeId.trim() || null;
 
     setIsSubmitting(true);
     const apiResponse = editingLead
@@ -644,28 +753,34 @@ export default function LeadsPage() {
 
   const runBulkAssign = async () => {
     if (!token || !assignValue.trim() || selectedLeads.length === 0) return;
+    // assignValue must be a workspace user id
+    const member = teamMembers.find((t) => t.id === assignValue.trim());
+    if (!member) {
+      toast.error("Select a team member from the list");
+      return;
+    }
     setBulkBusy(true);
     let ok = 0;
     let fail = 0;
     for (const lead of selectedLeads) {
       const res = await api.updateCrmContact(
         lead.id,
-        { name: lead.name, assignedTo: assignValue.trim() },
+        { name: lead.name, assignedTo: member.id },
         token
       );
       if (res.success) {
         ok++;
         setLeads((prev) =>
-          prev.map((l) =>
-            l.id === lead.id ? { ...l, assignedTo: assignValue.trim() } : l
-          )
+          prev.map((l) => (l.id === lead.id ? { ...l, assignedTo: member.id } : l))
         );
       } else fail++;
     }
     setBulkBusy(false);
     setAssignModalOpen(false);
     setAssignValue("");
-    if (ok) toast.success(`Assigned ${ok} lead(s) to "${assignValue.trim()}"`);
+    setTeamSearch("");
+    const label = member.name?.trim() || member.email;
+    if (ok) toast.success(`Assigned ${ok} lead(s) to ${label}`);
     if (fail) toast.error(`${fail} assignment(s) failed`);
     clearSelection();
   };
@@ -810,7 +925,10 @@ export default function LeadsPage() {
     if (!token || selectedLeads.length === 0 || !canBulkEdit) return;
     const patch: Record<string, unknown> = {};
     if (bulkEditForm.status.trim()) patch.status = bulkEditForm.status.trim();
-    if (bulkEditForm.assignedTo.trim()) patch.assignedTo = bulkEditForm.assignedTo.trim();
+    if (bulkEditForm.assignedTo.trim()) {
+      patch.assignedTo =
+        bulkEditForm.assignedTo === "__unassign__" ? null : bulkEditForm.assignedTo.trim();
+    }
     if (bulkEditForm.source.trim()) patch.source = bulkEditForm.source.trim();
     if (bulkEditForm.priority.trim()) patch.priority = bulkEditForm.priority.trim();
     if (bulkEditForm.company.trim()) patch.company = bulkEditForm.company.trim();
@@ -1206,7 +1324,9 @@ export default function LeadsPage() {
               type="button"
               disabled={bulkBusy}
               onClick={() => {
-                setAssignValue(user?.name || user?.email || "");
+                setAssignValue("");
+                setTeamSearch("");
+                void loadTeam();
                 setAssignModalOpen(true);
               }}
               className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50"
@@ -1416,6 +1536,7 @@ export default function LeadsPage() {
                       {f.label}
                     </th>
                   ))}
+                  <th>Assigned</th>
                   <th>AI Score</th>
                   <th className="text-right">Actions</th>
                 </tr>
@@ -1474,6 +1595,14 @@ export default function LeadsPage() {
                         </td>
                       );
                     })}
+                    <td className="p-3">
+                      <span
+                        className={`text-xs ${lead.assignedTo ? "text-zinc-300" : "text-zinc-600"}`}
+                        title={lead.assignedTo || undefined}
+                      >
+                        {assigneeLabel(lead.assignedTo)}
+                      </span>
+                    </td>
                     <td className="p-3">
                       {lead.aiScore != null ? (
                         <button
@@ -1584,6 +1713,36 @@ export default function LeadsPage() {
                 statusOptions={statusOptions.map((s) => ({ key: s.key, label: s.label }))}
                 disabled={isSubmitting}
               />
+              <div className="mt-4 p-3 bg-zinc-950 border border-zinc-800 rounded-xl">
+                <label className="block text-xs text-zinc-400 mb-1.5 tracking-wide">
+                  Assign To
+                </label>
+                <input
+                  type="search"
+                  value={teamSearch}
+                  onChange={(e) => setTeamSearch(e.target.value)}
+                  placeholder="Search team members…"
+                  className="w-full mb-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white"
+                  disabled={isSubmitting}
+                />
+                <select
+                  value={formAssigneeId}
+                  onChange={(e) => setFormAssigneeId(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-white min-h-11"
+                  disabled={isSubmitting}
+                >
+                  <option value="">Unassigned</option>
+                  {filteredTeam.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name?.trim() || m.email} ({m.email})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-zinc-500 mt-1.5">
+                  Stores user id · shown as name. Sales executives only see leads assigned to them
+                  (or created by them).
+                </p>
+              </div>
               {editingLead && (
                 <div className="mt-5 space-y-3">
                   <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl">
@@ -1658,26 +1817,42 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Assign User modal */}
+      {/* Assign User modal — workspace user ids only */}
       {assignModalOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-1">Assign User</h3>
             <p className="text-xs text-zinc-500 mb-4">
-              Assign {selectedIds.size} selected lead(s) to a team member (name or ID).
+              Assign {selectedIds.size} selected lead(s) to an active workspace member.
             </p>
             <input
-              type="text"
-              value={assignValue}
-              onChange={(e) => setAssignValue(e.target.value)}
-              placeholder="Assignee name or user id"
-              className={`${inputClass} mb-4`}
+              type="search"
+              value={teamSearch}
+              onChange={(e) => setTeamSearch(e.target.value)}
+              placeholder="Search by name or email…"
+              className={`${inputClass} mb-2`}
               autoFocus
             />
+            <select
+              value={assignValue}
+              onChange={(e) => setAssignValue(e.target.value)}
+              className={`${inputClass} mb-4 min-h-11`}
+            >
+              <option value="">Select team member…</option>
+              {filteredTeam.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name?.trim() || m.email} · {m.email}
+                </option>
+              ))}
+            </select>
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={() => setAssignModalOpen(false)}
+                onClick={() => {
+                  setAssignModalOpen(false);
+                  setAssignValue("");
+                  setTeamSearch("");
+                }}
                 className="flex-1 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
               >
                 Cancel
@@ -1724,12 +1899,19 @@ export default function LeadsPage() {
               </div>
               <div>
                 <label className="block text-xs text-zinc-400 mb-1">Assigned User</label>
-                <input
+                <select
                   value={bulkEditForm.assignedTo}
                   onChange={(e) => setBulkEditForm({ ...bulkEditForm, assignedTo: e.target.value })}
-                  placeholder="Name or user id"
                   className={inputClass}
-                />
+                >
+                  <option value="">— no change —</option>
+                  <option value="__unassign__">Unassigned</option>
+                  {teamMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name?.trim() || m.email}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs text-zinc-400 mb-1">Lead Source</label>

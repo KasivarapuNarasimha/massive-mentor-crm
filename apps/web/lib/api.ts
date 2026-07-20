@@ -32,14 +32,20 @@ interface RequestOptions extends RequestInit {
 function networkErrorMessage(err: unknown, url: string): string {
   const name = err instanceof Error ? err.name : "";
   const msg = err instanceof Error ? err.message : String(err || "Unknown error");
-  if (name === "AbortError" || /aborted/i.test(msg)) {
-    return `Request timed out talking to API (${url}). Is the backend running?`;
+  // Client-side abort (timeout / navigation) — NOT "API unreachable"
+  if (name === "AbortError" || /aborted|timeout/i.test(msg)) {
+    return (
+      `Request timed out (${url}). Large imports can take a few minutes — try again or split the file.`
+    );
   }
-  // Browser TypeError: Failed to fetch — connection refused, CORS, offline, TLS
-  if (/failed to fetch|networkerror|load failed|fetch failed/i.test(msg)) {
+  // Real connectivity failures only
+  if (/failed to fetch|networkerror|load failed|fetch failed|network request failed/i.test(msg)) {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return "You appear offline. Reconnect to the internet and try again.";
+    }
     return (
       `Cannot reach API at ${API_BASE_URL}. ` +
-      `Check that the backend is running on port 4000 and NEXT_PUBLIC_API_URL is correct.`
+      `Check that the backend is running and NEXT_PUBLIC_API_URL is correct.`
     );
   }
   return `Network error: ${msg}`;
@@ -639,8 +645,17 @@ class ApiClient {
     });
   }
 
-  /** Multipart file upload (CSV/Excel import). Do not set Content-Type manually. Never throws. */
-  async postFormData<T>(endpoint: string, formData: FormData, token?: string | null): Promise<ApiResponse<T>> {
+  /**
+   * Multipart file upload (CSV/Excel import). Do not set Content-Type manually. Never throws.
+   * Large imports use a long timeout so the browser does not abort mid-write and show a false
+   * "Cannot reach API" error after the server already imported rows.
+   */
+  async postFormData<T>(
+    endpoint: string,
+    formData: FormData,
+    token?: string | null,
+    opts?: { timeoutMs?: number }
+  ): Promise<ApiResponse<T>> {
     const headers: HeadersInit = {};
     if (token) {
       (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
@@ -648,13 +663,17 @@ class ApiClient {
     const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
     const url = `${this.baseUrl}${path}`;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 60_000);
+    // 5 minutes default for bulk import (450+ rows); preview can pass a shorter timeout
+    const timeoutMs = opts?.timeoutMs ?? 300_000;
+    const timer =
+      timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
     try {
       const response = await fetch(url, {
         method: "POST",
         headers,
         body: formData,
         signal: controller.signal,
+        cache: "no-store",
       });
       const text = await response.text();
       let data: Record<string, unknown> = {};
@@ -662,9 +681,16 @@ class ApiClient {
         try {
           data = JSON.parse(text) as Record<string, unknown>;
         } catch {
+          // Nginx HTML error pages etc. — not a JSON body
+          if (response.ok) {
+            return {
+              success: false,
+              error: `Import finished but response was not JSON (HTTP ${response.status}). Refresh the leads table to confirm rows.`,
+            };
+          }
           return {
             success: false,
-            error: `Invalid JSON upload response (${response.status})`,
+            error: `Upload failed (HTTP ${response.status}). ${text.slice(0, 120).replace(/\s+/g, " ")}`,
           };
         }
       }
@@ -676,17 +702,25 @@ class ApiClient {
         };
       }
       this.lastNetworkError = null;
-      return data as unknown as ApiResponse<T>;
+      // Normalize { success, data } wrappers
+      if (data && typeof data === "object" && "success" in data) {
+        return data as unknown as ApiResponse<T>;
+      }
+      return { success: true, data: data as T };
     } catch (error) {
       const message = networkErrorMessage(error, url);
-      this.lastNetworkError = message;
+      // Only mark global connectivity banner for real offline/CORS failures
+      const isAbort =
+        error instanceof Error &&
+        (error.name === "AbortError" || /aborted|timeout/i.test(error.message));
+      if (!isAbort) this.lastNetworkError = message;
       console.warn("[ApiClient] formData:", message);
       return {
         success: false,
         error: message,
       };
     } finally {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
     }
   }
 
@@ -711,7 +745,7 @@ class ApiClient {
       allowedStatuses: string[];
       autoMappings: Array<{ sourceHeader: string; fieldKey: string }>;
       message?: string;
-    }>("/reports/import/preview", fd, token);
+    }>("/reports/import/preview", fd, token, { timeoutMs: 90_000 });
   }
 
   async importContactsFile(
@@ -734,6 +768,7 @@ class ApiClient {
     if (opts?.updateExisting !== undefined) {
       fd.append("updateExisting", opts.updateExisting ? "true" : "false");
     }
+    // Long timeout: server may process hundreds of rows before responding
     return this.postFormData<{
       parsedRows: number;
       imported: number;
@@ -752,7 +787,7 @@ class ApiClient {
       allowedStatuses?: string[];
       needsMapping?: boolean;
       mappingPreview?: unknown;
-    }>("/reports/import/file", fd, token);
+    }>("/reports/import/file", fd, token, { timeoutMs: 300_000 });
   }
 
   /** Active business config (fields, pipelines, modules, AI pack, …) */

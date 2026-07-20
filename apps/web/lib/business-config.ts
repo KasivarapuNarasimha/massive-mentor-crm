@@ -72,7 +72,17 @@ export function leadStatusesFromConfig(config: BusinessConfigDTO | null | undefi
     pipelines.find((p) => p.entity === "contact" && p.key === "lead") ||
     pipelines.find((p) => p.entity === "contact");
   if (!lead?.statuses?.length) return [];
-  return lead.statuses.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const fromConfig = lead.statuses.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  // Ensure required production statuses exist even on older BusinessConfig manifests
+  const byKey = new Map(fromConfig.map((s) => [s.key, { ...s }]));
+  // Prefer human labels for known keys
+  if (byKey.has("proposal") && byKey.get("proposal")!.label?.toLowerCase() === "proposal") {
+    byKey.set("proposal", { ...byKey.get("proposal")!, label: "Proposal Sent" });
+  }
+  for (const req of FALLBACK_LEAD_STATUSES) {
+    if (!byKey.has(req.key)) byKey.set(req.key, { ...req });
+  }
+  return [...byKey.values()].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 /** Read a display value from contact core columns or customFields */
@@ -92,12 +102,14 @@ export function getContactFieldValue(
 }
 
 export const FALLBACK_LEAD_STATUSES: PipelineStatus[] = [
-  { key: "new", label: "new", order: 1 },
-  { key: "contacted", label: "contacted", order: 2 },
-  { key: "qualified", label: "qualified", order: 3 },
-  { key: "proposal", label: "proposal", order: 4 },
-  { key: "won", label: "won", order: 5 },
-  { key: "lost", label: "lost", order: 6 },
+  // Keep in sync with apps/api DEFAULT_LEAD_PIPELINE keys
+  { key: "new", label: "New", order: 1 },
+  { key: "contacted", label: "Contacted", order: 2 },
+  { key: "qualified", label: "Qualified", order: 3 },
+  { key: "proposal", label: "Proposal Sent", order: 4 },
+  { key: "negotiation", label: "Negotiation", order: 5 },
+  { key: "won", label: "Won", order: 6 },
+  { key: "lost", label: "Lost", order: 7 },
 ];
 
 export const FALLBACK_CONTACT_FIELDS: FieldDef[] = [

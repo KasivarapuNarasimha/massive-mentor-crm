@@ -344,7 +344,7 @@ function ExportButtons({
   );
 }
 
-export function EmptyChart({ label = "No data available" }: { label?: string }) {
+export function EmptyChart({ label = "No Data Available" }: { label?: string }) {
   return (
     <div className="flex min-h-[180px] flex-col items-center justify-center text-center px-4 py-6">
       <div className="mb-3 h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500/10 to-sky-500/5 border border-white/10 flex items-center justify-center text-zinc-500">
@@ -556,7 +556,7 @@ export function InteractiveDonutChart({
 }: CommonProps & { centerLabel?: string }) {
   const [tip, setTip] = useState<Tip | null>(null);
   if (!series.length || series.every((s) => !s.value)) {
-    return <EmptyChart label="No data available" />;
+    return <EmptyChart label="No Data Available" />;
   }
   const total = series.reduce((s, p) => s + p.value, 0) || 1;
   const r = 68;
