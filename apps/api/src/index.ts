@@ -38,7 +38,12 @@ app.disable("x-powered-by");
 /**
  * CORS allowlist for browser SPA clients.
  * credentials:true requires reflecting the request Origin (never "*").
- * FRONTEND_URL / CORS_ORIGINS / APP_URL must include the UI origin (e.g. http://200.141.0.25:3000).
+ *
+ * Production portals (must be allowed or browser blocks POST after OPTIONS):
+ *   https://app.massivementor.in
+ *   https://crm.massivementor.in
+ *   https://admin.massivementor.in
+ *   https://demo.massivementor.in
  */
 function collectAllowedOrigins(): Set<string> {
   const set = new Set<string>();
@@ -52,6 +57,7 @@ function collectAllowedOrigins(): Set<string> {
 
   // Explicit env lists
   add(env.FRONTEND_URL);
+  add(env.CORS_ORIGINS);
   add(process.env.CORS_ORIGINS);
   // App public URLs (often the same host the SPA is served from)
   add(env.APP_URL);
@@ -64,7 +70,14 @@ function collectAllowedOrigins(): Set<string> {
   add("http://127.0.0.1:3000");
   add("http://127.0.0.1:3001");
 
-  // Deployed CRM UI (this VPS) — required when FRONTEND_URL was only localhost
+  // Production SaaS portals (HTTPS) — never rely on stale FRONTEND_URL alone
+  add("https://app.massivementor.in");
+  add("https://crm.massivementor.in");
+  add("https://admin.massivementor.in");
+  add("https://demo.massivementor.in");
+  add("https://api.massivementor.in");
+
+  // Legacy direct-IP UI (pre-domain)
   add("http://200.141.0.25:3000");
   add("http://200.141.0.25:3001");
 
@@ -78,10 +91,19 @@ function isOriginAllowed(origin: string | undefined): boolean {
   if (!origin) return true;
   if (allowedOrigins.has(origin)) return true;
 
-  // Allow any port on the known public host when UI is re-bound (3000/3001/etc.)
   try {
     const u = new URL(origin);
+    // Any port on the known public host when UI is re-bound
     if (u.hostname === "200.141.0.25" && u.protocol === "http:") return true;
+
+    // All first-party HTTPS portals: https://*.massivementor.in
+    if (
+      u.protocol === "https:" &&
+      (u.hostname === "massivementor.in" || u.hostname.endsWith(".massivementor.in"))
+    ) {
+      return true;
+    }
+
     if (!isProd) {
       const isLocal =
         u.hostname === "localhost" ||
@@ -95,13 +117,12 @@ function isOriginAllowed(origin: string | undefined): boolean {
   return false;
 }
 
-if (!isProd) {
-  console.log(
-    `[cors] allowed origins (${allowedOrigins.size}): ${[...allowedOrigins].join(", ")}`
-  );
-} else {
-  console.log(`[cors] allowlist size=${allowedOrigins.size} (includes FRONTEND_URL + 200.141.0.25:3000)`);
-}
+console.log(
+  `[cors] allowlist size=${allowedOrigins.size} sample=${[...allowedOrigins]
+    .filter((o) => o.includes("massivementor") || o.includes("localhost"))
+    .slice(0, 12)
+    .join(", ")}`
+);
 
 app.use(
   cors({
@@ -115,8 +136,14 @@ app.use(
       return callback(null, false);
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept",
+      "Origin",
+      "X-Requested-With",
+    ],
     exposedHeaders: ["Content-Disposition"],
     optionsSuccessStatus: 204,
     preflightContinue: false,

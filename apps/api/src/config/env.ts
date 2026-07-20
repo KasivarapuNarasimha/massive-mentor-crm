@@ -35,22 +35,30 @@ const envSchema = z.object({
   // Server
   PORT: z.coerce.number().default(4000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  // Comma-separated browser origins allowed by CORS (must include the SPA origin)
+  // Comma-separated browser origins allowed by CORS (must include SPA origins)
   FRONTEND_URL: z
     .string()
     .optional()
     .default(
-      'http://localhost:3000,http://localhost:3001,http://200.141.0.25:3000'
+      [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://200.141.0.25:3000',
+        'https://app.massivementor.in',
+        'https://crm.massivementor.in',
+        'https://admin.massivementor.in',
+        'https://demo.massivementor.in',
+      ].join(',')
     ),
   /// Extra CORS origins (comma-separated), merged with FRONTEND_URL
   CORS_ORIGINS: z.string().optional(),
 
   // Customer portal public URL (password reset / login links)
   // APP_URL is preferred in emails; falls back to CUSTOMER_APP_URL
-  APP_URL: z.string().optional(),
-  CUSTOMER_APP_URL: z.string().optional().default('http://localhost:3000'),
+  APP_URL: z.string().optional().default('https://app.massivementor.in'),
+  CUSTOMER_APP_URL: z.string().optional().default('https://app.massivementor.in'),
   // Super Admin portal public URL
-  ADMIN_APP_URL: z.string().optional().default('http://localhost:3000'),
+  ADMIN_APP_URL: z.string().optional().default('https://admin.massivementor.in'),
   /// Optional absolute logo URL for HTML emails (HTTPS recommended)
   EMAIL_LOGO_URL: z.string().optional(),
   SUPPORT_WEBSITE: z.string().optional(),
