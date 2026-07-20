@@ -33,6 +33,7 @@ type BizDetail = {
   trialDaysLeft?: number | null;
   billingEmail?: string | null;
   industry?: string;
+  templateSlug?: string | null;
   phone?: string | null;
   createdAt: string;
   owner?: { id: string; email: string; name: string | null };
@@ -257,6 +258,7 @@ export default function AdminBusinessManagePage() {
             ["Email", biz.owner?.email || biz.billingEmail || "—"],
             ["Phone", biz.phone || "—"],
             ["Industry", biz.industry || "—"],
+            ["Business Type", biz.templateSlug || "generic"],
             ["Created", biz.createdAt ? new Date(biz.createdAt).toLocaleString() : "—"],
           ].map(([k, v]) => (
             <div key={k}>

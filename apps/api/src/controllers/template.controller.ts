@@ -72,9 +72,11 @@ const installSchema = z.object({
   templateId: z.string().min(1).optional(),
   templateSlug: z.string().min(1).optional(),
   replaceExisting: z.boolean().optional(),
+  /** When true (default on settings change), also update BusinessProfile.industry label */
+  updateProfileIndustry: z.boolean().optional(),
 });
 
-/** Install / re-provision a template onto the current business */
+/** Install / re-provision a template onto the current business (Business Settings / onboarding) */
 export async function installTemplate(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
@@ -87,16 +89,61 @@ export async function installTemplate(req: AuthenticatedRequest, res: Response) 
       return res.status(400).json({ success: false, error: "templateId or templateSlug required" });
     }
 
+    const { resolveIndustryTemplate } = await import("../services/industry-template-resolve.service.js");
+    const resolved = await resolveIndustryTemplate({ templateSlug: idOrSlug });
+
     const business = await ensureDefaultBusiness(req.user.id);
     const result = await provisionTemplateToBusiness({
       businessId: business.id,
-      templateIdOrSlug: idOrSlug,
+      templateIdOrSlug: resolved.templateSlug,
       installedByUserId: req.user.id,
-      source: "onboarding",
-      replaceExisting: parsed.data.replaceExisting === true,
+      source: "marketplace",
+      replaceExisting: parsed.data.replaceExisting !== false,
     });
 
-    res.json({ success: true, data: result });
+    // Keep profile industry label aligned with business type (Business Settings)
+    if (parsed.data.updateProfileIndustry !== false) {
+      const { prisma } = await import("../lib/prisma.js");
+      await prisma.businessProfile.upsert({
+        where: { userId: req.user.id },
+        create: {
+          userId: req.user.id,
+          businessName: business.name,
+          industry: resolved.industryLabel,
+          description: "",
+        },
+        update: {
+          industry: resolved.industryLabel,
+        },
+      });
+      const existing = await prisma.business.findUnique({
+        where: { id: business.id },
+        select: { settings: true },
+      });
+      const prev =
+        existing?.settings && typeof existing.settings === "object" && !Array.isArray(existing.settings)
+          ? (existing.settings as Record<string, unknown>)
+          : {};
+      await prisma.business.update({
+        where: { id: business.id },
+        data: {
+          settings: {
+            ...prev,
+            businessType: resolved.templateSlug,
+            industryLabel: resolved.industryLabel,
+          },
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        industryLabel: resolved.industryLabel,
+        templateName: resolved.templateName,
+      },
+    });
   } catch (error: unknown) {
     console.error("[templates] install error:", error);
     res.status(400).json({

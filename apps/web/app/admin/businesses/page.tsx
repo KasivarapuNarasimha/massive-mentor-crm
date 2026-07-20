@@ -37,6 +37,9 @@ export default function AdminBusinessesPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showCreate, setShowCreate] = useState(false);
+  const [industryCatalog, setIndustryCatalog] = useState<
+    Array<{ slug: string; name: string; description: string | null; category: string | null }>
+  >([]);
   const [form, setForm] = useState({
     companyName: "",
     ownerEmail: "",
@@ -49,6 +52,8 @@ export default function AdminBusinessesPage() {
     currency: "INR",
     maxUsers: "5",
     notes: "",
+    /** IndustryTemplate slug — required business type */
+    templateSlug: "",
   });
   const [confirm, setConfirm] = useState<{
     action: BulkAction;
@@ -90,6 +95,15 @@ export default function AdminBusinessesPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    // Same catalog as registration/onboarding (seed IndustryTemplate list)
+    void api.getIndustryCatalog().then((res) => {
+      if (res.success && res.data?.templates) {
+        setIndustryCatalog(res.data.templates);
+      }
+    });
+  }, []);
 
   const selectedCount = selected.size;
   const selectedNames = useMemo(
@@ -200,6 +214,11 @@ export default function AdminBusinessesPage() {
       toast.error("Owner name is required");
       return;
     }
+    if (!form.templateSlug.trim()) {
+      toast.error("Business type is required");
+      return;
+    }
+    const selectedType = industryCatalog.find((t) => t.slug === form.templateSlug);
     const res = await api.platformCreateBusiness(
       {
         companyName: form.companyName.trim(),
@@ -213,6 +232,8 @@ export default function AdminBusinessesPage() {
         currency: form.currency,
         maxUsers: Number(form.maxUsers) || 5,
         notes: form.notes.trim() || undefined,
+        templateSlug: form.templateSlug.trim(),
+        industryLabel: selectedType?.name,
       },
       token()
     );
@@ -251,6 +272,7 @@ export default function AdminBusinessesPage() {
         currency: "INR",
         maxUsers: "5",
         notes: "",
+        templateSlug: "",
       });
       load();
     } else toast.error(res.error || "Failed");
@@ -335,7 +357,8 @@ export default function AdminBusinessesPage() {
         >
           <p className="sm:col-span-2 text-xs text-zinc-500">
             Sales-led onboarding: creates business, owner, 3-day trial, and emails login credentials
-            (password is auto-generated).
+            (password is auto-generated). Business type configures dashboards, menus, modules, and
+            forms from the industry template catalog (falls back to Generic CRM).
           </p>
           <input
             className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
@@ -344,6 +367,29 @@ export default function AdminBusinessesPage() {
             value={form.companyName}
             onChange={(e) => setForm({ ...form, companyName: e.target.value })}
           />
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-zinc-400">Business type *</label>
+            <select
+              className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+              required
+              value={form.templateSlug}
+              onChange={(e) => setForm({ ...form, templateSlug: e.target.value })}
+            >
+              <option value="">Select business type…</option>
+              {industryCatalog.map((t) => (
+                <option key={t.slug} value={t.slug}>
+                  {t.name}
+                  {t.category ? ` · ${t.category}` : ""}
+                </option>
+              ))}
+            </select>
+            {form.templateSlug ? (
+              <p className="text-[11px] text-zinc-500">
+                {industryCatalog.find((t) => t.slug === form.templateSlug)?.description ||
+                  "Configures CRM UI for this industry on first login."}
+              </p>
+            ) : null}
+          </div>
           <input
             className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
             placeholder="Owner name *"

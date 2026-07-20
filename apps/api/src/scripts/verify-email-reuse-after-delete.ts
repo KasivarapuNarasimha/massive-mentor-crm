@@ -24,7 +24,8 @@ async function main() {
     businessName: `Reuse Biz A ${stamp}`,
     ownerEmail: email,
     ownerName: "Reuse Owner",
-    ownerPassword: password,
+    templateSlug: "generic",
+      ownerPassword: password,
     plan: "trial",
   });
   const bizAId = (a as { id?: string }).id || (a as { business?: { id: string } }).business?.id;
@@ -60,7 +61,8 @@ async function main() {
     businessName: `Reuse Biz B ${stamp}`,
     ownerEmail: email,
     ownerName: "Reuse Owner 2",
-    ownerPassword: password,
+    templateSlug: "generic",
+      ownerPassword: password,
     plan: "trial",
   });
   const bizB = await prisma.business.findFirst({
@@ -79,6 +81,7 @@ async function main() {
       actorUserId: admin.id,
       businessName: `Should Fail ${stamp}`,
       ownerEmail: email,
+      templateSlug: "generic",
       ownerPassword: password,
       plan: "trial",
     });

@@ -187,7 +187,8 @@ export async function createCustomerBusiness(input: {
   ownerEmail: string;
   ownerName?: string;
   ownerPassword: string;
-  templateSlug?: string;
+  templateSlug: string;
+  industryLabel?: string;
   plan?: string;
 }) {
   const plan = assertPlan(input.plan || "trial");
@@ -195,13 +196,19 @@ export async function createCustomerBusiness(input: {
   const trialEnds = new Date();
   trialEnds.setDate(trialEnds.getDate() + 14);
 
+  const { resolveIndustryTemplate } = await import("./industry-template-resolve.service.js");
+  const resolved = await resolveIndustryTemplate({
+    templateSlug: input.templateSlug,
+    industryLabel: input.industryLabel,
+  });
+
   // Shared with public registration — soft-deleted owners are reused
   const owner = await resolveOrCreateCustomerOwner({
     email,
     password: input.ownerPassword,
     name: input.ownerName,
     businessName: input.businessName.trim(),
-    industryLabel: "Other",
+    industryLabel: resolved.industryLabel,
   });
   const userId = owner.userId;
   const reusedUser = owner.reusedUser;
@@ -209,8 +216,22 @@ export async function createCustomerBusiness(input: {
   const business = await createBusinessWithTemplate({
     ownerUserId: userId,
     businessName: input.businessName.trim(),
-    templateSlug: input.templateSlug || "generic",
+    templateSlug: resolved.templateSlug,
     memberRole: "business_admin",
+  });
+
+  await prisma.businessProfile.upsert({
+    where: { userId },
+    create: {
+      userId,
+      businessName: input.businessName.trim(),
+      industry: resolved.industryLabel,
+      description: "",
+    },
+    update: {
+      industry: resolved.industryLabel,
+      businessName: input.businessName.trim(),
+    },
   });
 
   await prisma.business.update({

@@ -5,7 +5,6 @@ import { z } from "zod";
 import { env } from "../config/env.js";
 import { ensureDefaultBusiness, createBusinessWithTemplate } from "./business.service.js";
 import { recordAudit } from "./audit.service.js";
-import { seedIndustryTemplates, getTemplateByIdOrSlug } from "./template.service.js";
 import { resolveOrCreateCustomerOwner } from "./customer-owner.service.js";
 import type { PortalAudience } from "../types/portal.js";
 
@@ -119,42 +118,14 @@ export async function registerUser(input: RegisterInput): Promise<AuthResponse> 
       "Public registration is disabled. Contact Massive Mentor sales to start your CRM trial."
     );
   }
-  await seedIndustryTemplates();
-
-  // Resolve industry template (metadata-driven catalog)
-  let templateSlug = (input.templateSlug || "generic").trim().toLowerCase().replace(/\s+/g, "_");
-  // Map common UI labels / aliases
-  const aliases: Record<string, string> = {
-    other: "generic",
-    "digital_marketing_agency": "digital_marketing",
-    digitalmarketing: "digital_marketing",
-    "software": "software_company",
-    "real-estate": "real_estate",
-    realestate: "real_estate",
-    coaching: "coaching_institute",
-  };
-  if (aliases[templateSlug]) templateSlug = aliases[templateSlug];
-
-  const template = await getTemplateByIdOrSlug(templateSlug);
-  if (!template && templateSlug !== "generic") {
-    // Try match by name
-    const byName = await prisma.industryTemplate.findFirst({
-      where: {
-        OR: [
-          { name: { equals: input.industryLabel || input.templateSlug || "", mode: "insensitive" } },
-          { slug: templateSlug },
-        ],
-        isPublished: true,
-      },
-    });
-    if (byName) templateSlug = byName.slug;
-    else templateSlug = "generic";
-  } else if (template) {
-    templateSlug = template.slug;
-  }
-
   const businessName = (input.businessName || input.name || "My Business").trim();
-  const industryLabel = input.industryLabel || template?.name || "Other";
+  const { resolveIndustryTemplate } = await import("./industry-template-resolve.service.js");
+  const resolved = await resolveIndustryTemplate({
+    templateSlug: input.templateSlug,
+    industryLabel: input.industryLabel,
+  });
+  const templateSlug = resolved.templateSlug;
+  const industryLabel = resolved.industryLabel;
 
   // Shared with Super Admin create-business: reuse soft-deleted owners (email UNIQUE)
   const owner = await resolveOrCreateCustomerOwner({

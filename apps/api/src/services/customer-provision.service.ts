@@ -36,7 +36,9 @@ export type CreateCustomerInput = {
   maxUsers?: number;
   planCode?: string; // optional paid plan code; default trial
   notes?: string;
-  templateSlug?: string;
+  /** Required business type — IndustryTemplate slug from seed catalog */
+  templateSlug: string;
+  industryLabel?: string;
   trialDays?: number;
 };
 
@@ -45,8 +47,17 @@ export async function provisionCustomer(input: CreateCustomerInput) {
   const company = input.companyName.trim();
   if (!company) throw new Error("Company name is required");
   if (!email) throw new Error("Owner email is required");
+  if (!input.templateSlug?.trim()) {
+    throw new Error("Business type is required");
+  }
 
   await ensureSubscriptionPlans();
+
+  const { resolveIndustryTemplate } = await import("./industry-template-resolve.service.js");
+  const resolved = await resolveIndustryTemplate({
+    templateSlug: input.templateSlug,
+    industryLabel: input.industryLabel,
+  });
 
   const tempPassword = generateTempPassword();
   const trialDays = input.trialDays ?? trialDaysDefault();
@@ -56,7 +67,7 @@ export async function provisionCustomer(input: CreateCustomerInput) {
     password: tempPassword,
     name: input.ownerName.trim() || email.split("@")[0],
     businessName: company,
-    industryLabel: "Other",
+    industryLabel: resolved.industryLabel,
   });
 
   // Force password to temp on provision (even if user reused)
@@ -71,10 +82,11 @@ export async function provisionCustomer(input: CreateCustomerInput) {
     },
   });
 
+  // Provisions BusinessConfig (dashboards, menus, modules, fields, reports) from template
   const business = await createBusinessWithTemplate({
     ownerUserId: owner.userId,
     businessName: company,
-    templateSlug: input.templateSlug || "generic",
+    templateSlug: resolved.templateSlug,
     memberRole: "business_admin",
   });
 
@@ -100,28 +112,33 @@ export async function provisionCustomer(input: CreateCustomerInput) {
       suspendedAt: null,
       suspendedReason: null,
       licenseKey: `MM-${crypto.randomBytes(8).toString("hex").toUpperCase()}`,
+      templateSlug: resolved.templateSlug,
+      templateId: resolved.templateId || undefined,
       settings: {
         provisionNotes: input.notes || null,
         currency: input.currency || "INR",
         provisionedBy: input.actorUserId,
         provisionedAt: new Date().toISOString(),
+        businessType: resolved.templateSlug,
+        industryLabel: resolved.industryLabel,
       },
     },
   });
 
-  // Profile currency for CRM formatting
+  // Profile currency + industry label for CRM formatting / AI context
   await prisma.businessProfile.upsert({
     where: { userId: owner.userId },
     create: {
       userId: owner.userId,
       businessName: company,
-      industry: "Other",
+      industry: resolved.industryLabel,
       description: "",
       currency: input.currency || "INR",
       location: input.businessAddress || input.country || null,
     },
     update: {
       businessName: company,
+      industry: resolved.industryLabel,
       currency: input.currency || "INR",
       location: input.businessAddress || input.country || null,
     },
@@ -159,6 +176,8 @@ export async function provisionCustomer(input: CreateCustomerInput) {
       ownerEmail: email,
       trialDays,
       reusedUser: owner.reusedUser,
+      templateSlug: resolved.templateSlug,
+      industryLabel: resolved.industryLabel,
     },
   });
 

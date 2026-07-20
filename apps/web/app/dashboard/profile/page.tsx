@@ -15,20 +15,6 @@ import {
   setAppCurrency,
 } from "@/lib/currency";
 
-const INDUSTRIES = [
-  "SaaS / Software",
-  "E-commerce",
-  "Consulting",
-  "Agency",
-  "Healthcare",
-  "Education",
-  "Finance",
-  "Real Estate",
-  "Manufacturing",
-  "Retail",
-  "Other",
-];
-
 const STAGES = [
   { value: "idea", label: "Idea Stage" },
   { value: "mvp", label: "MVP / Pre-revenue" },
@@ -69,14 +55,34 @@ export default function BusinessProfilePage() {
     mainProduct: "",
     location: "",
   });
+  /** Industry template catalog (same as admin create / registration) */
+  const [industryCatalog, setIndustryCatalog] = useState<
+    Array<{ slug: string; name: string; description: string | null; category: string | null }>
+  >([]);
+  const [templateSlug, setTemplateSlug] = useState("");
+  const [initialTemplateSlug, setInitialTemplateSlug] = useState("");
 
-  // Load existing profile
+  // Load existing profile + industry catalog + current business template
   useEffect(() => {
     async function loadProfile() {
       if (!token) return;
 
       setIsLoading(true);
-      const response = await api.getProfile(token);
+      const [response, catalogRes, configRes] = await Promise.all([
+        api.getProfile(token),
+        api.getIndustryCatalog(),
+        api.getBusinessConfig(token),
+      ]);
+
+      if (catalogRes.success && catalogRes.data?.templates) {
+        setIndustryCatalog(catalogRes.data.templates);
+      }
+
+      const currentSlug = configRes.success
+        ? String(configRes.data?.business?.templateSlug || "generic")
+        : "generic";
+      setTemplateSlug(currentSlug);
+      setInitialTemplateSlug(currentSlug);
 
       if (response.success && response.data?.profile) {
         const p = response.data.profile as Profile;
@@ -88,9 +94,11 @@ export default function BusinessProfilePage() {
             });
         const annualRevenue = migrateRevenueRange(p.annualRevenue || "", currency);
         setAppCurrency(currency);
+        const catalogName =
+          catalogRes.data?.templates?.find((t) => t.slug === currentSlug)?.name || "";
         setFormData({
           businessName: p.businessName || "",
-          industry: p.industry || "",
+          industry: p.industry || catalogName || "",
           description: p.description || "",
           employeeCount: p.employeeCount ?? null,
           currency,
@@ -164,12 +172,36 @@ export default function BusinessProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
+    if (!templateSlug) {
+      toast.error("Business type is required");
+      return;
+    }
 
     setIsSaving(true);
+
+    const selected = industryCatalog.find((t) => t.slug === templateSlug);
+    const industryLabel = selected?.name || formData.industry || "Other / Generic";
+
+    const typeChanged = templateSlug !== initialTemplateSlug;
+
+    // If business type changed, re-provision CRM config (dashboards, menus, modules, fields)
+    if (typeChanged) {
+      const install = await api.installIndustryTemplate(
+        { templateSlug, replaceExisting: true },
+        token
+      );
+      if (!install.success) {
+        toast.error(install.error || "Failed to apply business type template");
+        setIsSaving(false);
+        return;
+      }
+      setInitialTemplateSlug(templateSlug);
+    }
 
     // Prepare data for API
     const payload = {
       ...formData,
+      industry: industryLabel,
       employeeCount: formData.employeeCount ? Number(formData.employeeCount) : null,
     };
 
@@ -177,7 +209,12 @@ export default function BusinessProfilePage() {
 
     if (response.success) {
       setAppCurrency(formData.currency);
-      toast.success("Profile saved successfully");
+      setFormData((prev) => ({ ...prev, industry: industryLabel }));
+      toast.success(
+        typeChanged
+          ? "Profile saved · business type template applied"
+          : "Profile saved successfully"
+      );
     } else {
       toast.error(response.error || "Failed to save. Please try again.");
     }
@@ -265,18 +302,30 @@ export default function BusinessProfilePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Industry *</label>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Business Type *</label>
                 <select
-                  value={formData.industry}
-                  onChange={(e) => handleChange("industry", e.target.value)}
+                  value={templateSlug}
+                  onChange={(e) => {
+                    const slug = e.target.value;
+                    setTemplateSlug(slug);
+                    const name = industryCatalog.find((t) => t.slug === slug)?.name || "";
+                    handleChange("industry", name);
+                  }}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
                   required
                 >
-                  <option value="">Select industry...</option>
-                  {INDUSTRIES.map((ind) => (
-                    <option key={ind} value={ind}>{ind}</option>
+                  <option value="">Select business type…</option>
+                  {industryCatalog.map((t) => (
+                    <option key={t.slug} value={t.slug}>
+                      {t.name}
+                      {t.category ? ` · ${t.category}` : ""}
+                    </option>
                   ))}
                 </select>
+                <p className="text-xs text-zinc-500 mt-1.5">
+                  Changes re-apply CRM menus, dashboards, modules, and forms from the industry
+                  template. Unknown types use Generic CRM.
+                </p>
               </div>
 
               <div>

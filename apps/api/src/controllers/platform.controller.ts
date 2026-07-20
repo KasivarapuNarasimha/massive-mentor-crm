@@ -74,7 +74,9 @@ export async function createBusiness(req: AuthenticatedRequest, res: Response) {
       maxUsers: z.number().int().min(1).max(5000).optional(),
       planCode: z.string().optional(),
       notes: z.string().max(2000).optional(),
-      templateSlug: z.string().optional(),
+      /** Business type — IndustryTemplate slug (required). Falls back to generic CRM if unknown. */
+      templateSlug: z.string().min(1, "Business type is required"),
+      industryLabel: z.string().max(120).optional(),
       trialDays: z.number().int().min(1).max(90).optional(),
       // Legacy fields
       ownerPassword: z.string().min(8).optional(),
@@ -88,6 +90,9 @@ export async function createBusiness(req: AuthenticatedRequest, res: Response) {
     const companyName = (body.companyName || body.businessName || "").trim();
     if (!companyName) {
       return res.status(400).json({ success: false, error: "Company name is required" });
+    }
+    if (!body.templateSlug?.trim()) {
+      return res.status(400).json({ success: false, error: "Business type is required" });
     }
 
     // New provision path (auto password + trial + emails)
@@ -108,6 +113,7 @@ export async function createBusiness(req: AuthenticatedRequest, res: Response) {
         planCode: body.planCode || body.plan,
         notes: body.notes,
         templateSlug: body.templateSlug,
+        industryLabel: body.industryLabel,
         trialDays: body.trialDays,
       });
       return res.status(201).json({ success: true, data });
@@ -121,6 +127,7 @@ export async function createBusiness(req: AuthenticatedRequest, res: Response) {
       ownerName: body.ownerName,
       ownerPassword: body.ownerPassword,
       templateSlug: body.templateSlug,
+      industryLabel: body.industryLabel,
       plan: body.plan || "trial",
     });
     res.status(201).json({ success: true, data });
