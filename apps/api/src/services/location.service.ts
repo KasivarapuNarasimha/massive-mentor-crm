@@ -165,49 +165,108 @@ export async function reverseGeocode(
   state?: string;
   country?: string;
   pincode?: string;
+  provider?: string;
 }> {
+  // 1) Nominatim (OpenStreetMap)
   try {
     const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 4000);
+    const t = setTimeout(() => controller.abort(), 4500);
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`;
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "MassiveMentor-CRM/1.0 (field-sales-location)",
+        "User-Agent": "MassiveMentor-CRM/1.0 (field-sales-location; contact: team@massivementor.in)",
         Accept: "application/json",
       },
     });
     clearTimeout(t);
-    if (!res.ok) return {};
-    const j = (await res.json()) as {
-      display_name?: string;
-      address?: Record<string, string>;
-    };
-    const a = j.address || {};
-    const locality =
-      a.suburb ||
-      a.neighbourhood ||
-      a.quarter ||
-      a.city_district ||
-      a.village ||
-      a.town ||
-      a.hamlet ||
-      undefined;
-    const city = a.city || a.town || a.municipality || a.county || undefined;
-    const state = a.state || a.region || undefined;
-    const country = a.country || undefined;
-    const pincode = a.postcode || undefined;
-    return {
-      fullAddress: j.display_name || undefined,
-      locality,
-      city,
-      state,
-      country,
-      pincode,
-    };
-  } catch {
-    return {};
+    if (res.ok) {
+      const j = (await res.json()) as {
+        display_name?: string;
+        address?: Record<string, string>;
+      };
+      const a = j.address || {};
+      const locality =
+        a.suburb ||
+        a.neighbourhood ||
+        a.quarter ||
+        a.city_district ||
+        a.village ||
+        a.town ||
+        a.hamlet ||
+        undefined;
+      const city = a.city || a.town || a.municipality || a.county || undefined;
+      const state = a.state || a.region || undefined;
+      const country = a.country || undefined;
+      const pincode = a.postcode || undefined;
+      console.info("[location] reverseGeocode Nominatim ok", {
+        lat,
+        lng,
+        city,
+        pincode,
+      });
+      return {
+        fullAddress: j.display_name || undefined,
+        locality,
+        city,
+        state,
+        country,
+        pincode,
+        provider: "nominatim",
+      };
+    }
+    console.warn("[location] reverseGeocode Nominatim HTTP", res.status);
+  } catch (e) {
+    console.warn(
+      "[location] reverseGeocode Nominatim failed",
+      e instanceof Error ? e.message : e
+    );
   }
+
+  // 2) BigDataCloud free reverse geocode (no key, server-side)
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 4000);
+    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(t);
+    if (res.ok) {
+      const j = (await res.json()) as {
+        locality?: string;
+        city?: string;
+        principalSubdivision?: string;
+        countryName?: string;
+        postcode?: string;
+      };
+      const fullAddress = [j.locality, j.city, j.principalSubdivision, j.postcode, j.countryName]
+        .filter(Boolean)
+        .join(", ");
+      console.info("[location] reverseGeocode BigDataCloud ok", {
+        lat,
+        lng,
+        city: j.city,
+        pincode: j.postcode,
+      });
+      return {
+        fullAddress: fullAddress || undefined,
+        locality: j.locality || undefined,
+        city: j.city || j.locality || undefined,
+        state: j.principalSubdivision || undefined,
+        country: j.countryName || undefined,
+        pincode: j.postcode || undefined,
+        provider: "bigdatacloud",
+      };
+    }
+    console.warn("[location] reverseGeocode BigDataCloud HTTP", res.status);
+  } catch (e) {
+    console.warn(
+      "[location] reverseGeocode BigDataCloud failed",
+      e instanceof Error ? e.message : e
+    );
+  }
+
+  console.error("[location] reverseGeocode ALL providers failed", { lat, lng });
+  return {};
 }
 
 function deriveStatus(eventType: string, hadActiveField: boolean, hadMeeting: boolean): string {
@@ -261,20 +320,42 @@ export async function recordLocationEvent(
       ? payload.accuracyM
       : null;
 
+  console.info("[location] recordLocationEvent input", {
+    userId,
+    eventType,
+    rawLat: payload.latitude,
+    rawLng: payload.longitude,
+    hasGps: latitude != null,
+    clientSource: payload.source,
+    clientCity: payload.city,
+    publicIp,
+  });
+
   if (latitude != null && longitude != null) {
     source = "gps";
-    // Server-side reverse geocode if client didn't send full address
-    if (!fullAddress || !city || !pincode) {
-      const geo = await reverseGeocode(latitude, longitude);
-      fullAddress = fullAddress || geo.fullAddress || null;
-      locality = locality || geo.locality || null;
-      city = city || geo.city || null;
-      state = state || geo.state || null;
-      country = country || geo.country || null;
-      pincode = pincode || geo.pincode || null;
-    }
+    // ALWAYS reverse-geocode on server when coords exist (client address often missing due to CORS)
+    const geo = await reverseGeocode(latitude, longitude);
+    fullAddress = fullAddress || geo.fullAddress || null;
+    locality = locality || geo.locality || null;
+    city = city || geo.city || null;
+    state = state || geo.state || null;
+    country = country || geo.country || null;
+    pincode = pincode || geo.pincode || null;
+    console.info("[location] GPS stored", {
+      userId,
+      eventType,
+      latitude,
+      longitude,
+      accuracyM,
+      city,
+      locality,
+      pincode,
+      fullAddress: fullAddress?.slice(0, 120),
+      reverseProvider: geo.provider || "none",
+    });
   } else {
-    // No GPS — do not invent a locality. Optional coarse IP city only (never shown as "GPS").
+    // No GPS coordinates in payload — do NOT label as "ip" for field UX.
+    // Optional coarse city from public IP for debugging only (never as GPS address).
     source = "unknown";
     locality = null;
     latitude = null;
@@ -287,6 +368,14 @@ export async function recordLocationEvent(
       state = state || ipGeo.state || null;
       country = country || ipGeo.country || null;
     }
+    console.warn("[location] NO GPS coordinates — storing without route accuracy", {
+      userId,
+      eventType,
+      publicIp,
+      city,
+      failHint:
+        "Browser likely blocked Geolocation (common on http://public-ip without HTTPS)",
+    });
   }
 
   // Active sessions for status
@@ -478,7 +567,7 @@ export async function startFieldWork(
       startedAt: new Date(),
       startLat: hasGps(payload.latitude, payload.longitude) ? payload.latitude! : null,
       startLng: hasGps(payload.latitude, payload.longitude) ? payload.longitude! : null,
-      startSource: hasGps(payload.latitude, payload.longitude) ? "gps" : "ip",
+      startSource: hasGps(payload.latitude, payload.longitude) ? "gps" : "unknown",
     },
   });
 

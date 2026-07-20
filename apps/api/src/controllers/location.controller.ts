@@ -37,13 +37,29 @@ function deviceFromReq(req: AuthenticatedRequest, body?: LocationPayload): Devic
   };
 }
 
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function payloadFromBody(body: Record<string, unknown>): LocationPayload {
+  const latitude = numOrNull(body.latitude);
+  const longitude = numOrNull(body.longitude);
+  console.info("[location] payloadFromBody", {
+    latitude,
+    longitude,
+    accuracyM: numOrNull(body.accuracyM),
+    source: body.source,
+    city: body.city,
+    hasCoords: latitude != null && longitude != null,
+  });
   return {
-    latitude: body.latitude != null ? Number(body.latitude) : null,
-    longitude: body.longitude != null ? Number(body.longitude) : null,
-    accuracyM: body.accuracyM != null ? Number(body.accuracyM) : null,
-    speedMps: body.speedMps != null ? Number(body.speedMps) : null,
-    headingDeg: body.headingDeg != null ? Number(body.headingDeg) : null,
+    latitude,
+    longitude,
+    accuracyM: numOrNull(body.accuracyM),
+    speedMps: numOrNull(body.speedMps),
+    headingDeg: numOrNull(body.headingDeg),
     fullAddress: (body.fullAddress as string) || null,
     locality: (body.locality as string) || null,
     city: (body.city as string) || null,
@@ -56,7 +72,11 @@ function payloadFromBody(body: Record<string, unknown>): LocationPayload {
     os: (body.os as string) || null,
     meetingId: (body.meetingId as string) || null,
     fieldSessionId: (body.fieldSessionId as string) || null,
-    source: body.source as "gps" | "ip" | "unknown" | undefined,
+    // Never trust client "ip" as a location source for GPS features
+    source:
+      body.source === "gps" && latitude != null && longitude != null
+        ? "gps"
+        : "unknown",
   };
 }
 
@@ -80,9 +100,30 @@ export async function postLocationEvent(req: AuthenticatedRequest, res: Response
     }
     const payload = payloadFromBody(body);
     const device = deviceFromReq(req, payload);
+    console.info("[location] POST /events", {
+      userId: req.user.id,
+      eventType,
+      lat: payload.latitude,
+      lng: payload.longitude,
+      source: payload.source,
+      ip: device.publicIp,
+    });
     const event = await recordLocationEvent(req.user.id, payload, device, eventType);
-    res.json({ success: true, data: { event } });
+    res.json({
+      success: true,
+      data: {
+        event,
+        debug: {
+          receivedLat: payload.latitude,
+          receivedLng: payload.longitude,
+          storedSource: event.source,
+          storedCity: event.city,
+          storedAddress: event.fullAddress,
+        },
+      },
+    });
   } catch (error: unknown) {
+    console.error("[location] POST /events failed", error);
     res.status(400).json({
       success: false,
       error: error instanceof Error ? error.message : "Failed to record location",
@@ -94,9 +135,27 @@ export async function postFieldStart(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const payload = payloadFromBody((req.body || {}) as Record<string, unknown>);
+    console.info("[location] POST /field/start", {
+      userId: req.user.id,
+      lat: payload.latitude,
+      lng: payload.longitude,
+      source: payload.source,
+    });
     const result = await startFieldWork(req.user.id, payload, deviceFromReq(req, payload));
-    res.json({ success: true, data: result });
+    res.json({
+      success: true,
+      data: {
+        ...result,
+        debug: {
+          receivedLat: payload.latitude,
+          receivedLng: payload.longitude,
+          eventSource: result.event?.source,
+          eventAddress: result.event?.fullAddress,
+        },
+      },
+    });
   } catch (error: unknown) {
+    console.error("[location] field/start failed", error);
     res.status(400).json({
       success: false,
       error: error instanceof Error ? error.message : "Failed to start field work",

@@ -9,6 +9,7 @@ import {
   startWatchGps,
   toLocationBody,
   gpsStatusLabel,
+  isGeoSecureContext,
   type CapturedLocation,
 } from "@/lib/location-client";
 import { usePortal } from "@/lib/portal-context";
@@ -270,10 +271,19 @@ export default function FieldSalesPage() {
 
   // Initial GPS permission request on page open
   useEffect(() => {
+    if (!isGeoSecureContext()) {
+      setGpsError(
+        "INSECURE_CONTEXT: Browser blocks GPS on http://public-ip. Serve the web app over HTTPS (or use localhost)."
+      );
+      return;
+    }
     void captureGps({ timeoutMs: 20000, force: true }).then((loc) => {
       setGpsLive(loc);
       if (loc.gpsDenied) {
-        setGpsError("GPS permission denied or unavailable. Enable location for accurate tracking.");
+        setGpsError(
+          loc.failReason ||
+            "GPS permission denied or unavailable. Enable location for accurate tracking."
+        );
       }
     });
   }, []);
@@ -281,20 +291,41 @@ export default function FieldSalesPage() {
   const withLocation = async (fn: (body: Record<string, unknown>) => Promise<void>) => {
     setBusy(true);
     try {
-      const loc = await captureGps({ timeoutMs: 25000, force: true });
+      if (!isGeoSecureContext()) {
+        const msg =
+          "GPS blocked: open the app via HTTPS. Plain HTTP on a public IP cannot access the Geolocation API.";
+        setGpsError(msg);
+        toast.error(msg);
+        setBusy(false);
+        return;
+      }
+      const loc = await captureGps({ timeoutMs: 30000, force: true });
       setGpsLive(loc);
-      if (loc.gpsDenied) {
-        toast.message("GPS unavailable — enable browser location for accurate tracking");
-        setGpsError("GPS permission denied or unavailable");
+      console.info("[mm-gps] field action location", {
+        lat: loc.latitude,
+        lng: loc.longitude,
+        source: loc.source,
+        failReason: loc.failReason,
+        city: loc.city,
+      });
+      if (loc.gpsDenied || loc.latitude == null) {
+        toast.error(
+          loc.failReason ||
+            "GPS unavailable — enable browser location (and HTTPS) for accurate tracking"
+        );
+        setGpsError(loc.failReason || "GPS permission denied or unavailable");
+        // Still post so server logs the failure path — but user sees clear error
       } else {
         setGpsError(null);
         toast.success(
           loc.locality || loc.city
             ? `GPS locked · ${loc.locality || loc.city}`
-            : "GPS locked"
+            : `GPS locked · ${loc.latitude.toFixed(5)}, ${loc.longitude?.toFixed(5)}`
         );
       }
-      await fn(toLocationBody(loc));
+      const body = toLocationBody(loc);
+      console.info("[mm-gps] posting field body", body);
+      await fn(body);
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Location action failed");
@@ -464,6 +495,37 @@ export default function FieldSalesPage() {
           )
         }
       />
+
+      {!isGeoSecureContext() && (
+        <div
+          className="mb-5 rounded-2xl border border-amber-500/50 bg-amber-500/10 px-4 py-4 text-sm text-amber-100"
+          role="alert"
+        >
+          <div className="font-semibold text-amber-50 mb-1">
+            GPS blocked: HTTPS required
+          </div>
+          <p className="text-amber-100/90 leading-relaxed">
+            You are on <code className="text-amber-50">{typeof window !== "undefined" ? window.location.origin : "HTTP"}</code>.
+            Browsers only allow the Geolocation API on <strong>HTTPS</strong> (or{" "}
+            <code className="text-amber-50">localhost</code>). On plain{" "}
+            <code className="text-amber-50">http://public-ip:3000</code>,{" "}
+            <code className="text-amber-50">getCurrentPosition</code> /{" "}
+            <code className="text-amber-50">watchPosition</code> fail → no coordinates reach the
+            API → history shows no GPS and travel stays 0 km.
+          </p>
+          <p className="mt-2 text-xs text-amber-200/80">
+            Fix: put Nginx/Caddy TLS in front of the web app (e.g.{" "}
+            <code>https://200.141.0.25</code> or a domain with Let&apos;s Encrypt), then allow
+            location again.
+          </p>
+        </div>
+      )}
+
+      {gpsError && isGeoSecureContext() && (
+        <div className="mb-5 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+          <strong>GPS diagnostic:</strong> {gpsError}
+        </div>
+      )}
 
       {myStatus?.activeField && (
         <div className="mb-5 rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 flex flex-wrap items-center gap-3">
