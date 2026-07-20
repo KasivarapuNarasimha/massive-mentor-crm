@@ -344,13 +344,23 @@ function ExportButtons({
   );
 }
 
-export function EmptyChart({ label = "No data yet" }: { label?: string }) {
+export function EmptyChart({ label = "No data available" }: { label?: string }) {
   return (
-    <div className="flex min-h-[160px] flex-col items-center justify-center text-center px-4">
-      <div className="mb-2 h-12 w-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-600 text-xl">
-        ◫
+    <div className="flex min-h-[180px] flex-col items-center justify-center text-center px-4 py-6">
+      <div className="mb-3 h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500/10 to-sky-500/5 border border-white/10 flex items-center justify-center text-zinc-500">
+        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+          />
+        </svg>
       </div>
-      <p className="text-sm text-zinc-400">{label}</p>
+      <p className="text-sm font-medium text-zinc-300">{label}</p>
+      <p className="text-[11px] text-zinc-600 mt-1 max-w-[200px]">
+        Add CRM activity to populate this chart
+      </p>
     </div>
   );
 }
@@ -545,9 +555,12 @@ export function InteractiveDonutChart({
   centerLabel,
 }: CommonProps & { centerLabel?: string }) {
   const [tip, setTip] = useState<Tip | null>(null);
-  if (!series.length || series.every((s) => !s.value)) return <EmptyChart />;
+  if (!series.length || series.every((s) => !s.value)) {
+    return <EmptyChart label="No data available" />;
+  }
   const total = series.reduce((s, p) => s + p.value, 0) || 1;
-  const r = 54;
+  const r = 68;
+  const stroke = 18;
   const c = 2 * Math.PI * r;
   let offset = 0;
   const slices = series.map((s, i) => {
@@ -563,23 +576,31 @@ export function InteractiveDonutChart({
   });
 
   return (
-    <div className="relative flex flex-col sm:flex-row items-center gap-4">
-      <div className="relative shrink-0 w-[160px] h-[160px]">
-        <svg viewBox="0 0 140 140" className="w-full h-full -rotate-90">
-          <circle cx="70" cy="70" r={r} fill="none" stroke="#27272a" strokeWidth="16" />
+    <div className="relative flex flex-col sm:flex-row items-center gap-5 sm:gap-6 min-h-[200px]">
+      <div className="relative shrink-0 w-[200px] h-[200px] sm:w-[220px] sm:h-[220px]">
+        <svg viewBox="0 0 180 180" className="w-full h-full -rotate-90">
+          <circle
+            cx="90"
+            cy="90"
+            r={r}
+            fill="none"
+            stroke="#27272a"
+            strokeWidth={stroke}
+          />
           {slices.map((s) => (
             <circle
               key={s.name}
-              cx="70"
-              cy="70"
+              cx="90"
+              cy="90"
               r={r}
               fill="none"
               stroke={s.color}
-              strokeWidth="16"
+              strokeWidth={stroke}
               strokeDasharray={s.dash}
               strokeDashoffset={s.offset}
-              className="cursor-pointer transition-all hover:opacity-90"
-              style={{ filter: `drop-shadow(0 0 6px ${s.color}66)` }}
+              strokeLinecap="butt"
+              className="cursor-pointer transition-all duration-300 hover:opacity-90"
+              style={{ filter: `drop-shadow(0 0 10px ${s.color}55)` }}
               onMouseEnter={(e) => {
                 const parent = (
                   e.currentTarget.closest(".relative.flex") as HTMLElement | null
@@ -600,22 +621,31 @@ export function InteractiveDonutChart({
           ))}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-lg font-bold tabular-nums text-white">{fmtNum(total)}</span>
-          <span className="text-[10px] text-zinc-500">{centerLabel || "total"}</span>
+          <span className="text-2xl font-bold tabular-nums text-white tracking-tight">
+            {fmtNum(total)}
+          </span>
+          <span className="text-[11px] text-zinc-500 font-medium mt-0.5">
+            {centerLabel || "total"}
+          </span>
         </div>
       </div>
-      <ul className="flex-1 space-y-1.5 min-w-0 w-full max-h-40 overflow-y-auto">
+      <ul className="flex-1 space-y-2 min-w-0 w-full max-h-52 overflow-y-auto pr-1">
         {slices.map((s) => (
           <li key={s.name}>
             <button
               type="button"
               onClick={() => onDrill?.(s)}
-              className="w-full flex items-center gap-2 text-xs text-zinc-400 hover:text-white transition-colors text-left py-0.5"
+              className="w-full flex items-center gap-2.5 text-xs text-zinc-400 hover:text-white transition-colors text-left py-1.5 px-1.5 rounded-lg hover:bg-white/[0.04]"
             >
-              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: s.color }} />
-              <span className="truncate flex-1">{s.name}</span>
-              <span className="tabular-nums text-zinc-300">{fmtNum(s.value)}</span>
-              <span className="tabular-nums text-zinc-600 w-10 text-right">
+              <span
+                className="h-3 w-3 rounded-full shrink-0 ring-2 ring-white/10"
+                style={{ background: s.color }}
+              />
+              <span className="truncate flex-1 font-medium">{s.name}</span>
+              <span className="tabular-nums text-zinc-200 font-semibold">
+                {fmtNum(s.value)}
+              </span>
+              <span className="tabular-nums text-zinc-500 w-12 text-right font-medium">
                 {((s.value / total) * 100).toFixed(0)}%
               </span>
             </button>

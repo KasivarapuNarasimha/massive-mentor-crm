@@ -16,12 +16,15 @@ export type LocationPayload = {
   latitude?: number | null;
   longitude?: number | null;
   accuracyM?: number | null;
+  speedMps?: number | null;
+  headingDeg?: number | null;
   /** Client may send reverse-geocoded fields from GPS */
   fullAddress?: string | null;
   locality?: string | null;
   city?: string | null;
   state?: string | null;
   country?: string | null;
+  pincode?: string | null;
   userAgent?: string | null;
   browser?: string | null;
   device?: string | null;
@@ -161,11 +164,12 @@ export async function reverseGeocode(
   city?: string;
   state?: string;
   country?: string;
+  pincode?: string;
 }> {
   try {
     const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 3500);
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`;
+    const t = setTimeout(() => controller.abort(), 4000);
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1&zoom=18`;
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -192,12 +196,14 @@ export async function reverseGeocode(
     const city = a.city || a.town || a.municipality || a.county || undefined;
     const state = a.state || a.region || undefined;
     const country = a.country || undefined;
+    const pincode = a.postcode || undefined;
     return {
       fullAddress: j.display_name || undefined,
       locality,
       city,
       state,
       country,
+      pincode,
     };
   } catch {
     return {};
@@ -241,25 +247,40 @@ export async function recordLocationEvent(
   let city = payload.city?.trim() || null;
   let state = payload.state?.trim() || null;
   let country = payload.country?.trim() || null;
+  let pincode = payload.pincode?.trim() || null;
+  const speedMps =
+    typeof payload.speedMps === "number" && Number.isFinite(payload.speedMps)
+      ? payload.speedMps
+      : null;
+  const headingDeg =
+    typeof payload.headingDeg === "number" && Number.isFinite(payload.headingDeg)
+      ? payload.headingDeg
+      : null;
+  const accuracyM =
+    typeof payload.accuracyM === "number" && Number.isFinite(payload.accuracyM)
+      ? payload.accuracyM
+      : null;
 
   if (latitude != null && longitude != null) {
     source = "gps";
-    // Server-side reverse geocode if client didn't send address
-    if (!fullAddress || !locality) {
+    // Server-side reverse geocode if client didn't send full address
+    if (!fullAddress || !city || !pincode) {
       const geo = await reverseGeocode(latitude, longitude);
       fullAddress = fullAddress || geo.fullAddress || null;
       locality = locality || geo.locality || null;
       city = city || geo.city || null;
       state = state || geo.state || null;
       country = country || geo.country || null;
+      pincode = pincode || geo.pincode || null;
     }
   } else {
-    // IP fallback — city/state/country only; clear any client-sent locality
-    source = "ip";
-    locality = null; // NEVER from IP
+    // No GPS — do not invent a locality. Optional coarse IP city only (never shown as "GPS").
+    source = "unknown";
+    locality = null;
     latitude = null;
     longitude = null;
     fullAddress = null;
+    pincode = null;
     if (!city || !state || !country) {
       const ipGeo = await lookupIpGeo(publicIp);
       city = city || ipGeo.city || null;
@@ -278,6 +299,51 @@ export async function recordLocationEvent(
     orderBy: { checkInAt: "desc" },
   });
 
+  // Segment distance from previous GPS point (route tracking)
+  let segmentDistanceKm: number | null = null;
+  if (latitude != null && longitude != null) {
+    const prev = await prisma.locationEvent.findFirst({
+      where: {
+        userId,
+        source: "gps",
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      orderBy: { recordedAt: "desc" },
+      select: { latitude: true, longitude: true, recordedAt: true },
+    });
+    if (
+      prev?.latitude != null &&
+      prev.longitude != null &&
+      Date.now() - prev.recordedAt.getTime() < 6 * 60 * 60 * 1000
+    ) {
+      const d = haversineKm(prev.latitude, prev.longitude, latitude, longitude);
+      // Ignore GPS jumps > 50km between consecutive pings
+      if (d > 0.005 && d < 50) {
+        segmentDistanceKm = Math.round(d * 1000) / 1000;
+      }
+    }
+  }
+
+  const dayKey = new Date().toISOString().slice(0, 10);
+  const prevState = await prisma.userLocationState.findUnique({ where: { userId } });
+  let travelledKmToday = prevState?.travelledKmToday ?? 0;
+  if (prevState?.travelDayKey !== dayKey) travelledKmToday = 0;
+  if (segmentDistanceKm != null) {
+    travelledKmToday = Math.round((travelledKmToday + segmentDistanceKm) * 1000) / 1000;
+  }
+
+  const movementStatus =
+    speedMps != null && speedMps > 0.8
+      ? "moving"
+      : speedMps != null
+        ? "stationary"
+        : segmentDistanceKm != null && segmentDistanceKm > 0.03
+          ? "moving"
+          : latitude != null
+            ? "stationary"
+            : "unknown";
+
   const event = await prisma.locationEvent.create({
     data: {
       userId,
@@ -286,13 +352,17 @@ export async function recordLocationEvent(
       recordedAt: new Date(),
       latitude,
       longitude,
-      accuracyM: payload.accuracyM ?? null,
+      accuracyM,
+      speedMps,
+      headingDeg,
+      segmentDistanceKm,
       source,
       fullAddress,
       locality,
       city,
       state,
       country,
+      pincode,
       publicIp,
       userAgent: ua,
       browser,
@@ -302,6 +372,17 @@ export async function recordLocationEvent(
       fieldSessionId: payload.fieldSessionId || activeField?.id || null,
     },
   });
+
+  // Accumulate route distance on active field session
+  if (activeField && segmentDistanceKm != null && eventType !== "field_end") {
+    await prisma.fieldWorkSession.update({
+      where: { id: activeField.id },
+      data: {
+        totalTravelledKm:
+          Math.round(((activeField.totalTravelledKm || 0) + segmentDistanceKm) * 1000) / 1000,
+      },
+    });
+  }
 
   const status = deriveStatus(
     eventType,
@@ -321,9 +402,16 @@ export async function recordLocationEvent(
       lastState: state,
       lastCountry: country,
       lastFullAddress: fullAddress,
+      lastPincode: pincode,
       lastLat: latitude,
       lastLng: longitude,
+      lastAccuracyM: accuracyM,
+      lastSpeedMps: speedMps,
+      lastHeadingDeg: headingDeg,
       lastSource: source,
+      movementStatus,
+      travelledKmToday,
+      travelDayKey: dayKey,
       lastUpdatedAt: new Date(),
       activeFieldSessionId:
         eventType === "field_end" ? null : activeField?.id || null,
@@ -339,9 +427,16 @@ export async function recordLocationEvent(
       lastState: state,
       lastCountry: country,
       lastFullAddress: fullAddress,
+      lastPincode: pincode,
       lastLat: latitude,
       lastLng: longitude,
+      lastAccuracyM: accuracyM,
+      lastSpeedMps: speedMps,
+      lastHeadingDeg: headingDeg,
       lastSource: source,
+      movementStatus,
+      travelledKmToday,
+      travelDayKey: dayKey,
       lastUpdatedAt: new Date(),
       activeFieldSessionId:
         eventType === "field_end"
@@ -438,10 +533,17 @@ export async function endFieldWork(
     event.latitude != null &&
     event.longitude != null
   ) {
-    distanceKm = Math.round(
-      haversineKm(session.startLat, session.startLng, event.latitude, event.longitude) * 100
-    ) / 100;
+    distanceKm =
+      Math.round(
+        haversineKm(session.startLat, session.startLng, event.latitude, event.longitude) * 100
+      ) / 100;
   }
+
+  // Prefer cumulative path distance if we recorded heartbeats
+  const totalTravelled =
+    session.totalTravelledKm != null && session.totalTravelledKm > 0
+      ? Math.round((session.totalTravelledKm + (event.segmentDistanceKm || 0)) * 1000) / 1000
+      : distanceKm;
 
   const updated = await prisma.fieldWorkSession.update({
     where: { id: session.id },
@@ -454,6 +556,7 @@ export async function endFieldWork(
       endAddress: event.fullAddress,
       endSource: event.source,
       distanceKm,
+      totalTravelledKm: totalTravelled,
     },
   });
 
@@ -687,10 +790,16 @@ export async function getLiveTeamLocations(actorUserId: string) {
       city: s.lastCity,
       state: s.lastState,
       country: s.lastCountry,
+      pincode: s.lastPincode,
       fullAddress: s.lastFullAddress,
       lat: s.lastSource === "gps" ? s.lastLat : null,
       lng: s.lastSource === "gps" ? s.lastLng : null,
       source: s.lastSource,
+      accuracyM: s.lastAccuracyM,
+      speedMps: s.lastSpeedMps,
+      headingDeg: s.lastHeadingDeg,
+      movementStatus: s.movementStatus,
+      travelledKmToday: s.travelledKmToday ?? 0,
       lastEventType: s.lastEventType,
       lastUpdatedAt: s.lastUpdatedAt,
       activeFieldSessionId: s.activeFieldSessionId,
@@ -846,14 +955,44 @@ export async function getTravelInsights(
     }
   }
 
+  const speedKmh =
+    state?.lastSpeedMps != null && Number.isFinite(state.lastSpeedMps)
+      ? Math.round(state.lastSpeedMps * 3.6 * 10) / 10
+      : null;
+
+  // Prefer stored cumulative day distance when available
+  const dayKey = start.toISOString().slice(0, 10);
+  const storedToday =
+    state?.travelDayKey === dayKey && state.travelledKmToday != null
+      ? Math.round(state.travelledKmToday * 100) / 100
+      : null;
+
   return {
-    date: start.toISOString().slice(0, 10),
+    date: dayKey,
     currentLocality: state?.lastLocality || null,
     currentCity: state?.lastCity || null,
-    travelledKm,
+    currentState: state?.lastState || null,
+    currentCountry: state?.lastCountry || null,
+    currentPincode: state?.lastPincode || null,
+    fullAddress: state?.lastFullAddress || null,
+    lat: state?.lastSource === "gps" ? state.lastLat : null,
+    lng: state?.lastSource === "gps" ? state.lastLng : null,
+    accuracyM: state?.lastAccuracyM ?? null,
+    source: state?.lastSource || null,
+    movementStatus: state?.movementStatus || "unknown",
+    speedKmh,
+    lastUpdatedAt: state?.lastUpdatedAt || null,
+    travelledKm: storedToday != null && storedToday > travelledKm ? storedToday : travelledKm,
     totalStayMin,
     visits: visitSummary,
     eventCount: events.length,
+    route: events.map((e) => ({
+      lat: e.latitude,
+      lng: e.longitude,
+      at: e.recordedAt,
+      address: e.fullAddress,
+      speedMps: e.speedMps,
+    })),
     officeInsight,
   };
 }

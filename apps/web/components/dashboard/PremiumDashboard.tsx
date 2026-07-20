@@ -668,7 +668,7 @@ export function PremiumDashboard() {
           </h2>
           <p className="text-[11px] text-zinc-500 hidden sm:block">Live tenant aggregates</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mm-stagger">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mm-stagger">
           {kpiCards.map((k) => (
             <PremiumKpi
               key={k.key}
@@ -686,6 +686,7 @@ export function PremiumDashboard() {
                   : undefined
               }
               loading={loading && !reports}
+              className="min-h-[132px]"
             />
           ))}
         </div>

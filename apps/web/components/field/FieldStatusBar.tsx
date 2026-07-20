@@ -93,17 +93,22 @@ export function FieldStatusBar() {
         ? "meeting"
         : data?.state?.status || "online";
   const place =
+    data?.state?.lastFullAddress ||
     data?.state?.lastLocality ||
     data?.state?.lastCity ||
-    (data?.state?.lastSource === "ip" ? "City-level (IP)" : loaded ? "Location not set" : "Detecting…");
+    (data?.state?.lastSource === "gps"
+      ? "GPS active"
+      : loaded
+        ? "GPS not set — enable location"
+        : "Detecting GPS…");
   const inField = !!data?.activeField;
 
   const run = async (path: string, successMsg: string) => {
     setBusy(true);
     try {
-      const loc = await captureGps({ timeoutMs: 20000, force: true });
+      const loc = await captureGps({ timeoutMs: 25000, force: true });
       if (loc.gpsDenied) {
-        toast.message("GPS not available — using approximate city from IP only");
+        toast.message("GPS permission denied — enable browser location for accurate tracking");
       } else {
         toast.success(
           `GPS locked${loc.locality ? `: ${loc.locality}` : loc.city ? `: ${loc.city}` : ""}`
@@ -117,7 +122,7 @@ export function FieldStatusBar() {
         toast.error(res.error || "Action failed");
       }
     } catch {
-      toast.error("Could not capture location");
+      toast.error("Could not capture GPS location");
     }
     setBusy(false);
   };

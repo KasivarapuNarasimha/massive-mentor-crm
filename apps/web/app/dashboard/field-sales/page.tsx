@@ -1,11 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { captureGps, toLocationBody } from "@/lib/location-client";
+import {
+  captureGps,
+  startWatchGps,
+  toLocationBody,
+  gpsStatusLabel,
+  type CapturedLocation,
+} from "@/lib/location-client";
 import { usePortal } from "@/lib/portal-context";
+import { PageHeader, PageShell } from "@/components/ui/PageShell";
 
 type TeamMember = {
   userId: string;
@@ -15,10 +22,15 @@ type TeamMember = {
   locality?: string | null;
   city?: string | null;
   state?: string | null;
+  pincode?: string | null;
   fullAddress?: string | null;
   lat?: number | null;
   lng?: number | null;
   source?: string | null;
+  accuracyM?: number | null;
+  speedMps?: number | null;
+  movementStatus?: string | null;
+  travelledKmToday?: number;
   lastUpdatedAt?: string;
   distanceFromOfficeKm?: number | null;
   travelMinutes?: number | null;
@@ -32,12 +44,36 @@ type HistoryItem = {
   locality?: string | null;
   city?: string | null;
   fullAddress?: string | null;
+  pincode?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   source?: string;
+  accuracyM?: number | null;
+  speedMps?: number | null;
+  segmentDistanceKm?: number | null;
   browser?: string | null;
   device?: string | null;
-  publicIp?: string | null;
+};
+
+type Insights = {
+  fullAddress?: string | null;
+  currentLocality?: string | null;
+  currentCity?: string | null;
+  currentState?: string | null;
+  currentCountry?: string | null;
+  currentPincode?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  accuracyM?: number | null;
+  source?: string | null;
+  movementStatus?: string | null;
+  speedKmh?: number | null;
+  lastUpdatedAt?: string | null;
+  travelledKm?: number;
+  totalStayMin?: number;
+  visits?: Array<{ meetingTitle?: string; locality?: string | null; stayedMin?: number | null }>;
+  officeInsight?: { distanceKm: number | null; travelMinutes: number | null; officeLabel: string } | null;
+  route?: Array<{ lat: number | null; lng: number | null; at: string; address?: string | null }>;
 };
 
 const STATUS_STYLE: Record<string, string> = {
@@ -62,9 +98,51 @@ function eventLabel(t: string) {
     field_end: "Field Work End",
     meeting_checkin: "Meeting Check-in",
     meeting_checkout: "Meeting Check-out",
-    heartbeat: "Heartbeat",
+    heartbeat: "GPS Update",
   };
   return map[t] || t;
+}
+
+function formatAddress(parts: {
+  fullAddress?: string | null;
+  locality?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  country?: string | null;
+}) {
+  if (parts.fullAddress) return parts.fullAddress;
+  return (
+    [parts.locality, parts.city, parts.state, parts.pincode, parts.country]
+      .filter(Boolean)
+      .join(", ") || "Waiting for GPS address…"
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  tone = "border-zinc-800",
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+  tone?: string;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border bg-gradient-to-br from-white/[0.04] to-zinc-950/80 p-4 sm:p-5 ${tone} min-h-[110px] flex flex-col`}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+        {label}
+      </div>
+      <div className="mt-2 text-xl sm:text-2xl font-semibold tabular-nums text-white tracking-tight">
+        {value}
+      </div>
+      {sub ? <div className="mt-auto pt-2 text-xs text-zinc-500 leading-relaxed">{sub}</div> : null}
+    </div>
+  );
 }
 
 export default function FieldSalesPage() {
@@ -82,9 +160,26 @@ export default function FieldSalesPage() {
   ].includes(role);
 
   const [busy, setBusy] = useState(false);
+  const [gpsLive, setGpsLive] = useState<CapturedLocation | null>(null);
+  const [gpsError, setGpsError] = useState<string | null>(null);
   const [myStatus, setMyStatus] = useState<{
-    state?: { status?: string; lastLocality?: string; lastCity?: string } | null;
-    activeField?: { id: string; startedAt: string } | null;
+    state?: {
+      status?: string;
+      lastLocality?: string | null;
+      lastCity?: string | null;
+      lastState?: string | null;
+      lastFullAddress?: string | null;
+      lastPincode?: string | null;
+      lastLat?: number | null;
+      lastLng?: number | null;
+      lastSource?: string | null;
+      lastAccuracyM?: number | null;
+      lastSpeedMps?: number | null;
+      movementStatus?: string | null;
+      travelledKmToday?: number | null;
+      lastUpdatedAt?: string;
+    } | null;
+    activeField?: { id: string; startedAt: string; totalTravelledKm?: number | null } | null;
     openMeeting?: { meetingId: string; meeting?: { title: string } } | null;
   } | null>(null);
   const [team, setTeam] = useState<TeamMember[]>([]);
@@ -95,18 +190,13 @@ export default function FieldSalesPage() {
     label?: string;
   } | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [insights, setInsights] = useState<{
-    currentLocality?: string | null;
-    currentCity?: string | null;
-    travelledKm?: number;
-    totalStayMin?: number;
-    visits?: Array<{ meetingTitle?: string; locality?: string | null; stayedMin?: number | null }>;
-    officeInsight?: { distanceKm: number | null; travelMinutes: number | null; officeLabel: string } | null;
-  } | null>(null);
+  const [insights, setInsights] = useState<Insights | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [officeLat, setOfficeLat] = useState("");
   const [officeLng, setOfficeLng] = useState("");
   const [officeLabel, setOfficeLabel] = useState("Office");
+  const stopWatchRef = useRef<(() => void) | null>(null);
+  const lastHeartbeatRef = useRef(0);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -114,7 +204,7 @@ export default function FieldSalesPage() {
       api.get("/location/me", token),
       isManager ? api.get("/location/live", token) : Promise.resolve({ success: false, data: null }),
       api.get(
-        `/location/history?pageSize=40${selectedUserId ? `&userId=${selectedUserId}` : ""}`,
+        `/location/history?pageSize=50${selectedUserId ? `&userId=${selectedUserId}` : ""}`,
         token
       ),
       api.get(
@@ -124,10 +214,7 @@ export default function FieldSalesPage() {
     ]);
     if (st.success) setMyStatus(st.data as typeof myStatus);
     if (live.success && live.data) {
-      const d = live.data as {
-        team?: TeamMember[];
-        office?: typeof office;
-      };
+      const d = live.data as { team?: TeamMember[]; office?: typeof office };
       setTeam(d.team || []);
       setOffice(d.office || null);
       if (d.office) {
@@ -139,21 +226,73 @@ export default function FieldSalesPage() {
     if (hist.success && hist.data) {
       setHistory((hist.data as { items?: HistoryItem[] }).items || []);
     }
-    if (ins.success) setInsights(ins.data as typeof insights);
+    if (ins.success) setInsights(ins.data as Insights);
   }, [token, isManager, selectedUserId]);
 
   useEffect(() => {
-    load();
-    const t = setInterval(load, 60_000);
+    void load();
+    const t = setInterval(() => void load(), 45_000);
     return () => clearInterval(t);
   }, [load]);
+
+  // Continuous high-accuracy GPS while field session is active
+  useEffect(() => {
+    if (!token || !myStatus?.activeField) {
+      stopWatchRef.current?.();
+      stopWatchRef.current = null;
+      return;
+    }
+
+    stopWatchRef.current?.();
+    stopWatchRef.current = startWatchGps({
+      onUpdate: (loc) => {
+        setGpsLive(loc);
+        setGpsError(null);
+        const now = Date.now();
+        // Heartbeat to server at most every 12s while in field
+        if (now - lastHeartbeatRef.current < 12_000) return;
+        lastHeartbeatRef.current = now;
+        void api
+          .post("/location/events", { eventType: "heartbeat", ...toLocationBody(loc) }, token)
+          .then(() => load())
+          .catch(() => undefined);
+      },
+      onError: (err) => {
+        setGpsError(err instanceof Error ? err.message : "GPS error");
+      },
+    });
+
+    return () => {
+      stopWatchRef.current?.();
+      stopWatchRef.current = null;
+    };
+  }, [token, myStatus?.activeField?.id, load]);
+
+  // Initial GPS permission request on page open
+  useEffect(() => {
+    void captureGps({ timeoutMs: 20000, force: true }).then((loc) => {
+      setGpsLive(loc);
+      if (loc.gpsDenied) {
+        setGpsError("GPS permission denied or unavailable. Enable location for accurate tracking.");
+      }
+    });
+  }, []);
 
   const withLocation = async (fn: (body: Record<string, unknown>) => Promise<void>) => {
     setBusy(true);
     try {
-      const loc = await captureGps({ timeoutMs: 15000, force: true });
+      const loc = await captureGps({ timeoutMs: 25000, force: true });
+      setGpsLive(loc);
       if (loc.gpsDenied) {
-        toast.message("GPS unavailable — recording with city-level IP fallback only");
+        toast.message("GPS unavailable — enable browser location for accurate tracking");
+        setGpsError("GPS permission denied or unavailable");
+      } else {
+        setGpsError(null);
+        toast.success(
+          loc.locality || loc.city
+            ? `GPS locked · ${loc.locality || loc.city}`
+            : "GPS locked"
+        );
       }
       await fn(toLocationBody(loc));
       await load();
@@ -166,7 +305,7 @@ export default function FieldSalesPage() {
   const startField = () =>
     withLocation(async (body) => {
       const res = await api.post("/location/field/start", body, token);
-      if (res.success) toast.success("Field work started");
+      if (res.success) toast.success("Field work started — live GPS tracking on");
       else toast.error(res.error || "Failed");
     });
 
@@ -179,11 +318,18 @@ export default function FieldSalesPage() {
 
   const saveOffice = async () => {
     if (!token) return;
-    const lat = parseFloat(officeLat);
-    const lng = parseFloat(officeLng);
+    let lat = parseFloat(officeLat);
+    let lng = parseFloat(officeLng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      toast.error("Enter valid office coordinates");
-      return;
+      const loc = await captureGps({ timeoutMs: 20000, force: true });
+      if (loc.latitude == null) {
+        toast.error("Enter coordinates or allow GPS");
+        return;
+      }
+      lat = loc.latitude;
+      lng = loc.longitude!;
+      setOfficeLat(String(lat));
+      setOfficeLng(String(lng));
     }
     const res = await api.put(
       "/location/office",
@@ -207,23 +353,10 @@ export default function FieldSalesPage() {
         toast.error("Export failed");
         return;
       }
-      if (format === "json") {
-        const j = await res.json();
-        const blob = new Blob([JSON.stringify(j, null, 2)], {
-          type: "application/json",
-        });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `location-${type}.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-        toast.success("Report downloaded");
-        return;
-      }
       const blob = await res.blob();
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `location-${type}.${format === "xlsx" ? "xlsx" : "csv"}`;
+      a.download = `location-${type}.${format === "xlsx" ? "xlsx" : format === "pdf" ? "pdf" : "csv"}`;
       a.click();
       toast.success("Report downloaded");
     } catch {
@@ -231,37 +364,91 @@ export default function FieldSalesPage() {
     }
   };
 
-  const mapCenter = useMemo(() => {
-    const withGps = team.filter((t) => t.lat != null && t.lng != null);
-    if (withGps[0]) return { lat: withGps[0].lat!, lng: withGps[0].lng! };
-    if (office) return { lat: office.lat, lng: office.lng };
-    return { lat: 16.5062, lng: 80.648 }; // default coastal India approx
-  }, [team, office]);
+  const displayLat = gpsLive?.latitude ?? insights?.lat ?? myStatus?.state?.lastLat ?? null;
+  const displayLng = gpsLive?.longitude ?? insights?.lng ?? myStatus?.state?.lastLng ?? null;
+  const displayAddress = formatAddress({
+    fullAddress: gpsLive?.fullAddress || insights?.fullAddress || myStatus?.state?.lastFullAddress,
+    locality: gpsLive?.locality || insights?.currentLocality || myStatus?.state?.lastLocality,
+    city: gpsLive?.city || insights?.currentCity || myStatus?.state?.lastCity,
+    state: gpsLive?.state || insights?.currentState || myStatus?.state?.lastState,
+    pincode: gpsLive?.pincode || insights?.currentPincode || myStatus?.state?.lastPincode,
+    country: gpsLive?.country || insights?.currentCountry,
+  });
+  const accuracy =
+    gpsLive?.accuracyM ?? insights?.accuracyM ?? myStatus?.state?.lastAccuracyM ?? null;
+  const speedKmh =
+    gpsLive?.speedMps != null
+      ? Math.round(gpsLive.speedMps * 3.6 * 10) / 10
+      : insights?.speedKmh ??
+        (myStatus?.state?.lastSpeedMps != null
+          ? Math.round(myStatus.state.lastSpeedMps * 3.6 * 10) / 10
+          : null);
+  const travelToday =
+    insights?.travelledKm ??
+    myStatus?.state?.travelledKmToday ??
+    myStatus?.activeField?.totalTravelledKm ??
+    0;
+  const movement =
+    gpsLive?.speedMps != null && gpsLive.speedMps > 0.8
+      ? "Moving"
+      : insights?.movementStatus === "moving" || myStatus?.state?.movementStatus === "moving"
+        ? "Moving"
+        : displayLat != null
+          ? "Stationary"
+          : "—";
+  const lastSync =
+    insights?.lastUpdatedAt || myStatus?.state?.lastUpdatedAt
+      ? new Date(
+          insights?.lastUpdatedAt || myStatus?.state?.lastUpdatedAt || ""
+        ).toLocaleString()
+      : "—";
 
-  const osmEmbed = `https://www.openstreetmap.org/export/embed.html?bbox=${
-    mapCenter.lng - 0.08
-  }%2C${mapCenter.lat - 0.06}%2C${mapCenter.lng + 0.08}%2C${mapCenter.lat + 0.06}&layer=mapnik&marker=${mapCenter.lat}%2C${mapCenter.lng}`;
+  const mapCenter = useMemo(() => {
+    if (displayLat != null && displayLng != null) return { lat: displayLat, lng: displayLng };
+    const withGps = team.find((t) => t.lat != null && t.lng != null);
+    if (withGps) return { lat: withGps.lat!, lng: withGps.lng! };
+    if (office) return { lat: office.lat, lng: office.lng };
+    return { lat: 16.5062, lng: 80.648 };
+  }, [displayLat, displayLng, team, office]);
+
+  const routePts = (insights?.route || []).filter(
+    (p) => p.lat != null && p.lng != null
+  ) as Array<{ lat: number; lng: number }>;
+  const osmEmbed = useMemo(() => {
+    const pad = 0.04;
+    let minLat = mapCenter.lat - pad;
+    let maxLat = mapCenter.lat + pad;
+    let minLng = mapCenter.lng - pad;
+    let maxLng = mapCenter.lng + pad;
+    for (const p of routePts) {
+      minLat = Math.min(minLat, p.lat - 0.01);
+      maxLat = Math.max(maxLat, p.lat + 0.01);
+      minLng = Math.min(minLng, p.lng - 0.01);
+      maxLng = Math.max(maxLng, p.lng + 0.01);
+    }
+    return `https://www.openstreetmap.org/export/embed.html?bbox=${minLng}%2C${minLat}%2C${maxLng}%2C${maxLat}&layer=mapnik&marker=${mapCenter.lat}%2C${mapCenter.lng}`;
+  }, [mapCenter, routePts]);
+
+  const gpsLabel = gpsStatusLabel({
+    source: gpsLive?.source || insights?.source || myStatus?.state?.lastSource,
+    gpsDenied: gpsLive?.gpsDenied,
+    permissionState: gpsLive?.permissionState,
+    latitude: displayLat,
+  });
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Field Sales Location</h1>
-          <p className="text-zinc-400 mt-1 text-sm leading-relaxed">
-            Login records device + location for attendance.{" "}
-            <strong className="text-zinc-200">Field tracking is manual:</strong> press{" "}
-            <strong className="text-sky-400">Start Field Work</strong> to go On Field (GPS
-            preferred). Live map and team list appear for managers after field sessions exist.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          {!myStatus?.activeField ? (
+    <PageShell wide>
+      <PageHeader
+        title="Field Sales Location"
+        eyebrow="GPS tracking"
+        description="High-accuracy GPS with live address, route distance, and manager visibility. Enable browser location for best results."
+        actions={
+          !myStatus?.activeField ? (
             <button
               type="button"
               disabled={busy}
               onClick={startField}
-              className="w-full sm:w-auto min-h-12 px-5 py-3 rounded-xl bg-sky-500 text-zinc-950 text-sm font-semibold hover:bg-sky-400 disabled:opacity-50 shadow-lg shadow-sky-500/20 touch-manipulation"
-              data-testid="page-start-field-work"
+              className="mm-btn mm-btn-primary min-h-11 px-5 bg-sky-500 border-0 text-zinc-950 hover:bg-sky-400"
             >
               {busy ? "Getting GPS…" : "▶ Start Field Work"}
             </button>
@@ -270,107 +457,162 @@ export default function FieldSalesPage() {
               type="button"
               disabled={busy}
               onClick={endField}
-              className="w-full sm:w-auto min-h-12 px-5 py-3 rounded-xl bg-amber-500 text-zinc-950 text-sm font-semibold hover:bg-amber-400 disabled:opacity-50 touch-manipulation"
-              data-testid="page-end-field-work"
+              className="mm-btn min-h-11 px-5 bg-amber-500 text-zinc-950 border-0 hover:bg-amber-400"
             >
               {busy ? "Saving…" : "■ End Field Work"}
             </button>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
       {myStatus?.activeField && (
-        <div className="mb-6 rounded-2xl border border-sky-500/40 bg-sky-500/10 p-4 flex flex-wrap items-center gap-3">
-          <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-sky-500 text-zinc-950">
-            On Field
+        <div className="mb-5 rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 flex flex-wrap items-center gap-3">
+          <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-sky-500 text-zinc-950">
+            Live GPS
           </span>
-          <div className="text-sm text-sky-100">
-            Tracking active
-            {myStatus.state?.lastLocality || myStatus.state?.lastCity
-              ? ` · ${myStatus.state?.lastLocality || myStatus.state?.lastCity}`
-              : ""}
-            {myStatus.activeField.startedAt
-              ? ` · since ${new Date(myStatus.activeField.startedAt).toLocaleTimeString()}`
-              : ""}
-          </div>
+          <span className="text-sm text-sky-100">
+            Field session since {new Date(myStatus.activeField.startedAt).toLocaleTimeString()}
+            {gpsError ? ` · ${gpsError}` : " · Watching position…"}
+          </span>
         </div>
       )}
 
-      {/* My status + insights */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-          <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">My Status</div>
-          <div
-            className={`inline-flex px-2.5 py-1 rounded-full text-xs border ${
-              STATUS_STYLE[myStatus?.state?.status || "offline"] || STATUS_STYLE.offline
-            }`}
-          >
-            {statusLabel(myStatus?.state?.status || "offline")}
-          </div>
-          <div className="mt-3 text-sm text-zinc-300">
-            {myStatus?.state?.lastLocality || myStatus?.state?.lastCity || "—"}
-          </div>
-          {myStatus?.activeField && (
-            <div className="text-xs text-sky-400 mt-2">
-              Field session since {new Date(myStatus.activeField.startedAt).toLocaleTimeString()}
-            </div>
-          )}
-          {myStatus?.openMeeting?.meeting && (
-            <div className="text-xs text-violet-300 mt-1">
-              In meeting: {myStatus.openMeeting.meeting.title}
-            </div>
-          )}
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-          <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Today Travel</div>
-          <div className="text-2xl font-semibold tabular-nums">
-            {insights?.travelledKm ?? 0} <span className="text-sm text-zinc-500">km</span>
-          </div>
-          <div className="text-xs text-zinc-500 mt-1">
-            Customer time: {insights?.totalStayMin ?? 0} min · Visits:{" "}
-            {insights?.visits?.length ?? 0}
-          </div>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-          <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">
-            Distance from Office
-          </div>
-          {insights?.officeInsight ? (
+      {/* Professional KPI cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
+        <StatCard
+          label="Current location"
+          value={
+            <span className="text-base sm:text-lg line-clamp-2 leading-snug">
+              {displayLat != null
+                ? `${displayLat.toFixed(5)}, ${displayLng?.toFixed(5)}`
+                : "—"}
+            </span>
+          }
+          sub={displayAddress}
+          tone="border-sky-500/25"
+        />
+        <StatCard
+          label="GPS status"
+          value={<span className="text-lg">{gpsLabel}</span>}
+          sub={
+            myStatus?.state?.status
+              ? `Work status: ${statusLabel(myStatus.state.status)}`
+              : "Enable browser location"
+          }
+          tone={
+            displayLat != null ? "border-emerald-500/25" : "border-amber-500/30"
+          }
+        />
+        <StatCard
+          label="Travel today"
+          value={
             <>
-              <div className="text-2xl font-semibold tabular-nums">
-                {insights.officeInsight.distanceKm ?? "—"}{" "}
-                <span className="text-sm text-zinc-500">km</span>
-              </div>
-              <div className="text-xs text-zinc-500 mt-1">
-                ~{insights.officeInsight.travelMinutes ?? "—"} min to{" "}
-                {insights.officeInsight.officeLabel}
-              </div>
+              {Number(travelToday || 0).toFixed(2)}{" "}
+              <span className="text-sm font-normal text-zinc-500">km</span>
             </>
-          ) : (
-            <p className="text-sm text-zinc-500">
-              Set office coordinates (admin) to see distance insights. GPS required for distance.
-            </p>
+          }
+          sub={`Visits: ${insights?.visits?.length ?? 0} · Stay ${insights?.totalStayMin ?? 0} min`}
+          tone="border-violet-500/25"
+        />
+        <StatCard
+          label="Distance from office"
+          value={
+            insights?.officeInsight?.distanceKm != null ? (
+              <>
+                {insights.officeInsight.distanceKm}{" "}
+                <span className="text-sm font-normal text-zinc-500">km</span>
+              </>
+            ) : (
+              "—"
+            )
+          }
+          sub={
+            insights?.officeInsight
+              ? `~${insights.officeInsight.travelMinutes ?? "—"} min · ${insights.officeInsight.officeLabel}`
+              : "Set office coordinates below"
+          }
+          tone="border-fuchsia-500/20"
+        />
+        <StatCard
+          label="Speed / movement"
+          value={
+            speedKmh != null ? (
+              <>
+                {speedKmh} <span className="text-sm font-normal text-zinc-500">km/h</span>
+              </>
+            ) : (
+              movement
+            )
+          }
+          sub={`Status: ${movement}`}
+          tone="border-cyan-500/20"
+        />
+        <StatCard
+          label="Accuracy · last sync"
+          value={
+            accuracy != null ? (
+              <>
+                ±{Math.round(accuracy)}{" "}
+                <span className="text-sm font-normal text-zinc-500">m</span>
+              </>
+            ) : (
+              "—"
+            )
+          }
+          sub={lastSync}
+          tone="border-zinc-700"
+        />
+      </div>
+
+      {/* Address detail card */}
+      <div className="mm-panel p-4 sm:p-5 mb-6">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-2">
+          Full address
+        </div>
+        <p className="text-sm sm:text-base text-zinc-100 leading-relaxed">{displayAddress}</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-zinc-500">
+          {gpsLive?.pincode || insights?.currentPincode || myStatus?.state?.lastPincode ? (
+            <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+              PIN {gpsLive?.pincode || insights?.currentPincode || myStatus?.state?.lastPincode}
+            </span>
+          ) : null}
+          {(gpsLive?.city || insights?.currentCity || myStatus?.state?.lastCity) && (
+            <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+              {gpsLive?.city || insights?.currentCity || myStatus?.state?.lastCity}
+            </span>
+          )}
+          {(gpsLive?.state || insights?.currentState || myStatus?.state?.lastState) && (
+            <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+              {gpsLive?.state || insights?.currentState || myStatus?.state?.lastState}
+            </span>
+          )}
+          {(gpsLive?.country || insights?.currentCountry) && (
+            <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+              {gpsLive?.country || insights?.currentCountry}
+            </span>
           )}
         </div>
       </div>
 
-      {/* Live team + map */}
+      {/* Manager live + map */}
       {isManager && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 items-stretch">
+          <div className="mm-panel p-4 sm:p-5 flex flex-col min-h-[340px]">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-semibold">Sales Team Live Location</h2>
+              <h2 className="text-sm font-semibold text-white">Team live location</h2>
               <button
                 type="button"
-                onClick={load}
-                className="text-xs px-2 py-1 rounded-lg bg-white/10 hover:bg-white/15"
+                onClick={() => void load()}
+                className="text-xs px-2.5 py-1 rounded-lg border border-white/10 text-zinc-400 hover:text-white"
               >
                 Refresh
               </button>
             </div>
-            <div className="space-y-2 max-h-80 overflow-auto">
+            <div className="space-y-2 flex-1 overflow-auto max-h-96">
               {team.length === 0 ? (
-                <p className="text-sm text-zinc-500">No live locations yet. Team members log in or start field work.</p>
+                <p className="text-sm text-zinc-500 py-8 text-center">
+                  No live GPS yet. Team members should allow location and start field work.
+                </p>
               ) : (
                 team.map((m) => (
                   <button
@@ -379,12 +621,12 @@ export default function FieldSalesPage() {
                     onClick={() => setSelectedUserId(m.userId)}
                     className={`w-full text-left p-3 rounded-xl border transition-colors ${
                       selectedUserId === m.userId
-                        ? "border-sky-500/50 bg-sky-500/5"
-                        : "border-zinc-800 bg-zinc-950 hover:border-zinc-700"
+                        ? "border-sky-500/50 bg-sky-500/10"
+                        : "border-zinc-800 bg-zinc-950/60 hover:border-zinc-700"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-sm truncate">{m.name}</span>
+                      <span className="font-medium text-sm text-white truncate">{m.name}</span>
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded-full border shrink-0 ${
                           STATUS_STYLE[m.status] || STATUS_STYLE.offline
@@ -393,38 +635,41 @@ export default function FieldSalesPage() {
                         {statusLabel(m.status)}
                       </span>
                     </div>
-                    <div className="text-xs text-zinc-400 mt-1 truncate">
-                      {[m.locality, m.city].filter(Boolean).join(" · ") ||
-                        (m.source === "ip" ? `${m.city || "City unknown"} (IP)` : "—")}
+                    <div className="text-xs text-zinc-400 mt-1 line-clamp-2">
+                      {m.fullAddress ||
+                        [m.locality, m.city, m.state, m.pincode].filter(Boolean).join(", ") ||
+                        (m.source === "gps" ? "GPS fix (address pending)" : "GPS not available")}
                     </div>
-                    <div className="text-[10px] text-zinc-600 mt-0.5 flex justify-between">
+                    <div className="text-[10px] text-zinc-600 mt-1 flex flex-wrap justify-between gap-2">
                       <span>
-                        {m.lastUpdatedAt
-                          ? new Date(m.lastUpdatedAt).toLocaleString()
+                        {m.lastUpdatedAt ? new Date(m.lastUpdatedAt).toLocaleString() : ""}
+                      </span>
+                      <span>
+                        Today {Number(m.travelledKmToday || 0).toFixed(2)} km
+                        {m.distanceFromOfficeKm != null
+                          ? ` · Office ${m.distanceFromOfficeKm} km`
                           : ""}
                       </span>
-                      {m.distanceFromOfficeKm != null && (
-                        <span>
-                          {m.distanceFromOfficeKm} km · ~{m.travelMinutes} min
-                        </span>
-                      )}
                     </div>
                   </button>
                 ))
               )}
             </div>
           </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden min-h-[320px]">
+          <div className="mm-panel overflow-hidden flex flex-col min-h-[340px]">
             <iframe
-              title="Team map"
-              className="w-full h-full min-h-[320px] border-0 grayscale-[20%]"
+              title="Field map"
+              className="w-full flex-1 min-h-[280px] border-0"
               src={osmEmbed}
             />
-            <div className="p-2 text-[10px] text-zinc-600 border-t border-zinc-800">
-              OpenStreetMap · Markers use last GPS when available.{" "}
+            <div className="p-2.5 text-[10px] text-zinc-500 border-t border-zinc-800 flex flex-wrap justify-between gap-2">
+              <span>
+                Route points today: {routePts.length}
+                {routePts.length > 1 ? " (path stored on server)" : ""}
+              </span>
               <a
-                className="text-sky-500 hover:underline"
-                href={`https://www.openstreetmap.org/?mlat=${mapCenter.lat}&mlon=${mapCenter.lng}#map=13/${mapCenter.lat}/${mapCenter.lng}`}
+                className="text-sky-400 hover:underline"
+                href={`https://www.openstreetmap.org/?mlat=${mapCenter.lat}&mlon=${mapCenter.lng}#map=14/${mapCenter.lat}/${mapCenter.lng}`}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -435,89 +680,67 @@ export default function FieldSalesPage() {
         </div>
       )}
 
-      {/* Office settings (admin) */}
+      {/* Office + reports for managers */}
       {isManager &&
         ["ceo", "owner", "business_admin", "admin", "super_admin"].includes(role) && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 mb-6">
-            <h2 className="font-semibold mb-3">Office Location (for distance insights)</h2>
+          <div className="mm-panel p-4 sm:p-5 mb-6">
+            <h2 className="text-sm font-semibold text-white mb-3">Office location</h2>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <input
-                className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm"
+                className="mm-input"
                 placeholder="Latitude"
                 value={officeLat}
                 onChange={(e) => setOfficeLat(e.target.value)}
               />
               <input
-                className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm"
+                className="mm-input"
                 placeholder="Longitude"
                 value={officeLng}
                 onChange={(e) => setOfficeLng(e.target.value)}
               />
               <input
-                className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm"
-                placeholder="Label (e.g. Benz Circle Office)"
+                className="mm-input"
+                placeholder="Label"
                 value={officeLabel}
                 onChange={(e) => setOfficeLabel(e.target.value)}
               />
-              <button
-                type="button"
-                onClick={saveOffice}
-                className="px-4 py-2 rounded-xl bg-white text-zinc-950 text-sm font-medium"
-              >
-                Save Office
+              <button type="button" onClick={() => void saveOffice()} className="mm-btn mm-btn-primary">
+                Save office
               </button>
             </div>
           </div>
         )}
 
-      {/* Reports */}
       {isManager && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 mb-6">
-          <h2 className="font-semibold mb-3">Reports</h2>
+        <div className="mm-panel p-4 sm:p-5 mb-6">
+          <h2 className="text-sm font-semibold text-white mb-3">Reports</h2>
           <div className="flex flex-wrap gap-2">
             {(
               [
-                ["attendance", "Daily Attendance"],
-                ["travel", "Daily Travel"],
-                ["visits", "Customer Visits"],
-                ["productivity", "Field Productivity"],
-                ["route", "Route History"],
+                ["attendance", "Attendance"],
+                ["travel", "Travel"],
+                ["visits", "Visits"],
+                ["route", "Route"],
               ] as const
             ).map(([type, label]) => (
-              <div key={type} className="flex flex-wrap gap-1 items-center">
-                <span className="text-[10px] text-zinc-500 w-full sm:w-auto sm:mr-1">{label}</span>
-                <button
-                  type="button"
-                  onClick={() => exportReport(type, "csv")}
-                  className="px-2.5 py-1 text-xs rounded-lg bg-white/10 hover:bg-white/15"
-                >
-                  CSV
-                </button>
-                <button
-                  type="button"
-                  onClick={() => exportReport(type, "xlsx")}
-                  className="px-2.5 py-1 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400"
-                >
-                  Excel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => exportReport(type, "pdf")}
-                  className="px-2.5 py-1 text-xs rounded-lg bg-white/5 hover:bg-white/10 text-zinc-400"
-                >
-                  PDF
-                </button>
-              </div>
+              <button
+                key={type}
+                type="button"
+                onClick={() => void exportReport(type, "csv")}
+                className="mm-btn mm-btn-secondary min-h-9 px-3 text-xs"
+              >
+                {label} CSV
+              </button>
             ))}
           </div>
         </div>
       )}
 
       {/* History */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+      <div className="mm-panel p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold">
-            Location History{selectedUserId ? " (selected)" : " (you)"}
+          <h2 className="text-sm font-semibold text-white">
+            Location history{selectedUserId ? " (selected)" : ""}
           </h2>
           {selectedUserId && (
             <button
@@ -530,84 +753,59 @@ export default function FieldSalesPage() {
           )}
         </div>
         {history.length === 0 ? (
-          <p className="py-8 text-center text-zinc-500 text-sm">
-            No location events yet. Log in or start field work to begin tracking.
-          </p>
+          <div className="mm-empty py-10">
+            <p className="text-sm text-zinc-400">No GPS points yet</p>
+            <p className="text-xs text-zinc-600 mt-1">
+              Start field work with location permission to record the route.
+            </p>
+          </div>
         ) : (
-          <>
-            {/* Mobile / tablet cards — no wide table squeeze */}
-            <div className="md:hidden space-y-3">
-              {history.map((h) => (
-                <div
-                  key={h.id}
-                  className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 space-y-1.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-xs font-medium text-white">{eventLabel(h.eventType)}</span>
-                    <span className="text-[10px] text-zinc-500 whitespace-nowrap">
+          <div className="mm-table-wrap">
+            <table className="mm-table min-w-[800px]">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Event</th>
+                  <th>Address</th>
+                  <th>Coords</th>
+                  <th>Segment</th>
+                  <th>Accuracy</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id}>
+                    <td className="text-xs whitespace-nowrap">
                       {new Date(h.recordedAt).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="text-sm text-zinc-300">
-                    {h.locality || h.city || "—"}
-                  </div>
-                  {(h.fullAddress || h.source === "ip") && (
-                    <div className="text-xs text-zinc-500 break-words">
-                      {h.fullAddress || `${h.city || ""} (${h.source})`}
-                    </div>
-                  )}
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-zinc-600">
-                    <span>{[h.device, h.browser].filter(Boolean).join(" · ") || "—"}</span>
-                    {h.publicIp && <span className="font-mono">{h.publicIp}</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop table */}
-            <div className="hidden md:block table-scroll">
-              <table className="mm-table min-w-[720px]">
-                <thead className="text-xs text-zinc-500 border-b border-zinc-800">
-                  <tr>
-                    <th className="text-left py-2 pr-2">Date / Time</th>
-                    <th className="text-left py-2 pr-2">Event</th>
-                    <th className="text-left py-2 pr-2">Area</th>
-                    <th className="text-left py-2 pr-2">Address</th>
-                    <th className="text-left py-2 pr-2">Device</th>
-                    <th className="text-left py-2">IP</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800/80">
-                  {history.map((h) => (
-                    <tr key={h.id} className="text-zinc-300">
-                      <td className="py-2 pr-2 whitespace-nowrap text-xs">
-                        {new Date(h.recordedAt).toLocaleString()}
-                      </td>
-                      <td className="py-2 pr-2 text-xs">{eventLabel(h.eventType)}</td>
-                      <td className="py-2 pr-2 text-xs max-w-[120px] truncate">
-                        {h.locality || h.city || "—"}
-                      </td>
-                      <td
-                        className="py-2 pr-2 text-xs max-w-[200px] truncate"
-                        title={h.fullAddress || ""}
-                      >
+                    </td>
+                    <td className="text-xs">{eventLabel(h.eventType)}</td>
+                    <td className="text-xs max-w-[240px]">
+                      <div className="truncate" title={h.fullAddress || ""}>
                         {h.fullAddress ||
-                          (h.source === "ip" ? `${h.city || ""} ${h.source}` : "—")}
-                      </td>
-                      <td className="py-2 pr-2 text-xs">
-                        {[h.device, h.browser].filter(Boolean).join(" · ")}
-                      </td>
-                      <td className="py-2 text-xs font-mono text-zinc-500">
-                        {h.publicIp || "—"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+                          [h.locality, h.city, h.pincode].filter(Boolean).join(", ") ||
+                          (h.source === "gps" ? "GPS point" : "No GPS")}
+                      </div>
+                    </td>
+                    <td className="text-xs tabular-nums whitespace-nowrap">
+                      {h.latitude != null
+                        ? `${h.latitude.toFixed(5)}, ${h.longitude?.toFixed(5)}`
+                        : "—"}
+                    </td>
+                    <td className="text-xs tabular-nums">
+                      {h.segmentDistanceKm != null
+                        ? `${h.segmentDistanceKm.toFixed(3)} km`
+                        : "—"}
+                    </td>
+                    <td className="text-xs tabular-nums">
+                      {h.accuracyM != null ? `±${Math.round(h.accuracyM)} m` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

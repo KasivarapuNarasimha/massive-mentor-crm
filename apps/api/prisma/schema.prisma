@@ -760,6 +760,12 @@ model LocationEvent {
   latitude   Float?
   longitude  Float?
   accuracyM  Float?
+  /// meters/second from Geolocation API
+  speedMps   Float?
+  /// degrees 0-360
+  headingDeg Float?
+  /// Distance from previous GPS point in this session/day (km)
+  segmentDistanceKm Float?
   /// gps | ip | unknown
   source     String   @default("unknown")
 
@@ -769,6 +775,7 @@ model LocationEvent {
   city        String?
   state       String?
   country     String?
+  pincode     String?
 
   publicIp    String?
   userAgent   String?  @db.Text
@@ -816,8 +823,10 @@ model FieldWorkSession {
   endAddress  String?  @db.Text
   endSource   String?
 
-  /// Haversine km between start/end when both GPS
+  /// Haversine km between start/end when both GPS (straight-line)
   distanceKm Float?
+  /// Sum of GPS path segments during the session (route distance)
+  totalTravelledKm Float?
 
   events LocationEvent[]
 
@@ -878,10 +887,20 @@ model UserLocationState {
   lastState       String?
   lastCountry     String?
   lastFullAddress String?  @db.Text
+  lastPincode     String?
   lastLat         Float?
   lastLng         Float?
+  lastAccuracyM   Float?
+  lastSpeedMps    Float?
+  lastHeadingDeg  Float?
   /// gps | ip | unknown
   lastSource      String?
+  /// stationary | moving | unknown
+  movementStatus  String?  @default("unknown")
+  /// Cumulative path distance for calendar day (km)
+  travelledKmToday Float?  @default(0)
+  /// YYYY-MM-DD local server day key for travelledKmToday reset
+  travelDayKey    String?
   lastUpdatedAt   DateTime @default(now())
 
   activeFieldSessionId String?
