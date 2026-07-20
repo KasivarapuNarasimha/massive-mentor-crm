@@ -110,7 +110,7 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 export default function LeadsPage() {
-  const { token, role, user } = useAuth();
+  const { token, role } = useAuth();
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Contact[]>([]);
   /** Server total from CRM list API (must match Dashboard "My Leads") */
