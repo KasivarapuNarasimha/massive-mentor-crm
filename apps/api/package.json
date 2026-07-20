@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "prisma generate && tsc",
+    "build": "prisma generate && tsc -p tsconfig.json && node scripts/ensure-dist-esm.mjs",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
     "db:push": "prisma db push",
@@ -14,7 +14,7 @@
     "db:reset": "prisma migrate reset",
     "prisma:generate": "prisma generate",
     "postinstall": "prisma generate",
-    "clean": "rm -rf dist"
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
