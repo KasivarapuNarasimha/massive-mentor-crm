@@ -1,6 +1,9 @@
 /**
  * Massive Mentor email brand tokens + URL helpers.
  * Inline-CSS safe; no runtime CSS frameworks.
+ *
+ * Production CRM links always use https://crm.massivementor.in when env is
+ * missing or still set to localhost under NODE_ENV=production.
  */
 import { env } from "../../config/env.js";
 
@@ -30,17 +33,60 @@ export const EMAIL_BRAND = {
   year: 2026,
 } as const;
 
-/** Public CRM app base URL — prefer APP_URL, then CUSTOMER_APP_URL. */
+const PROD_CRM_URL = "https://crm.massivementor.in";
+const PROD_ADMIN_URL = "https://admin.massivementor.in";
+const PROD_WEBSITE = "https://massivementor.in";
+const PROD_SUPPORT_EMAIL = "team@massivementor.in";
+const PROD_SUPPORT_WHATSAPP = "+91 9182920047";
+
+function isProd(): boolean {
+  return env.NODE_ENV === "production";
+}
+
+function isLocalUrl(url: string): boolean {
+  return /localhost|127\.0\.0\.1/i.test(url);
+}
+
+function stripSlash(url: string): string {
+  return String(url || "").trim().replace(/\/$/, "");
+}
+
+/**
+ * Public CRM app base URL for login / reset links in emails.
+ * Prefer APP_URL → CUSTOMER_APP_URL; never emit localhost in production.
+ */
 export function getAppUrl(): string {
-  const raw =
-    (env.APP_URL || "").trim() ||
-    (env.CUSTOMER_APP_URL || "").trim() ||
-    "http://localhost:3000";
-  return String(raw).replace(/\/$/, "");
+  let raw =
+    stripSlash(env.APP_URL || "") ||
+    stripSlash(env.CUSTOMER_APP_URL || "") ||
+    "";
+
+  if (!raw) {
+    return isProd() ? PROD_CRM_URL : "http://localhost:3000";
+  }
+
+  // Hard block: production must never email localhost links
+  if (isProd() && isLocalUrl(raw)) {
+    console.warn(
+      `[email] APP_URL/CUSTOMER_APP_URL is localhost in production — using ${PROD_CRM_URL}`
+    );
+    return PROD_CRM_URL;
+  }
+
+  // Prefer crm. over legacy app. host when env still points at app.*
+  if (isProd() && /\/\/app\.massivementor\.in/i.test(raw)) {
+    return PROD_CRM_URL;
+  }
+
+  return raw;
 }
 
 export function getAdminAppUrl(): string {
-  return (env.ADMIN_APP_URL || getAppUrl()).replace(/\/$/, "");
+  let raw = stripSlash(env.ADMIN_APP_URL || "") || getAppUrl();
+  if (isProd() && isLocalUrl(raw)) {
+    return PROD_ADMIN_URL;
+  }
+  return raw;
 }
 
 export function getLoginUrl(path = "/login"): string {
@@ -50,36 +96,27 @@ export function getLoginUrl(path = "/login"): string {
 }
 
 export function getSupportEmail(): string {
-  return (env.SUPPORT_EMAIL || "team@massivementor.in").trim();
+  return stripSlash(env.SUPPORT_EMAIL || "") || PROD_SUPPORT_EMAIL;
 }
 
 export function getSupportWhatsApp(): string {
-  return (env.SUPPORT_WHATSAPP || "+919000000000").trim();
+  return stripSlash(env.SUPPORT_WHATSAPP || "") || PROD_SUPPORT_WHATSAPP;
 }
 
 export function getSupportWebsite(): string {
-  const fromEnv = (env.SUPPORT_WEBSITE || process.env.WEBSITE_URL || "").trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, "");
-  // Prefer production marketing site when app is still on localhost
-  const app = getAppUrl();
-  if (/localhost|127\.0\.0\.1/i.test(app)) {
-    return "https://massivementor.in";
-  }
-  try {
-    const u = new URL(app);
-    return `${u.protocol}//${u.host}`;
-  } catch {
-    return "https://massivementor.in";
-  }
+  const fromEnv =
+    stripSlash(env.SUPPORT_WEBSITE || "") ||
+    stripSlash(env.WEBSITE_URL || process.env.WEBSITE_URL || "");
+  if (fromEnv && !isLocalUrl(fromEnv)) return fromEnv;
+  return PROD_WEBSITE;
 }
 
 /** Optional hosted logo (absolute HTTPS recommended for email clients). */
 export function getEmailLogoUrl(): string | null {
-  const explicit = (env.EMAIL_LOGO_URL || process.env.EMAIL_LOGO_URL || "").trim();
-  if (explicit) return explicit;
-  // Prefer app-hosted asset when APP_URL is public
+  const explicit = stripSlash(env.EMAIL_LOGO_URL || process.env.EMAIL_LOGO_URL || "");
+  if (explicit && !isLocalUrl(explicit)) return explicit;
   const app = getAppUrl();
-  if (/localhost|127\.0\.0\.1/i.test(app)) return null;
+  if (isLocalUrl(app)) return null;
   return `${app}/email-logo.png`;
 }
 

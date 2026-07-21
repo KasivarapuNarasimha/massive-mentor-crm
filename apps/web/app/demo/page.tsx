@@ -49,7 +49,7 @@ export default function DemoLandingPage() {
             Enter demo
           </Link>
           <a
-            href="https://app.massivementor.in"
+            href="https://crm.massivementor.in"
             className="min-h-12 inline-flex items-center justify-center px-6 bg-white/10 rounded-xl text-sm"
           >
             Customer CRM (production)

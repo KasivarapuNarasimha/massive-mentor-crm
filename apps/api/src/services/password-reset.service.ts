@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma.js";
 import { env } from "../config/env.js";
 import { recordAudit } from "./audit.service.js";
 import { buildPasswordResetEmail, sendEmail } from "./email.service.js";
+import { getAdminAppUrl, getAppUrl } from "./email/brand.js";
 
 export type ResetPortal = "customer" | "admin";
 
@@ -41,10 +42,9 @@ function generateRawToken(): string {
 }
 
 function appBaseForPortal(portal: ResetPortal): string {
-  if (portal === "admin") {
-    return (env.ADMIN_APP_URL || env.CUSTOMER_APP_URL || "http://localhost:3000").replace(/\/$/, "");
-  }
-  return (env.CUSTOMER_APP_URL || "http://localhost:3000").replace(/\/$/, "");
+  // Email brand helpers: production never emits localhost / legacy app.* hosts
+  if (portal === "admin") return getAdminAppUrl();
+  return getAppUrl();
 }
 
 function resetPath(portal: ResetPortal): string {

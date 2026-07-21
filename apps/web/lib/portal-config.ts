@@ -3,7 +3,8 @@
  *
  * demo.massivementor.in  → Demo product tour (sample data)
  * admin.massivementor.in → Super Admin platform ops
- * app.massivementor.in   → Customer CRM
+ * crm.massivementor.in    → Customer CRM (primary)
+ * app.massivementor.in    → Customer CRM (legacy alias)
  *
  * Local dev uses path prefixes: /demo, /admin, /dashboard
  */

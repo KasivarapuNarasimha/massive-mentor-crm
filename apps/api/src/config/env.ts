@@ -43,9 +43,8 @@ const envSchema = z.object({
       [
         'http://localhost:3000',
         'http://localhost:3001',
-        'http://200.141.0.25:3000',
-        'https://app.massivementor.in',
         'https://crm.massivementor.in',
+        'https://app.massivementor.in',
         'https://admin.massivementor.in',
         'https://demo.massivementor.in',
       ].join(',')
@@ -53,15 +52,17 @@ const envSchema = z.object({
   /// Extra CORS origins (comma-separated), merged with FRONTEND_URL
   CORS_ORIGINS: z.string().optional(),
 
-  // Customer portal public URL (password reset / login links)
-  // APP_URL is preferred in emails; falls back to CUSTOMER_APP_URL
-  APP_URL: z.string().optional().default('https://app.massivementor.in'),
-  CUSTOMER_APP_URL: z.string().optional().default('https://app.massivementor.in'),
+  // Customer CRM public URL (password reset / login links in emails)
+  // Production: https://crm.massivementor.in — never localhost in production deploys
+  APP_URL: z.string().optional().default('https://crm.massivementor.in'),
+  CUSTOMER_APP_URL: z.string().optional().default('https://crm.massivementor.in'),
   // Super Admin portal public URL
   ADMIN_APP_URL: z.string().optional().default('https://admin.massivementor.in'),
+  /// Marketing / public website (email footer)
+  WEBSITE_URL: z.string().optional().default('https://massivementor.in'),
   /// Optional absolute logo URL for HTML emails (HTTPS recommended)
   EMAIL_LOGO_URL: z.string().optional(),
-  SUPPORT_WEBSITE: z.string().optional(),
+  SUPPORT_WEBSITE: z.string().optional().default('https://massivementor.in'),
 
   // Optional SMTP for production email (if unset: log reset links to console in non-prod)
   SMTP_HOST: z.string().optional(),
@@ -100,7 +101,8 @@ const envSchema = z.object({
   TRIAL_DAYS: z.coerce.number().min(1).max(90).optional().default(3),
 
   SUPPORT_EMAIL: z.string().optional().default("team@massivementor.in"),
-  SUPPORT_WHATSAPP: z.string().optional().default("+919000000000"),
+  /// Display format OK; wa.me uses digits only
+  SUPPORT_WHATSAPP: z.string().optional().default("+91 9182920047"),
 });
 
 // Custom refinement for AI provider key validation

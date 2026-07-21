@@ -7,7 +7,7 @@ import { portalFromHostname, type PortalId } from "@/lib/portal-config";
  *
  * admin.massivementor.in  → only /admin/*
  * demo.massivementor.in   → only /demo/*
- * app.massivementor.in     → customer CRM (/login, /register, /dashboard)
+ * crm.massivementor.in / app.massivementor.in → customer CRM (/login, /dashboard)
  *
  * Localhost allows all path prefixes so three portals can be developed together.
  */

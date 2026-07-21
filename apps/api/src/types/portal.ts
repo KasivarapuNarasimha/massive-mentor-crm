@@ -4,7 +4,8 @@
  *
  * demo.massivementor.in  → product demonstration (sample data only)
  * admin.massivementor.in → Super Admin platform management
- * app.massivementor.in   → Customer CRM workspaces
+ * crm.massivementor.in  → Customer CRM workspaces (primary)
+ * app.massivementor.in   → Customer CRM (legacy alias)
  */
 export type PortalAudience = "customer" | "admin" | "demo";
 

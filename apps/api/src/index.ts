@@ -40,8 +40,8 @@ app.disable("x-powered-by");
  * credentials:true requires reflecting the request Origin (never "*").
  *
  * Production portals (must be allowed or browser blocks POST after OPTIONS):
- *   https://app.massivementor.in
- *   https://crm.massivementor.in
+ *   https://crm.massivementor.in  (primary customer CRM)
+ *   https://app.massivementor.in  (legacy alias)
  *   https://admin.massivementor.in
  *   https://demo.massivementor.in
  */
@@ -71,11 +71,12 @@ function collectAllowedOrigins(): Set<string> {
   add("http://127.0.0.1:3001");
 
   // Production SaaS portals (HTTPS) — never rely on stale FRONTEND_URL alone
-  add("https://app.massivementor.in");
   add("https://crm.massivementor.in");
+  add("https://app.massivementor.in");
   add("https://admin.massivementor.in");
   add("https://demo.massivementor.in");
   add("https://api.massivementor.in");
+  add("https://massivementor.in");
 
   // Legacy direct-IP UI (pre-domain)
   add("http://200.141.0.25:3000");

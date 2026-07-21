@@ -117,7 +117,7 @@ export default function SuperAdminLoginPage() {
         </div>
 
         <p className="text-center text-xs text-zinc-600 mt-6">
-          Customers use app.massivementor.in · Demo uses demo.massivementor.in
+          Customers use crm.massivementor.in · Demo uses demo.massivementor.in
         </p>
       </div>
     </div>

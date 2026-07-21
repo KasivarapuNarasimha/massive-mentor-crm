@@ -176,7 +176,7 @@ export async function registerUser(input: RegisterInput): Promise<AuthResponse> 
 }
 
 /**
- * Customer portal login only (app.massivementor.in).
+ * Customer portal login only (crm.massivementor.in).
  * Rejects Super Admin staff and pure demo accounts.
  * Enterprise: binds JWT to UserSession (sid) + concurrent session limits.
  */

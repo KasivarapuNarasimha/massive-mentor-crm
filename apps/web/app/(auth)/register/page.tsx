@@ -24,7 +24,7 @@ export default function RegisterPage() {
             Contact Sales
           </a>
           <a
-            href="https://wa.me/919000000000"
+            href="https://wa.me/919182920047"
             target="_blank"
             rel="noreferrer"
             className="min-h-11 flex items-center justify-center rounded-xl bg-emerald-600 font-medium"

@@ -69,7 +69,7 @@ export default function SubscriptionRequiredPage() {
             Contact Sales
           </a>
           <a
-            href="https://wa.me/919000000000?text=Hi%2C%20I%20need%20help%20with%20Massive%20Mentor%20CRM%20subscription"
+            href="https://wa.me/919182920047?text=Hi%2C%20I%20need%20help%20with%20Massive%20Mentor%20CRM%20subscription"
             target="_blank"
             rel="noreferrer"
             className="min-h-12 flex items-center justify-center rounded-xl bg-emerald-600/90 text-white font-medium"
