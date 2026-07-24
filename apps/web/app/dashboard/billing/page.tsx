@@ -213,15 +213,15 @@ function ProgressBar({
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between gap-2 text-sm">
-        <span className="font-medium text-zinc-200">{label}</span>
-        <span className="tabular-nums text-zinc-400">
+        <span className="font-medium text-foreground">{label}</span>
+        <span className="tabular-nums text-muted-foreground">
           {used}
           {unit ? ` ${unit}` : ""} / {total}
           {unit ? ` ${unit}` : ""}
         </span>
       </div>
       <div
-        className="h-2.5 rounded-full bg-zinc-800/90 overflow-hidden ring-1 ring-inset ring-zinc-700/50"
+        className="h-2.5 rounded-full bg-muted/90 overflow-hidden ring-1 ring-inset ring-border/50"
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}
@@ -233,7 +233,7 @@ function ProgressBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="text-[11px] text-zinc-500">{pct}% used</p>
+      <p className="text-[11px] text-muted-foreground">{pct}% used</p>
     </div>
   );
 }
@@ -602,10 +602,10 @@ export default function BillingPage() {
     return (
       <PageShell wide>
         <div className="space-y-5 animate-pulse" aria-busy="true" aria-label="Loading billing">
-          <div className="h-44 rounded-3xl bg-zinc-900 border border-zinc-800" />
+          <div className="h-44 rounded-3xl bg-card border border-border" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-96 rounded-3xl bg-zinc-900 border border-zinc-800" />
+              <div key={i} className="h-96 rounded-3xl bg-card border border-border" />
             ))}
           </div>
         </div>
@@ -626,14 +626,14 @@ export default function BillingPage() {
           </div>
           <h1
             id={successTitleId}
-            className="text-2xl sm:text-3xl font-semibold tracking-tight text-white"
+            className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground"
           >
             Subscription Activated
           </h1>
-          <p className="mt-3 text-sm sm:text-base text-zinc-400 leading-relaxed">
+          <p className="mt-3 text-sm sm:text-base text-muted-foreground leading-relaxed">
             Thank you for choosing Massive Mentor CRM. Your workspace is unlocked and ready.
           </p>
-          <dl className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/70 text-left divide-y divide-zinc-800">
+          <dl className="mt-8 rounded-2xl border border-border bg-card/70 text-left divide-y divide-border">
             {[
               { k: "Plan", v: success.planName },
               {
@@ -644,22 +644,22 @@ export default function BillingPage() {
               { k: "Payment ID", v: success.paymentId },
             ].map((row) => (
               <div key={row.k} className="flex justify-between gap-4 px-5 py-3.5 text-sm">
-                <dt className="text-zinc-500">{row.k}</dt>
-                <dd className="font-medium text-zinc-100 text-right break-all">{row.v}</dd>
+                <dt className="text-muted-foreground">{row.k}</dt>
+                <dd className="font-medium text-foreground text-right break-all">{row.v}</dd>
               </div>
             ))}
           </dl>
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <Link
               href="/dashboard"
-              className="flex-1 min-h-12 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-white shadow-lg shadow-violet-900/30 focus-ring button-active"
+              className="flex-1 min-h-12 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-foreground shadow-lg shadow-violet-900/30 focus-ring button-active"
             >
               Go to Dashboard
             </Link>
             <button
               type="button"
               onClick={() => void downloadInvoice(success.paymentId, success.invoiceNumber)}
-              className="flex-1 min-h-12 rounded-2xl border border-zinc-700 bg-zinc-900 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 focus-ring button-active"
+              className="flex-1 min-h-12 rounded-2xl border border-border bg-card text-sm font-semibold text-foreground hover:bg-muted focus-ring button-active"
             >
               Download Invoice
             </button>
@@ -671,7 +671,7 @@ export default function BillingPage() {
               setSuccess(null);
               void load();
             }}
-            className="mt-4 text-sm text-zinc-500 underline-offset-2 hover:underline focus-ring rounded"
+            className="mt-4 text-sm text-muted-foreground underline-offset-2 hover:underline focus-ring rounded"
           >
             Back to Billing
           </button>
@@ -698,10 +698,10 @@ export default function BillingPage() {
               />
             </svg>
           </div>
-          <h1 id={failTitleId} className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+          <h1 id={failTitleId} className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
             Payment unsuccessful
           </h1>
-          <p className="mt-3 text-sm text-zinc-400 leading-relaxed" role="alert">
+          <p className="mt-3 text-sm text-muted-foreground leading-relaxed" role="alert">
             {failure.reason || "Something went wrong while processing your payment."}
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -714,14 +714,14 @@ export default function BillingPage() {
                   if (p) setConfirm({ plan: p, purpose: failure.purpose || "checkout" });
                   else setFailure(null);
                 }}
-                className="flex-1 min-h-12 rounded-2xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-white focus-ring button-active"
+                className="flex-1 min-h-12 rounded-2xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-foreground focus-ring button-active"
               >
                 Retry payment
               </button>
             )}
             <a
               href={`mailto:${SALES_EMAIL}?subject=${encodeURIComponent("Billing support")}`}
-              className="flex-1 min-h-12 inline-flex items-center justify-center rounded-2xl border border-zinc-700 bg-zinc-900 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 focus-ring"
+              className="flex-1 min-h-12 inline-flex items-center justify-center rounded-2xl border border-border bg-card text-sm font-semibold text-foreground hover:bg-muted focus-ring"
             >
               Contact Support
             </a>
@@ -732,7 +732,7 @@ export default function BillingPage() {
               setUiMode("main");
               setFailure(null);
             }}
-            className="mt-4 text-sm text-zinc-500 underline-offset-2 hover:underline focus-ring rounded"
+            className="mt-4 text-sm text-muted-foreground underline-offset-2 hover:underline focus-ring rounded"
           >
             Back to Billing
           </button>
@@ -748,7 +748,7 @@ export default function BillingPage() {
 
       {/* Hero */}
       <section
-        className="mm-fade-up relative overflow-hidden rounded-3xl border border-zinc-800/80 bg-gradient-to-br from-violet-950/90 via-zinc-950 to-sky-950/60 p-6 sm:p-8 mb-8"
+        className="mm-fade-up relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-violet-950/90 via-zinc-950 to-sky-950/60 p-6 sm:p-8 mb-8"
         aria-labelledby="billing-hero-title"
       >
         <div
@@ -766,7 +766,7 @@ export default function BillingPage() {
             </p>
             <h1
               id="billing-hero-title"
-              className="mt-2 text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-white"
+              className="mt-2 text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-foreground"
             >
               {displayPlanTitle} Plan
             </h1>
@@ -781,11 +781,11 @@ export default function BillingPage() {
                   ⏱ {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} trial remaining
                 </span>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900/60 px-3 py-1 text-xs font-medium text-zinc-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/60 px-3 py-1 text-xs font-medium text-muted-foreground">
                 📅 Renewal {renewalDisplay}
               </span>
             </div>
-            <p className="mt-4 max-w-xl text-sm text-zinc-400 leading-relaxed">
+            <p className="mt-4 max-w-xl text-sm text-muted-foreground leading-relaxed">
               Manage your subscription, compare packages, and upgrade when your team is ready to
               scale.
             </p>
@@ -795,7 +795,7 @@ export default function BillingPage() {
               <button
                 type="button"
                 onClick={scrollToPlans}
-                className="min-h-12 px-6 rounded-2xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-white shadow-lg shadow-violet-900/40 hover:from-violet-500 hover:to-sky-500 focus-ring button-active transition-all"
+                className="min-h-12 px-6 rounded-2xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-foreground shadow-lg shadow-violet-900/40 hover:from-violet-500 hover:to-sky-500 focus-ring button-active transition-all"
               >
                 Upgrade to {heroUpgradeTarget}
               </button>
@@ -803,7 +803,7 @@ export default function BillingPage() {
             <button
               type="button"
               onClick={scrollToPlans}
-              className="min-h-12 px-6 rounded-2xl border border-zinc-600/80 bg-zinc-950/40 text-sm font-semibold text-zinc-200 hover:bg-zinc-900 focus-ring button-active"
+              className="min-h-12 px-6 rounded-2xl border border-border/80 bg-background/40 text-sm font-semibold text-foreground hover:bg-card focus-ring button-active"
             >
               View all plans
             </button>
@@ -830,16 +830,16 @@ export default function BillingPage() {
         aria-labelledby="plans-heading"
       >
         <div>
-          <h2 id="plans-heading" className="text-xl font-semibold tracking-tight text-white">
+          <h2 id="plans-heading" className="text-xl font-semibold tracking-tight text-foreground">
             Choose your plan
           </h2>
-          <p className="mt-1 text-sm text-zinc-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             Toggle billing cycle — only matching packages are shown.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div
-            className="inline-flex rounded-full border border-zinc-700/80 bg-zinc-900/90 p-1 shadow-inner"
+            className="inline-flex rounded-full border border-border bg-card/90 p-1 shadow-inner"
             role="tablist"
             aria-label="Billing cycle"
           >
@@ -855,8 +855,8 @@ export default function BillingPage() {
                   className={[
                     "mm-toggle-thumb min-h-11 min-w-[7.5rem] rounded-full px-5 text-sm font-semibold capitalize focus-ring",
                     active
-                      ? "bg-gradient-to-r from-violet-600 to-sky-600 text-white shadow-md shadow-violet-900/30"
-                      : "text-zinc-400 hover:text-white",
+                      ? "bg-gradient-to-r from-violet-600 to-sky-600 text-foreground shadow-md shadow-violet-900/30"
+                      : "text-muted-foreground hover:text-foreground",
                   ].join(" ")}
                 >
                   {c === "annual" ? "Annual" : "Monthly"}
@@ -877,7 +877,7 @@ export default function BillingPage() {
             value={coupon}
             onChange={(e) => setCoupon(e.target.value.toUpperCase())}
             placeholder="Coupon code"
-            className="bg-zinc-950/80 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 w-40 focus-ring"
+            className="bg-background/80 border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 w-40 focus-ring"
             autoComplete="off"
           />
         </div>
@@ -889,7 +889,7 @@ export default function BillingPage() {
         aria-label="Subscription plans"
       >
         {filteredPlans.length === 0 && (
-          <div className="col-span-full rounded-3xl border border-zinc-800 bg-zinc-900/50 p-12 text-center text-zinc-500">
+          <div className="col-span-full rounded-3xl border border-border bg-card/50 p-12 text-center text-muted-foreground">
             No {cycle} plans available right now.
           </div>
         )}
@@ -933,23 +933,23 @@ export default function BillingPage() {
               className={[
                 "mm-card-hover relative flex flex-col rounded-[1.75rem] border p-6 sm:p-8 min-w-0",
                 popular
-                  ? "border-violet-500/55 bg-gradient-to-b from-violet-950/90 via-zinc-900 to-zinc-950 shadow-2xl shadow-violet-950/50 xl:scale-[1.04] xl:z-[1] xl:py-10"
+                  ? "border-violet-500/55 bg-gradient-to-b from-violet-950/90 via-card to-background shadow-2xl shadow-violet-950/50 xl:scale-[1.04] xl:z-[1] xl:py-10"
                   : enterprise
-                    ? "border-amber-500/30 bg-gradient-to-b from-amber-950/40 via-zinc-900 to-zinc-950"
-                    : "border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950",
+                    ? "border-amber-500/30 bg-gradient-to-b from-amber-950/40 via-card to-background"
+                    : "border-border bg-gradient-to-b from-zinc-900 to-background",
               ].join(" ")}
             >
               {/* Badges / ribbons */}
               {isCurrent && (
                 <div className="absolute -right-px top-6 overflow-hidden z-[2]">
-                  <span className="block bg-gradient-to-r from-emerald-600 to-teal-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-md rounded-l-lg">
+                  <span className="block bg-gradient-to-r from-emerald-600 to-teal-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-foreground shadow-md rounded-l-lg">
                     Current Plan
                   </span>
                 </div>
               )}
               {popular && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-[2]">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-sky-600 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white shadow-lg whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-sky-600 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wide text-foreground shadow-lg whitespace-nowrap">
                     ⭐ Most Popular
                   </span>
                 </div>
@@ -976,20 +976,20 @@ export default function BillingPage() {
                     ? "border-violet-500/40 bg-violet-500/15 text-violet-300"
                     : enterprise
                       ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
-                      : "border-zinc-700 bg-zinc-800/80 text-zinc-300",
+                      : "border-border bg-muted/80 text-muted-foreground",
                 ].join(" ")}
               >
                 <PlanIcon family={family} />
               </div>
 
-              <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">
+              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
                 {cycle === "annual" ? "Billed annually" : "Billed monthly"}
               </p>
-              <h3 className="mt-1 text-2xl sm:text-[1.75rem] font-semibold tracking-tight text-white">
+              <h3 className="mt-1 text-2xl sm:text-[1.75rem] font-semibold tracking-tight text-foreground">
                 {title}
               </h3>
               {p.description && (
-                <p className="mt-2 text-sm text-zinc-400 leading-relaxed line-clamp-2">
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed line-clamp-2">
                   {p.description}
                 </p>
               )}
@@ -998,10 +998,10 @@ export default function BillingPage() {
               <div className="mt-6">
                 {enterprise ? (
                   <div>
-                    <span className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
+                    <span className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
                       Custom Pricing
                     </span>
-                    <p className="mt-1 text-sm text-zinc-500">Tailored for your organization</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Tailored for your organization</p>
                   </div>
                 ) : (
                   <>
@@ -1010,36 +1010,36 @@ export default function BillingPage() {
                         <span className="inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">
                           🎉 Save {ANNUAL_DISCOUNT_PCT}%
                         </span>
-                        <span className="text-sm text-zinc-500 line-through tabular-nums">
+                        <span className="text-sm text-muted-foreground line-through tabular-nums">
                           {formatCurrency(listPrice, p.currency)}
                         </span>
                       </div>
                     )}
                     <div className="flex items-baseline gap-1.5 flex-wrap">
-                      <span className="text-3xl sm:text-4xl font-bold tracking-tight text-white tabular-nums">
+                      <span className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground tabular-nums">
                         {formatCurrency(p.price, p.currency)}
                       </span>
-                      <span className="text-sm text-zinc-500">
+                      <span className="text-sm text-muted-foreground">
                         / {cycle === "annual" ? "Year" : "Month"}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-zinc-500">+ 18% GST · exclusive of taxes</p>
+                    <p className="mt-1 text-xs text-muted-foreground">+ 18% GST · exclusive of taxes</p>
                   </>
                 )}
               </div>
 
               {/* Users + additional seats — always visible for paid tiers */}
               {!enterprise && (
-                <div className="mt-4 space-y-2 rounded-2xl border border-zinc-800 bg-zinc-950/50 p-3.5">
+                <div className="mt-4 space-y-2 rounded-2xl border border-border bg-background/50 p-3.5">
                   <div className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-zinc-400">Users included</span>
-                    <span className="font-semibold text-zinc-100">
+                    <span className="text-muted-foreground">Users included</span>
+                    <span className="font-semibold text-foreground">
                       Up to {includedUsers} Users
                     </span>
                   </div>
                   {addOnPrice != null && (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pt-2 border-t border-zinc-800/80">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pt-2 border-t border-border/80">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Additional Users
                       </span>
                       <span className="text-sm font-semibold text-violet-300 tabular-nums">
@@ -1055,15 +1055,15 @@ export default function BillingPage() {
                   <p className="text-sm font-semibold text-amber-100">
                     Need more than 10 Users?
                   </p>
-                  <p className="text-sm text-zinc-400">Need White Label CRM?</p>
-                  <p className="text-sm text-zinc-400">Need Custom AI?</p>
-                  <p className="text-sm text-zinc-400">Need API Integration?</p>
-                  <p className="text-sm text-zinc-400">Need Dedicated Infrastructure?</p>
-                  <p className="text-base font-semibold text-white pt-2">Let&apos;s Talk</p>
+                  <p className="text-sm text-muted-foreground">Need White Label CRM?</p>
+                  <p className="text-sm text-muted-foreground">Need Custom AI?</p>
+                  <p className="text-sm text-muted-foreground">Need API Integration?</p>
+                  <p className="text-sm text-muted-foreground">Need Dedicated Infrastructure?</p>
+                  <p className="text-base font-semibold text-foreground pt-2">Let&apos;s Talk</p>
                   <div className="flex flex-col gap-2 pt-3">
                     <a
                       href={DEMO_MAILTO}
-                      className="min-h-12 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 text-sm font-semibold text-white shadow-lg shadow-amber-900/20 hover:from-amber-500 hover:to-orange-500 focus-ring button-active"
+                      className="min-h-12 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 text-sm font-semibold text-foreground shadow-lg shadow-amber-900/20 hover:from-amber-500 hover:to-orange-500 focus-ring button-active"
                     >
                       Schedule Demo
                     </a>
@@ -1079,7 +1079,7 @@ export default function BillingPage() {
                 <>
                   <ul className="mt-6 space-y-2.5 flex-1" aria-label={`${title} features`}>
                     {features.map((f) => (
-                      <li key={f.label} className="flex items-start gap-2.5 text-sm text-zinc-300">
+                      <li key={f.label} className="flex items-start gap-2.5 text-sm text-muted-foreground">
                         <IconCheck
                           className={`h-4 w-4 shrink-0 mt-0.5 ${popular ? "text-violet-400" : "text-emerald-400"}`}
                         />
@@ -1095,10 +1095,10 @@ export default function BillingPage() {
                     className={[
                       "mt-8 min-h-12 rounded-2xl text-sm font-semibold transition-all focus-ring button-active disabled:cursor-not-allowed",
                       isCurrent
-                        ? "border border-zinc-700 bg-zinc-800/50 text-zinc-400"
+                        ? "border border-border bg-muted/50 text-muted-foreground"
                         : popular
-                          ? "bg-gradient-to-r from-violet-600 to-sky-600 text-white shadow-lg shadow-violet-900/30 hover:from-violet-500 hover:to-sky-500"
-                          : "bg-white text-zinc-950 hover:bg-zinc-100",
+                          ? "bg-gradient-to-r from-violet-600 to-sky-600 text-foreground shadow-lg shadow-violet-900/30 hover:from-violet-500 hover:to-sky-500"
+                          : "bg-primary text-primary-foreground hover:bg-primary-hover",
                       busy ? "opacity-70" : "",
                     ].join(" ")}
                   >
@@ -1120,20 +1120,20 @@ export default function BillingPage() {
 
       {/* Feature comparison */}
       <section className="mb-12" aria-labelledby="compare-heading">
-        <h2 id="compare-heading" className="text-xl font-semibold tracking-tight text-white mb-1">
+        <h2 id="compare-heading" className="text-xl font-semibold tracking-tight text-foreground mb-1">
           Feature comparison
         </h2>
-        <p className="text-sm text-zinc-500 mb-5">
+        <p className="text-sm text-muted-foreground mb-5">
           See exactly what unlocks when you upgrade.
         </p>
-        <div className="rounded-2xl border border-zinc-800 overflow-hidden bg-zinc-900/40">
+        <div className="rounded-2xl border border-border overflow-hidden bg-card/40">
           <div className="overflow-x-auto table-scroll">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 bg-zinc-950/60">
+                <tr className="border-b border-border bg-background/60">
                   <th
                     scope="col"
-                    className="p-4 text-left font-medium text-zinc-400 sticky left-0 bg-zinc-950/95"
+                    className="p-4 text-left font-medium text-muted-foreground sticky left-0 bg-background/95"
                   >
                     Feature
                   </th>
@@ -1142,7 +1142,7 @@ export default function BillingPage() {
                       key={col}
                       scope="col"
                       className={`p-4 text-center font-semibold ${
-                        col === "Professional" ? "text-violet-300" : "text-zinc-200"
+                        col === "Professional" ? "text-violet-300" : "text-foreground"
                       }`}
                     >
                       {col}
@@ -1154,11 +1154,11 @@ export default function BillingPage() {
                 {COMPARISON_ROWS.map((row, i) => (
                   <tr
                     key={row.label}
-                    className={i % 2 === 0 ? "bg-zinc-900/20" : "bg-transparent"}
+                    className={i % 2 === 0 ? "bg-card/20" : "bg-transparent"}
                   >
                     <th
                       scope="row"
-                      className="p-3.5 text-left font-medium text-zinc-300 sticky left-0 bg-zinc-950/90"
+                      className="p-3.5 text-left font-medium text-muted-foreground sticky left-0 bg-background/90"
                     >
                       {row.label}
                     </th>
@@ -1179,7 +1179,7 @@ export default function BillingPage() {
                             </span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center justify-center gap-1 text-zinc-600">
+                          <span className="inline-flex items-center justify-center gap-1 text-muted-foreground">
                             <IconCross className="h-4 w-4" />
                             <span className="sr-only">Not included</span>
                             <span className="hidden sm:inline text-xs" aria-hidden>
@@ -1199,7 +1199,7 @@ export default function BillingPage() {
 
       {/* Billing timeline */}
       <section className="mb-12" aria-labelledby="timeline-heading">
-        <h2 id="timeline-heading" className="text-xl font-semibold tracking-tight text-white mb-5">
+        <h2 id="timeline-heading" className="text-xl font-semibold tracking-tight text-foreground mb-5">
           Billing timeline
         </h2>
         <ol className="relative space-y-0 pl-2">
@@ -1213,7 +1213,7 @@ export default function BillingPage() {
                       ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
                       : node.state === "current"
                         ? "border-violet-500/60 bg-violet-500/20 text-violet-200 ring-2 ring-violet-500/30"
-                        : "border-zinc-700 bg-zinc-900 text-zinc-500",
+                        : "border-border bg-card text-muted-foreground",
                   ].join(" ")}
                   aria-hidden
                 >
@@ -1230,18 +1230,18 @@ export default function BillingPage() {
                 <p
                   className={[
                     "text-sm font-semibold",
-                    node.state === "upcoming" ? "text-zinc-500" : "text-white",
+                    node.state === "upcoming" ? "text-muted-foreground" : "text-foreground",
                   ].join(" ")}
                 >
                   {node.label}
                 </p>
                 {node.date && (
-                  <p className="mt-0.5 text-xs text-zinc-500">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {new Date(node.date).toLocaleString()}
                   </p>
                 )}
                 {!node.date && node.state === "upcoming" && (
-                  <p className="mt-0.5 text-xs text-zinc-600">Pending</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Pending</p>
                 )}
               </div>
             </li>
@@ -1249,14 +1249,14 @@ export default function BillingPage() {
         </ol>
 
         {data?.timeline && data.timeline.length > 0 && (
-          <div className="mt-2 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-3">
+          <div className="mt-2 rounded-2xl border border-border bg-card/40 p-4">
+            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
               Recent events
             </h3>
-            <ul className="space-y-2 text-sm text-zinc-400 max-h-48 overflow-y-auto">
+            <ul className="space-y-2 text-sm text-muted-foreground max-h-48 overflow-y-auto">
               {data.timeline.slice(0, 12).map((t, i) => (
-                <li key={i} className="flex flex-col sm:flex-row sm:gap-3 border-l border-zinc-700 pl-3">
-                  <span className="text-xs text-zinc-600 sm:w-40 shrink-0">
+                <li key={i} className="flex flex-col sm:flex-row sm:gap-3 border-l border-border pl-3">
+                  <span className="text-xs text-muted-foreground sm:w-40 shrink-0">
                     {new Date(t.at).toLocaleString()}
                   </span>
                   <span>{t.label}</span>
@@ -1269,16 +1269,16 @@ export default function BillingPage() {
 
       {/* Payment history */}
       <section className="mb-10" aria-labelledby="payments-heading">
-        <h2 id="payments-heading" className="text-xl font-semibold tracking-tight text-white mb-4">
+        <h2 id="payments-heading" className="text-xl font-semibold tracking-tight text-foreground mb-4">
           Payment history
         </h2>
         {(data?.payments || []).length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-zinc-700 bg-zinc-900/30 px-6 py-14 text-center">
+          <div className="rounded-3xl border border-dashed border-border bg-card/30 px-6 py-14 text-center">
             <div
-              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-800/80 border border-zinc-700"
+              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/80 border border-border"
               aria-hidden
             >
-              <svg className="h-8 w-8 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-8 w-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -1287,25 +1287,25 @@ export default function BillingPage() {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-white">No payments yet</h3>
-            <p className="mt-2 text-sm text-zinc-500 max-w-sm mx-auto leading-relaxed">
+            <h3 className="text-lg font-semibold text-foreground">No payments yet</h3>
+            <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
               When you subscribe, invoices and payment receipts will appear here for easy
               download and audit.
             </p>
             <button
               type="button"
               onClick={scrollToPlans}
-              className="mt-6 min-h-11 px-5 rounded-xl bg-white text-zinc-950 text-sm font-semibold hover:bg-zinc-100 focus-ring button-active"
+              className="mt-6 min-h-11 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover focus-ring button-active"
             >
               Browse plans
             </button>
           </div>
         ) : (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 overflow-hidden">
+          <div className="rounded-2xl border border-border bg-card/60 overflow-hidden">
             <div className="overflow-x-auto desktop-only-table">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-zinc-500 border-b border-zinc-800 bg-zinc-950/40">
+                  <tr className="text-left text-muted-foreground border-b border-border bg-background/40">
                     <th className="p-3.5 font-medium">Date</th>
                     <th className="p-3.5 font-medium">Invoice</th>
                     <th className="p-3.5 font-medium">Plan</th>
@@ -1317,12 +1317,12 @@ export default function BillingPage() {
                   {(data?.payments || []).map((pay) => (
                     <tr
                       key={pay.id}
-                      className="border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors"
+                      className="border-b border-border/50 hover:bg-muted/20 transition-colors"
                     >
                       <td className="p-3.5 whitespace-nowrap">
                         {new Date(pay.createdAt).toLocaleString()}
                       </td>
-                      <td className="p-3.5 font-mono text-xs text-zinc-400">
+                      <td className="p-3.5 font-mono text-xs text-muted-foreground">
                         {pay.invoiceNumber || "—"}
                       </td>
                       <td className="p-3.5">{pay.plan?.name || "—"}</td>
@@ -1336,7 +1336,7 @@ export default function BillingPage() {
                               ? "text-emerald-400"
                               : pay.status === "failed"
                                 ? "text-red-400"
-                                : "text-zinc-400"
+                                : "text-muted-foreground"
                           }
                         >
                           {pay.status}
@@ -1380,15 +1380,15 @@ export default function BillingPage() {
               {(data?.payments || []).map((pay) => (
                 <div
                   key={pay.id}
-                  className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4 text-sm"
+                  className="rounded-xl border border-border bg-background/50 p-4 text-sm"
                 >
                   <div className="flex justify-between gap-2">
-                    <span className="font-medium text-white">{pay.plan?.name || "Payment"}</span>
-                    <span className="tabular-nums text-zinc-200">
+                    <span className="font-medium text-foreground">{pay.plan?.name || "Payment"}</span>
+                    <span className="tabular-nums text-foreground">
                       {formatCurrency(pay.amount, "INR")}
                     </span>
                   </div>
-                  <div className="mt-1 text-xs text-zinc-500">
+                  <div className="mt-1 text-xs text-muted-foreground">
                     {new Date(pay.createdAt).toLocaleString()} · {pay.status}
                   </div>
                 </div>
@@ -1399,7 +1399,7 @@ export default function BillingPage() {
       </section>
 
       {user?.email && (
-        <p className="text-xs text-zinc-600 pb-4">Signed in as {user.email}</p>
+        <p className="text-xs text-muted-foreground pb-4">Signed in as {user.email}</p>
       )}
 
       {/* Checkout confirmation modal */}
@@ -1416,27 +1416,27 @@ export default function BillingPage() {
             aria-label="Close confirmation"
             onClick={() => !busyCode && setConfirm(null)}
           />
-          <div className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border border-zinc-700/80 bg-gradient-to-b from-zinc-900 to-zinc-950 shadow-2xl p-6 sm:p-8 mm-fade-up">
-            <p className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+          <div className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border border-border bg-gradient-to-b from-zinc-900 to-background shadow-2xl p-6 sm:p-8 mm-fade-up">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Confirm checkout
             </p>
-            <h2 id={confirmTitleId} className="mt-2 text-xl font-semibold text-white tracking-tight">
+            <h2 id={confirmTitleId} className="mt-2 text-xl font-semibold text-foreground tracking-tight">
               {displayPlanName(confirm.plan.code, confirm.plan.name)}{" "}
               {cycle === "annual" ? "Annual" : "Monthly"}
             </h2>
-            <p className="mt-3 text-3xl font-bold text-white tabular-nums">
+            <p className="mt-3 text-3xl font-bold text-foreground tabular-nums">
               {formatCurrency(confirm.plan.price, confirm.plan.currency)}
-              <span className="text-sm font-normal text-zinc-500">
+              <span className="text-sm font-normal text-muted-foreground">
                 {" "}
                 / {cycle === "annual" ? "year" : "month"}
               </span>
             </p>
-            <p className="mt-1 text-xs text-zinc-500">+ 18% GST applied at checkout</p>
-            <div className="mt-5 rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2">
+            <p className="mt-1 text-xs text-muted-foreground">+ 18% GST applied at checkout</p>
+            <div className="mt-5 rounded-xl border border-border bg-background/50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                 Included
               </p>
-              <ul className="space-y-1.5 text-sm text-zinc-300">
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
                 {(PLAN_FEATURE_LISTS[familyOf(confirm.plan.code, confirm.plan.name)] || [])
                   .slice(0, 6)
                   .map((f) => (
@@ -1447,13 +1447,13 @@ export default function BillingPage() {
                   ))}
               </ul>
             </div>
-            <p className="mt-4 text-sm text-zinc-400">Continue to secure Razorpay checkout?</p>
+            <p className="mt-4 text-sm text-muted-foreground">Continue to secure Razorpay checkout?</p>
             <div className="mt-6 flex flex-col-reverse sm:flex-row gap-2.5">
               <button
                 type="button"
                 disabled={!!busyCode}
                 onClick={() => setConfirm(null)}
-                className="flex-1 min-h-11 rounded-xl border border-zinc-700 text-sm font-medium text-zinc-300 hover:bg-zinc-800 focus-ring disabled:opacity-50"
+                className="flex-1 min-h-11 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-muted focus-ring disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -1465,7 +1465,7 @@ export default function BillingPage() {
                     purpose: confirm.purpose,
                   })
                 }
-                className="flex-1 min-h-11 rounded-xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-white focus-ring button-active disabled:opacity-70"
+                className="flex-1 min-h-11 rounded-xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-foreground focus-ring button-active disabled:opacity-70"
               >
                 {busyCode ? "Please wait…" : "Continue"}
               </button>

@@ -227,12 +227,12 @@ export default function BusinessProfilePage() {
       <div className="w-full max-w-3xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold tracking-tight">Business Profile</h1>
-          <p className="text-zinc-400 mt-2">This information powers your Health Score, SWOT, and AI Mentor.</p>
+          <p className="text-muted-foreground mt-2">This information powers your Health Score, SWOT, and AI Mentor.</p>
         </div>
 
         <div className="space-y-8 animate-pulse">
           {/* Basic Information skeleton */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-8">
+          <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
             <Skeleton className="h-6 w-40 mb-6" />
             <div className="space-y-6">
               <div>
@@ -253,13 +253,13 @@ export default function BusinessProfilePage() {
           </div>
 
           {/* Description skeleton */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-8">
+          <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
             <Skeleton className="h-6 w-48 mb-6" />
             <Skeleton className="h-32 w-full rounded-xl" />
           </div>
 
           {/* Business Details skeleton */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-8">
+          <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
             <Skeleton className="h-6 w-40 mb-6" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[...Array(4)].map((_, i) => (
@@ -279,22 +279,22 @@ export default function BusinessProfilePage() {
     <div className="w-full max-w-3xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
       <div className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight">Business Profile</h1>
-        <p className="text-zinc-400 mt-2">This information powers your Health Score, SWOT, and AI Mentor.</p>
+        <p className="text-muted-foreground mt-2">This information powers your Health Score, SWOT, and AI Mentor.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Basic Information */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8">
+        <div className="bg-card border border-border rounded-2xl p-8">
           <h2 className="font-semibold text-lg mb-6">Basic Information</h2>
 
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">Business Name *</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-2">Business Name *</label>
               <input
                 type="text"
                 value={formData.businessName}
                 onChange={(e) => handleChange("businessName", e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
                 placeholder="Acme Corp"
                 required
               />
@@ -302,7 +302,7 @@ export default function BusinessProfilePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Business Type *</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">Business Type *</label>
                 <select
                   value={templateSlug}
                   onChange={(e) => {
@@ -311,7 +311,7 @@ export default function BusinessProfilePage() {
                     const name = industryCatalog.find((t) => t.slug === slug)?.name || "";
                     handleChange("industry", name);
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
                   required
                 >
                   <option value="">Select business type…</option>
@@ -322,18 +322,18 @@ export default function BusinessProfilePage() {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-zinc-500 mt-1.5">
+                <p className="text-xs text-muted-foreground mt-1.5">
                   Changes re-apply CRM menus, dashboards, modules, and forms from the industry
                   template. Unknown types use Generic CRM.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Current Stage</label>
+                <label className="block text-sm font-medium text-muted-foreground mb-2">Current Stage</label>
                 <select
                   value={formData.stage}
                   onChange={(e) => handleChange("stage", e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
                 >
                   <option value="">Select stage...</option>
                   {STAGES.map((s) => (
@@ -346,31 +346,31 @@ export default function BusinessProfilePage() {
         </div>
 
         {/* Description */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8">
+        <div className="bg-card border border-border rounded-2xl p-8">
           <h2 className="font-semibold text-lg mb-2">About Your Business</h2>
-          <p className="text-sm text-zinc-500 mb-4">Help the AI understand what you do (this is very important).</p>
+          <p className="text-sm text-muted-foreground mb-4">Help the AI understand what you do (this is very important).</p>
 
           <textarea
             value={formData.description}
             onChange={(e) => handleChange("description", e.target.value)}
             rows={5}
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white resize-y focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
+            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground resize-y focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
             placeholder="We help small e-commerce brands increase customer lifetime value through personalized email marketing automation..."
           />
-          <div className="text-xs text-zinc-500 mt-1.5 text-right">{formData.description.length} / 2000</div>
+          <div className="text-xs text-muted-foreground mt-1.5 text-right">{formData.description.length} / 2000</div>
         </div>
 
         {/* Business Details */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8">
+        <div className="bg-card border border-border rounded-2xl p-8">
           <h2 className="font-semibold text-lg mb-6">Business Details</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">Team Size</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-2">Team Size</label>
               <select
                 value={formData.employeeCount ?? ""}
                 onChange={(e) => handleChange("employeeCount", e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
               >
                 <option value="">Select team size...</option>
                 {EMPLOYEE_COUNTS.map((num) => (
@@ -380,11 +380,11 @@ export default function BusinessProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">Currency</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-2">Currency</label>
               <select
                 value={formData.currency}
                 onChange={(e) => handleChange("currency", e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
                 aria-label="Business currency"
               >
                 {SUPPORTED_CURRENCIES.map((c) => (
@@ -393,17 +393,17 @@ export default function BusinessProfilePage() {
                   </option>
                 ))}
               </select>
-              <p className="text-[11px] text-zinc-500 mt-1.5">
+              <p className="text-[11px] text-muted-foreground mt-1.5">
                 Default follows your location (India → INR). Used for dashboards, invoices &amp; AI.
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">Annual Revenue</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-2">Annual Revenue</label>
               <select
                 value={formData.annualRevenue}
                 onChange={(e) => handleChange("annualRevenue", e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
                 aria-label="Annual revenue range"
               >
                 <option value="">Select revenue range…</option>
@@ -416,34 +416,34 @@ export default function BusinessProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">Main Product / Service</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-2">Main Product / Service</label>
               <input
                 type="text"
                 value={formData.mainProduct}
                 onChange={(e) => handleChange("mainProduct", e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
                 placeholder="Email marketing platform"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-300 mb-2">Primary Location</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-2">Primary Location</label>
               <input
                 type="text"
                 value={formData.location}
                 onChange={(e) => handleChange("location", e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
                 placeholder="San Francisco, CA"
               />
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-zinc-300 mb-2">Target Market / Ideal Customer</label>
+              <label className="block text-sm font-medium text-muted-foreground mb-2">Target Market / Ideal Customer</label>
               <input
                 type="text"
                 value={formData.targetMarket}
                 onChange={(e) => handleChange("targetMarket", e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-white/30"
+                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
                 placeholder="Early-stage brands in your market (describe size in your currency)"
               />
             </div>
@@ -455,13 +455,13 @@ export default function BusinessProfilePage() {
           <button
             type="submit"
             disabled={isSaving}
-            className="px-8 py-3 bg-white text-zinc-950 rounded-xl font-medium hover:bg-zinc-200 focus-ring button-active transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-8 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isSaving ? "Saving..." : "Save Profile"}
           </button>
         </div>
 
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted-foreground">
           This data is used to generate accurate Health Scores, SWOT analyses, and personalized AI advice.
         </p>
       </form>

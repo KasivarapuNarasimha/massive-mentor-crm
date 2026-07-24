@@ -142,7 +142,7 @@ export function AdminDataTable<T extends { id: string }>({
               setPage(1);
             }}
             placeholder="Search…"
-            className="flex-1 min-w-[160px] bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white min-h-10"
+            className="flex-1 min-w-[160px] bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground min-h-10"
           />
           <div className="relative">
             <button
@@ -153,11 +153,11 @@ export function AdminDataTable<T extends { id: string }>({
               Columns
             </button>
             {showCols && (
-              <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-zinc-900 border border-zinc-700 rounded-xl p-2 shadow-xl">
+              <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-card border border-border rounded-xl p-2 shadow-xl">
                 {columns
                   .filter((c) => c.hideable !== false)
                   .map((c) => (
-                    <label key={c.key} className="flex items-center gap-2 text-xs py-1.5 px-1 text-zinc-300">
+                    <label key={c.key} className="flex items-center gap-2 text-xs py-1.5 px-1 text-muted-foreground">
                       <input
                         type="checkbox"
                         checked={!hidden.has(c.key)}
@@ -226,8 +226,8 @@ export function AdminDataTable<T extends { id: string }>({
           </button>
           {(selectedIds?.size || 0) > 0 && (
             <>
-              <span className="text-zinc-400">{selectedIds?.size} selected</span>
-              <button type="button" onClick={clearSelection} className="text-zinc-500 underline">
+              <span className="text-muted-foreground">{selectedIds?.size} selected</span>
+              <button type="button" onClick={clearSelection} className="text-muted-foreground underline">
                 Clear
               </button>
             </>
@@ -236,11 +236,11 @@ export function AdminDataTable<T extends { id: string }>({
         </div>
       )}
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+      <div className="bg-card border border-border rounded-2xl overflow-hidden">
         <div className="overflow-x-auto max-h-[70vh]">
           <table className="w-full text-sm min-w-[720px]">
-            <thead className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800">
-              <tr className="text-zinc-500">
+            <thead className="sticky top-0 z-10 bg-card border-b border-border">
+              <tr className="text-muted-foreground">
                 {selectable && (
                   <th className="p-3 w-10">
                     <input
@@ -268,7 +268,7 @@ export function AdminDataTable<T extends { id: string }>({
                       type="button"
                       disabled={c.sortable === false}
                       onClick={() => c.sortable !== false && toggleSort(c.key)}
-                      className="inline-flex items-center gap-1 hover:text-zinc-300 disabled:cursor-default"
+                      className="inline-flex items-center gap-1 hover:text-muted-foreground disabled:cursor-default"
                     >
                       {c.label}
                       {sortKey === c.key ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
@@ -281,26 +281,26 @@ export function AdminDataTable<T extends { id: string }>({
                           setPage(1);
                         }}
                         placeholder="Filter"
-                        className="mt-1 block w-full max-w-[140px] bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-[11px] text-zinc-300"
+                        className="mt-1 block w-full max-w-[140px] bg-background border border-border rounded-lg px-2 py-1 text-[11px] text-muted-foreground"
                       />
                     )}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/80">
+            <tbody className="divide-y divide-border/80">
               {pageRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={visibleCols.length + (selectable ? 1 : 0)}
-                    className="p-10 text-center text-zinc-500"
+                    className="p-10 text-center text-muted-foreground"
                   >
                     {emptyMessage}
                   </td>
                 </tr>
               ) : (
                 pageRows.map((row) => (
-                  <tr key={row.id} className="hover:bg-zinc-800/40">
+                  <tr key={row.id} className="hover:bg-muted/40">
                     {selectable && (
                       <td className="p-3">
                         <input
@@ -312,7 +312,7 @@ export function AdminDataTable<T extends { id: string }>({
                       </td>
                     )}
                     {visibleCols.map((c) => (
-                      <td key={c.key} className={`p-3 text-zinc-200 ${c.className || ""}`}>
+                      <td key={c.key} className={`p-3 text-foreground ${c.className || ""}`}>
                         {c.render
                           ? c.render(row)
                           : String((row as Record<string, unknown>)[c.key] ?? "—")}
@@ -326,7 +326,7 @@ export function AdminDataTable<T extends { id: string }>({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <div>
           Showing {(pageSafe - 1) * pageSize + (filtered.length ? 1 : 0)}–
           {Math.min(pageSafe * pageSize, filtered.length)} of {filtered.length}
@@ -338,7 +338,7 @@ export function AdminDataTable<T extends { id: string }>({
               setPageSize(Number(e.target.value));
               setPage(1);
             }}
-            className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1.5"
+            className="bg-background border border-border rounded-lg px-2 py-1.5"
           >
             {pageSizeOptions.map((n) => (
               <option key={n} value={n}>

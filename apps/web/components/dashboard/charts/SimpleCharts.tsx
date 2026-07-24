@@ -18,12 +18,12 @@ function fmt(n: number) {
 export function EmptyChart({ label = "No data yet" }: { label?: string }) {
   return (
     <div
-      className="flex h-full min-h-[160px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 px-4 text-center"
+      className="flex h-full min-h-[160px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background/40 px-4 text-center"
       role="img"
       aria-label={label}
     >
-      <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900 border border-zinc-800">
-        <svg className="h-6 w-6 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-card border border-border">
+        <svg className="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -32,8 +32,8 @@ export function EmptyChart({ label = "No data yet" }: { label?: string }) {
           />
         </svg>
       </div>
-      <p className="text-sm font-medium text-zinc-400">{label}</p>
-      <p className="mt-1 text-xs text-zinc-600">Add CRM activity to populate this chart</p>
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p className="mt-1 text-xs text-muted-foreground">Add CRM activity to populate this chart</p>
     </div>
   );
 }
@@ -63,7 +63,7 @@ export function BarChart({
         const color = BRAND[i % BRAND.length];
         return (
           <div key={s.name} className="flex flex-1 flex-col items-center gap-1.5 min-w-0 group">
-            <span className="text-[10px] tabular-nums text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="text-[10px] tabular-nums text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
               {fmt(s.value)}
             </span>
             <div className="relative w-full flex items-end justify-center" style={{ height: height - 40 }}>
@@ -76,7 +76,7 @@ export function BarChart({
                 title={`${s.name}: ${fmt(s.value)}`}
               />
             </div>
-            <span className="w-full truncate text-center text-[10px] sm:text-[11px] text-zinc-500">
+            <span className="w-full truncate text-center text-[10px] sm:text-[11px] text-muted-foreground">
               {s.name}
             </span>
           </div>
@@ -133,7 +133,7 @@ export function AreaChart({
       </svg>
       <div className="mt-1 flex justify-between px-1">
         {series.map((s) => (
-          <span key={s.name} className="text-[10px] text-zinc-600 truncate max-w-[4rem] text-center">
+          <span key={s.name} className="text-[10px] text-muted-foreground truncate max-w-[4rem] text-center">
             {s.name}
           </span>
         ))}
@@ -197,16 +197,16 @@ export function DonutChart({
           ))}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-lg font-semibold tabular-nums text-white">{fmt(total)}</span>
-          {centerLabel && <span className="text-[10px] text-zinc-500">{centerLabel}</span>}
+          <span className="text-lg font-semibold tabular-nums text-foreground">{fmt(total)}</span>
+          {centerLabel && <span className="text-[10px] text-muted-foreground">{centerLabel}</span>}
         </div>
       </div>
       <ul className="flex-1 space-y-1.5 min-w-0 w-full">
         {slices.map((s) => (
-          <li key={s.name} className="flex items-center gap-2 text-xs text-zinc-400">
+          <li key={s.name} className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: s.color }} />
             <span className="truncate flex-1">{s.name}</span>
-            <span className="tabular-nums text-zinc-300">{fmt(s.value)}</span>
+            <span className="tabular-nums text-muted-foreground">{fmt(s.value)}</span>
           </li>
         ))}
       </ul>
@@ -251,7 +251,7 @@ export function GaugeChart({
           {Math.round(value)}%
         </text>
       </svg>
-      {label && <p className="text-xs text-zinc-500 -mt-1">{label}</p>}
+      {label && <p className="text-xs text-muted-foreground -mt-1">{label}</p>}
     </div>
   );
 }

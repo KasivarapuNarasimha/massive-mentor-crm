@@ -114,7 +114,7 @@ export default function AdminBillingPage() {
             Mark paid
           </button>
         ) : (
-          <span className="text-xs text-zinc-500">—</span>
+          <span className="text-xs text-muted-foreground">—</span>
         ),
     },
   ];
@@ -126,7 +126,7 @@ export default function AdminBillingPage() {
     <div className="max-w-6xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Billing</h1>
-        <p className="text-sm text-zinc-400 mt-1">Setup charges, subscription payments, invoice history.</p>
+        <p className="text-sm text-muted-foreground mt-1">Setup charges, subscription payments, invoice history.</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -140,13 +140,13 @@ export default function AdminBillingPage() {
         />
       </div>
 
-      <form onSubmit={create} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 grid sm:grid-cols-2 gap-3">
+      <form onSubmit={create} className="bg-card border border-border rounded-2xl p-4 grid sm:grid-cols-2 gap-3">
         <h2 className="sm:col-span-2 font-semibold">Create invoice</h2>
         <select
           required
           value={form.businessId}
           onChange={(e) => setForm({ ...form, businessId: e.target.value })}
-          className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+          className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
         >
           <option value="">Select business</option>
           {businesses.map((b) => (
@@ -158,7 +158,7 @@ export default function AdminBillingPage() {
         <select
           value={form.kind}
           onChange={(e) => setForm({ ...form, kind: e.target.value })}
-          className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+          className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
         >
           <option value="setup">Setup charge</option>
           <option value="subscription">Subscription</option>
@@ -172,15 +172,15 @@ export default function AdminBillingPage() {
           placeholder="Amount"
           value={form.amount}
           onChange={(e) => setForm({ ...form, amount: e.target.value })}
-          className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+          className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
         />
         <input
           placeholder="Notes"
           value={form.notes}
           onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+          className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
         />
-        <button type="submit" className="sm:col-span-2 min-h-11 bg-white text-zinc-950 rounded-xl font-medium">
+        <button type="submit" className="sm:col-span-2 min-h-11 bg-primary text-primary-foreground rounded-xl font-medium">
           Create invoice
         </button>
       </form>

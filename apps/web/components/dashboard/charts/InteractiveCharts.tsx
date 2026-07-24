@@ -77,7 +77,7 @@ function ChartTooltip({
   const growth = tip.growth;
   return (
     <div
-      className="pointer-events-none absolute z-30 min-w-[180px] max-w-[260px] rounded-2xl border border-white/12 bg-zinc-950/98 px-3.5 py-3 shadow-2xl shadow-black/60 backdrop-blur-xl text-left ring-1 ring-white/5"
+      className="pointer-events-none absolute z-30 min-w-[180px] max-w-[260px] rounded-2xl border border-white/12 bg-background/98 px-3.5 py-3 shadow-2xl shadow-black/60 backdrop-blur-xl text-left ring-1 ring-white/5"
       style={{
         left: tip.x,
         top: tip.y,
@@ -90,33 +90,33 @@ function ChartTooltip({
           className="h-2.5 w-2.5 rounded-full shrink-0 ring-2 ring-white/15 shadow-[0_0_8px_currentColor]"
           style={{ background: tip.color, color: tip.color }}
         />
-        <span className="text-xs font-semibold text-white truncate tracking-tight">
+        <span className="text-xs font-semibold text-foreground truncate tracking-tight">
           {tip.point.name}
         </span>
       </div>
       <div className="space-y-1.5 text-[11px]">
         <div className="flex justify-between gap-6">
-          <span className="text-zinc-500">Count</span>
-          <span className="tabular-nums text-zinc-100 font-semibold">
+          <span className="text-muted-foreground">Count</span>
+          <span className="tabular-nums text-foreground font-semibold">
             {fmtNum(tip.point.count ?? tip.point.value)}
           </span>
         </div>
         <div className="flex justify-between gap-6">
-          <span className="text-zinc-500">Share</span>
+          <span className="text-muted-foreground">Share</span>
           <span className="tabular-nums text-sky-300 font-semibold">{tip.pct.toFixed(1)}%</span>
         </div>
         <div className="flex justify-between gap-6">
-          <span className="text-zinc-500">Revenue</span>
+          <span className="text-muted-foreground">Revenue</span>
           <span className="tabular-nums text-emerald-300 font-semibold">
             {fmtMoney(tip.point.revenue ?? 0, currency)}
           </span>
         </div>
         <div className="flex justify-between gap-6">
-          <span className="text-zinc-500">Growth</span>
+          <span className="text-muted-foreground">Growth</span>
           <span
             className={`tabular-nums font-semibold ${
               growth == null
-                ? "text-zinc-500"
+                ? "text-muted-foreground"
                 : growth >= 0
                   ? "text-emerald-400"
                   : "text-red-400"
@@ -128,7 +128,7 @@ function ChartTooltip({
           </span>
         </div>
       </div>
-      <div className="mt-2.5 text-[10px] text-zinc-600 font-medium tracking-wide">
+      <div className="mt-2.5 text-[10px] text-muted-foreground font-medium tracking-wide">
         Click to drill down
       </div>
     </div>
@@ -202,7 +202,7 @@ export function GlassCard({
     <article
       className={[
         "group/card relative overflow-hidden rounded-3xl border border-white/10",
-        "bg-gradient-to-br from-white/[0.07] via-zinc-900/65 to-zinc-950/85",
+        "bg-gradient-to-br from-white/[0.07] via-card/65 to-background/85",
         "backdrop-blur-xl shadow-xl shadow-black/25",
         "p-4 sm:p-5 transition-all duration-300 hover:border-white/18 hover:shadow-violet-950/25",
         "min-w-0 mm-card-hover",
@@ -216,9 +216,9 @@ export function GlassCard({
       <div className="pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-sky-500/8 blur-3xl" aria-hidden />
       <div className="relative flex items-start justify-between gap-2 mb-4">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-white tracking-tight">{title}</h3>
+          <h3 className="text-sm font-semibold text-foreground tracking-tight">{title}</h3>
           {subtitle && (
-            <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{subtitle}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{subtitle}</p>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -327,7 +327,7 @@ function ExportButtons({
       <button
         type="button"
         onClick={() => void exportPng()}
-        className="text-[10px] px-2 py-1 rounded-lg border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 focus-ring"
+        className="text-[10px] px-2 py-1 rounded-lg border border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 focus-ring"
         title="Export PNG"
       >
         PNG
@@ -335,7 +335,7 @@ function ExportButtons({
       <button
         type="button"
         onClick={exportPdf}
-        className="text-[10px] px-2 py-1 rounded-lg border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 focus-ring"
+        className="text-[10px] px-2 py-1 rounded-lg border border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 focus-ring"
         title="Export PDF"
       >
         PDF
@@ -347,7 +347,7 @@ function ExportButtons({
 export function EmptyChart({ label = "No Data Available" }: { label?: string }) {
   return (
     <div className="flex min-h-[180px] flex-col items-center justify-center text-center px-4 py-6">
-      <div className="mb-3 h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500/10 to-sky-500/5 border border-white/10 flex items-center justify-center text-zinc-500">
+      <div className="mb-3 h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500/10 to-sky-500/5 border border-white/10 flex items-center justify-center text-muted-foreground">
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
           <path
             strokeLinecap="round"
@@ -357,8 +357,8 @@ export function EmptyChart({ label = "No Data Available" }: { label?: string }) 
           />
         </svg>
       </div>
-      <p className="text-sm font-medium text-zinc-300">{label}</p>
-      <p className="text-[11px] text-zinc-600 mt-1 max-w-[200px]">
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      <p className="text-[11px] text-muted-foreground mt-1 max-w-[200px]">
         Add CRM activity to populate this chart
       </p>
     </div>
@@ -476,7 +476,7 @@ export function InteractiveAreaChart({
         {series.map((s, i) => (
           <span
             key={s.name + i}
-            className="text-[9px] sm:text-[10px] text-zinc-600 truncate max-w-[3.5rem] text-center flex-1"
+            className="text-[9px] sm:text-[10px] text-muted-foreground truncate max-w-[3.5rem] text-center flex-1"
             title={s.name}
           >
             {s.name}
@@ -536,7 +536,7 @@ export function InteractiveBarChart({
                   transformOrigin: "bottom",
                 }}
               />
-              <span className="w-full truncate text-center text-[10px] text-zinc-500 group-hover:text-zinc-300">
+              <span className="w-full truncate text-center text-[10px] text-muted-foreground group-hover:text-muted-foreground">
                 {s.name}
               </span>
             </button>
@@ -621,10 +621,10 @@ export function InteractiveDonutChart({
           ))}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-2xl font-bold tabular-nums text-white tracking-tight">
+          <span className="text-2xl font-bold tabular-nums text-foreground tracking-tight">
             {fmtNum(total)}
           </span>
-          <span className="text-[11px] text-zinc-500 font-medium mt-0.5">
+          <span className="text-[11px] text-muted-foreground font-medium mt-0.5">
             {centerLabel || "total"}
           </span>
         </div>
@@ -635,17 +635,17 @@ export function InteractiveDonutChart({
             <button
               type="button"
               onClick={() => onDrill?.(s)}
-              className="w-full flex items-center gap-2.5 text-xs text-zinc-400 hover:text-white transition-colors text-left py-1.5 px-1.5 rounded-lg hover:bg-white/[0.04]"
+              className="w-full flex items-center gap-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors text-left py-1.5 px-1.5 rounded-lg hover:bg-white/[0.04]"
             >
               <span
                 className="h-3 w-3 rounded-full shrink-0 ring-2 ring-white/10"
                 style={{ background: s.color }}
               />
               <span className="truncate flex-1 font-medium">{s.name}</span>
-              <span className="tabular-nums text-zinc-200 font-semibold">
+              <span className="tabular-nums text-foreground font-semibold">
                 {fmtNum(s.value)}
               </span>
-              <span className="tabular-nums text-zinc-500 w-12 text-right font-medium">
+              <span className="tabular-nums text-muted-foreground w-12 text-right font-medium">
                 {((s.value / total) * 100).toFixed(0)}%
               </span>
             </button>
@@ -694,7 +694,7 @@ export function InteractiveFunnelChart({
             onClick={() => onDrill?.(s)}
           >
             <div
-              className="h-9 sm:h-10 rounded-lg flex items-center justify-between px-3 text-xs font-medium text-white transition-all duration-500 group-hover:brightness-110"
+              className="h-9 sm:h-10 rounded-lg flex items-center justify-between px-3 text-xs font-medium text-foreground transition-all duration-500 group-hover:brightness-110"
               style={{
                 width: `${widthPct}%`,
                 background: `linear-gradient(90deg, ${color}, ${color}99)`,
@@ -751,12 +751,12 @@ export function InteractiveHorizontalBar({
             onClick={() => onDrill?.(s)}
           >
             <div className="flex justify-between text-[11px] mb-1 gap-2">
-              <span className="text-zinc-300 truncate font-medium">{s.name}</span>
-              <span className="tabular-nums text-zinc-400 shrink-0">
+              <span className="text-muted-foreground truncate font-medium">{s.name}</span>
+              <span className="tabular-nums text-muted-foreground shrink-0">
                 {valueIsMoney ? fmtMoney(s.value, currency) : fmtNum(s.value)}
               </span>
             </div>
-            <div className="h-2.5 rounded-full bg-zinc-800/80 overflow-hidden">
+            <div className="h-2.5 rounded-full bg-muted/80 overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-700 ease-out group-hover:brightness-125"
                 style={{

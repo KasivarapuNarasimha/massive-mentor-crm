@@ -62,7 +62,7 @@ export function ConfigDashboard() {
   }, [loadData, dataVersion]);
 
   const selectClass =
-    "bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-600";
+    "bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-border";
 
   const roleOptions =
     portal?.workspaceRoles?.length
@@ -76,8 +76,8 @@ export function ConfigDashboard() {
           <h2 className="text-xl font-semibold truncate">
             {portal?.portalLabel || dashLabel || "Dashboard"}
           </h2>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Role: <span className="text-zinc-300 font-mono">{viewRole}</span>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Role: <span className="text-muted-foreground font-mono">{viewRole}</span>
             {portal?.isWorkspacePreview ? " · preview" : ""} · business workspace only
           </p>
         </div>
@@ -85,7 +85,7 @@ export function ConfigDashboard() {
           {/* Role selector — controls entire portal (sidebar, dashboards, AI, permissions). Not a dashboard picker. */}
           {portal?.canSwitchWorkspace && (
             <div className="flex items-center gap-2">
-              <label htmlFor="overview-role" className="text-xs text-zinc-500 shrink-0">
+              <label htmlFor="overview-role" className="text-xs text-muted-foreground shrink-0">
                 Role
               </label>
               <select
@@ -119,7 +119,7 @@ export function ConfigDashboard() {
           <button
             type="button"
             onClick={loadData}
-            className="px-3 py-2 text-sm rounded-xl bg-white/10 border border-zinc-800 hover:bg-white/15"
+            className="px-3 py-2 text-sm rounded-xl bg-white/10 border border-border hover:bg-white/15"
           >
             Refresh
           </button>

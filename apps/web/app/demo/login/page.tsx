@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const INPUT_CLASS =
-  "portal-login-input w-full min-h-11 px-4 py-3 bg-zinc-950 border border-zinc-700 rounded-xl text-base sm:text-sm text-white placeholder:text-zinc-400";
+  "portal-login-input w-full min-h-11 px-4 py-3 bg-background border border-border rounded-xl text-base sm:text-sm text-foreground placeholder:text-muted-foreground";
 
 export default function DemoLoginPage() {
   const router = useRouter();
@@ -56,29 +56,29 @@ export default function DemoLoginPage() {
 
   if (hasSession) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-zinc-950">
-        <div className="text-zinc-400 text-sm">Opening demo workspace…</div>
+      <div className="min-h-dvh flex items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm">Opening demo workspace…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-zinc-950 px-4 py-10">
+    <div className="min-h-dvh flex items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex px-3 py-1 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30 text-xs font-medium mb-4">
             DEMO PORTAL
           </div>
-          <h1 className="text-2xl font-semibold text-white">Product demonstration</h1>
-          <p className="mt-2 text-zinc-400 text-sm">
+          <h1 className="text-2xl font-semibold text-foreground">Product demonstration</h1>
+          <p className="mt-2 text-muted-foreground text-sm">
             Uses sample data only. Never production customers. Resets periodically.
           </p>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+        <div className="bg-card border border-border rounded-2xl p-6">
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
-              <label htmlFor="demo-email" className="block text-sm text-zinc-300 mb-2">
+              <label htmlFor="demo-email" className="block text-sm text-muted-foreground mb-2">
                 Demo email
               </label>
               <input
@@ -93,7 +93,7 @@ export default function DemoLoginPage() {
               />
             </div>
             <div>
-              <label htmlFor="demo-password" className="block text-sm text-zinc-300 mb-2">
+              <label htmlFor="demo-password" className="block text-sm text-muted-foreground mb-2">
                 Password
               </label>
               <PasswordInput
@@ -109,13 +109,13 @@ export default function DemoLoginPage() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full min-h-12 bg-sky-500 text-zinc-950 font-semibold rounded-xl disabled:opacity-50 touch-manipulation"
+              className="w-full min-h-12 bg-sky-500 text-white font-semibold rounded-xl disabled:opacity-50 touch-manipulation"
             >
               {busy ? "Starting demo…" : "Launch demo CRM"}
             </button>
           </form>
-          <p className="text-xs text-zinc-500 mt-4 text-center">
-            <Link href="/demo" className="underline hover:text-zinc-300">
+          <p className="text-xs text-muted-foreground mt-4 text-center">
+            <Link href="/demo" className="underline hover:text-muted-foreground">
               Back
             </Link>
           </p>

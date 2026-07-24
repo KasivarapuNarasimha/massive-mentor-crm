@@ -72,7 +72,7 @@ const STATUS_STYLE: Record<string, string> = {
   pending: "bg-amber-500/15 text-amber-200 border-amber-500/30",
   approved: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   rejected: "bg-red-500/15 text-red-300 border-red-500/30",
-  cancelled: "bg-zinc-700/40 text-zinc-400 border-zinc-600",
+  cancelled: "bg-muted/40 text-muted-foreground border-border",
 };
 
 export default function ApprovalsPage() {
@@ -229,21 +229,21 @@ export default function ApprovalsPage() {
             <button
               type="button"
               onClick={() => setShowSubmit(true)}
-              className="min-h-11 px-4 rounded-xl bg-white text-zinc-950 text-sm font-medium"
+              className="min-h-11 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-medium"
             >
               New request
             </button>
             <button
               type="button"
               onClick={exportCsv}
-              className="min-h-11 px-4 rounded-xl bg-white/10 text-sm border border-zinc-700"
+              className="min-h-11 px-4 rounded-xl bg-white/10 text-sm border border-border"
             >
               Export CSV
             </button>
             <button
               type="button"
               onClick={exportPrint}
-              className="min-h-11 px-4 rounded-xl bg-white/10 text-sm border border-zinc-700"
+              className="min-h-11 px-4 rounded-xl bg-white/10 text-sm border border-border"
             >
               Export PDF
             </button>
@@ -257,14 +257,14 @@ export default function ApprovalsPage() {
             { label: "Pending", value: kpis.pending, tone: "text-amber-300" },
             { label: "Approved", value: kpis.approved, tone: "text-emerald-300" },
             { label: "Rejected", value: kpis.rejected, tone: "text-red-300" },
-            { label: "Cancelled", value: kpis.cancelled, tone: "text-zinc-400" },
-            { label: "Total", value: kpis.total, tone: "text-white" },
+            { label: "Cancelled", value: kpis.cancelled, tone: "text-muted-foreground" },
+            { label: "Total", value: kpis.total, tone: "text-foreground" },
           ].map((k) => (
             <div
               key={k.label}
-              className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"
+              className="rounded-2xl border border-border bg-card p-4"
             >
-              <div className="text-[10px] uppercase tracking-widest text-zinc-500">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
                 {k.label}
               </div>
               <div className={`text-2xl font-semibold tabular-nums mt-1 ${k.tone}`}>
@@ -291,8 +291,8 @@ export default function ApprovalsPage() {
             onClick={() => setTab(key)}
             className={`min-h-10 px-3 rounded-xl text-sm border ${
               tab === key
-                ? "bg-white text-zinc-950 border-white"
-                : "bg-zinc-900 text-zinc-300 border-zinc-800"
+                ? "bg-primary text-primary-foreground border-white"
+                : "bg-card text-muted-foreground border-border"
             }`}
           >
             {label}
@@ -305,7 +305,7 @@ export default function ApprovalsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm min-h-10"
+            className="bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
           >
             <option value="">All statuses</option>
             {["pending", "approved", "rejected", "cancelled"].map((s) => (
@@ -317,7 +317,7 @@ export default function ApprovalsPage() {
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm min-h-10"
+            className="bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
           >
             <option value="">All types</option>
             {TYPES.map((t) => (
@@ -330,34 +330,34 @@ export default function ApprovalsPage() {
       )}
 
       {loading ? (
-        <div className="h-40 rounded-2xl bg-zinc-900 animate-pulse" />
+        <div className="h-40 rounded-2xl bg-card animate-pulse" />
       ) : tab === "workflows" ? (
         <div className="space-y-3">
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             Default multi-level workflows are provisioned per business. Configure thresholds
-            via API <code className="text-zinc-300">PUT /api/approvals/workflows</code>.
+            via API <code className="text-muted-foreground">PUT /api/approvals/workflows</code>.
           </p>
           {workflows.map((w) => (
             <div
               key={w.id}
-              className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"
+              className="rounded-2xl border border-border bg-card p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <div className="font-medium text-white">{w.name}</div>
-                  <div className="text-xs text-zinc-500 mt-0.5">
+                  <div className="font-medium text-foreground">{w.name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
                     {w.type} · {w.enabled ? "enabled" : "disabled"} ·{" "}
                     {w._count?.requests ?? 0} requests
                   </div>
                   {w.description && (
-                    <p className="text-sm text-zinc-400 mt-2">{w.description}</p>
+                    <p className="text-sm text-muted-foreground mt-2">{w.description}</p>
                   )}
                 </div>
-                <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full border border-zinc-700 text-zinc-400">
+                <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full border border-border text-muted-foreground">
                   {w.steps?.length || 0} levels
                 </span>
               </div>
-              <ol className="mt-3 space-y-1 text-xs text-zinc-400">
+              <ol className="mt-3 space-y-1 text-xs text-muted-foreground">
                 {(w.steps || []).map((s) => (
                   <li key={s.id}>
                     Level {s.level}: {s.name || s.approverRole || "Approver"}
@@ -366,7 +366,7 @@ export default function ApprovalsPage() {
                 ))}
               </ol>
               {w.rules && (w.rules.minAmount != null || w.rules.autoApproveBelow != null) && (
-                <p className="text-xs text-zinc-500 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   Rules: min {w.rules.minAmount ?? "—"} · auto-approve below{" "}
                   {w.rules.autoApproveBelow ?? "—"}
                 </p>
@@ -375,24 +375,24 @@ export default function ApprovalsPage() {
           ))}
         </div>
       ) : tab === "report" ? (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 overflow-x-auto">
+        <div className="rounded-2xl border border-border bg-card p-4 overflow-x-auto">
           <table className="mm-table">
             <thead>
-              <tr className="text-left text-zinc-500 border-b border-zinc-800">
+              <tr className="text-left text-muted-foreground border-b border-border">
                 <th className="py-2 pr-3">Type</th>
                 <th className="py-2 pr-3">Count</th>
               </tr>
             </thead>
             <tbody>
               {(stats?.byType || []).map((t) => (
-                <tr key={t.type} className="border-b border-zinc-800/60">
-                  <td className="py-2 pr-3 text-white capitalize">{t.type}</td>
+                <tr key={t.type} className="border-b border-border/60">
+                  <td className="py-2 pr-3 text-foreground capitalize">{t.type}</td>
                   <td className="py-2 pr-3 tabular-nums">{t.count}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="text-xs text-zinc-500 mt-4">
+          <p className="text-xs text-muted-foreground mt-4">
             Use Export CSV / PDF for full request history with filters applied on the All
             tab.
           </p>
@@ -400,7 +400,7 @@ export default function ApprovalsPage() {
       ) : (
         <div className="space-y-3">
           {requests.length === 0 && (
-            <div className="text-sm text-zinc-500 py-12 text-center border border-dashed border-zinc-800 rounded-2xl">
+            <div className="text-sm text-muted-foreground py-12 text-center border border-dashed border-border rounded-2xl">
               No approval requests yet. Create an expense/invoice above threshold or submit a
               custom request.
             </div>
@@ -408,12 +408,12 @@ export default function ApprovalsPage() {
           {requests.map((r) => (
             <div
               key={r.id}
-              className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 space-y-3"
+              className="rounded-2xl border border-border bg-card p-4 space-y-3"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-white">{r.title}</span>
+                    <span className="text-sm font-semibold text-foreground">{r.title}</span>
                     <span
                       className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full border ${
                         STATUS_STYLE[r.status] || STATUS_STYLE.pending
@@ -421,14 +421,14 @@ export default function ApprovalsPage() {
                     >
                       {r.status}
                     </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400 capitalize">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full border border-border text-muted-foreground capitalize">
                       {r.type}
                     </span>
                   </div>
                   {r.description && (
-                    <p className="text-xs text-zinc-400 mt-1">{r.description}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{r.description}</p>
                   )}
-                  <div className="text-[11px] text-zinc-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                  <div className="text-[11px] text-muted-foreground mt-2 flex flex-wrap gap-x-3 gap-y-1">
                     <span>
                       By {r.requestedBy?.name || r.requestedBy?.email || "—"}
                     </span>
@@ -446,12 +446,12 @@ export default function ApprovalsPage() {
               </div>
 
               {r.actions && r.actions.length > 0 && (
-                <div className="text-[11px] text-zinc-500 border-t border-zinc-800 pt-2 space-y-0.5">
+                <div className="text-[11px] text-muted-foreground border-t border-border pt-2 space-y-0.5">
                   {r.actions.map((a) => (
                     <div key={a.id}>
                       L{a.level} · {a.action} · {a.actor?.name || a.actor?.email}
                       {a.comment ? ` — ${a.comment}` : ""}
-                      <span className="text-zinc-600">
+                      <span className="text-muted-foreground">
                         {" "}
                         · {new Date(a.createdAt).toLocaleString()}
                       </span>
@@ -468,14 +468,14 @@ export default function ApprovalsPage() {
                       setComment((c) => ({ ...c, [r.id]: e.target.value }))
                     }
                     placeholder="Comment (optional)"
-                    className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm min-h-10"
+                    className="flex-1 bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
                   />
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       disabled={busyId === r.id}
                       onClick={() => void act(r.id, "approve")}
-                      className="min-h-10 px-3 rounded-xl text-xs font-semibold bg-emerald-500 text-zinc-950 disabled:opacity-50"
+                      className="min-h-10 px-3 rounded-xl text-xs font-semibold bg-emerald-500 text-white disabled:opacity-50"
                     >
                       Approve
                     </button>
@@ -491,7 +491,7 @@ export default function ApprovalsPage() {
                       type="button"
                       disabled={busyId === r.id}
                       onClick={() => void act(r.id, "cancel")}
-                      className="min-h-10 px-3 rounded-xl text-xs font-medium bg-white/10 border border-zinc-700 disabled:opacity-50"
+                      className="min-h-10 px-3 rounded-xl text-xs font-medium bg-white/10 border border-border disabled:opacity-50"
                       title="Requester or admin can cancel (enforced by API)"
                     >
                       Cancel
@@ -514,13 +514,13 @@ export default function ApprovalsPage() {
           />
           <form
             onSubmit={submit}
-            className="relative z-10 w-full sm:max-w-md bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl p-5 space-y-3"
+            className="relative z-10 w-full sm:max-w-md bg-card border border-border rounded-t-2xl sm:rounded-2xl p-5 space-y-3"
           >
             <h3 className="font-semibold text-lg">New approval request</h3>
             <select
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value })}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11"
+              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11"
             >
               {TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -533,20 +533,20 @@ export default function ApprovalsPage() {
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               placeholder="Title *"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11"
+              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11"
             />
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Description"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm h-20"
+              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm h-20"
             />
             <input
               type="number"
               value={form.amount}
               onChange={(e) => setForm({ ...form, amount: e.target.value })}
               placeholder="Amount (optional)"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11"
+              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11"
             />
             <div className="flex gap-2 pt-1">
               <button
@@ -558,7 +558,7 @@ export default function ApprovalsPage() {
               </button>
               <button
                 type="submit"
-                className="flex-1 min-h-11 rounded-xl bg-white text-zinc-950 font-medium"
+                className="flex-1 min-h-11 rounded-xl bg-primary text-primary-foreground font-medium"
               >
                 Submit
               </button>

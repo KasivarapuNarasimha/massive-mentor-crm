@@ -13,6 +13,8 @@ export interface User {
   role?: string;
   platformRole?: string;
   businessId?: string;
+  /** light | dark | system */
+  themePreference?: string;
 }
 
 export interface AuthResponse {

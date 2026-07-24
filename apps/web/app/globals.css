@@ -2,73 +2,192 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════
-   Massive Mentor Design System — enterprise dark SaaS
+   Massive Mentor Design System — semantic theme tokens
+   Light / Dark driven by next-themes (class on <html>)
    ═══════════════════════════════════════════════════════════ */
 
+/* ── Light theme (default / :root) ── */
 :root {
+  color-scheme: light;
+
   /* Canvas */
-  --mm-bg: #09090b;
-  --mm-bg-elevated: #0c0c0f;
-  --mm-surface: rgba(24, 24, 27, 0.72);
-  --mm-surface-solid: #18181b;
-  --mm-surface-hover: rgba(39, 39, 42, 0.55);
+  --background: #ffffff;
+  --background-secondary: #f8fafc;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #111827;
 
-  /* Text */
-  --mm-fg: #fafafa;
-  --mm-fg-muted: #a1a1aa;
-  --mm-fg-subtle: #71717a;
-  --mm-fg-faint: #52525b;
+  /* Brand */
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #111827;
+  --muted: #f1f5f9;
+  --muted-foreground: #6b7280;
+  --accent: #f5f3ff;
+  --accent-foreground: #5b21b6;
 
-  /* Borders & focus */
-  --mm-border: rgba(63, 63, 70, 0.85);
-  --mm-border-soft: rgba(255, 255, 255, 0.06);
-  --mm-ring: rgba(167, 139, 250, 0.45);
+  /* Semantic status */
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #111827;
 
-  /* Brand accents */
-  --mm-violet: #8b5cf6;
-  --mm-violet-soft: rgba(139, 92, 246, 0.15);
+  /* Borders / inputs / focus */
+  --border: #e5e7eb;
+  --input: #ffffff;
+  --input-border: #d1d5db;
+  --ring: #7c3aed;
+
+  /* MM legacy aliases → semantic */
+  --mm-bg: var(--background);
+  --mm-bg-elevated: var(--background-secondary);
+  --mm-surface: color-mix(in srgb, var(--card) 92%, transparent);
+  --mm-surface-solid: var(--card);
+  --mm-surface-hover: color-mix(in srgb, var(--muted) 80%, transparent);
+  --mm-fg: var(--foreground);
+  --mm-fg-muted: var(--muted-foreground);
+  --mm-fg-subtle: #9ca3af;
+  --mm-fg-faint: #9ca3af;
+  --mm-border: var(--border);
+  --mm-border-soft: color-mix(in srgb, var(--border) 70%, transparent);
+  --mm-ring: color-mix(in srgb, var(--ring) 45%, transparent);
+  --mm-violet: var(--primary);
+  --mm-violet-soft: color-mix(in srgb, var(--primary) 15%, transparent);
   --mm-sky: #38bdf8;
-  --mm-emerald: #34d399;
-  --mm-amber: #fbbf24;
+  --mm-emerald: var(--success);
+  --mm-amber: var(--warning);
   --mm-rose: #fb7185;
 
-  /* Radius scale */
+  /* Radius */
   --mm-radius-sm: 0.5rem;
   --mm-radius: 0.75rem;
   --mm-radius-lg: 1rem;
   --mm-radius-xl: 1.25rem;
   --mm-radius-2xl: 1.5rem;
 
-  /* Shadows */
-  --mm-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --mm-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
-  --mm-shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.45);
-  --mm-shadow-glow: 0 0 40px rgba(139, 92, 246, 0.12);
+  /* Shadows (light) */
+  --mm-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --mm-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+  --mm-shadow-lg: 0 20px 50px rgba(15, 23, 42, 0.12);
+  --mm-shadow-glow: 0 0 40px color-mix(in srgb, var(--primary) 12%, transparent);
 
   /* Motion */
   --mm-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --mm-duration: 200ms;
 
-  /* Legacy tokens (compat) */
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #18181b;
-  --card-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #0a0a0a;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #a78bfa;
+  /* Scrollbar */
+  --mm-scrollbar: #d1d5db;
+  --mm-scrollbar-hover: #9ca3af;
 }
 
-/* App shell is dark (zinc-950). Always use dark canvas so light OS theme
-   never shows a white void under short dashboard pages. */
+/* ── Dark theme ── */
+.dark {
+  color-scheme: dark;
+
+  --background: #09090b;
+  --background-secondary: #111827;
+  --foreground: #ffffff;
+  --card: #1f2937;
+  --card-foreground: #ffffff;
+  --popover: #1f2937;
+  --popover-foreground: #ffffff;
+  --sidebar: #18181b;
+  --sidebar-foreground: #ffffff;
+
+  --primary: #8b5cf6;
+  --primary-hover: #7c3aed;
+  --primary-foreground: #ffffff;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #9ca3af;
+  --accent: rgba(139, 92, 246, 0.15);
+  --accent-foreground: #e9d5ff;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #111827;
+
+  --border: #374151;
+  --input: #111827;
+  --input-border: #374151;
+  --ring: #a78bfa;
+
+  --mm-bg: var(--background);
+  --mm-bg-elevated: var(--background-secondary);
+  --mm-surface: color-mix(in srgb, var(--sidebar) 72%, transparent);
+  --mm-surface-solid: var(--sidebar);
+  --mm-surface-hover: color-mix(in srgb, var(--muted) 55%, transparent);
+  --mm-fg: var(--foreground);
+  --mm-fg-muted: var(--muted-foreground);
+  --mm-fg-subtle: #71717a;
+  --mm-fg-faint: #52525b;
+  --mm-border: color-mix(in srgb, var(--border) 85%, transparent);
+  --mm-border-soft: rgba(255, 255, 255, 0.06);
+  --mm-ring: color-mix(in srgb, var(--ring) 45%, transparent);
+  --mm-violet: var(--primary);
+  --mm-violet-soft: color-mix(in srgb, var(--primary) 15%, transparent);
+  --mm-sky: #38bdf8;
+  --mm-emerald: var(--success);
+  --mm-amber: var(--warning);
+  --mm-rose: #fb7185;
+
+  --mm-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --mm-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --mm-shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.45);
+  --mm-shadow-glow: 0 0 40px color-mix(in srgb, var(--primary) 12%, transparent);
+
+  --mm-scrollbar: #3f3f46;
+  --mm-scrollbar-hover: #52525b;
+}
+
+/* Tailwind v4 theme — semantic utilities: bg-background, text-foreground, etc. */
+@theme inline {
+  --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-border: var(--input-border);
+  --color-ring: var(--ring);
+}
+
 html,
 body {
-  color: var(--mm-fg);
-  background-color: var(--mm-bg);
+  color: var(--foreground);
+  background-color: var(--background);
   font-feature-settings: "ss01" on, "cv11" on;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -82,30 +201,30 @@ body {
 
 /* Selection */
 ::selection {
-  background: rgba(139, 92, 246, 0.35);
-  color: #fff;
+  background: color-mix(in srgb, var(--primary) 35%, transparent);
+  color: var(--foreground);
 }
 
-/* Scrollbars (WebKit) */
+/* Scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3f3f46 transparent;
+  scrollbar-color: var(--mm-scrollbar) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: var(--mm-scrollbar);
   border-radius: 999px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: var(--mm-scrollbar-hover);
 }
 
 /* Accessibility & Micro-interactions */
 .focus-ring {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 transition-colors;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors;
 }
 
 .button-active {
@@ -188,49 +307,53 @@ body {
 
 /* ── Portal login fields ── */
 .portal-login-input {
-  color: #fafafa !important;
-  background-color: #09090b !important;
-  caret-color: #fafafa;
-  -webkit-text-fill-color: #fafafa;
+  color: var(--foreground) !important;
+  background-color: var(--input) !important;
+  caret-color: var(--foreground);
+  -webkit-text-fill-color: var(--foreground);
+  border-color: var(--input-border) !important;
 }
 .portal-login-input::placeholder {
-  color: #a1a1aa !important;
+  color: var(--muted-foreground) !important;
   opacity: 1;
-  -webkit-text-fill-color: #a1a1aa;
+  -webkit-text-fill-color: var(--muted-foreground);
 }
 .portal-login-input:-webkit-autofill,
 .portal-login-input:-webkit-autofill:hover,
 .portal-login-input:-webkit-autofill:focus,
 .portal-login-input:-webkit-autofill:active {
-  -webkit-text-fill-color: #fafafa !important;
-  caret-color: #fafafa;
-  box-shadow: 0 0 0 1000px #09090b inset !important;
-  -webkit-box-shadow: 0 0 0 1000px #09090b inset !important;
+  -webkit-text-fill-color: var(--foreground) !important;
+  caret-color: var(--foreground);
+  box-shadow: 0 0 0 1000px var(--input) inset !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--input) inset !important;
   transition: background-color 99999s ease-in-out 0s;
-  border-color: #3f3f46 !important;
+  border-color: var(--input-border) !important;
 }
 .portal-login-input:focus {
   outline: none;
-  border-color: #a78bfa !important;
-  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2);
+  border-color: var(--ring) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 20%, transparent);
 }
 
-/* Sonner toasts */
+/* Sonner toasts — theme-aware via CSS vars */
 [data-sonner-toast] {
   border-radius: 14px !important;
   font-size: 14px;
   padding: 12px 16px;
   box-shadow: var(--mm-shadow) !important;
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--foreground) !important;
 }
 [data-sonner-toast][data-type="error"] {
-  background: #450a0a !important;
-  border-color: #7f1d1d !important;
-  color: #f87171 !important;
+  background: color-mix(in srgb, var(--destructive) 12%, var(--card)) !important;
+  border-color: color-mix(in srgb, var(--destructive) 40%, var(--border)) !important;
+  color: var(--destructive) !important;
 }
 [data-sonner-toast][data-type="success"] {
-  background: #052e16 !important;
-  border-color: #166534 !important;
-  color: #34d399 !important;
+  background: color-mix(in srgb, var(--success) 12%, var(--card)) !important;
+  border-color: color-mix(in srgb, var(--success) 40%, var(--border)) !important;
+  color: var(--success) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -271,7 +394,7 @@ body {
     text-shadow: 0 0 0 transparent;
   }
   50% {
-    text-shadow: 0 0 12px rgba(167, 139, 250, 0.35);
+    text-shadow: 0 0 12px color-mix(in srgb, var(--primary) 35%, transparent);
   }
 }
 @keyframes mm-success-pop {
@@ -349,7 +472,7 @@ body {
 .mm-card-hover:hover {
   transform: translateY(-3px);
   box-shadow: var(--mm-shadow), var(--mm-shadow-glow);
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: color-mix(in srgb, var(--border) 80%, var(--foreground));
 }
 .mm-toggle-thumb {
   transition:
@@ -357,7 +480,6 @@ body {
     background 0.2s ease;
 }
 
-/* Stagger children for lists */
 .mm-stagger > * {
   animation: mm-fade-up 0.4s var(--mm-ease) both;
 }
@@ -413,9 +535,9 @@ body {
   border: 1px solid var(--mm-border-soft);
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.06) 0%,
-    rgba(24, 24, 27, 0.72) 40%,
-    rgba(9, 9, 11, 0.9) 100%
+    color-mix(in srgb, var(--foreground) 4%, var(--card)) 0%,
+    var(--card) 45%,
+    var(--background) 100%
   );
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -430,7 +552,7 @@ body {
   border-radius: inherit;
   background: radial-gradient(
     600px circle at var(--mx, 80%) var(--my, 0%),
-    rgba(139, 92, 246, 0.08),
+    color-mix(in srgb, var(--primary) 8%, transparent),
     transparent 40%
   );
   opacity: 0.9;
@@ -438,8 +560,8 @@ body {
 
 .mm-panel {
   border-radius: var(--mm-radius-xl);
-  border: 1px solid rgba(39, 39, 42, 0.9);
-  background: rgba(24, 24, 27, 0.65);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 90%, transparent);
   box-shadow: var(--mm-shadow-sm);
 }
 
@@ -447,7 +569,7 @@ body {
   font-size: 1.125rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: #fff;
+  color: var(--foreground);
 }
 
 .mm-section-label {
@@ -455,7 +577,7 @@ body {
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(167, 139, 250, 0.85);
+  color: color-mix(in srgb, var(--primary) 85%, var(--muted-foreground));
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -466,9 +588,9 @@ body {
   width: 100%;
   min-height: 2.75rem;
   border-radius: var(--mm-radius);
-  border: 1px solid rgba(63, 63, 70, 0.9);
-  background: #09090b;
-  color: #fafafa;
+  border: 1px solid var(--input-border);
+  background: var(--input);
+  color: var(--foreground);
   font-size: 0.875rem;
   padding: 0.625rem 0.875rem;
   transition:
@@ -477,43 +599,42 @@ body {
     background 0.15s ease;
 }
 .mm-input::placeholder {
-  color: #71717a;
+  color: var(--muted-foreground);
 }
 .mm-input:hover:not(:disabled) {
-  border-color: #52525b;
+  border-color: color-mix(in srgb, var(--input-border) 60%, var(--foreground));
 }
 .mm-input:focus {
   outline: none;
-  border-color: rgba(167, 139, 250, 0.65);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+  border-color: color-mix(in srgb, var(--ring) 65%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
 }
 .mm-input:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 .mm-input[aria-invalid="true"] {
-  border-color: rgba(248, 113, 113, 0.7);
-  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.12);
+  border-color: color-mix(in srgb, var(--destructive) 70%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--destructive) 12%, transparent);
 }
 .mm-label {
   display: block;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #d4d4d8;
+  color: var(--foreground);
   margin-bottom: 0.375rem;
 }
 .mm-field-error {
   margin-top: 0.375rem;
   font-size: 0.75rem;
-  color: #f87171;
+  color: var(--destructive);
 }
 .mm-field-hint {
   margin-top: 0.25rem;
   font-size: 0.75rem;
-  color: #71717a;
+  color: var(--muted-foreground);
 }
 
-/* Global form polish for CRM pages using common patterns */
 .adaptive-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .adaptive-form select,
 .adaptive-form textarea {
@@ -525,8 +646,8 @@ body {
 .adaptive-form input:focus,
 .adaptive-form select:focus,
 .adaptive-form textarea:focus {
-  border-color: rgba(167, 139, 250, 0.65) !important;
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15) !important;
+  border-color: color-mix(in srgb, var(--ring) 65%, transparent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent) !important;
   outline: none !important;
 }
 
@@ -562,40 +683,40 @@ body {
   transform: scale(0.985);
 }
 .mm-btn-primary {
-  background: #fff;
-  color: #09090b;
+  background: var(--primary);
+  color: var(--primary-foreground);
   border: 1px solid transparent;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--primary-foreground) 15%, transparent) inset;
 }
 .mm-btn-primary:hover:not(:disabled) {
-  background: #f4f4f5;
-  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.08);
+  background: var(--primary-hover);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 .mm-btn-secondary {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fafafa;
-  border: 1px solid rgba(63, 63, 70, 0.9);
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
 }
 .mm-btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: #52525b;
+  background: color-mix(in srgb, var(--secondary) 80%, var(--muted-foreground));
+  border-color: color-mix(in srgb, var(--border) 70%, var(--foreground));
 }
 .mm-btn-ghost {
   background: transparent;
-  color: #a1a1aa;
+  color: var(--muted-foreground);
   border: 1px solid transparent;
 }
 .mm-btn-ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  background: var(--muted);
+  color: var(--foreground);
 }
 .mm-btn-danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: #f87171;
-  border: 1px solid rgba(127, 29, 29, 0.5);
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  color: var(--destructive);
+  border: 1px solid color-mix(in srgb, var(--destructive) 35%, transparent);
 }
 .mm-btn-danger:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.18);
+  background: color-mix(in srgb, var(--destructive) 18%, transparent);
 }
 .mm-btn-loading {
   position: relative;
@@ -611,13 +732,11 @@ body {
   border-right-color: transparent;
   border-radius: 50%;
   animation: mm-spin 0.6s linear infinite;
-  color: inherit;
-  /* reinstate visible spinner color via border */
-  border-color: rgba(255, 255, 255, 0.35);
+  border-color: color-mix(in srgb, var(--foreground) 35%, transparent);
   border-right-color: transparent;
 }
 .mm-btn-primary.mm-btn-loading::after {
-  border-color: rgba(0, 0, 0, 0.25);
+  border-color: color-mix(in srgb, var(--primary-foreground) 45%, transparent);
   border-right-color: transparent;
 }
 @keyframes mm-spin {
@@ -635,8 +754,8 @@ body {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   border-radius: var(--mm-radius-xl);
-  border: 1px solid rgba(39, 39, 42, 0.95);
-  background: rgba(24, 24, 27, 0.45);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 80%, transparent);
 }
 
 .mm-table {
@@ -650,11 +769,11 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(24, 24, 27, 0.95);
+  background: color-mix(in srgb, var(--card) 95%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(63, 63, 70, 0.8);
-  color: #a1a1aa;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted-foreground);
   font-weight: 600;
   font-size: 0.75rem;
   letter-spacing: 0.04em;
@@ -666,8 +785,8 @@ body {
 
 .mm-table tbody td {
   padding: 0.875rem 1rem;
-  border-bottom: 1px solid rgba(39, 39, 42, 0.85);
-  color: #d4d4d8;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
   vertical-align: middle;
 }
 
@@ -676,15 +795,15 @@ body {
 }
 
 .mm-table tbody tr:nth-child(even) {
-  background: rgba(255, 255, 255, 0.015);
+  background: color-mix(in srgb, var(--foreground) 2%, transparent);
 }
 
 .mm-table tbody tr:hover {
-  background: rgba(139, 92, 246, 0.06);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
 }
 
 .mm-table tbody tr[data-selected="true"] {
-  background: rgba(139, 92, 246, 0.1);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -704,21 +823,21 @@ body {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 1rem;
-  border: 1px solid rgba(63, 63, 70, 0.8);
-  background: rgba(9, 9, 11, 0.6);
+  border: 1px solid var(--border);
+  background: var(--background-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #52525b;
+  color: var(--muted-foreground);
   margin-bottom: 0.5rem;
 }
 
 .mm-skeleton {
   background: linear-gradient(
     90deg,
-    #27272a 0%,
-    #3f3f46 50%,
-    #27272a 100%
+    var(--muted) 0%,
+    color-mix(in srgb, var(--muted) 60%, var(--border)) 50%,
+    var(--muted) 100%
   );
   background-size: 200% 100%;
   animation: mm-shimmer 1.4s ease-in-out infinite;
@@ -737,25 +856,25 @@ body {
   padding: 0.55rem 0.75rem;
   border-radius: 0.75rem;
   font-size: 0.875rem;
-  color: #a1a1aa;
+  color: var(--muted-foreground);
   transition:
     background 0.15s ease,
     color 0.15s ease,
     transform 0.15s ease;
 }
 .mm-nav-link:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  background: var(--muted);
+  color: var(--foreground);
 }
 .mm-nav-link[aria-current="page"] {
   background: linear-gradient(
     90deg,
-    rgba(139, 92, 246, 0.18),
-    rgba(139, 92, 246, 0.06)
+    color-mix(in srgb, var(--primary) 18%, transparent),
+    color-mix(in srgb, var(--primary) 6%, transparent)
   );
-  color: #fff;
+  color: var(--foreground);
   font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 .mm-nav-link[aria-current="page"]::before {
   content: "";
@@ -765,7 +884,7 @@ body {
   bottom: 20%;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: linear-gradient(180deg, #a78bfa, #38bdf8);
+  background: linear-gradient(180deg, var(--primary), var(--mm-sky));
   animation: mm-nav-indicator 0.25s var(--mm-ease) both;
 }
 .mm-nav-link .mm-nav-icon {
@@ -775,7 +894,7 @@ body {
   width: 1.75rem;
   height: 1.75rem;
   border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--foreground) 4%, transparent);
   color: inherit;
   transition:
     background 0.15s ease,
@@ -784,7 +903,7 @@ body {
 }
 .mm-nav-link:hover .mm-nav-icon,
 .mm-nav-link[aria-current="page"] .mm-nav-icon {
-  background: rgba(139, 92, 246, 0.2);
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
   transform: scale(1.05);
 }
 
@@ -808,18 +927,17 @@ body {
   height: 18rem;
   top: -4rem;
   right: -3rem;
-  background: rgba(139, 92, 246, 0.35);
+  background: color-mix(in srgb, var(--primary) 35%, transparent);
 }
 .mm-hero-mesh::after {
   width: 14rem;
   height: 14rem;
   bottom: -3rem;
   left: -2rem;
-  background: rgba(56, 189, 248, 0.22);
+  background: color-mix(in srgb, var(--mm-sky) 22%, transparent);
   animation-delay: -4s;
 }
 
-/* Main content subtle page transition wrapper */
 main .mm-page-enter {
   will-change: opacity, transform;
 }

@@ -156,7 +156,7 @@ export default function SecurityPage() {
           description="Only Business Admins can view the organization security dashboard."
           eyebrow="Access control"
         />
-        <div className="mm-panel p-6 text-sm text-zinc-400">
+        <div className="mm-panel p-6 text-sm text-muted-foreground">
           Ask your Business Admin for access, or review your own sessions after we expand personal
           security settings.
         </div>
@@ -213,12 +213,12 @@ export default function SecurityPage() {
             key={k.label}
             className={`rounded-2xl border bg-gradient-to-br ${k.tone} to-transparent p-4`}
           >
-            <div className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
               {k.label}
             </div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums text-white">{k.value}</div>
+            <div className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{k.value}</div>
             {k.label === "Session limit" && policy?.plan && (
-              <div className="text-[11px] text-zinc-500 mt-1 capitalize">Plan: {policy.plan}</div>
+              <div className="text-[11px] text-muted-foreground mt-1 capitalize">Plan: {policy.plan}</div>
             )}
           </div>
         ))}
@@ -226,7 +226,7 @@ export default function SecurityPage() {
 
       {/* Active sessions */}
       <section className="mm-panel p-4 sm:p-5 mb-6">
-        <h2 className="text-sm font-semibold text-white mb-3">Active sessions</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-3">Active sessions</h2>
         <div className="mm-table-wrap">
           <table className="mm-table min-w-[800px]">
             <thead>
@@ -242,7 +242,7 @@ export default function SecurityPage() {
             <tbody>
               {sessions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center text-zinc-500 py-8">
+                  <td colSpan={6} className="text-center text-muted-foreground py-8">
                     No active sessions
                   </td>
                 </tr>
@@ -250,24 +250,24 @@ export default function SecurityPage() {
                 sessions.map((s) => (
                   <tr key={s.id} data-selected={s.id === currentSessionId ? "true" : undefined}>
                     <td>
-                      <div className="font-medium text-white">{s.userName || "—"}</div>
-                      <div className="text-xs text-zinc-500">{s.userEmail}</div>
+                      <div className="font-medium text-foreground">{s.userName || "—"}</div>
+                      <div className="text-xs text-muted-foreground">{s.userEmail}</div>
                       {s.id === currentSessionId && (
                         <span className="text-[10px] text-emerald-400 font-semibold">Current</span>
                       )}
                     </td>
                     <td>
-                      <div className="text-zinc-200">{s.deviceName || "—"}</div>
-                      <div className="text-xs text-zinc-500">
+                      <div className="text-foreground">{s.deviceName || "—"}</div>
+                      <div className="text-xs text-muted-foreground">
                         {s.browser} · {s.os}
                       </div>
                     </td>
                     <td>
-                      <div className="tabular-nums text-zinc-300">{s.ipAddress || "—"}</div>
-                      <div className="text-xs text-zinc-500">{s.locationLabel || "—"}</div>
+                      <div className="tabular-nums text-muted-foreground">{s.ipAddress || "—"}</div>
+                      <div className="text-xs text-muted-foreground">{s.locationLabel || "—"}</div>
                     </td>
-                    <td className="text-xs text-zinc-400">{fmt(s.loginTime)}</td>
-                    <td className="text-xs text-zinc-400">{fmt(s.lastActivity)}</td>
+                    <td className="text-xs text-muted-foreground">{fmt(s.loginTime)}</td>
+                    <td className="text-xs text-muted-foreground">{fmt(s.lastActivity)}</td>
                     <td className="text-right">
                       <button
                         type="button"
@@ -289,21 +289,21 @@ export default function SecurityPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Devices */}
         <section className="mm-panel p-4 sm:p-5">
-          <h2 className="text-sm font-semibold text-white mb-3">Devices</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-3">Devices</h2>
           {devices.length === 0 ? (
-            <p className="text-sm text-zinc-500">No devices online</p>
+            <p className="text-sm text-muted-foreground">No devices online</p>
           ) : (
             <ul className="space-y-2">
               {devices.map((d, i) => (
                 <li
                   key={i}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/50 px-3 py-2.5"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background/50 px-3 py-2.5"
                 >
                   <div>
-                    <div className="text-sm text-white font-medium">
+                    <div className="text-sm text-foreground font-medium">
                       {d.browser} on {d.os}
                     </div>
-                    <div className="text-[11px] text-zinc-500">
+                    <div className="text-[11px] text-muted-foreground">
                       {d.activeSessions} session(s) · {d.userCount} user(s) · last {fmt(d.lastSeen)}
                     </div>
                   </div>
@@ -315,7 +315,7 @@ export default function SecurityPage() {
 
         {/* Password / MFA snapshot */}
         <section className="mm-panel p-4 sm:p-5">
-          <h2 className="text-sm font-semibold text-white mb-3">User security snapshot</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-3">User security snapshot</h2>
           <div className="mm-table-wrap max-h-72 overflow-y-auto">
             <table className="mm-table min-w-full">
               <thead>
@@ -330,16 +330,16 @@ export default function SecurityPage() {
                 {users.map((u) => (
                   <tr key={u.id}>
                     <td>
-                      <div className="text-sm text-white">{u.name || "—"}</div>
-                      <div className="text-xs text-zinc-500">{u.email}</div>
+                      <div className="text-sm text-foreground">{u.name || "—"}</div>
+                      <div className="text-xs text-muted-foreground">{u.email}</div>
                     </td>
-                    <td className="text-xs text-zinc-400">{fmt(u.lastLoginAt)}</td>
-                    <td className="text-xs text-zinc-400">{fmt(u.passwordChangedAt)}</td>
+                    <td className="text-xs text-muted-foreground">{fmt(u.lastLoginAt)}</td>
+                    <td className="text-xs text-muted-foreground">{fmt(u.passwordChangedAt)}</td>
                     <td className="text-xs">
                       {u.mfaEnabled ? (
                         <span className="text-emerald-400">On</span>
                       ) : (
-                        <span className="text-zinc-500">Off</span>
+                        <span className="text-muted-foreground">Off</span>
                       )}
                     </td>
                   </tr>
@@ -347,7 +347,7 @@ export default function SecurityPage() {
               </tbody>
             </table>
           </div>
-          <p className="mt-3 text-[11px] text-zinc-600">
+          <p className="mt-3 text-[11px] text-muted-foreground">
             MFA/2FA is architected (flags reserved) and can be enabled later without redesigning
             sessions.
           </p>
@@ -356,7 +356,7 @@ export default function SecurityPage() {
 
       {/* Login history */}
       <section className="mm-panel p-4 sm:p-5">
-        <h2 className="text-sm font-semibold text-white mb-3">Login history</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-3">Login history</h2>
         <div className="mm-table-wrap">
           <table className="mm-table min-w-[720px]">
             <thead>
@@ -371,14 +371,14 @@ export default function SecurityPage() {
             <tbody>
               {history.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center text-zinc-500 py-8">
+                  <td colSpan={5} className="text-center text-muted-foreground py-8">
                     No history yet
                   </td>
                 </tr>
               ) : (
                 history.map((h) => (
                   <tr key={h.id}>
-                    <td className="text-xs text-zinc-400 whitespace-nowrap">{fmt(h.createdAt)}</td>
+                    <td className="text-xs text-muted-foreground whitespace-nowrap">{fmt(h.createdAt)}</td>
                     <td>
                       <span
                         className={`text-xs font-medium ${
@@ -386,18 +386,18 @@ export default function SecurityPage() {
                             ? "text-rose-400"
                             : h.eventType === "force_logout"
                               ? "text-amber-400"
-                              : "text-zinc-200"
+                              : "text-foreground"
                         }`}
                       >
                         {eventLabel(h.eventType)}
                       </span>
                     </td>
                     <td className="text-xs">
-                      <div className="text-zinc-200">{h.userName || "—"}</div>
-                      <div className="text-zinc-500">{h.userEmail}</div>
+                      <div className="text-foreground">{h.userName || "—"}</div>
+                      <div className="text-muted-foreground">{h.userEmail}</div>
                     </td>
-                    <td className="text-xs text-zinc-400">{h.deviceName || "—"}</td>
-                    <td className="text-xs text-zinc-400">
+                    <td className="text-xs text-muted-foreground">{h.deviceName || "—"}</td>
+                    <td className="text-xs text-muted-foreground">
                       {h.ipAddress || "—"}
                       {h.locationLabel ? ` · ${h.locationLabel}` : ""}
                     </td>

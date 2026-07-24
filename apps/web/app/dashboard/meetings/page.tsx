@@ -145,12 +145,12 @@ export default function MeetingsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold">Meetings</h1>
-          <p className="text-zinc-400 text-sm sm:text-base mt-1">Schedule and log meetings with contacts.</p>
+          <p className="text-muted-foreground text-sm sm:text-base mt-1">Schedule and log meetings with contacts.</p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-white text-zinc-950 rounded-xl font-medium touch-manipulation"
+          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium touch-manipulation"
         >
           + Schedule Meeting
         </button>
@@ -159,19 +159,19 @@ export default function MeetingsPage() {
       <ExportFiltersBar module="meetings" token={token} className="mb-4" />
 
       {isLoading ? (
-        <div className="h-40 bg-zinc-900 rounded-2xl animate-pulse" />
+        <div className="h-40 bg-card rounded-2xl animate-pulse" />
       ) : meetings.length === 0 ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-12 text-center">No meetings scheduled yet.</div>
+        <div className="bg-card border border-border rounded-2xl p-12 text-center">No meetings scheduled yet.</div>
       ) : (
         <div className="space-y-3">
           {meetings.map((m) => (
             <div
               key={m.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start"
+              className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start"
             >
               <div className="min-w-0">
-                <div className="font-medium text-white">{m.title}</div>
-                <div className="text-sm text-zinc-400 mt-0.5">
+                <div className="font-medium text-foreground">{m.title}</div>
+                <div className="text-sm text-muted-foreground mt-0.5">
                   {new Date(m.scheduledAt).toLocaleString()}
                   {m.durationMin ? ` (${m.durationMin}m)` : ""}
                 </div>
@@ -220,23 +220,23 @@ export default function MeetingsPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-zinc-900 border border-zinc-800 p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
+          <div className="bg-card border border-border p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
             <h3 className="font-semibold mb-4 text-lg">{editingMeeting ? "Edit Meeting" : "Schedule Meeting"}</h3>
             <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
               <input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Meeting title *"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
                 required
               />
-              <label className="block text-xs text-zinc-500">
+              <label className="block text-xs text-muted-foreground">
                 Date & time *
                 <input
                   type="datetime-local"
                   value={formData.scheduledAt}
                   onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
-                  className="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white text-base sm:text-sm min-h-11"
+                  className="mt-1 w-full bg-background border border-border rounded-xl p-3 text-foreground text-base sm:text-sm min-h-11"
                   required
                 />
               </label>
@@ -245,19 +245,19 @@ export default function MeetingsPage() {
                 onChange={(e) => setFormData({ ...formData, durationMin: e.target.value })}
                 placeholder="Duration min"
                 type="number"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
               />
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 placeholder="Notes"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 h-20 text-base sm:text-sm"
+                className="w-full bg-background border border-border rounded-xl p-3 h-20 text-base sm:text-sm"
               />
               <input
                 value={formData.outcome}
                 onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
                 placeholder="Outcome"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
               />
               <div className="flex gap-3">
                 <button type="button" onClick={closeModal} className="flex-1 min-h-11 py-2.5 bg-white/10 rounded-xl touch-manipulation">
@@ -266,7 +266,7 @@ export default function MeetingsPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 min-h-11 py-2.5 bg-white text-zinc-950 rounded-xl touch-manipulation"
+                  className="flex-1 min-h-11 py-2.5 bg-primary text-primary-foreground rounded-xl touch-manipulation"
                 >
                   {isSubmitting ? "Saving..." : "Save"}
                 </button>

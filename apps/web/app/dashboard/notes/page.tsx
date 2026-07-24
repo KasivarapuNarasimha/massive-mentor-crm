@@ -79,13 +79,13 @@ export default function NotesPage() {
   return (
     <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
       <h1 className="text-2xl sm:text-3xl font-semibold mb-1">Notes</h1>
-      <p className="text-zinc-400 mb-6 text-sm sm:text-base">Attach rich notes to contacts, deals, meetings.</p>
+      <p className="text-muted-foreground mb-6 text-sm sm:text-base">Attach rich notes to contacts, deals, meetings.</p>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <select
           value={entityType}
           onChange={(e) => setEntityType(e.target.value)}
-          className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+          className="bg-background border border-border rounded-xl px-3 py-3 sm:py-2 text-base sm:text-sm min-h-11"
         >
           <option value="contact">Contact</option>
           <option value="deal">Deal</option>
@@ -95,7 +95,7 @@ export default function NotesPage() {
           value={entityId}
           onChange={(e) => setEntityId(e.target.value)}
           placeholder="Entity ID"
-          className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+          className="flex-1 bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
         />
       </div>
 
@@ -104,14 +104,14 @@ export default function NotesPage() {
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Write a note..."
-          className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+          className="flex-1 bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
         />
         <div className="flex gap-2">
           <button
             type="button"
             onClick={handleCreate}
             disabled={isSubmitting || !content.trim()}
-            className="flex-1 sm:flex-none min-h-11 px-6 bg-white text-zinc-950 rounded-xl touch-manipulation"
+            className="flex-1 sm:flex-none min-h-11 px-6 bg-primary text-primary-foreground rounded-xl touch-manipulation"
           >
             {editingNoteId ? "Update" : "Add"} Note
           </button>
@@ -131,15 +131,15 @@ export default function NotesPage() {
       </div>
 
       {isLoading ? (
-        <div className="animate-pulse h-20 bg-zinc-900 rounded" />
+        <div className="animate-pulse h-20 bg-card rounded" />
       ) : notes.length === 0 ? (
-        <div className="text-center py-10 text-zinc-500">No notes for this entity.</div>
+        <div className="text-center py-10 text-muted-foreground">No notes for this entity.</div>
       ) : (
         <div className="space-y-3">
           {notes.map((n) => (
             <div
               key={n.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm whitespace-pre-wrap flex flex-col gap-3 sm:flex-row sm:justify-between"
+              className="bg-card border border-border rounded-2xl p-4 text-sm whitespace-pre-wrap flex flex-col gap-3 sm:flex-row sm:justify-between"
             >
               <div className="min-w-0 break-words">{n.content}</div>
               <div className="flex gap-2 text-xs shrink-0">

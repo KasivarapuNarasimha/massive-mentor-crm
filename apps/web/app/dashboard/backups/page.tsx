@@ -96,8 +96,8 @@ export default function TenantBackupsPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Backups</h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <h1 className="text-2xl font-semibold text-foreground">Backups</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Business-only backups. You cannot access other tenants. Restore requires confirmation.
         </p>
       </div>
@@ -106,7 +106,7 @@ export default function TenantBackupsPage() {
         type="button"
         disabled={busy}
         onClick={create}
-        className="px-4 py-2.5 rounded-xl bg-white text-zinc-950 font-medium text-sm disabled:opacity-50"
+        className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm disabled:opacity-50"
       >
         Create backup now
       </button>
@@ -119,7 +119,7 @@ export default function TenantBackupsPage() {
             type="button"
             disabled={busy}
             onClick={confirmRestore}
-            className="px-3 py-2 rounded-lg bg-amber-500 text-zinc-950 text-sm font-semibold"
+            className="px-3 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold"
           >
             Confirm restore
           </button>
@@ -128,19 +128,19 @@ export default function TenantBackupsPage() {
 
       <div className="space-y-2">
         {rows.length === 0 && (
-          <div className="text-sm text-zinc-500">No backups yet for this business.</div>
+          <div className="text-sm text-muted-foreground">No backups yet for this business.</div>
         )}
         {rows.map((r) => (
           <div
             key={r.id}
-            className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 flex flex-wrap items-center justify-between gap-3"
+            className="rounded-xl border border-border bg-card/50 p-4 flex flex-wrap items-center justify-between gap-3"
           >
             <div>
-              <div className="text-sm text-white font-medium">{r.createdAt}</div>
-              <div className="text-xs text-zinc-500">
+              <div className="text-sm text-foreground font-medium">{r.createdAt}</div>
+              <div className="text-xs text-muted-foreground">
                 {r.status} · {r.trigger} · {r.progress}%
               </div>
-              <div className="mt-1 h-1 w-40 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="mt-1 h-1 w-40 bg-muted rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-500" style={{ width: `${r.progress}%` }} />
               </div>
             </div>

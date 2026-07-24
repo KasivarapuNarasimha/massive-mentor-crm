@@ -381,23 +381,23 @@ export default function DealsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Deals</h1>
-          <p className="text-zinc-400 mt-1 sm:mt-2 text-sm sm:text-base">
+          <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-base">
             Pipeline management with Kanban view.
           </p>
         </div>
         <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
-          <div className="flex rounded-xl border border-zinc-800 overflow-hidden shrink-0">
+          <div className="flex rounded-xl border border-border overflow-hidden shrink-0">
             <button
               type="button"
               onClick={() => setView("kanban")}
-              className={`flex-1 sm:flex-none min-h-11 px-4 py-2 text-sm touch-manipulation ${view === "kanban" ? "bg-white/10 text-white" : "text-zinc-400"}`}
+              className={`flex-1 sm:flex-none min-h-11 px-4 py-2 text-sm touch-manipulation ${view === "kanban" ? "bg-white/10 text-foreground" : "text-muted-foreground"}`}
             >
               Kanban
             </button>
             <button
               type="button"
               onClick={() => setView("list")}
-              className={`flex-1 sm:flex-none min-h-11 px-4 py-2 text-sm touch-manipulation ${view === "list" ? "bg-white/10 text-white" : "text-zinc-400"}`}
+              className={`flex-1 sm:flex-none min-h-11 px-4 py-2 text-sm touch-manipulation ${view === "list" ? "bg-white/10 text-foreground" : "text-muted-foreground"}`}
             >
               List
             </button>
@@ -405,7 +405,7 @@ export default function DealsPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-white text-zinc-950 rounded-xl font-medium hover:bg-zinc-200 focus-ring button-active touch-manipulation"
+            className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active touch-manipulation"
           >
             + New Deal
           </button>
@@ -418,11 +418,11 @@ export default function DealsPage() {
         placeholder="Search deals..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm text-white focus:outline-none focus:border-zinc-600 mb-6 min-h-11"
+        className="w-full max-w-md bg-background border border-border rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm text-foreground focus:outline-none focus:border-border mb-6 min-h-11"
       />
 
       {isLoading ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 animate-pulse h-96" />
+        <div className="bg-card border border-border rounded-2xl p-8 animate-pulse h-96" />
       ) : view === "kanban" ? (
         <>
           {highlightStage && (
@@ -439,15 +439,15 @@ export default function DealsPage() {
                 ref={(el) => {
                   stageColRefs.current[stage] = el;
                 }}
-                className={`bg-zinc-900 border rounded-2xl p-3 ${
+                className={`bg-card border rounded-2xl p-3 ${
                   highlightStage === stage
                     ? "border-violet-500/60 ring-2 ring-violet-500/30"
-                    : "border-zinc-800"
+                    : "border-border"
                 }`}
               >
                 <div className="flex items-center justify-between mb-3 px-1">
                   <div className="text-sm font-semibold text-white/90">{stageLabel(stage)}</div>
-                  <div className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">
+                  <div className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                     {(dealsByStage[stage] || []).length}
                   </div>
                 </div>
@@ -456,11 +456,11 @@ export default function DealsPage() {
                     (dealsByStage[stage] || []).map((deal) => (
                       <div
                         key={deal.id || `${stage}-${deal.title}`}
-                        className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 space-y-2"
+                        className="bg-background border border-border rounded-xl p-3 space-y-2"
                       >
-                        <div className="font-medium text-sm text-white">{deal.title || "Untitled"}</div>
+                        <div className="font-medium text-sm text-foreground">{deal.title || "Untitled"}</div>
                         {deal.contact?.name ? (
-                          <div className="text-xs text-zinc-400">{deal.contact.name}</div>
+                          <div className="text-xs text-muted-foreground">{deal.contact.name}</div>
                         ) : null}
                         <div className="flex justify-between items-center gap-2">
                           <div className="text-sm text-emerald-400 tabular-nums">
@@ -507,7 +507,7 @@ export default function DealsPage() {
                               await loadDeals({ silent: true });
                             }
                           }}
-                          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white min-h-10"
+                          className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-xs text-foreground min-h-10"
                           aria-label={`Change stage for ${deal.title}`}
                         >
                           {STAGES.map((s) => (
@@ -517,7 +517,7 @@ export default function DealsPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="text-center text-zinc-500 text-xs py-6">No deals</div>
+                    <div className="text-center text-muted-foreground text-xs py-6">No deals</div>
                   )}
                 </div>
               </div>
@@ -535,17 +535,17 @@ export default function DealsPage() {
                     stageColRefs.current[stage] = el;
                   }
                 }}
-                className={`bg-zinc-900 border rounded-2xl p-3 min-h-[400px] ${
+                className={`bg-card border rounded-2xl p-3 min-h-[400px] ${
                   highlightStage === stage
                     ? "border-violet-500/60 ring-2 ring-violet-500/30"
-                    : "border-zinc-800"
+                    : "border-border"
                 }`}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, stage)}
               >
                 <div className="flex items-center justify-between mb-3 px-1">
                   <div className="text-sm font-semibold text-white/90">{stageLabel(stage)}</div>
-                  <div className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">
+                  <div className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                     {(dealsByStage[stage] || []).length}
                   </div>
                 </div>
@@ -556,11 +556,11 @@ export default function DealsPage() {
                         key={deal.id || `${stage}-${deal.title}`}
                         draggable
                         onDragStart={(e) => handleDragStart(e, deal.id)}
-                        className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 cursor-grab active:cursor-grabbing hover:border-zinc-700"
+                        className="bg-background border border-border rounded-xl p-3 cursor-grab active:cursor-grabbing hover:border-border"
                       >
-                        <div className="font-medium text-sm text-white mb-1.5">{deal.title || "Untitled"}</div>
+                        <div className="font-medium text-sm text-foreground mb-1.5">{deal.title || "Untitled"}</div>
                         {deal.contact?.name ? (
-                          <div className="text-xs text-zinc-400 mb-2">{deal.contact.name}</div>
+                          <div className="text-xs text-muted-foreground mb-2">{deal.contact.name}</div>
                         ) : null}
                         <div className="flex justify-between items-center text-xs">
                           <div className="text-emerald-400">
@@ -586,7 +586,7 @@ export default function DealsPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="text-center text-zinc-500 text-xs py-8">No deals</div>
+                    <div className="text-center text-muted-foreground text-xs py-8">No deals</div>
                   )}
                 </div>
               </div>
@@ -600,12 +600,12 @@ export default function DealsPage() {
             {filteredDeals.map((deal) => (
               <div
                 key={deal.id}
-                className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3"
+                className="bg-card border border-border rounded-2xl p-4 space-y-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-medium text-white truncate">{deal.title || "Untitled"}</div>
-                    <div className="text-sm text-zinc-400 mt-0.5">{deal.contact?.name || "—"}</div>
+                    <div className="font-medium text-foreground truncate">{deal.title || "Untitled"}</div>
+                    <div className="text-sm text-muted-foreground mt-0.5">{deal.contact?.name || "—"}</div>
                   </div>
                   <span className="shrink-0 px-2.5 py-0.5 text-xs rounded-full bg-white/10">
                     {stageLabel(deal.stage)}
@@ -637,10 +637,10 @@ export default function DealsPage() {
           </div>
 
           {/* Desktop table */}
-          <div className="hidden md:block bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+          <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden">
             <div className="table-scroll">
               <table className="mm-table min-w-[640px]">
-                <thead className="border-b border-zinc-800 text-zinc-400">
+                <thead className="border-b border-border text-muted-foreground">
                   <tr>
                     <th className="text-left p-4">Title</th>
                     <th className="text-left p-4">Contact</th>
@@ -649,11 +649,11 @@ export default function DealsPage() {
                     <th className="text-right p-4">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-border">
                   {filteredDeals.map((deal) => (
-                    <tr key={deal.id} className="hover:bg-zinc-800/50">
-                      <td className="p-4 font-medium text-white">{deal.title || "Untitled"}</td>
-                      <td className="p-4 text-zinc-300">{deal.contact?.name || "-"}</td>
+                    <tr key={deal.id} className="hover:bg-muted/50">
+                      <td className="p-4 font-medium text-foreground">{deal.title || "Untitled"}</td>
+                      <td className="p-4 text-muted-foreground">{deal.contact?.name || "-"}</td>
                       <td className="p-4">
                         <span className="px-2 py-0.5 text-xs rounded bg-white/10">{stageLabel(deal.stage)}</span>
                       </td>
@@ -673,34 +673,34 @@ export default function DealsPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto p-4 sm:p-6 safe-bottom">
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto p-4 sm:p-6 safe-bottom">
             <h2 className="text-xl font-semibold mb-6">{editingDeal ? "Edit Deal" : "New Deal"}</h2>
             <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
               <div>
-                <label className="block text-sm text-zinc-300 mb-1">Title *</label>
+                <label className="block text-sm text-muted-foreground mb-1">Title *</label>
                 <input
                   value={formData.title}
                   onChange={(e) => handleChange("title", e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
                   required
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-zinc-300 mb-1">Value</label>
+                  <label className="block text-sm text-muted-foreground mb-1">Value</label>
                   <input
                     type="number"
                     value={formData.value}
                     onChange={(e) => handleChange("value", e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-300 mb-1">Stage</label>
+                  <label className="block text-sm text-muted-foreground mb-1">Stage</label>
                   <select
                     value={formData.stage}
                     onChange={(e) => handleChange("stage", e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
                   >
                     {STAGES.map((s) => (
                       <option key={s} value={s}>{STAGE_LABELS[s]}</option>
@@ -709,16 +709,16 @@ export default function DealsPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-zinc-300 mb-1">Notes</label>
+                <label className="block text-sm text-muted-foreground mb-1">Notes</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => handleChange("notes", e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm h-24"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm h-24"
                 />
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={closeModal} className="flex-1 min-h-11 px-5 py-2.5 bg-white/10 border border-white/20 rounded-xl text-sm touch-manipulation">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="flex-1 min-h-11 px-5 py-2.5 bg-white text-zinc-950 rounded-xl text-sm font-medium disabled:opacity-50 touch-manipulation">
+                <button type="submit" disabled={isSubmitting} className="flex-1 min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium disabled:opacity-50 touch-manipulation">
                   {isSubmitting ? "Saving..." : "Save"}
                 </button>
               </div>

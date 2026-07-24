@@ -19,6 +19,7 @@ import {
   type FeatureKey,
 } from "@/lib/plan-entitlements";
 import { FeatureGate } from "@/components/billing/FeatureGate";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 /** Layout chrome heights — keep FieldStatusBar at h-12 (3rem) */
 const NAV_H = "3.5rem"; // h-14
@@ -266,6 +267,42 @@ const DEFAULT_ICON = (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
   </svg>
 );
+
+/** Always available — never gated by plan, portal seed lag, or role */
+const SETTINGS_NAV: NavItem[] = [
+  {
+    key: "settings:appearance",
+    href: "/dashboard/settings/appearance",
+    label: "Appearance",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+        />
+      </svg>
+    ),
+  },
+  {
+    key: "settings:security",
+    href: "/dashboard/security",
+    label: "Security",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+        />
+      </svg>
+    ),
+  },
+];
+
+const APPEARANCE_HREF = "/dashboard/settings/appearance";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { user, logout, token } = useAuth();
@@ -525,13 +562,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               : "Field Sales Map",
         icon: known?.icon || DEFAULT_ICON,
       });
+      seenRoutes.add("/dashboard/field-sales");
     }
-    // Stable order: field sales near CRM ops
+
+    // Do not inject Appearance into primary portal menus — it lives under Settings below.
     return items;
   })();
 
-  const primaryNav = portalNav || resolveNav(navItems);
-  const crmNav = portalNav ? [] : resolveNav(crmNavItems);
+  const primaryNav = (portalNav || resolveNav(navItems)).filter(
+    (item) => item.href !== APPEARANCE_HREF
+  );
+  // When portal menus replace CRM nav, keep Security out of the flat CRM list if present —
+  // Settings section owns Appearance (+ Security for discovery).
+  const crmNav = (portalNav ? [] : resolveNav(crmNavItems)).filter(
+    (item) => item.href !== APPEARANCE_HREF && item.href !== "/dashboard/security"
+  );
 
   // Body scroll lock when mobile sidebar is open (prevents background scroll)
   useEffect(() => {
@@ -624,7 +669,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className="min-h-screen min-h-dvh bg-zinc-950 text-white overflow-x-hidden safe-top"
+      className="min-h-screen min-h-dvh bg-background text-foreground overflow-x-hidden safe-top"
       style={
         {
           ["--mm-chrome-h" as string]: contentOffset,
@@ -635,7 +680,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     >
       {isDemoMode && (
         <div
-          className="fixed top-0 left-0 right-0 z-[60] bg-sky-600 text-zinc-950 text-center text-xs sm:text-sm font-semibold px-3 flex items-center justify-center"
+          className="fixed top-0 left-0 right-0 z-[60] bg-sky-600 text-white text-center text-xs sm:text-sm font-semibold px-3 flex items-center justify-center"
           style={{ height: DEMO_BANNER_H }}
         >
           DEMO MODE — sample data only · not a production customer workspace ·{" "}
@@ -651,7 +696,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </div>
       {/* Top Navigation — z-50 above location strip */}
       <nav
-        className="fixed left-0 right-0 z-50 border-b border-zinc-800/90 bg-zinc-950/90 backdrop-blur-xl safe-x shadow-sm shadow-black/20"
+        className="fixed left-0 right-0 z-50 border-b border-border/90 bg-background/90 backdrop-blur-xl safe-x shadow-sm shadow-black/10"
         style={{ top: navTop, height: NAV_H }}
         aria-label="Top navigation"
       >
@@ -659,7 +704,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2.5 -ml-1 text-zinc-400 hover:text-white focus-ring rounded-xl touch-manipulation min-h-11 min-w-11 inline-flex items-center justify-center"
+              className="lg:hidden p-2.5 -ml-1 text-muted-foreground hover:text-foreground focus-ring rounded-xl touch-manipulation min-h-11 min-w-11 inline-flex items-center justify-center"
               aria-label="Open menu"
               aria-expanded={sidebarOpen}
             >
@@ -671,10 +716,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               href={portal?.homeRoute || "/dashboard"}
               className="font-semibold tracking-tight text-base sm:text-xl truncate focus-ring rounded-lg"
             >
-              <span className="bg-gradient-to-r from-white via-zinc-100 to-violet-200 bg-clip-text text-transparent sm:hidden">
+              <span className="bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent sm:hidden">
                 MM
               </span>
-              <span className="hidden sm:inline bg-gradient-to-r from-white via-zinc-100 to-violet-200 bg-clip-text text-transparent">
+              <span className="hidden sm:inline bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">
                 Massive Mentor
               </span>
             </Link>
@@ -695,7 +740,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <div className="hidden md:flex items-center gap-1.5">
                 <label
                   htmlFor="workspace-role"
-                  className="text-[10px] uppercase tracking-wider text-zinc-500 hidden lg:block"
+                  className="text-[10px] uppercase tracking-wider text-muted-foreground hidden lg:block"
                 >
                   Role
                 </label>
@@ -704,7 +749,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   value={workspaceRole || portal.role}
                   disabled={portalLoading}
                   onChange={(e) => setWorkspaceRole(e.target.value)}
-                  className="bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white max-w-[140px] lg:max-w-[200px] focus:outline-none focus:border-emerald-500/50 min-h-9"
+                  className="bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground max-w-[140px] lg:max-w-[200px] focus:outline-none focus:border-emerald-500/50 min-h-9"
                   title="Switch entire portal workspace by role"
                   aria-label="Select role"
                 >
@@ -738,7 +783,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen(!notifOpen)}
-                className="p-2 text-zinc-400 hover:text-white relative"
+                className="p-2 text-muted-foreground hover:text-foreground relative min-h-11 min-w-11 inline-flex items-center justify-center"
                 aria-label="Notifications"
                 aria-expanded={notifOpen}
               >
@@ -757,9 +802,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 )}
               </button>
               {notifOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 text-sm max-h-96 flex flex-col">
-                  <div className="px-3 py-2 border-b border-zinc-800 flex items-center justify-between shrink-0">
-                    <span className="text-xs text-zinc-400 font-medium">
+                <div className="absolute right-0 mt-2 w-80 bg-card border border-border rounded-xl shadow-xl z-50 text-sm max-h-96 flex flex-col">
+                  <div className="px-3 py-2 border-b border-border flex items-center justify-between shrink-0">
+                    <span className="text-xs text-muted-foreground font-medium">
                       Notifications{unreadCount > 0 ? ` (${unreadCount} unread)` : ""}
                     </span>
                     {unreadCount > 0 && (
@@ -776,7 +821,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     {notifError ? (
                       <div className="p-4 text-center text-red-400/90 text-xs space-y-2">
                         <div>Could not load notifications.</div>
-                        <div className="text-zinc-500">{notifError}</div>
+                        <div className="text-muted-foreground">{notifError}</div>
                         <button
                           type="button"
                           onClick={() => loadNotifs()}
@@ -786,9 +831,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                         </button>
                       </div>
                     ) : notifLoading && notifications.length === 0 ? (
-                      <div className="p-4 text-center text-zinc-500 text-xs">Loading…</div>
+                      <div className="p-4 text-center text-muted-foreground text-xs">Loading…</div>
                     ) : notifications.length === 0 ? (
-                      <div className="p-4 text-center text-zinc-500 text-xs">
+                      <div className="p-4 text-center text-muted-foreground text-xs">
                         No notifications yet. Create a lead, deal, task, or meeting to see one here.
                       </div>
                     ) : (
@@ -804,8 +849,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                           }}
                           className={`w-full text-left p-2.5 rounded-lg mb-0.5 transition-colors ${
                             n.isRead
-                              ? "text-zinc-400 hover:bg-zinc-800/50"
-                              : "bg-emerald-500/10 text-zinc-100 hover:bg-emerald-500/15"
+                              ? "text-muted-foreground hover:bg-muted/50"
+                              : "bg-emerald-500/10 text-white hover:bg-emerald-500/15"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
@@ -814,9 +859,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1" />
                             )}
                           </div>
-                          <div className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2">{message}</div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{message}</div>
                           {n.createdAt && (
-                            <div className="text-[10px] text-zinc-600 mt-1">
+                            <div className="text-[10px] text-muted-foreground mt-1">
                               {new Date(n.createdAt).toLocaleString()}
                             </div>
                           )}
@@ -829,41 +874,72 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
+            {/* Theme: between Notifications and Profile — always mounted, all roles */}
+            <ThemeToggle />
+
             <button
               type="button"
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 rounded-full focus-ring"
+              className="flex items-center gap-2 rounded-full focus-ring min-h-11 px-1"
               aria-haspopup="true"
               aria-expanded={userMenuOpen}
               aria-label="User menu"
               data-testid="user-menu"
             >
-              <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-sm font-medium text-white ring-1 ring-zinc-600">
+              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium text-foreground ring-1 ring-border">
                 {(user?.name || user?.email || "U")[0].toUpperCase()}
               </div>
-              <div className="hidden md:block text-sm text-zinc-400 max-w-[120px] truncate">
+              <div className="hidden md:block text-sm text-muted-foreground max-w-[120px] truncate">
                 {user?.name || user?.email}
               </div>
             </button>
 
             {userMenuOpen && (
-              <div 
-                className="absolute right-0 top-full mt-2 w-52 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl py-1 z-50 text-sm" 
+              <div
+                className="absolute right-0 top-full mt-2 w-56 bg-card border border-border rounded-xl shadow-xl py-1 z-[70] text-sm"
                 role="menu"
                 aria-label="User menu"
+                data-testid="user-menu-dropdown"
               >
-                <div className="px-4 py-2.5 border-b border-zinc-700">
-                  <div className="font-medium text-white truncate">{user?.name || "User"}</div>
-                  <div className="text-zinc-400 text-xs truncate mt-0.5">{user?.email}</div>
+                <div className="px-4 py-2.5 border-b border-border">
+                  <div className="font-medium text-foreground truncate">{user?.name || "User"}</div>
+                  <div className="text-muted-foreground text-xs truncate mt-0.5">{user?.email}</div>
                 </div>
 
                 <Link
                   href="/dashboard/profile"
                   onClick={() => setUserMenuOpen(false)}
-                  className="block px-4 py-2 text-zinc-300 hover:bg-zinc-800 focus-visible:bg-zinc-800 focus-ring transition-colors"
+                  className="block px-4 py-2.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-ring transition-colors"
                   role="menuitem"
                 >
                   Profile
+                </Link>
+
+                <Link
+                  href={APPEARANCE_HREF}
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-2 px-4 py-2.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-ring transition-colors"
+                  role="menuitem"
+                  data-testid="user-menu-appearance"
+                >
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+                    />
+                  </svg>
+                  Appearance
+                </Link>
+
+                <Link
+                  href="/dashboard/security"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="block px-4 py-2.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-ring transition-colors"
+                  role="menuitem"
+                >
+                  Security
                 </Link>
 
                 <button
@@ -872,7 +948,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     setUserMenuOpen(false);
                     logout({ redirect: true });
                   }}
-                  className="w-full text-left px-4 py-2 text-red-400 hover:bg-zinc-800 focus-visible:bg-zinc-800 focus-ring transition-colors"
+                  className="w-full text-left px-4 py-2.5 text-destructive hover:bg-muted focus-visible:bg-muted focus-ring transition-colors"
                   role="menuitem"
                   data-testid="sign-out"
                 >
@@ -904,7 +980,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       />
 
       <div
-        className="flex items-start overflow-x-hidden bg-zinc-950 w-full min-w-0"
+        className="flex items-start overflow-x-hidden bg-background w-full min-w-0"
         style={{ minHeight: `calc(100dvh - ${contentOffset})` }}
       >
         {/*
@@ -913,7 +989,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           - Desktop (≥lg): permanent full sidebar
         */}
         <aside
-          className={`fixed lg:sticky lg:self-start left-0 z-30 border-r border-zinc-800/90 bg-zinc-950/95 backdrop-blur-md transform transition-all duration-200 ease-out lg:translate-x-0 overflow-y-auto overscroll-contain ${
+          className={`fixed lg:sticky lg:self-start left-0 z-30 border-r border-border/90 bg-sidebar/95 backdrop-blur-md transform transition-all duration-200 ease-out lg:translate-x-0 overflow-y-auto overscroll-contain ${
             sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
           } w-[min(100vw-3rem,18rem)] ${
             sidebarCollapsed ? "lg:w-[4.25rem]" : "md:w-64 lg:w-64"
@@ -928,7 +1004,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <div className={`pt-1 pb-4 ${sidebarCollapsed ? "lg:px-0" : "px-1"}`}>
               <div className={`flex items-center justify-between gap-2 mb-3 ${sidebarCollapsed ? "lg:justify-center" : ""}`}>
                 <div
-                  className={`text-[10px] uppercase tracking-[0.16em] text-zinc-500 font-semibold ${
+                  className={`text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold ${
                     sidebarCollapsed ? "lg:hidden" : ""
                   }`}
                 >
@@ -937,7 +1013,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={toggleSidebarCollapsed}
-                  className="hidden lg:inline-flex items-center justify-center h-8 w-8 rounded-lg border border-zinc-800 text-zinc-500 hover:text-white hover:bg-white/5 focus-ring"
+                  className="hidden lg:inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted focus-ring"
                   aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                   title={sidebarCollapsed ? "Expand" : "Collapse"}
                 >
@@ -953,9 +1029,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
               {portal && !sidebarCollapsed && (
-                <div className="mb-3 px-3 py-2.5 rounded-xl bg-gradient-to-br from-white/[0.06] to-transparent border border-zinc-800/80 text-[11px] text-zinc-400">
-                  <div className="text-zinc-200 font-medium truncate">{portal.businessName || portal.portalLabel}</div>
-                  <div className="mt-0.5 truncate text-zinc-500 capitalize">
+                <div className="mb-3 px-3 py-2.5 rounded-xl bg-gradient-to-br from-white/[0.06] to-transparent border border-border/80 text-[11px] text-muted-foreground">
+                  <div className="text-foreground font-medium truncate">{portal.businessName || portal.portalLabel}</div>
+                  <div className="mt-0.5 truncate text-muted-foreground capitalize">
                     {portal.role?.replace(/_/g, " ")}
                   </div>
                   {portal.canSwitchWorkspace && (
@@ -963,7 +1039,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       value={workspaceRole || portal.role}
                       disabled={portalLoading}
                       onChange={(e) => setWorkspaceRole(e.target.value)}
-                      className="md:hidden mt-2 w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-2.5 text-xs text-white min-h-11"
+                      className="md:hidden mt-2 w-full bg-card border border-border rounded-lg px-2 py-2.5 text-xs text-foreground min-h-11"
                       aria-label="Select role workspace"
                     >
                       {(portal.workspaceRoles?.length
@@ -1002,7 +1078,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       {item.label}
                     </span>
                     {locked && (
-                      <svg className={`w-3.5 h-3.5 text-zinc-600 shrink-0 ${sidebarCollapsed ? "lg:hidden" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Locked">
+                      <svg className={`w-3.5 h-3.5 text-muted-foreground shrink-0 ${sidebarCollapsed ? "lg:hidden" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Locked">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
                     )}
@@ -1013,7 +1089,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
               {portal?.actions && portal.actions.length > 0 && !sidebarCollapsed && (
                 <>
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-zinc-500 font-semibold mb-2 mt-6">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2 mt-6">
                     Actions
                   </div>
                   <div className="space-y-1 px-0.5">
@@ -1043,7 +1119,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
               {crmNav.length > 0 && (
                 <div
-                  className={`text-[10px] uppercase tracking-[0.16em] text-zinc-500 font-semibold mb-2 mt-6 ${
+                  className={`text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2 mt-6 ${
                     sidebarCollapsed ? "lg:hidden" : ""
                   }`}
                 >
@@ -1074,7 +1150,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       {item.label}
                     </span>
                     {locked && (
-                      <svg className={`w-3.5 h-3.5 text-zinc-600 shrink-0 ${sidebarCollapsed ? "lg:hidden" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Locked">
+                      <svg className={`w-3.5 h-3.5 text-muted-foreground shrink-0 ${sidebarCollapsed ? "lg:hidden" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Locked">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
                     )}
@@ -1082,10 +1158,46 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   );
                 })}
               </nav>
+
+              {/*
+                Settings — always visible for every role (Business Admin included).
+                Not plan-gated. Shown even when portal menus replace CRM nav.
+              */}
+              <div
+                className={`text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2 mt-6 ${
+                  sidebarCollapsed ? "lg:hidden" : ""
+                }`}
+              >
+                Settings
+              </div>
+              <nav className="space-y-0.5" aria-label="Settings navigation" data-testid="settings-nav">
+                {SETTINGS_NAV.map((item) => (
+                  <Link
+                    key={item.key || `settings:${item.href}`}
+                    href={item.href}
+                    title={item.label}
+                    onClick={() => setSidebarOpen(false)}
+                    aria-current={isActive(item.href) ? "page" : undefined}
+                    className={`mm-nav-link focus-ring ${
+                      sidebarCollapsed ? "lg:justify-center lg:px-2" : ""
+                    }`}
+                    data-testid={
+                      item.href === APPEARANCE_HREF ? "nav-appearance" : undefined
+                    }
+                  >
+                    <span className="mm-nav-icon" aria-hidden>
+                      {item.icon}
+                    </span>
+                    <span className={`flex-1 truncate ${sidebarCollapsed ? "lg:hidden" : ""}`}>
+                      {item.label}
+                    </span>
+                  </Link>
+                ))}
+              </nav>
             </div>
 
             <div
-              className={`mt-auto text-[10px] text-zinc-600 border-t border-zinc-800/80 pt-3 ${
+              className={`mt-auto text-[10px] text-muted-foreground border-t border-border/80 pt-3 ${
                 sidebarCollapsed ? "lg:text-center lg:px-0" : "px-2"
               }`}
             >
@@ -1098,7 +1210,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Main content — starts below fixed chrome; pages use PageShell for title/KPI spacing */}
-        <main className="flex-1 min-w-0 w-full max-w-[1600px] mx-auto bg-zinc-950 overflow-x-hidden lg:pl-0 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-6 mb-[4.5rem] md:mb-0">
+        <main className="flex-1 min-w-0 w-full max-w-[1600px] mx-auto bg-background overflow-x-hidden lg:pl-0 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-6 mb-[4.5rem] md:mb-0">
           {routeFeature && FEATURE_MIN_TIER[routeFeature] ? (
             <FeatureGate feature={routeFeature}>{children}</FeatureGate>
           ) : (
@@ -1122,7 +1234,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         Hidden on tablet+ (md) where drawer/sidebar is preferred.
       */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-zinc-800 bg-zinc-950/98 backdrop-blur-md safe-bottom safe-x"
+        className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/98 backdrop-blur-md safe-bottom safe-x"
         aria-label="Mobile primary navigation"
       >
         <div className="grid grid-cols-5 gap-0.5 px-1 pt-1 pb-1">
@@ -1133,10 +1245,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               onClick={(e) => onNavClick(e, item.href)}
               className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-xl text-[10px] min-h-14 touch-manipulation ${
                 isActive(item.href)
-                  ? "text-white bg-white/10"
+                  ? "text-foreground bg-white/10"
                   : isRouteLocked(item.href)
-                    ? "text-zinc-600"
-                    : "text-zinc-500 hover:text-zinc-300"
+                    ? "text-muted-foreground"
+                    : "text-muted-foreground hover:text-muted-foreground"
               }`}
             >
               <span className="scale-110">{item.icon}</span>
@@ -1148,7 +1260,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-xl text-[10px] min-h-14 text-zinc-500 hover:text-zinc-300 touch-manipulation"
+            className="flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-xl text-[10px] min-h-14 text-muted-foreground hover:text-muted-foreground touch-manipulation"
             aria-label="More menu"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

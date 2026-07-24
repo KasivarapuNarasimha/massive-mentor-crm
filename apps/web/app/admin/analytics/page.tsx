@@ -63,7 +63,7 @@ export default function AdminAnalyticsPage() {
   }, []);
 
   if (!data) {
-    return <div className="h-64 bg-zinc-900 rounded-2xl animate-pulse max-w-7xl" />;
+    return <div className="h-64 bg-card rounded-2xl animate-pulse max-w-7xl" />;
   }
 
   const k = data.kpis;
@@ -105,7 +105,7 @@ export default function AdminAnalyticsPage() {
     <div className="max-w-7xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-semibold">Usage Analytics</h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Platform-wide KPIs and trends — presented as cards and charts, not raw JSON.
         </p>
       </div>

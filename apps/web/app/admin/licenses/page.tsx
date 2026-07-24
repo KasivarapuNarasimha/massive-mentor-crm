@@ -68,7 +68,7 @@ export default function AdminLicensesPage() {
     <div className="max-w-6xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">License Management</h1>
-        <p className="text-sm text-zinc-400 mt-1">Active, trial, and expired licenses across customers.</p>
+        <p className="text-sm text-muted-foreground mt-1">Active, trial, and expired licenses across customers.</p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard label="Total" value={rows.length} />
@@ -83,7 +83,7 @@ export default function AdminLicensesPage() {
             type="button"
             onClick={() => setFilter(f)}
             className={`min-h-10 px-3 rounded-xl text-sm capitalize ${
-              filter === f ? "bg-violet-500 text-zinc-950" : "bg-white/10"
+              filter === f ? "bg-violet-500 text-white" : "bg-white/10"
             }`}
           >
             {f || "all"}

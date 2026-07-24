@@ -80,7 +80,7 @@ export default function DashboardLayout({
   // Only show loading while bootstrapping AND not forced ready
   if ((isLoading && !forceReady) || (isAuthenticated && !billingChecked && !pathname?.startsWith("/dashboard/billing"))) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-950 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <div className="text-center max-w-xs">
           <div
             className="mx-auto mb-4 h-10 w-10 rounded-2xl border border-violet-500/30 bg-violet-500/10 flex items-center justify-center"
@@ -88,8 +88,8 @@ export default function DashboardLayout({
           >
             <div className="h-5 w-5 rounded-full border-2 border-violet-400/40 border-t-violet-300 animate-spin" />
           </div>
-          <div className="text-zinc-300 text-sm font-medium tracking-tight">Loading workspace…</div>
-          <div className="text-zinc-600 text-xs mt-1.5">Restoring your session</div>
+          <div className="text-muted-foreground text-sm font-medium tracking-tight">Loading workspace…</div>
+          <div className="text-muted-foreground text-xs mt-1.5">Restoring your session</div>
         </div>
       </div>
     );
@@ -97,8 +97,8 @@ export default function DashboardLayout({
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
-        <div className="text-zinc-500 text-sm">Redirecting to sign in…</div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm">Redirecting to sign in…</div>
       </div>
     );
   }

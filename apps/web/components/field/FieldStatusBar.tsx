@@ -29,10 +29,10 @@ const STATUS_CLASS: Record<string, string> = {
   online: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
   in_field: "bg-sky-500/25 text-sky-200 border-sky-400/50",
   meeting: "bg-violet-500/25 text-violet-200 border-violet-400/50",
-  offline: "bg-zinc-700/50 text-zinc-400 border-zinc-600",
+  offline: "bg-muted/50 text-muted-foreground border-border",
 };
 
-const STATUS_STYLE_FALLBACK = "bg-zinc-700/50 text-zinc-400 border-zinc-600";
+const STATUS_STYLE_FALLBACK = "bg-muted/50 text-muted-foreground border-border";
 
 function label(s?: string) {
   if (s === "in_field") return "On Field";
@@ -78,7 +78,7 @@ export function FieldStatusBar() {
   if (!isAuthenticated || !token) {
     return (
       <div
-        className={`${FIELD_STATUS_BAR_HEIGHT_CLASS} w-full border-b border-zinc-800 bg-zinc-900/95`}
+        className={`${FIELD_STATUS_BAR_HEIGHT_CLASS} w-full border-b border-border bg-card/95`}
         data-testid="field-status-bar"
         aria-hidden
       />
@@ -134,7 +134,7 @@ export function FieldStatusBar() {
         "w-full border-b flex items-center gap-2 sm:gap-3",
         "px-3 sm:px-5 md:px-6",
         "overflow-hidden",
-        inField ? "bg-sky-950/90 border-sky-800/60" : "bg-zinc-900/95 border-zinc-800",
+        inField ? "bg-sky-950/90 border-sky-800/60" : "bg-card/95 border-border",
       ].join(" ")}
       data-testid="field-status-bar"
       role="status"
@@ -151,17 +151,17 @@ export function FieldStatusBar() {
               ? "bg-emerald-400"
               : status === "meeting"
                 ? "bg-violet-400"
-                : "bg-zinc-500"
+                : "bg-muted-foreground"
           }`}
           aria-hidden
         />
         {label(status)}
       </span>
 
-      <div className="min-w-0 flex-1 flex items-center gap-1.5 text-xs sm:text-sm text-zinc-300 truncate">
-        <span className="text-zinc-500 shrink-0 hidden sm:inline">Location:</span>
+      <div className="min-w-0 flex-1 flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground truncate">
+        <span className="text-muted-foreground shrink-0 hidden sm:inline">Location:</span>
         <span
-          className="font-medium text-white truncate"
+          className="font-medium text-foreground truncate"
           title={data?.state?.lastFullAddress || place}
         >
           {place}
@@ -180,7 +180,7 @@ export function FieldStatusBar() {
             type="button"
             disabled={busy}
             onClick={() => run("/location/field/start", "Field work started — you are On Field")}
-            className="min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-lg text-[11px] sm:text-xs font-semibold bg-sky-500 text-zinc-950 hover:bg-sky-400 disabled:opacity-50 touch-manipulation whitespace-nowrap"
+            className="min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-lg text-[11px] sm:text-xs font-semibold bg-sky-500 text-white hover:bg-sky-400 disabled:opacity-50 touch-manipulation whitespace-nowrap"
             data-testid="start-field-work"
           >
             {busy ? "…" : "Start Field"}
@@ -190,7 +190,7 @@ export function FieldStatusBar() {
             type="button"
             disabled={busy}
             onClick={() => run("/location/field/end", "Field work ended")}
-            className="min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-lg text-[11px] sm:text-xs font-semibold bg-amber-500 text-zinc-950 hover:bg-amber-400 disabled:opacity-50 touch-manipulation whitespace-nowrap"
+            className="min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-lg text-[11px] sm:text-xs font-semibold bg-amber-500 text-white hover:bg-amber-400 disabled:opacity-50 touch-manipulation whitespace-nowrap"
             data-testid="end-field-work"
           >
             {busy ? "…" : "End Field"}
@@ -198,7 +198,7 @@ export function FieldStatusBar() {
         )}
         <Link
           href="/dashboard/field-sales"
-          className="min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-lg text-[11px] sm:text-xs font-medium bg-white/10 text-zinc-200 hover:bg-white/15 border border-zinc-700 inline-flex items-center touch-manipulation whitespace-nowrap"
+          className="min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-lg text-[11px] sm:text-xs font-medium bg-white/10 text-foreground hover:bg-white/15 border border-border inline-flex items-center touch-manipulation whitespace-nowrap"
         >
           Map
         </Link>

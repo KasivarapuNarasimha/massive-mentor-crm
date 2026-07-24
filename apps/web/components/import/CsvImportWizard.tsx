@@ -80,7 +80,7 @@ export function CsvImportWizard({
     if (c === "high") return "text-emerald-400";
     if (c === "medium") return "text-amber-400";
     if (c === "low") return "text-orange-400";
-    return "text-zinc-500";
+    return "text-muted-foreground";
   };
 
   const handleConfirm = () => {
@@ -92,17 +92,17 @@ export function CsvImportWizard({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-zinc-950 border border-zinc-700 rounded-2xl shadow-2xl">
-        <div className="px-5 py-4 border-b border-zinc-800 flex items-start justify-between gap-3">
+      <div className="w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col bg-background border border-border rounded-2xl shadow-2xl">
+        <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-white">Map CSV columns</h2>
-            <p className="text-xs text-zinc-500 mt-1">
+            <h2 className="text-lg font-semibold text-foreground">Map CSV columns</h2>
+            <p className="text-xs text-muted-foreground mt-1">
               {filename} · {preview.parsedRows} row(s) detected
               {preview.allowedStatuses?.length ? (
                 <>
                   {" "}
                   · Status values:{" "}
-                  <span className="font-mono text-zinc-400">
+                  <span className="font-mono text-muted-foreground">
                     {preview.allowedStatuses.join(", ")}
                   </span>
                 </>
@@ -115,7 +115,7 @@ export function CsvImportWizard({
           <button
             type="button"
             onClick={onCancel}
-            className="text-zinc-500 hover:text-white text-xl leading-none px-1"
+            className="text-muted-foreground hover:text-foreground text-xl leading-none px-1"
             aria-label="Close"
           >
             ×
@@ -123,14 +123,14 @@ export function CsvImportWizard({
         </div>
 
         <div className="flex-1 overflow-auto px-5 py-4">
-          <p className="text-xs text-zinc-500 mb-3">
+          <p className="text-xs text-muted-foreground mb-3">
             We auto-matched columns from Zoho, HubSpot, Salesforce, Excel, and Google Sheets
             exports. Confirm or change the mapping before importing.
           </p>
 
-          <div className="rounded-xl border border-zinc-800 overflow-hidden">
+          <div className="rounded-xl border border-border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-zinc-900 text-zinc-400 text-xs uppercase tracking-wider">
+              <thead className="bg-card text-muted-foreground text-xs uppercase tracking-wider">
                 <tr>
                   <th className="text-left px-3 py-2.5 font-medium">CSV column</th>
                   <th className="text-left px-3 py-2.5 font-medium">CRM field</th>
@@ -141,9 +141,9 @@ export function CsvImportWizard({
               </thead>
               <tbody>
                 {preview.suggestions.map((s) => (
-                  <tr key={s.sourceHeader} className="border-t border-zinc-800/80">
+                  <tr key={s.sourceHeader} className="border-t border-border/80">
                     <td className="px-3 py-2.5 align-top">
-                      <div className="font-medium text-zinc-200">{s.sourceHeader}</div>
+                      <div className="font-medium text-foreground">{s.sourceHeader}</div>
                       <div className={`text-[10px] mt-0.5 ${confColor(s.confidence)}`}>
                         {s.confidence === "none" ? "unmapped" : `${s.confidence} confidence`}
                       </div>
@@ -157,7 +157,7 @@ export function CsvImportWizard({
                             [s.sourceHeader]: e.target.value,
                           }))
                         }
-                        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none focus:border-zinc-500"
+                        className="w-full bg-card border border-border rounded-lg px-2 py-1.5 text-sm text-foreground focus:outline-none focus:border-border"
                       >
                         <option value={SKIP}>— Skip —</option>
                         {preview.crmFields.map((f) => (
@@ -168,7 +168,7 @@ export function CsvImportWizard({
                         ))}
                       </select>
                     </td>
-                    <td className="px-3 py-2.5 align-top text-xs text-zinc-500 font-mono hidden sm:table-cell">
+                    <td className="px-3 py-2.5 align-top text-xs text-muted-foreground font-mono hidden sm:table-cell">
                       {s.sampleValues.slice(0, 2).join(" · ") || "—"}
                     </td>
                   </tr>
@@ -183,13 +183,13 @@ export function CsvImportWizard({
             </p>
           )}
 
-          <div className="mt-4 flex flex-col sm:flex-row gap-3 text-sm text-zinc-400">
+          <div className="mt-4 flex flex-col sm:flex-row gap-3 text-sm text-muted-foreground">
             <label className="inline-flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={saveMapping}
                 onChange={(e) => setSaveMapping(e.target.checked)}
-                className="rounded border-zinc-600"
+                className="rounded border-border"
               />
               Save mapping for future imports
             </label>
@@ -198,28 +198,28 @@ export function CsvImportWizard({
                 type="checkbox"
                 checked={updateExisting}
                 onChange={(e) => setUpdateExisting(e.target.checked)}
-                className="rounded border-zinc-600"
+                className="rounded border-border"
               />
               Update existing contacts (match phone/email)
             </label>
           </div>
 
           {preview.sampleRows.length > 0 && (
-            <details className="mt-4 text-xs text-zinc-500">
-              <summary className="cursor-pointer hover:text-zinc-300">Preview first rows</summary>
-              <pre className="mt-2 max-h-32 overflow-auto bg-zinc-900 rounded-lg p-3 font-mono text-zinc-400">
+            <details className="mt-4 text-xs text-muted-foreground">
+              <summary className="cursor-pointer hover:text-muted-foreground">Preview first rows</summary>
+              <pre className="mt-2 max-h-32 overflow-auto bg-card rounded-lg p-3 font-mono text-muted-foreground">
                 {JSON.stringify(preview.sampleRows.slice(0, 3), null, 2)}
               </pre>
             </details>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-zinc-800 flex justify-end gap-2">
+        <div className="px-5 py-4 border-t border-border flex justify-end gap-2">
           <button
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="px-4 py-2 rounded-xl text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            className="px-4 py-2 rounded-xl text-sm text-muted-foreground hover:bg-white/5 disabled:opacity-50"
           >
             Cancel
           </button>
@@ -227,7 +227,7 @@ export function CsvImportWizard({
             type="button"
             onClick={handleConfirm}
             disabled={busy || !nameOk}
-            className="px-5 py-2 rounded-xl text-sm font-medium bg-white text-zinc-950 hover:bg-zinc-200 disabled:opacity-50"
+            className="px-5 py-2 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-50"
           >
             {busy ? "Importing…" : `Import ${preview.parsedRows} row(s)`}
           </button>

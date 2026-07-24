@@ -114,7 +114,7 @@ function InfoTip({ text }: { text: string }) {
     <span className="relative inline-flex">
       <button
         type="button"
-        className="w-4 h-4 rounded-full border border-zinc-600 text-[10px] text-zinc-400 hover:text-white hover:border-zinc-400 flex items-center justify-center"
+        className="w-4 h-4 rounded-full border border-border text-[10px] text-muted-foreground hover:text-foreground hover:border-border flex items-center justify-center"
         aria-label="What this metric means"
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
@@ -125,7 +125,7 @@ function InfoTip({ text }: { text: string }) {
         i
       </button>
       {open && (
-        <span className="absolute right-0 top-5 z-30 w-56 sm:w-64 rounded-xl border border-zinc-700 bg-zinc-950 p-2.5 text-[11px] leading-relaxed text-zinc-300 shadow-xl">
+        <span className="absolute right-0 top-5 z-30 w-56 sm:w-64 rounded-xl border border-border bg-background p-2.5 text-[11px] leading-relaxed text-muted-foreground shadow-xl">
           {text}
         </span>
       )}
@@ -135,10 +135,10 @@ function InfoTip({ text }: { text: string }) {
 
 function WidgetSkeleton() {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 animate-pulse">
-      <div className="h-4 w-1/3 bg-zinc-800 rounded mb-4" />
-      <div className="h-28 bg-zinc-800/80 rounded-xl" />
-      <div className="h-3 w-2/3 bg-zinc-800 rounded mt-3" />
+    <div className="bg-card border border-border rounded-2xl p-4 animate-pulse">
+      <div className="h-4 w-1/3 bg-muted rounded mb-4" />
+      <div className="h-28 bg-muted/80 rounded-xl" />
+      <div className="h-3 w-2/3 bg-muted rounded mt-3" />
     </div>
   );
 }
@@ -197,9 +197,9 @@ export function DashboardWidgetHost({ widgets, onDrill, loading }: Props) {
 
   if (!widgets.length) {
     return (
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center">
-        <p className="text-zinc-400 text-sm font-medium">No widgets for this role</p>
-        <p className="text-zinc-600 text-xs mt-1">
+      <div className="bg-card border border-border rounded-2xl p-8 text-center">
+        <p className="text-muted-foreground text-sm font-medium">No widgets for this role</p>
+        <p className="text-muted-foreground text-xs mt-1">
           Your portal role determines which KPIs and charts appear. Contact a Business Admin if this looks wrong.
         </p>
       </div>
@@ -250,15 +250,15 @@ export function DashboardWidgetHost({ widgets, onDrill, loading }: Props) {
           return (
             <div
               key={w.widgetKey}
-              className={`bg-zinc-900 border border-zinc-800 rounded-2xl p-3 sm:p-4 flex flex-col min-w-0 ${span}`}
+              className={`bg-card border border-border rounded-2xl p-3 sm:p-4 flex flex-col min-w-0 ${span}`}
             >
               <div className="flex items-start justify-between mb-2 sm:mb-3 gap-2">
-                <h3 className="text-xs sm:text-sm font-medium text-zinc-200 leading-snug line-clamp-2">
+                <h3 className="text-xs sm:text-sm font-medium text-foreground leading-snug line-clamp-2">
                   {w.title}
                 </h3>
                 <div className="flex items-center gap-2 shrink-0">
                   {w.drillDown?.enabled && (
-                    <span className="text-[10px] uppercase tracking-wider text-zinc-600 hidden md:inline">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground hidden md:inline">
                       Clickable
                     </span>
                   )}
@@ -267,7 +267,7 @@ export function DashboardWidgetHost({ widgets, onDrill, loading }: Props) {
               </div>
 
               {isMetric && (
-                <div className="text-2xl sm:text-3xl font-semibold tabular-nums text-white mb-1">
+                <div className="text-2xl sm:text-3xl font-semibold tabular-nums text-foreground mb-1">
                   {typeof w.value === "number"
                     ? isMoneyWidget(w)
                       ? money(w.value)
@@ -290,16 +290,16 @@ export function DashboardWidgetHost({ widgets, onDrill, loading }: Props) {
               )}
 
               {(w.type === "list" || w.type === "tasks_due" || w.type === "feedback_recent") && (
-                <ul className="divide-y divide-zinc-800 text-sm flex-1">
+                <ul className="divide-y divide-border text-sm flex-1">
                   {(w.items || []).length === 0 && (
-                    <li className="py-6 text-center text-zinc-500 text-xs">No items in this period</li>
+                    <li className="py-6 text-center text-muted-foreground text-xs">No items in this period</li>
                   )}
                   {(w.items || []).map((item, idx) => (
                     <li key={String(item.id || idx)} className="py-2 flex justify-between gap-2">
-                      <span className="text-zinc-200 truncate">
+                      <span className="text-foreground truncate">
                         {String(item.title || item.name || "—")}
                       </span>
-                      <span className="text-zinc-500 text-xs shrink-0">
+                      <span className="text-muted-foreground text-xs shrink-0">
                         {String(item.status || item.dueDate || "")}
                       </span>
                     </li>
@@ -307,7 +307,7 @@ export function DashboardWidgetHost({ widgets, onDrill, loading }: Props) {
                 </ul>
               )}
 
-              <p className="mt-2 sm:mt-3 text-[10px] sm:text-[11px] leading-relaxed text-zinc-500 border-t border-zinc-800/80 pt-2 line-clamp-3 sm:line-clamp-none">
+              <p className="mt-2 sm:mt-3 text-[10px] sm:text-[11px] leading-relaxed text-muted-foreground border-t border-border/80 pt-2 line-clamp-3 sm:line-clamp-none">
                 <span className="text-emerald-500/80 font-medium">AI insight · </span>
                 {insight.replace(/^AI:\s*/, "")}
               </p>

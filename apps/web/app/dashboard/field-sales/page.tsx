@@ -81,7 +81,7 @@ const STATUS_STYLE: Record<string, string> = {
   online: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   in_field: "bg-sky-500/15 text-sky-400 border-sky-500/30",
   meeting: "bg-violet-500/15 text-violet-300 border-violet-500/30",
-  offline: "bg-zinc-700/40 text-zinc-400 border-zinc-600",
+  offline: "bg-muted/40 text-muted-foreground border-border",
 };
 
 function statusLabel(s: string) {
@@ -124,7 +124,7 @@ function StatCard({
   label,
   value,
   sub,
-  tone = "border-zinc-800",
+  tone = "border-border",
 }: {
   label: string;
   value: React.ReactNode;
@@ -133,15 +133,15 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-2xl border bg-gradient-to-br from-white/[0.04] to-zinc-950/80 p-4 sm:p-5 ${tone} min-h-[110px] flex flex-col`}
+      className={`rounded-2xl border bg-gradient-to-br from-white/[0.04] to-background/80 p-4 sm:p-5 ${tone} min-h-[110px] flex flex-col`}
     >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </div>
-      <div className="mt-2 text-xl sm:text-2xl font-semibold tabular-nums text-white tracking-tight">
+      <div className="mt-2 text-xl sm:text-2xl font-semibold tabular-nums text-foreground tracking-tight">
         {value}
       </div>
-      {sub ? <div className="mt-auto pt-2 text-xs text-zinc-500 leading-relaxed">{sub}</div> : null}
+      {sub ? <div className="mt-auto pt-2 text-xs text-muted-foreground leading-relaxed">{sub}</div> : null}
     </div>
   );
 }
@@ -479,7 +479,7 @@ export default function FieldSalesPage() {
               type="button"
               disabled={busy}
               onClick={startField}
-              className="mm-btn mm-btn-primary min-h-11 px-5 bg-sky-500 border-0 text-zinc-950 hover:bg-sky-400"
+              className="mm-btn mm-btn-primary min-h-11 px-5 bg-sky-500 border-0 text-foreground hover:bg-sky-400"
             >
               {busy ? "Getting GPS…" : "▶ Start Field Work"}
             </button>
@@ -488,7 +488,7 @@ export default function FieldSalesPage() {
               type="button"
               disabled={busy}
               onClick={endField}
-              className="mm-btn min-h-11 px-5 bg-amber-500 text-zinc-950 border-0 hover:bg-amber-400"
+              className="mm-btn min-h-11 px-5 bg-amber-500 text-white border-0 hover:bg-amber-400"
             >
               {busy ? "Saving…" : "■ End Field Work"}
             </button>
@@ -529,7 +529,7 @@ export default function FieldSalesPage() {
 
       {myStatus?.activeField && (
         <div className="mb-5 rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 flex flex-wrap items-center gap-3">
-          <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-sky-500 text-zinc-950">
+          <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-sky-500 text-white">
             Live GPS
           </span>
           <span className="text-sm text-sky-100">
@@ -570,7 +570,7 @@ export default function FieldSalesPage() {
           value={
             <>
               {Number(travelToday || 0).toFixed(2)}{" "}
-              <span className="text-sm font-normal text-zinc-500">km</span>
+              <span className="text-sm font-normal text-muted-foreground">km</span>
             </>
           }
           sub={`Visits: ${insights?.visits?.length ?? 0} · Stay ${insights?.totalStayMin ?? 0} min`}
@@ -582,7 +582,7 @@ export default function FieldSalesPage() {
             insights?.officeInsight?.distanceKm != null ? (
               <>
                 {insights.officeInsight.distanceKm}{" "}
-                <span className="text-sm font-normal text-zinc-500">km</span>
+                <span className="text-sm font-normal text-muted-foreground">km</span>
               </>
             ) : (
               "—"
@@ -600,7 +600,7 @@ export default function FieldSalesPage() {
           value={
             speedKmh != null ? (
               <>
-                {speedKmh} <span className="text-sm font-normal text-zinc-500">km/h</span>
+                {speedKmh} <span className="text-sm font-normal text-muted-foreground">km/h</span>
               </>
             ) : (
               movement
@@ -615,24 +615,24 @@ export default function FieldSalesPage() {
             accuracy != null ? (
               <>
                 ±{Math.round(accuracy)}{" "}
-                <span className="text-sm font-normal text-zinc-500">m</span>
+                <span className="text-sm font-normal text-muted-foreground">m</span>
               </>
             ) : (
               "—"
             )
           }
           sub={lastSync}
-          tone="border-zinc-700"
+          tone="border-border"
         />
       </div>
 
       {/* Address detail card */}
       <div className="mm-panel p-4 sm:p-5 mb-6">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-2">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2">
           Full address
         </div>
-        <p className="text-sm sm:text-base text-zinc-100 leading-relaxed">{displayAddress}</p>
-        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-zinc-500">
+        <p className="text-sm sm:text-base text-foreground leading-relaxed">{displayAddress}</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
           {gpsLive?.pincode || insights?.currentPincode || myStatus?.state?.lastPincode ? (
             <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
               PIN {gpsLive?.pincode || insights?.currentPincode || myStatus?.state?.lastPincode}
@@ -661,18 +661,18 @@ export default function FieldSalesPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 items-stretch">
           <div className="mm-panel p-4 sm:p-5 flex flex-col min-h-[340px]">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-white">Team live location</h2>
+              <h2 className="text-sm font-semibold text-foreground">Team live location</h2>
               <button
                 type="button"
                 onClick={() => void load()}
-                className="text-xs px-2.5 py-1 rounded-lg border border-white/10 text-zinc-400 hover:text-white"
+                className="text-xs px-2.5 py-1 rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"
               >
                 Refresh
               </button>
             </div>
             <div className="space-y-2 flex-1 overflow-auto max-h-96">
               {team.length === 0 ? (
-                <p className="text-sm text-zinc-500 py-8 text-center">
+                <p className="text-sm text-muted-foreground py-8 text-center">
                   No live GPS yet. Team members should allow location and start field work.
                 </p>
               ) : (
@@ -684,11 +684,11 @@ export default function FieldSalesPage() {
                     className={`w-full text-left p-3 rounded-xl border transition-colors ${
                       selectedUserId === m.userId
                         ? "border-sky-500/50 bg-sky-500/10"
-                        : "border-zinc-800 bg-zinc-950/60 hover:border-zinc-700"
+                        : "border-border bg-background/60 hover:border-border"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-sm text-white truncate">{m.name}</span>
+                      <span className="font-medium text-sm text-foreground truncate">{m.name}</span>
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded-full border shrink-0 ${
                           STATUS_STYLE[m.status] || STATUS_STYLE.offline
@@ -697,12 +697,12 @@ export default function FieldSalesPage() {
                         {statusLabel(m.status)}
                       </span>
                     </div>
-                    <div className="text-xs text-zinc-400 mt-1 line-clamp-2">
+                    <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
                       {m.fullAddress ||
                         [m.locality, m.city, m.state, m.pincode].filter(Boolean).join(", ") ||
                         (m.source === "gps" ? "GPS fix (address pending)" : "GPS not available")}
                     </div>
-                    <div className="text-[10px] text-zinc-600 mt-1 flex flex-wrap justify-between gap-2">
+                    <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap justify-between gap-2">
                       <span>
                         {m.lastUpdatedAt ? new Date(m.lastUpdatedAt).toLocaleString() : ""}
                       </span>
@@ -724,7 +724,7 @@ export default function FieldSalesPage() {
               className="w-full flex-1 min-h-[280px] border-0"
               src={osmEmbed}
             />
-            <div className="p-2.5 text-[10px] text-zinc-500 border-t border-zinc-800 flex flex-wrap justify-between gap-2">
+            <div className="p-2.5 text-[10px] text-muted-foreground border-t border-border flex flex-wrap justify-between gap-2">
               <span>
                 Route points today: {routePts.length}
                 {routePts.length > 1 ? " (path stored on server)" : ""}
@@ -746,7 +746,7 @@ export default function FieldSalesPage() {
       {isManager &&
         ["ceo", "owner", "business_admin", "admin", "super_admin"].includes(role) && (
           <div className="mm-panel p-4 sm:p-5 mb-6">
-            <h2 className="text-sm font-semibold text-white mb-3">Office location</h2>
+            <h2 className="text-sm font-semibold text-foreground mb-3">Office location</h2>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <input
                 className="mm-input"
@@ -775,7 +775,7 @@ export default function FieldSalesPage() {
 
       {isManager && (
         <div className="mm-panel p-4 sm:p-5 mb-6">
-          <h2 className="text-sm font-semibold text-white mb-3">Reports</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-3">Reports</h2>
           <div className="flex flex-wrap gap-2">
             {(
               [
@@ -801,13 +801,13 @@ export default function FieldSalesPage() {
       {/* History */}
       <div className="mm-panel p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-white">
+          <h2 className="text-sm font-semibold text-foreground">
             Location history{selectedUserId ? " (selected)" : ""}
           </h2>
           {selectedUserId && (
             <button
               type="button"
-              className="text-xs text-zinc-500 hover:text-zinc-300"
+              className="text-xs text-muted-foreground hover:text-muted-foreground"
               onClick={() => setSelectedUserId("")}
             >
               Clear selection
@@ -816,8 +816,8 @@ export default function FieldSalesPage() {
         </div>
         {history.length === 0 ? (
           <div className="mm-empty py-10">
-            <p className="text-sm text-zinc-400">No GPS points yet</p>
-            <p className="text-xs text-zinc-600 mt-1">
+            <p className="text-sm text-muted-foreground">No GPS points yet</p>
+            <p className="text-xs text-muted-foreground mt-1">
               Start field work with location permission to record the route.
             </p>
           </div>

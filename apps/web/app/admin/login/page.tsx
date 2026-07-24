@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const INPUT_CLASS =
-  "portal-login-input w-full min-h-11 px-4 py-3 bg-zinc-950 border border-zinc-700 rounded-xl text-base sm:text-sm text-white placeholder:text-zinc-400";
+  "portal-login-input w-full min-h-11 px-4 py-3 bg-background border border-border rounded-xl text-base sm:text-sm text-foreground placeholder:text-muted-foreground";
 
 export default function SuperAdminLoginPage() {
   const router = useRouter();
@@ -46,31 +46,31 @@ export default function SuperAdminLoginPage() {
 
   if (hasSession) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-zinc-950">
-        <div className="text-zinc-400 text-sm">Opening Super Admin…</div>
+      <div className="min-h-dvh flex items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm">Opening Super Admin…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-zinc-950 px-4 py-10">
+    <div className="min-h-dvh flex items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/30 text-xs font-medium mb-4">
             SUPER ADMIN PORTAL
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">
             Massive Mentor Platform
           </h1>
-          <p className="mt-2 text-zinc-400 text-sm">
+          <p className="mt-2 text-muted-foreground text-sm">
             Internal staff only. Completely isolated from customer CRM authentication.
           </p>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-8">
+        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
           <form onSubmit={onSubmit} className="space-y-5">
             <div>
-              <label htmlFor="admin-email" className="block text-sm text-zinc-300 mb-2">
+              <label htmlFor="admin-email" className="block text-sm text-muted-foreground mb-2">
                 Staff email
               </label>
               <input
@@ -86,12 +86,12 @@ export default function SuperAdminLoginPage() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label htmlFor="admin-password" className="block text-sm text-zinc-300">
+                <label htmlFor="admin-password" className="block text-sm text-muted-foreground">
                   Password
                 </label>
                 <Link
                   href="/admin/forgot-password"
-                  className="text-xs text-zinc-400 hover:text-violet-300 underline"
+                  className="text-xs text-muted-foreground hover:text-violet-300 underline"
                 >
                   Forgot password?
                 </Link>
@@ -109,14 +109,14 @@ export default function SuperAdminLoginPage() {
             <button
               type="submit"
               disabled={busy}
-              className="w-full min-h-12 bg-violet-500 hover:bg-violet-400 text-zinc-950 font-semibold rounded-xl disabled:opacity-50 touch-manipulation"
+              className="w-full min-h-12 bg-violet-500 hover:bg-violet-400 text-white font-semibold rounded-xl disabled:opacity-50 touch-manipulation"
             >
               {busy ? "Signing in…" : "Sign in to Platform"}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-xs text-zinc-600 mt-6">
+        <p className="text-center text-xs text-muted-foreground mt-6">
           Customers use crm.massivementor.in · Demo uses demo.massivementor.in
         </p>
       </div>

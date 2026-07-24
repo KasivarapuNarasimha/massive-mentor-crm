@@ -56,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!ready) {
     return (
-      <div className="min-h-dvh bg-zinc-950 flex items-center justify-center text-zinc-500 text-sm">
+      <div className="min-h-dvh bg-background flex items-center justify-center text-muted-foreground text-sm">
         Loading platform…
       </div>
     );
@@ -67,12 +67,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-dvh bg-zinc-950 text-white flex">
-      <aside className="hidden lg:flex w-64 flex-col border-r border-zinc-800 bg-zinc-950 sticky top-0 h-dvh">
-        <div className="p-5 border-b border-zinc-800">
+    <div className="min-h-dvh bg-background text-foreground flex">
+      <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-background sticky top-0 h-dvh">
+        <div className="p-5 border-b border-border">
           <div className="text-xs uppercase tracking-widest text-violet-400/90 mb-1">Platform</div>
           <div className="font-semibold">Super Admin</div>
-          <div className="text-xs text-zinc-500 mt-1 truncate">{email}</div>
+          <div className="text-xs text-muted-foreground mt-1 truncate">{email}</div>
         </div>
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {NAV.map((item) => {
@@ -82,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 key={item.href}
                 href={item.href}
                 className={`block px-3 py-2.5 rounded-xl text-sm ${
-                  active ? "bg-violet-500/15 text-violet-200" : "text-zinc-400 hover:bg-white/5 hover:text-white"
+                  active ? "bg-violet-500/15 text-violet-200" : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
                 }`}
               >
                 {item.label}
@@ -90,7 +90,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             );
           })}
         </nav>
-        <div className="p-3 border-t border-zinc-800">
+        <div className="p-3 border-t border-border">
           <button
             type="button"
             onClick={logout}
@@ -102,19 +102,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="lg:hidden sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur px-3 py-3 flex items-center justify-between gap-2">
+        <header className="lg:hidden sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur px-3 py-3 flex items-center justify-between gap-2">
           <div className="font-semibold text-sm">Super Admin</div>
           <button type="button" onClick={logout} className="text-xs text-red-400 px-2 py-1">
             Sign out
           </button>
         </header>
-        <nav className="lg:hidden flex gap-1 overflow-x-auto px-2 py-2 border-b border-zinc-800 text-xs">
+        <nav className="lg:hidden flex gap-1 overflow-x-auto px-2 py-2 border-b border-border text-xs">
           {NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={`shrink-0 px-3 py-2 rounded-lg ${
-                pathname === item.href ? "bg-violet-500/20 text-violet-200" : "text-zinc-400"
+                pathname === item.href ? "bg-violet-500/20 text-violet-200" : "text-muted-foreground"
               }`}
             >
               {item.label}

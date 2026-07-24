@@ -518,7 +518,7 @@ function AiSalesIntelligencePageInner() {
     <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
       <div className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight">AI Sales Intelligence</h1>
-        <p className="text-zinc-400 mt-2">AI-powered tools for your CRM. Powered by Groq / your AI provider.</p>
+        <p className="text-muted-foreground mt-2">AI-powered tools for your CRM. Powered by Groq / your AI provider.</p>
       </div>
 
       {/* CRM Dashboard KPIs */}
@@ -526,7 +526,7 @@ function AiSalesIntelligencePageInner() {
         <h2 className="text-xl font-semibold mb-4 tracking-tight">CRM Dashboard</h2>
         {isLoading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[...Array(7)].map((_, i) => <div key={i} className="h-24 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse" />)}
+            {[...Array(7)].map((_, i) => <div key={i} className="h-24 bg-card border border-border rounded-2xl animate-pulse" />)}
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
@@ -544,13 +544,13 @@ function AiSalesIntelligencePageInner() {
       {/* AI Tools */}
       <div className="space-y-8">
         {/* Lead Scoring */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+        <div className="bg-card border border-border rounded-2xl p-6">
           <h3 className="font-semibold mb-4">AI Lead Scoring (0-100)</h3>
           <div className="flex flex-col md:flex-row gap-3 mb-4">
             <select
               value={selectedContactId}
               onChange={(e) => setSelectedContactId(e.target.value)}
-              className="flex-1 min-w-[160px] bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-zinc-600"
+              className="flex-1 min-w-[160px] bg-background border border-border rounded-xl px-4 py-2.5 text-foreground focus:outline-none focus:border-border"
               title="Select a lead"
             >
               <option value="">Select a Lead</option>
@@ -562,15 +562,15 @@ function AiSalesIntelligencePageInner() {
             <button
               onClick={() => runAi("lead-score", { contactId: selectedContactId }, setLeadScoreResult, "Lead Score")}
               disabled={!selectedContactId || isGenerating}
-              className="px-6 py-2.5 bg-white text-zinc-950 rounded-xl font-medium disabled:opacity-50"
+              className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium disabled:opacity-50"
             >
               Score Lead
             </button>
           </div>
           {!!leadScoreResult && (
-            <div className="mt-3 p-4 bg-zinc-950 border border-zinc-800 rounded-xl">
+            <div className="mt-3 p-4 bg-background border border-border rounded-xl">
               <div className="text-3xl font-bold tabular-nums text-emerald-400">{(leadScoreResult as {score?: number}).score}</div>
-              <p className="text-sm text-zinc-300 mt-1">{(leadScoreResult as {explanation?: string}).explanation}</p>
+              <p className="text-sm text-muted-foreground mt-1">{(leadScoreResult as {explanation?: string}).explanation}</p>
               <button onClick={() => {
                 const ls = leadScoreResult as {score?: number, explanation?: string};
                 copyToClipboard(`${ls.score}: ${ls.explanation}`);
@@ -581,13 +581,13 @@ function AiSalesIntelligencePageInner() {
 
         {/* Follow-up Suggestions (kept compact) */}
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-card border border-border rounded-2xl p-6">
             <h3 className="font-semibold mb-4">AI Follow-up Suggestions</h3>
             <div className="flex gap-3 mb-4">
               <select 
                 value={selectedContactId} 
                 onChange={e=>setSelectedContactId(e.target.value)} 
-                className="flex-1 min-w-[140px] bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-zinc-600"
+                className="flex-1 min-w-[140px] bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-border"
                 title="Select Lead/Client"
               >
                 <option value="">Select Lead/Client</option>
@@ -598,12 +598,12 @@ function AiSalesIntelligencePageInner() {
               </select>
               <button onClick={() => runAi("follow-up", { contactId: selectedContactId }, setFollowUpResult, "Suggestions")} disabled={!selectedContactId || isGenerating} className="px-5 bg-white/10 rounded-xl text-sm">Generate</button>
             </div>
-            {followUpResult && (followUpResult as Record<string, unknown>).suggestions ? <ul className="text-sm space-y-1 text-zinc-300">{((followUpResult as Record<string, unknown>).suggestions as string[]).map((s: string, i: number) => <li key={i}>• {s}</li>)}</ul> : null}
+            {followUpResult && (followUpResult as Record<string, unknown>).suggestions ? <ul className="text-sm space-y-1 text-muted-foreground">{((followUpResult as Record<string, unknown>).suggestions as string[]).map((s: string, i: number) => <li key={i}>• {s}</li>)}</ul> : null}
           </div>
         </div>
 
         {/* Production Quality AI WhatsApp Generator (Feature 2) */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+        <div className="bg-card border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">AI WhatsApp Generator</h3>
               {selectedContactPhone && (
@@ -616,7 +616,7 @@ function AiSalesIntelligencePageInner() {
               <select
                 value={selectedContactId}
                 onChange={(e) => setSelectedContactId(e.target.value)}
-                className="flex-1 min-w-[160px] bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-zinc-600"
+                className="flex-1 min-w-[160px] bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm focus:outline-none focus:border-border"
                 title="Select Lead / Contact"
               >
                 <option value="">Select Lead / Contact</option>
@@ -631,7 +631,7 @@ function AiSalesIntelligencePageInner() {
               </select>
 
               {/* Tone Selector */}
-              <div className="flex rounded-xl overflow-hidden border border-zinc-800">
+              <div className="flex rounded-xl overflow-hidden border border-border">
                 {(["Professional", "Friendly", "Sales"] as const).map((t) => (
                   <button
                     key={t}
@@ -639,8 +639,8 @@ function AiSalesIntelligencePageInner() {
                     disabled={isGenerating}
                     className={`px-4 py-2 text-sm transition-colors ${
                       waTone === t
-                        ? "bg-white text-zinc-950 font-medium"
-                        : "bg-zinc-950 text-zinc-300 hover:bg-zinc-800"
+                        ? "bg-primary text-primary-foreground font-medium"
+                        : "bg-background text-muted-foreground hover:bg-muted"
                     }`}
                   >
                     {t}
@@ -659,7 +659,7 @@ function AiSalesIntelligencePageInner() {
               <button
                 onClick={generateWhatsApp}
                 disabled={!selectedContactId || isGenerating}
-                className="px-6 py-2.5 bg-white text-zinc-950 rounded-xl font-medium disabled:opacity-50 hover:bg-zinc-200"
+                className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium disabled:opacity-50 hover:bg-primary-hover"
               >
                 {isGenerating ? "Generating..." : "Generate Message"}
               </button>
@@ -667,14 +667,14 @@ function AiSalesIntelligencePageInner() {
 
             {/* Generated Message Display */}
             {waMessage && (
-              <div className="mt-4 p-4 bg-zinc-950 border border-zinc-800 rounded-xl">
-                <div className="flex items-center justify-between mb-2 text-xs uppercase tracking-widest text-zinc-400">
+              <div className="mt-4 p-4 bg-background border border-border rounded-xl">
+                <div className="flex items-center justify-between mb-2 text-xs uppercase tracking-widest text-muted-foreground">
                   <span>
                     {waTone} • {getLanguageLabel(waLanguage)}
                   </span>
                   <span>Ready to send</span>
                 </div>
-                <div className="text-sm text-zinc-100 whitespace-pre-wrap leading-relaxed mb-4 p-3 bg-zinc-900 rounded-lg border border-zinc-800">
+                <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed mb-4 p-3 bg-card rounded-lg border border-border">
                   {waMessage}
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -697,16 +697,16 @@ function AiSalesIntelligencePageInner() {
             {/* History for selected lead */}
             <div className="mt-6">
               <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-medium text-zinc-400">Previous Messages for this Lead</div>
-                {waLoadingHistory && <div className="text-xs text-zinc-500">Loading...</div>}
+                <div className="text-sm font-medium text-muted-foreground">Previous Messages for this Lead</div>
+                {waLoadingHistory && <div className="text-xs text-muted-foreground">Loading...</div>}
               </div>
               {waHistory.length === 0 ? (
-                <div className="text-xs text-zinc-500 italic">No saved messages yet for this lead.</div>
+                <div className="text-xs text-muted-foreground italic">No saved messages yet for this lead.</div>
               ) : (
                 <div className="space-y-3 max-h-72 overflow-auto pr-1">
                   {waHistory.map((item, idx) => (
-                    <div key={idx} className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-sm">
-                      <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1.5">
+                    <div key={idx} className="p-3 bg-background border border-border rounded-xl text-sm">
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1.5">
                         <span>
                           {item.createdAt
                             ? new Date(item.createdAt).toLocaleString()
@@ -714,7 +714,7 @@ function AiSalesIntelligencePageInner() {
                           • {item.tone || "—"} • {getLanguageLabel(item.language || "auto")}
                         </span>
                       </div>
-                      <div className="text-zinc-200 whitespace-pre-wrap text-sm mb-2 leading-snug">
+                      <div className="text-foreground whitespace-pre-wrap text-sm mb-2 leading-snug">
                         {item.content || item.body || ""}
                       </div>
                       <div className="flex gap-2">
@@ -736,17 +736,17 @@ function AiSalesIntelligencePageInner() {
                 </div>
               )}
             </div>
-            <p className="mt-3 text-[10px] text-zinc-500">Messages are automatically saved with tone + language. Generation uses AI for natural fluency in the chosen language.</p>
+            <p className="mt-3 text-[10px] text-muted-foreground">Messages are automatically saved with tone + language. Generation uses AI for natural fluency in the chosen language.</p>
           </div>
 
         {/* Proposal, Forecast, Next Best Action */}
         <div className="grid md:grid-cols-3 gap-6">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-card border border-border rounded-2xl p-6">
             <h3 className="font-semibold mb-4">AI Proposal Generator</h3>
             <select 
               value={selectedDealId} 
               onChange={e=>setSelectedDealId(e.target.value)} 
-              className="w-full mb-3 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-zinc-600"
+              className="w-full mb-3 bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-border"
               title="Select a deal"
             >
               <option value="">Select Deal</option>
@@ -776,8 +776,8 @@ function AiSalesIntelligencePageInner() {
                 if (arr.length === 0) return null;
                 return (
                   <div className="mt-1">
-                    <div className="text-xs text-zinc-400 uppercase tracking-wider mb-0.5">{title}</div>
-                    <ul className="list-disc pl-4 text-sm text-zinc-200 space-y-0.5">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">{title}</div>
+                    <ul className="list-disc pl-4 text-sm text-foreground space-y-0.5">
                       {arr.map((item, i) => <li key={i}>{String(item)}</li>)}
                     </ul>
                   </div>
@@ -789,12 +789,12 @@ function AiSalesIntelligencePageInner() {
                 const entries = Object.entries(obj as Record<string, unknown>);
                 if (entries.length === 0) return null;
                 return (
-                  <div className="mt-1 bg-zinc-900 border border-zinc-700 rounded p-2 text-xs">
-                    <div className="text-zinc-400 uppercase tracking-wider mb-1">{title}</div>
+                  <div className="mt-1 bg-card border border-border rounded p-2 text-xs">
+                    <div className="text-muted-foreground uppercase tracking-wider mb-1">{title}</div>
                     {entries.map(([k, v]) => (
                       <div key={k} className="flex gap-2 mb-0.5">
-                        <span className="text-zinc-400 min-w-[80px]">{k}:</span>
-                        <span className="text-zinc-200">{formatText(v)}</span>
+                        <span className="text-muted-foreground min-w-[80px]">{k}:</span>
+                        <span className="text-foreground">{formatText(v)}</span>
                       </div>
                     ))}
                   </div>
@@ -804,7 +804,7 @@ function AiSalesIntelligencePageInner() {
               const renderSolution = (sol: unknown) => {
                 if (!sol) return null;
                 if (typeof sol === 'string') {
-                  return <p className="mt-1 text-sm text-zinc-200 whitespace-pre-wrap">{sol}</p>;
+                  return <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{sol}</p>;
                 }
                 if (typeof sol === 'object' && sol !== null) {
                   const s = sol as Record<string, unknown>;
@@ -812,8 +812,8 @@ function AiSalesIntelligencePageInner() {
                     <div className="mt-1 space-y-2 text-sm">
                       {s.description ? (
                         <div>
-                          <div className="text-xs text-zinc-400 uppercase tracking-wider">Description</div>
-                          <p className="text-zinc-200 whitespace-pre-wrap">{String(s.description)}</p>
+                          <div className="text-xs text-muted-foreground uppercase tracking-wider">Description</div>
+                          <p className="text-foreground whitespace-pre-wrap">{String(s.description)}</p>
                         </div>
                       ) : null}
                       {renderList(s.keyFeatures, 'Key Features')}
@@ -826,13 +826,13 @@ function AiSalesIntelligencePageInner() {
                     </div>
                   );
                 }
-                return <p className="mt-1 text-sm text-zinc-200">{String(sol)}</p>;
+                return <p className="mt-1 text-sm text-foreground">{String(sol)}</p>;
               };
 
               const renderPricing = (pr: unknown) => {
                 if (!pr) return null;
                 if (typeof pr === 'string') {
-                  return <p className="mt-1 text-sm text-zinc-200 whitespace-pre-wrap">{pr}</p>;
+                  return <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{pr}</p>;
                 }
                 if (typeof pr === 'object' && pr !== null) {
                   const pObj = pr as Record<string, unknown>;
@@ -840,20 +840,20 @@ function AiSalesIntelligencePageInner() {
                     <div className="mt-1 space-y-2 text-sm">
                       {pObj.totalPrice ? (
                         <div>
-                          <span className="text-xs text-zinc-400 uppercase tracking-wider">Total Price: </span>
+                          <span className="text-xs text-muted-foreground uppercase tracking-wider">Total Price: </span>
                           <span className="font-medium text-emerald-400">{String(pObj.totalPrice)}</span>
                         </div>
                       ) : null}
                       {pObj.breakdown ? (
                         <div>
-                          <div className="text-xs text-zinc-400 uppercase tracking-wider mb-1">Breakdown</div>
+                          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Breakdown</div>
                           {Array.isArray(pObj.breakdown) ? (
                             <div className="space-y-1">
                               {pObj.breakdown.map((item: unknown, i: number) => {
                                 if (typeof item === "object" && item) {
                                   const row = item as Record<string, unknown>;
                                   return (
-                                    <div key={i} className="flex justify-between bg-zinc-900 px-2 py-1 rounded text-xs border border-zinc-700">
+                                    <div key={i} className="flex justify-between bg-card px-2 py-1 rounded text-xs border border-border">
                                       <span>
                                         {String(
                                           row.item || row.name || row.description || JSON.stringify(item)
@@ -875,14 +875,14 @@ function AiSalesIntelligencePageInner() {
                       ) : null}
                       {pObj.paymentTerms ? (
                         <div>
-                          <div className="text-xs text-zinc-400 uppercase tracking-wider">Payment Terms</div>
-                          <p className="text-zinc-200">{String(pObj.paymentTerms)}</p>
+                          <div className="text-xs text-muted-foreground uppercase tracking-wider">Payment Terms</div>
+                          <p className="text-foreground">{String(pObj.paymentTerms)}</p>
                         </div>
                       ) : null}
                       {pObj.validity ? (
                         <div>
-                          <div className="text-xs text-zinc-400 uppercase tracking-wider">Validity</div>
-                          <p className="text-zinc-200">{String(pObj.validity)}</p>
+                          <div className="text-xs text-muted-foreground uppercase tracking-wider">Validity</div>
+                          <p className="text-foreground">{String(pObj.validity)}</p>
                         </div>
                       ) : null}
                       {/* other pricing fields as card */}
@@ -892,18 +892,18 @@ function AiSalesIntelligencePageInner() {
                     </div>
                   );
                 }
-                return <p className="mt-1 text-sm text-zinc-200">{String(pr)}</p>;
+                return <p className="mt-1 text-sm text-foreground">{String(pr)}</p>;
               };
 
               const renderGeneral = (val: unknown) => {
                 if (val == null || val === '') return null;
                 if (Array.isArray(val)) {
-                  return <ul className="list-disc pl-4 mt-1 text-sm text-zinc-200 space-y-0.5">{val.map((v,i) => <li key={i}>{String(v)}</li>)}</ul>;
+                  return <ul className="list-disc pl-4 mt-1 text-sm text-foreground space-y-0.5">{val.map((v,i) => <li key={i}>{String(v)}</li>)}</ul>;
                 }
                 if (typeof val === 'object') {
                   return renderObjectAsCard(val, 'Details');
                 }
-                return <p className="mt-1 text-sm text-zinc-200 whitespace-pre-wrap">{String(val)}</p>;
+                return <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{String(val)}</p>;
               };
 
               const formatProposalText = (proposal: Record<string, unknown>) => {
@@ -922,45 +922,45 @@ function AiSalesIntelligencePageInner() {
               };
 
               return (
-                <div className="text-sm text-zinc-300 bg-zinc-950 p-4 rounded border border-zinc-800 max-h-80 overflow-auto space-y-4">
+                <div className="text-sm text-muted-foreground bg-background p-4 rounded border border-border max-h-80 overflow-auto space-y-4">
                   {p.title ? (
                     <div>
-                      <strong className="text-white text-xs uppercase tracking-wider">Title</strong>
+                      <strong className="text-foreground text-xs uppercase tracking-wider">Title</strong>
                       {renderGeneral(p.title)}
                     </div>
                   ) : null}
                   {p.executiveSummary ? (
                     <div>
-                      <strong className="text-white text-xs uppercase tracking-wider">Executive Summary</strong>
+                      <strong className="text-foreground text-xs uppercase tracking-wider">Executive Summary</strong>
                       {renderGeneral(p.executiveSummary)}
                     </div>
                   ) : null}
                   {p.solution ? (
                     <div>
-                      <strong className="text-white text-xs uppercase tracking-wider">Solution</strong>
+                      <strong className="text-foreground text-xs uppercase tracking-wider">Solution</strong>
                       {renderSolution(p.solution)}
                     </div>
                   ) : null}
                   {p.pricing ? (
                     <div>
-                      <strong className="text-white text-xs uppercase tracking-wider">Pricing</strong>
+                      <strong className="text-foreground text-xs uppercase tracking-wider">Pricing</strong>
                       {renderPricing(p.pricing)}
                     </div>
                   ) : null}
                   {p.timeline ? (
                     <div>
-                      <strong className="text-white text-xs uppercase tracking-wider">Timeline</strong>
+                      <strong className="text-foreground text-xs uppercase tracking-wider">Timeline</strong>
                       {renderGeneral(p.timeline)}
                     </div>
                   ) : null}
                   {p.nextSteps ? (
                     <div>
-                      <strong className="text-white text-xs uppercase tracking-wider">Next Steps</strong>
+                      <strong className="text-foreground text-xs uppercase tracking-wider">Next Steps</strong>
                       {renderGeneral(p.nextSteps)}
                     </div>
                   ) : null}
 
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-700">
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
                     <button
                       onClick={() => copyToClipboard(formatProposalText(p))}
                       className="text-xs px-3 py-1 bg-white/10 hover:bg-white/20 rounded border border-white/10"
@@ -1003,7 +1003,7 @@ function AiSalesIntelligencePageInner() {
             })() : null}
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-card border border-border rounded-2xl p-6">
             <h3 className="font-semibold mb-4">AI Sales Forecast</h3>
             <button onClick={() => runAi("forecast", {}, setForecastResult, "Forecast")} disabled={isGenerating} className="w-full py-2 bg-white/10 rounded-xl text-sm mb-3">Generate Forecast</button>
             {!!forecastResult ? (() => {
@@ -1014,19 +1014,19 @@ function AiSalesIntelligencePageInner() {
               return (
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3">
-                      <div className="text-xs uppercase tracking-widest text-zinc-400 mb-1">Expected Revenue</div>
+                    <div className="bg-background border border-border rounded-xl p-3">
+                      <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Expected Revenue</div>
                       <div className="text-lg font-semibold text-emerald-400 tabular-nums">{formatCurrency(revenue)}</div>
                     </div>
-                    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3">
-                      <div className="text-xs uppercase tracking-widest text-zinc-400 mb-1">Win Rate</div>
-                      <div className="text-lg font-semibold text-white tabular-nums">{winRate != null ? `${winRate}%` : '—'}</div>
+                    <div className="bg-background border border-border rounded-xl p-3">
+                      <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Win Rate</div>
+                      <div className="text-lg font-semibold text-foreground tabular-nums">{winRate != null ? `${winRate}%` : '—'}</div>
                     </div>
                   </div>
                   {insights.length > 0 && (
-                    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3">
-                      <div className="text-xs uppercase tracking-widest text-zinc-400 mb-2">Insights</div>
-                      <ul className="text-sm text-zinc-200 space-y-1 list-disc list-inside">
+                    <div className="bg-background border border-border rounded-xl p-3">
+                      <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Insights</div>
+                      <ul className="text-sm text-foreground space-y-1 list-disc list-inside">
                         {insights.map((ins: string, i: number) => <li key={i}>{ins}</li>)}
                       </ul>
                     </div>
@@ -1036,13 +1036,13 @@ function AiSalesIntelligencePageInner() {
             })() : null}
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-card border border-border rounded-2xl p-6">
             <h3 className="font-semibold mb-4">AI Next Best Action</h3>
             <div className="flex flex-col sm:flex-row gap-2 mb-3">
               <select 
                 value={selectedContactId} 
                 onChange={e=>setSelectedContactId(e.target.value)} 
-                className="flex-1 min-w-[140px] bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-zinc-600"
+                className="flex-1 min-w-[140px] bg-background border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-border"
                 title="Select contact"
               >
                 <option value="">Contact</option>
@@ -1054,7 +1054,7 @@ function AiSalesIntelligencePageInner() {
               <select 
                 value={selectedDealId} 
                 onChange={e=>setSelectedDealId(e.target.value)} 
-                className="flex-1 min-w-[140px] bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-zinc-600"
+                className="flex-1 min-w-[140px] bg-background border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-border"
                 title="Select deal"
               >
                 <option value="">Deal</option>
@@ -1071,21 +1071,21 @@ function AiSalesIntelligencePageInner() {
             {!!nextActionResult ? (() => {
               const n = nextActionResult as Record<string, unknown>;
               return (
-                <div className="mt-2 bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-2">
+                <div className="mt-2 bg-background border border-border rounded-xl p-4 space-y-2">
                   <div>
-                    <div className="text-xs uppercase tracking-widest text-zinc-400 mb-0.5">Recommended Action</div>
-                    <div className="text-white font-medium">{String(n.action || '—')}</div>
+                    <div className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Recommended Action</div>
+                    <div className="text-foreground font-medium">{String(n.action || '—')}</div>
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-widest text-zinc-400 mb-0.5">Reason</div>
-                    <div className="text-sm text-zinc-200">{String(n.reason || '—')}</div>
+                    <div className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Reason</div>
+                    <div className="text-sm text-foreground">{String(n.reason || '—')}</div>
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-widest text-zinc-400 mb-0.5">Priority</div>
+                    <div className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Priority</div>
                     <div className="text-sm text-emerald-400">{String(n.priority || '—')}</div>
                   </div>
                   <div>
-                    <div className="text-xs uppercase tracking-widest text-zinc-400 mb-0.5">Timing</div>
+                    <div className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Timing</div>
                     <div className="text-sm text-emerald-400">{String(n.timing || '—')}</div>
                   </div>
                 </div>
@@ -1096,22 +1096,22 @@ function AiSalesIntelligencePageInner() {
 
         {/* Meeting Summary + Reminders */}
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-card border border-border rounded-2xl p-6">
             <h3 className="font-semibold mb-1">AI Meeting Summary</h3>
-            <p className="text-xs text-zinc-500 mb-4">
+            <p className="text-xs text-muted-foreground mb-4">
               Pick a meeting by title — no internal IDs. AI reads notes, discussion, and outcome.
             </p>
 
-            <label className="block text-xs text-zinc-500 mb-1.5">Search meetings</label>
+            <label className="block text-xs text-muted-foreground mb-1.5">Search meetings</label>
             <input
               type="search"
               value={meetingSearch}
               onChange={(e) => setMeetingSearch(e.target.value)}
               placeholder="Search by title, client, date…"
-              className="w-full mb-3 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 min-h-11"
+              className="w-full mb-3 bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground min-h-11"
             />
 
-            <label className="block text-xs text-zinc-500 mb-1.5">Meeting</label>
+            <label className="block text-xs text-muted-foreground mb-1.5">Meeting</label>
             <select
               value={selectedMeetingId}
               onChange={(e) => {
@@ -1119,7 +1119,7 @@ function AiSalesIntelligencePageInner() {
                 setMeetingSummaryResult(null);
                 setMeetingSummaryStatus(null);
               }}
-              className="w-full mb-3 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-white min-h-11"
+              className="w-full mb-3 bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground min-h-11"
               aria-label="Select meeting to summarize"
             >
               <option value="">Select a meeting…</option>
@@ -1163,8 +1163,8 @@ function AiSalesIntelligencePageInner() {
               const m = meetings.find((x) => x.id === selectedMeetingId);
               if (!m) return null;
               return (
-                <div className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950/80 p-3 text-xs text-zinc-400 space-y-1">
-                  <div className="text-sm text-white font-medium">{m.title}</div>
+                <div className="mb-3 rounded-xl border border-border bg-background/80 p-3 text-xs text-muted-foreground space-y-1">
+                  <div className="text-sm text-foreground font-medium">{m.title}</div>
                   <div>
                     {m.scheduledAt
                       ? new Date(m.scheduledAt).toLocaleString()
@@ -1173,21 +1173,21 @@ function AiSalesIntelligencePageInner() {
                   </div>
                   <div>
                     Client/Lead:{" "}
-                    <span className="text-zinc-200">
+                    <span className="text-foreground">
                       {m.contact?.name || "Not linked"}
                       {m.contact?.company ? ` (${m.contact.company})` : ""}
                     </span>
                   </div>
                   {(m.notes || m.outcome) && (
-                    <div className="pt-1 border-t border-zinc-800 mt-1 space-y-0.5">
+                    <div className="pt-1 border-t border-border mt-1 space-y-0.5">
                       {m.notes ? (
                         <p className="line-clamp-2">
-                          Notes: <span className="text-zinc-300">{m.notes}</span>
+                          Notes: <span className="text-muted-foreground">{m.notes}</span>
                         </p>
                       ) : null}
                       {m.outcome ? (
                         <p>
-                          Outcome: <span className="text-zinc-300">{m.outcome}</span>
+                          Outcome: <span className="text-muted-foreground">{m.outcome}</span>
                         </p>
                       ) : null}
                     </div>
@@ -1200,7 +1200,7 @@ function AiSalesIntelligencePageInner() {
               type="button"
               onClick={() => void generateMeetingSummary()}
               disabled={isGenerating || !selectedMeetingId}
-              className="w-full min-h-11 py-2.5 bg-white text-zinc-950 font-medium rounded-xl text-sm disabled:opacity-50"
+              className="w-full min-h-11 py-2.5 bg-primary text-primary-foreground font-medium rounded-xl text-sm disabled:opacity-50"
               aria-busy={!!meetingSummaryStatus}
             >
               {meetingSummaryStatus ? "Working…" : "Generate AI Summary"}
@@ -1284,84 +1284,84 @@ function AiSalesIntelligencePageInner() {
                       Copy all
                     </button>
                   </div>
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">
+                  <div className="rounded-xl border border-border bg-background p-3">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                       Executive Summary
                     </div>
-                    <p className="text-zinc-100 leading-relaxed">{exec || "—"}</p>
+                    <p className="text-foreground leading-relaxed">{exec || "—"}</p>
                   </div>
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">
+                  <div className="rounded-xl border border-border bg-background p-3">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                       Key Discussion Points
                     </div>
                     {points.length ? (
-                      <ul className="space-y-1 text-zinc-200">
+                      <ul className="space-y-1 text-foreground">
                         {points.map((p, i) => (
                           <li key={i}>• {String(p)}</li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-zinc-500">—</p>
+                      <p className="text-muted-foreground">—</p>
                     )}
                   </div>
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">
+                  <div className="rounded-xl border border-border bg-background p-3">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                       Action Items
                     </div>
                     {actions.length ? (
-                      <ul className="space-y-1 text-zinc-200">
+                      <ul className="space-y-1 text-foreground">
                         {actions.map((p, i) => (
                           <li key={i}>• {String(p)}</li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-zinc-500">—</p>
+                      <p className="text-muted-foreground">—</p>
                     )}
                   </div>
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">
+                  <div className="rounded-xl border border-border bg-background p-3">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                       Follow-up Tasks
                     </div>
                     {followUps.length ? (
-                      <ul className="space-y-1 text-zinc-200">
+                      <ul className="space-y-1 text-foreground">
                         {followUps.map((p, i) => (
                           <li key={i}>• {String(p)}</li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-zinc-500">—</p>
+                      <p className="text-muted-foreground">—</p>
                     )}
                   </div>
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                    <div className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">
+                  <div className="rounded-xl border border-border bg-background p-3">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                       Next Meeting Recommendation
                     </div>
-                    <p className="text-zinc-100">{next || "—"}</p>
+                    <p className="text-foreground">{next || "—"}</p>
                   </div>
                 </div>
               );
             })()}
           </div>
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-card border border-border rounded-2xl p-6">
             <h3 className="font-semibold mb-1">AI Reminder Suggestions</h3>
-            <p className="text-xs text-zinc-500 mb-4">
+            <p className="text-xs text-muted-foreground mb-4">
               Built from the selected lead/client, deal, and/or meeting — dates are relative to
               today (or the meeting date), not demo years.
             </p>
-            <div className="flex flex-wrap gap-2 mb-3 text-[11px] text-zinc-500">
+            <div className="flex flex-wrap gap-2 mb-3 text-[11px] text-muted-foreground">
               {selectedContactId && (
-                <span className="px-2 py-1 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300">
+                <span className="px-2 py-1 rounded-lg bg-background border border-border text-muted-foreground">
                   Contact selected
                 </span>
               )}
               {selectedDealId && (
-                <span className="px-2 py-1 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300">
+                <span className="px-2 py-1 rounded-lg bg-background border border-border text-muted-foreground">
                   Deal selected
                 </span>
               )}
               {selectedMeetingId && (
-                <span className="px-2 py-1 rounded-lg bg-zinc-950 border border-zinc-800 text-zinc-300">
+                <span className="px-2 py-1 rounded-lg bg-background border border-border text-muted-foreground">
                   Meeting selected
                 </span>
               )}
@@ -1411,7 +1411,7 @@ function AiSalesIntelligencePageInner() {
                     rem.priority === "high"
                       ? "bg-red-500/15 text-red-300 border-red-500/30"
                       : rem.priority === "low"
-                        ? "bg-zinc-700/40 text-zinc-300 border-zinc-600"
+                        ? "bg-muted/40 text-muted-foreground border-border"
                         : "bg-amber-500/15 text-amber-200 border-amber-500/30";
                   const typeLabel =
                     rem.type === "follow_up"
@@ -1420,12 +1420,12 @@ function AiSalesIntelligencePageInner() {
                   return (
                     <li
                       key={rem.id}
-                      className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2"
+                      className="rounded-xl border border-border bg-background p-3 space-y-2"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-white">{rem.title}</div>
-                          <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">
+                          <div className="text-sm font-medium text-foreground">{rem.title}</div>
+                          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                             {rem.description}
                           </p>
                         </div>
@@ -1435,16 +1435,16 @@ function AiSalesIntelligencePageInner() {
                           {rem.priority}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                         <span>
-                          Due: <span className="text-zinc-300">{dueLabel}</span>
+                          Due: <span className="text-muted-foreground">{dueLabel}</span>
                         </span>
                         <span>
-                          Type: <span className="text-zinc-300">{typeLabel}</span>
+                          Type: <span className="text-muted-foreground">{typeLabel}</span>
                         </span>
                         <span>
                           Assigned:{" "}
-                          <span className="text-zinc-300">
+                          <span className="text-muted-foreground">
                             {rem.assignedUserName || rem.assignedUserEmail}
                           </span>
                         </span>
@@ -1456,7 +1456,7 @@ function AiSalesIntelligencePageInner() {
                             !!rem.createdTaskId || creatingReminderId === rem.id
                           }
                           onClick={() => void createTaskFromReminder(rem)}
-                          className="min-h-9 px-3 rounded-lg text-xs font-medium bg-emerald-500 text-zinc-950 hover:bg-emerald-400 disabled:opacity-50"
+                          className="min-h-9 px-3 rounded-lg text-xs font-medium bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-50"
                         >
                           {rem.createdTaskId
                             ? "Task created ✓"
@@ -1467,7 +1467,7 @@ function AiSalesIntelligencePageInner() {
                         <button
                           type="button"
                           onClick={() => addReminderToCalendar(rem)}
-                          className="min-h-9 px-3 rounded-lg text-xs font-medium bg-white/10 text-zinc-200 border border-zinc-700 hover:bg-white/15"
+                          className="min-h-9 px-3 rounded-lg text-xs font-medium bg-white/10 text-foreground border border-border hover:bg-white/15"
                         >
                           Add to Calendar
                         </button>
@@ -1481,15 +1481,15 @@ function AiSalesIntelligencePageInner() {
         </div>
       </div>
 
-      <p className="text-xs text-zinc-500 mt-8">All AI outputs are generated using your configured provider (Groq recommended). Results can be copied for use in proposals or CRM records.</p>
+      <p className="text-xs text-muted-foreground mt-8">All AI outputs are generated using your configured provider (Groq recommended). Results can be copied for use in proposals or CRM records.</p>
     </div>
   );
 }
 
 function KpiCard({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-      <div className="text-xs text-zinc-500 mb-1 tracking-widest">{label.toUpperCase()}</div>
+    <div className="bg-card border border-border rounded-2xl p-4">
+      <div className="text-xs text-muted-foreground mb-1 tracking-widest">{label.toUpperCase()}</div>
       <div className="text-2xl font-semibold tabular-nums">{value}</div>
     </div>
   );
@@ -1499,7 +1499,7 @@ export default function AiSalesIntelligencePage() {
   return (
     <Suspense
       fallback={
-        <div className="p-6 text-zinc-500 text-sm">Loading AI Sales Intelligence…</div>
+        <div className="p-6 text-muted-foreground text-sm">Loading AI Sales Intelligence…</div>
       }
     >
       <AiSalesIntelligencePageInner />

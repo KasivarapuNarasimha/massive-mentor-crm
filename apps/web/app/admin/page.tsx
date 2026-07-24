@@ -53,7 +53,7 @@ export default function AdminOverviewPage() {
     <div className="max-w-7xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Platform Overview</h1>
-        <p className="text-zinc-400 text-sm mt-1">
+        <p className="text-muted-foreground text-sm mt-1">
           Enterprise Super Admin dashboard — customer lifecycle, health, and growth at a glance.
         </p>
       </div>
@@ -71,7 +71,7 @@ export default function AdminOverviewPage() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+        <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
           <h2 className="font-semibold">System health</h2>
           {Object.keys(healthCards).length ? (
             <div className="space-y-3">
@@ -79,10 +79,10 @@ export default function AdminOverviewPage() {
                 const c = healthCards[k];
                 if (!c) return null;
                 return (
-                  <div key={k} className="flex items-center justify-between gap-2 text-sm border-b border-zinc-800 pb-2">
+                  <div key={k} className="flex items-center justify-between gap-2 text-sm border-b border-border pb-2">
                     <div>
-                      <div className="text-zinc-200">{c.label}</div>
-                      <div className="text-xs text-zinc-500">{c.detail}</div>
+                      <div className="text-foreground">{c.label}</div>
+                      <div className="text-xs text-muted-foreground">{c.detail}</div>
                     </div>
                     <div className="text-right">
                       <div className="font-medium">{c.value}</div>
@@ -93,7 +93,7 @@ export default function AdminOverviewPage() {
               })}
             </div>
           ) : (
-            <div className="h-24 animate-pulse bg-zinc-800 rounded-xl" />
+            <div className="h-24 animate-pulse bg-muted rounded-xl" />
           )}
           <Link href="/admin/monitoring" className="text-xs text-violet-300 hover:underline">
             Open monitoring →
@@ -103,7 +103,7 @@ export default function AdminOverviewPage() {
         {planPoints.length ? (
           <BarChart title="Plan mix" points={planPoints} color="bg-violet-500" />
         ) : (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-sm text-zinc-500">
+          <div className="bg-card border border-border rounded-2xl p-5 text-sm text-muted-foreground">
             No plan data yet.
           </div>
         )}

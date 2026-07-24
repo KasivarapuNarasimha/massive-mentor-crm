@@ -41,6 +41,8 @@ export interface AuthUser {
   role?: string;
   platformRole?: string;
   businessId?: string;
+  /** light | dark | system */
+  themePreference?: string;
 }
 
 export interface AuthResponse {
@@ -318,6 +320,9 @@ export async function loginUser(
       role: user.role,
       platformRole: user.platformRole,
       businessId: business.id,
+      themePreference: normalizeThemePreference(
+        (user as { themePreference?: string }).themePreference
+      ),
     },
     token,
     portal: "customer",
@@ -499,6 +504,27 @@ export type AuthUserFull = AuthUser & {
   tokenVersion?: number;
 };
 
+const THEME_PREFS = new Set(["light", "dark", "system"]);
+
+export function normalizeThemePreference(value: unknown): "light" | "dark" | "system" {
+  if (typeof value === "string" && THEME_PREFS.has(value)) {
+    return value as "light" | "dark" | "system";
+  }
+  return "system";
+}
+
+export async function updateUserThemePreference(
+  userId: string,
+  theme: string
+): Promise<"light" | "dark" | "system"> {
+  const themePreference = normalizeThemePreference(theme);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { themePreference },
+  });
+  return themePreference;
+}
+
 export async function getUserById(userId: string): Promise<AuthUserFull | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -510,6 +536,7 @@ export async function getUserById(userId: string): Promise<AuthUserFull | null> 
       platformRole: true,
       isDisabled: true,
       tokenVersion: true,
+      themePreference: true,
     },
   });
 
@@ -522,6 +549,7 @@ export async function getUserById(userId: string): Promise<AuthUserFull | null> 
     platformRole: user.platformRole,
     isDisabled: user.isDisabled,
     tokenVersion: user.tokenVersion ?? 0,
+    themePreference: normalizeThemePreference(user.themePreference),
   };
 }
 

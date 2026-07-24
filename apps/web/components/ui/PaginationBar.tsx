@@ -33,17 +33,17 @@ export function PaginationBar({
 
   return (
     <nav
-      className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 pt-4 text-sm text-zinc-400"
+      className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 pt-4 text-sm text-muted-foreground"
       aria-label="Pagination"
     >
       <div className="text-xs sm:text-sm">
-        Showing <span className="text-zinc-200 tabular-nums font-medium">{from}</span>–
-        <span className="text-zinc-200 tabular-nums font-medium">{to}</span> of{" "}
-        <span className="text-zinc-200 tabular-nums font-medium">{total.toLocaleString()}</span>
+        Showing <span className="text-foreground tabular-nums font-medium">{from}</span>–
+        <span className="text-foreground tabular-nums font-medium">{to}</span> of{" "}
+        <span className="text-foreground tabular-nums font-medium">{total.toLocaleString()}</span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5 text-xs">
-          <span className="text-zinc-500">Rows</span>
+          <span className="text-muted-foreground">Rows</span>
           <select
             className="mm-input min-h-9 w-auto py-1.5 px-2 text-xs"
             value={pageSize}
@@ -71,7 +71,7 @@ export function PaginationBar({
             {start > 1 && (
               <>
                 <PageBtn n={1} current={page} onClick={onPageChange} />
-                {start > 2 && <span className="px-1 text-zinc-600">…</span>}
+                {start > 2 && <span className="px-1 text-muted-foreground">…</span>}
               </>
             )}
             {pages.map((n) => (
@@ -79,12 +79,12 @@ export function PaginationBar({
             ))}
             {end < safeTotalPages && (
               <>
-                {end < safeTotalPages - 1 && <span className="px-1 text-zinc-600">…</span>}
+                {end < safeTotalPages - 1 && <span className="px-1 text-muted-foreground">…</span>}
                 <PageBtn n={safeTotalPages} current={page} onClick={onPageChange} />
               </>
             )}
           </div>
-          <span className="sm:hidden text-xs tabular-nums px-2 text-zinc-300">
+          <span className="sm:hidden text-xs tabular-nums px-2 text-muted-foreground">
             {page} / {safeTotalPages}
           </span>
           <button
@@ -120,8 +120,8 @@ function PageBtn({
       aria-current={active ? "page" : undefined}
       className={`min-h-9 min-w-9 px-2 rounded-lg text-xs tabular-nums border transition-colors ${
         active
-          ? "bg-violet-500/20 border-violet-500/40 text-white font-semibold"
-          : "border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+          ? "bg-violet-500/20 border-violet-500/40 text-foreground font-semibold"
+          : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
       }`}
     >
       {n}

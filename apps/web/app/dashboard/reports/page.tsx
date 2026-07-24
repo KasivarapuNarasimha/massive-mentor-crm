@@ -181,7 +181,7 @@ export default function ReportsPage() {
   return (
     <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
       <h1 className="text-2xl sm:text-3xl font-semibold mb-2">Reports & Analytics</h1>
-      <p className="text-sm text-zinc-500 mb-6">
+      <p className="text-sm text-muted-foreground mb-6">
         Live charts for your workspace — never raw JSON. Empty series show &quot;No Data Available&quot;.
       </p>
 
@@ -190,7 +190,7 @@ export default function ReportsPage() {
         <AnalyticsDashboard />
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6 mb-6">
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 mb-6">
         <h3 className="font-semibold mb-4">Export</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 sm:gap-3">
           <button
@@ -252,20 +252,20 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-6 mb-6">
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 mb-6">
         <h3 className="font-semibold mb-4">Import Leads / Clients (CSV or Excel)</h3>
         <textarea
           value={importCsvText}
           onChange={(e) => setImportCsvText(e.target.value)}
           placeholder="Paste CSV here (header row required: name, phone, email, company…)"
-          className="w-full h-32 bg-zinc-950 border border-zinc-800 rounded-xl p-3 mb-3 font-mono text-xs"
+          className="w-full h-32 bg-background border border-border rounded-xl p-3 mb-3 font-mono text-xs"
         />
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-wrap">
           <button
             type="button"
             onClick={importCsv}
             disabled={importing || !importCsvText}
-            className="min-h-11 px-6 py-2.5 bg-white text-zinc-950 rounded-xl disabled:opacity-50 touch-manipulation"
+            className="min-h-11 px-6 py-2.5 bg-primary text-primary-foreground rounded-xl disabled:opacity-50 touch-manipulation"
           >
             {importing ? "Importing…" : "Import Text"}
           </button>
@@ -282,13 +282,13 @@ export default function ReportsPage() {
             />
           </label>
         </div>
-        <p className="text-xs mt-2 text-zinc-500">
-          Prefer <span className="text-zinc-300">Leads → Import</span> for the column-mapping wizard on
+        <p className="text-xs mt-2 text-muted-foreground">
+          Prefer <span className="text-muted-foreground">Leads → Import</span> for the column-mapping wizard on
           large files. Large imports can take a few minutes.
         </p>
 
         {importReport && (
-          <div className="mt-5 border border-zinc-700 rounded-xl p-4 bg-zinc-950">
+          <div className="mt-5 border border-border rounded-xl p-4 bg-background">
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-semibold">Import Report</h4>
               {importReport.report && (
@@ -303,30 +303,30 @@ export default function ReportsPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm mb-3">
               <div>
-                <div className="text-zinc-500 text-xs">Parsed rows</div>
+                <div className="text-muted-foreground text-xs">Parsed rows</div>
                 <div className="text-xl font-semibold">{importReport.parsedRows}</div>
               </div>
               <div>
-                <div className="text-zinc-500 text-xs">Imported</div>
+                <div className="text-muted-foreground text-xs">Imported</div>
                 <div className="text-xl font-semibold text-emerald-400">{importReport.imported}</div>
               </div>
               <div>
-                <div className="text-zinc-500 text-xs">Updated</div>
+                <div className="text-muted-foreground text-xs">Updated</div>
                 <div className="text-xl font-semibold text-sky-400">{importReport.updated ?? 0}</div>
               </div>
               <div>
-                <div className="text-zinc-500 text-xs">Duplicates</div>
+                <div className="text-muted-foreground text-xs">Duplicates</div>
                 <div className="text-xl font-semibold text-amber-400">
                   {importReport.skippedDuplicates}
                 </div>
               </div>
               <div>
-                <div className="text-zinc-500 text-xs">Failed</div>
+                <div className="text-muted-foreground text-xs">Failed</div>
                 <div className="text-xl font-semibold text-red-400">{importReport.failed}</div>
               </div>
             </div>
             {importReport.errors && importReport.errors.length > 0 && (
-              <ul className="mb-3 max-h-48 overflow-auto space-y-1.5 text-sm font-mono bg-zinc-900 border border-zinc-800 rounded-lg p-3">
+              <ul className="mb-3 max-h-48 overflow-auto space-y-1.5 text-sm font-mono bg-card border border-border rounded-lg p-3">
                 {importReport.errors.map((e, i) => (
                   <li key={`${e.row}-${i}`} className="text-red-300/90">
                     {formatImportError(e)}

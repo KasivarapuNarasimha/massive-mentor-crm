@@ -135,8 +135,8 @@ function EmptyBlock({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-      <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-950">
-        <svg className="h-7 w-7 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-background">
+        <svg className="h-7 w-7 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -145,8 +145,8 @@ function EmptyBlock({
           />
         </svg>
       </div>
-      <p className="text-sm font-medium text-zinc-300">{title}</p>
-      <p className="mt-1 text-xs text-zinc-500 max-w-xs">{hint}</p>
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <p className="mt-1 text-xs text-muted-foreground max-w-xs">{hint}</p>
       {actionHref && actionLabel && (
         <Link
           href={actionHref}
@@ -573,17 +573,17 @@ export function PremiumDashboard() {
               <p className="mm-section-label">Welcome back</p>
               <h1
                 id="dash-welcome"
-                className="mt-2 text-2xl sm:text-3xl lg:text-[2.15rem] font-semibold tracking-tight text-white leading-tight"
+                className="mt-2 text-2xl sm:text-3xl lg:text-[2.15rem] font-semibold tracking-tight text-foreground leading-tight"
               >
                 {greet}, {name}
               </h1>
-              <p className="mt-2 text-sm sm:text-base text-zinc-400 max-w-xl">
+              <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-xl">
                 Here&apos;s the pulse of{" "}
-                <span className="text-zinc-200 font-medium">{companyName}</span> for today.
+                <span className="text-foreground font-medium">{companyName}</span> for today.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 shrink-0">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] font-medium text-zinc-300 backdrop-blur-sm">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] font-medium text-muted-foreground backdrop-blur-sm">
                 <span className="h-1.5 w-1.5 rounded-full bg-violet-400" aria-hidden />
                 {companyName}
               </span>
@@ -596,7 +596,7 @@ export function PremiumDashboard() {
               >
                 {isTrial ? "Trial" : "Plan"} · {planLabel}
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] text-zinc-400 backdrop-blur-sm tabular-nums">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] text-muted-foreground backdrop-blur-sm tabular-nums">
                 {todayDateLabel}
               </span>
             </div>
@@ -614,7 +614,7 @@ export function PremiumDashboard() {
                 AI Executive Summary
               </h2>
             </div>
-            <p className="text-sm sm:text-[0.9375rem] text-zinc-300 leading-relaxed">
+            <p className="text-sm sm:text-[0.9375rem] text-muted-foreground leading-relaxed">
               {aiSummary}
             </p>
             <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2">
@@ -628,8 +628,8 @@ export function PremiumDashboard() {
                   key={item.label}
                   className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5"
                 >
-                  <div className="text-[10px] uppercase tracking-wider text-zinc-500">{item.label}</div>
-                  <div className="mt-0.5 text-base sm:text-lg font-semibold tabular-nums text-white truncate">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{item.label}</div>
+                  <div className="mt-0.5 text-base sm:text-lg font-semibold tabular-nums text-foreground truncate">
                     {item.value}
                   </div>
                 </div>
@@ -649,7 +649,7 @@ export function PremiumDashboard() {
             <Link
               key={a.href + a.label}
               href={a.href}
-              className={`snap-start shrink-0 mm-card-hover flex items-center gap-2.5 rounded-2xl border bg-gradient-to-br ${a.tone} px-4 py-3 min-h-12 text-sm font-semibold text-white focus-ring button-active`}
+              className={`snap-start shrink-0 mm-card-hover flex items-center gap-2.5 rounded-2xl border bg-gradient-to-br ${a.tone} px-4 py-3 min-h-12 text-sm font-semibold text-foreground focus-ring button-active`}
             >
               <span aria-hidden className="text-base">
                 {a.icon}
@@ -666,7 +666,7 @@ export function PremiumDashboard() {
           <h2 id="kpi-heading" className="mm-section-title">
             Key metrics
           </h2>
-          <p className="text-[11px] text-zinc-500 hidden sm:block">Live tenant aggregates</p>
+          <p className="text-[11px] text-muted-foreground hidden sm:block">Live tenant aggregates</p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mm-stagger">
           {kpiCards.map((k) => (
@@ -695,7 +695,7 @@ export function PremiumDashboard() {
       {/* 3. Sales Pipeline Kanban */}
       <section aria-labelledby="pipeline-heading">
         <div className="flex items-center justify-between gap-3 mb-3">
-          <h2 id="pipeline-heading" className="text-lg font-semibold tracking-tight text-white">
+          <h2 id="pipeline-heading" className="text-lg font-semibold tracking-tight text-foreground">
             Sales pipeline
           </h2>
           <Link
@@ -709,18 +709,18 @@ export function PremiumDashboard() {
           {pipeline.map((col) => (
             <div
               key={col.key}
-              className="snap-start shrink-0 w-[140px] sm:w-[150px] rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3.5 mm-card-hover"
+              className="snap-start shrink-0 w-[140px] sm:w-[150px] rounded-2xl border border-border bg-card/70 p-3.5 mm-card-hover"
             >
               <div className="flex items-center justify-between gap-1">
-                <span className="text-xs font-semibold text-zinc-300">{col.label}</span>
-                <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-bold tabular-nums text-zinc-400">
+                <span className="text-xs font-semibold text-muted-foreground">{col.label}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold tabular-nums text-muted-foreground">
                   {col.count}
                 </span>
               </div>
-              <div className="mt-3 text-base font-semibold tabular-nums text-white truncate">
+              <div className="mt-3 text-base font-semibold tabular-nums text-foreground truncate">
                 {formatCurrency(col.value, currency)}
               </div>
-              <div className="mt-2 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+              <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
                 <div
                   className={`h-full rounded-full ${
                     col.key === "won"
@@ -743,7 +743,7 @@ export function PremiumDashboard() {
           ))}
         </div>
         {deals.length === 0 && (
-          <div className="mt-2 rounded-2xl border border-zinc-800 bg-zinc-900/40">
+          <div className="mt-2 rounded-2xl border border-border bg-card/40">
             <EmptyBlock
               title="No deals in pipeline"
               hint="Create your first deal to see the Kanban stages fill up."
@@ -768,7 +768,7 @@ export function PremiumDashboard() {
         {/* Recent Activity */}
         <article className="mm-panel p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white tracking-tight">Recent activity</h3>
+            <h3 className="text-sm font-semibold text-foreground tracking-tight">Recent activity</h3>
             <Link href="/dashboard/activity" className="text-[11px] text-violet-300 font-semibold focus-ring rounded">
               View all
             </Link>
@@ -785,13 +785,13 @@ export function PremiumDashboard() {
                   <div className="flex flex-col items-center">
                     <span className="h-2.5 w-2.5 rounded-full bg-violet-500 ring-4 ring-violet-500/15" />
                     {i < Math.min(activities.length, 8) - 1 && (
-                      <span className="w-px flex-1 bg-zinc-800 min-h-[1.5rem]" />
+                      <span className="w-px flex-1 bg-muted min-h-[1.5rem]" />
                     )}
                   </div>
                   <div className="pb-4 min-w-0">
-                    <p className="text-sm text-zinc-200 truncate">{activityLabel(a)}</p>
+                    <p className="text-sm text-foreground truncate">{activityLabel(a)}</p>
                     {a.createdAt && (
-                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
                         {new Date(a.createdAt).toLocaleString()}
                       </p>
                     )}
@@ -805,24 +805,24 @@ export function PremiumDashboard() {
         {/* Upcoming Tasks */}
         <article className="mm-panel p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white tracking-tight">Tasks & meetings</h3>
+            <h3 className="text-sm font-semibold text-foreground tracking-tight">Tasks & meetings</h3>
             <Link href="/dashboard/tasks" className="text-[11px] text-violet-300 font-semibold focus-ring rounded">
               Tasks
             </Link>
           </div>
           <div className="space-y-4">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
                 Today&apos;s tasks
               </p>
               {tasksToday.length === 0 ? (
-                <p className="text-xs text-zinc-500">No tasks due today</p>
+                <p className="text-xs text-muted-foreground">No tasks due today</p>
               ) : (
                 <ul className="space-y-1.5">
                   {tasksToday.slice(0, 4).map((t) => (
                     <li
                       key={t.id}
-                      className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-sm text-zinc-200 truncate"
+                      className="rounded-xl border border-border bg-background/50 px-3 py-2 text-sm text-foreground truncate"
                     >
                       {t.title}
                     </li>
@@ -835,7 +835,7 @@ export function PremiumDashboard() {
                 Overdue ({tasksOverdue.length})
               </p>
               {tasksOverdue.length === 0 ? (
-                <p className="text-xs text-zinc-500">You&apos;re caught up ✨</p>
+                <p className="text-xs text-muted-foreground">You&apos;re caught up ✨</p>
               ) : (
                 <ul className="space-y-1.5">
                   {tasksOverdue.slice(0, 3).map((t) => (
@@ -850,20 +850,20 @@ export function PremiumDashboard() {
               )}
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
                 Upcoming meetings
               </p>
               {upcomingMeetings.length === 0 ? (
-                <p className="text-xs text-zinc-500">No upcoming meetings</p>
+                <p className="text-xs text-muted-foreground">No upcoming meetings</p>
               ) : (
                 <ul className="space-y-1.5">
                   {upcomingMeetings.map((m) => (
                     <li
                       key={m.id}
-                      className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-sm"
+                      className="rounded-xl border border-border bg-background/50 px-3 py-2 text-sm"
                     >
-                      <div className="text-zinc-200 truncate">{m.title}</div>
-                      <div className="text-[11px] text-zinc-500">
+                      <div className="text-foreground truncate">{m.title}</div>
+                      <div className="text-[11px] text-muted-foreground">
                         {m.scheduledAt ? new Date(m.scheduledAt).toLocaleString() : ""}
                       </div>
                     </li>
@@ -877,7 +877,7 @@ export function PremiumDashboard() {
         {/* AI Insights */}
         <article className="rounded-2xl border border-violet-500/25 bg-gradient-to-b from-violet-950/40 to-zinc-900/80 p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <span
                 className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/20 border border-violet-500/30 text-xs"
                 aria-hidden
@@ -905,7 +905,7 @@ export function PremiumDashboard() {
               {aiRecs.map((r) => (
                 <li
                   key={r.id}
-                  className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-3 py-2.5"
+                  className="rounded-xl border border-border/80 bg-background/40 px-3 py-2.5"
                 >
                   <div className="flex items-start gap-2">
                     <span
@@ -919,9 +919,9 @@ export function PremiumDashboard() {
                       aria-hidden
                     />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-zinc-100 truncate">{r.title}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{r.title}</p>
                       {r.reason && (
-                        <p className="mt-0.5 text-xs text-zinc-500 line-clamp-2">{r.reason}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{r.reason}</p>
                       )}
                     </div>
                   </div>
@@ -930,14 +930,14 @@ export function PremiumDashboard() {
             </ul>
           )}
           <div className="mt-4 grid grid-cols-2 gap-2 text-[11px]">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-3 py-2">
-              <div className="text-zinc-500">Pipeline value</div>
-              <div className="font-semibold text-zinc-200 tabular-nums">
+            <div className="rounded-xl border border-border bg-background/50 px-3 py-2">
+              <div className="text-muted-foreground">Pipeline value</div>
+              <div className="font-semibold text-foreground tabular-nums">
                 {formatCurrency(n(reports?.pipelineValue), currency)}
               </div>
             </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-3 py-2">
-              <div className="text-zinc-500">Win rate</div>
+            <div className="rounded-xl border border-border bg-background/50 px-3 py-2">
+              <div className="text-muted-foreground">Win rate</div>
               <div className="font-semibold text-emerald-300 tabular-nums">{conversion}%</div>
             </div>
           </div>

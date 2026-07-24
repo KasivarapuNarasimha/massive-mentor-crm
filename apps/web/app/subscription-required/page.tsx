@@ -66,14 +66,14 @@ export default function SubscriptionRequiredPage() {
         : "Your Free Trial has expired";
 
   return (
-    <div className="min-h-dvh bg-zinc-950 text-white flex items-center justify-center px-4">
-      <div className="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-3xl p-8 sm:p-10 text-center shadow-2xl">
+    <div className="min-h-dvh bg-background text-foreground flex items-center justify-center px-4">
+      <div className="w-full max-w-lg bg-card border border-border rounded-3xl p-8 sm:p-10 text-center shadow-2xl">
         <div className="text-xs uppercase tracking-widest text-amber-400/90 mb-3">
           Massive Mentor CRM
         </div>
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-3">{title}</h1>
-        {bizName && <p className="text-sm text-zinc-500 mb-2">{bizName}</p>}
-        <p className="text-zinc-400 text-sm sm:text-base leading-relaxed mb-8">
+        {bizName && <p className="text-sm text-muted-foreground mb-2">{bizName}</p>}
+        <p className="text-muted-foreground text-sm sm:text-base leading-relaxed mb-8">
           Please subscribe to continue using Massive Mentor CRM. Your data is safe — unlock full
           access with a plan that fits your team.
         </p>
@@ -81,14 +81,14 @@ export default function SubscriptionRequiredPage() {
         <div className="flex flex-col gap-3">
           <Link
             href="/dashboard/billing"
-            className="min-h-12 flex items-center justify-center rounded-xl bg-white text-zinc-950 font-semibold hover:bg-zinc-200"
+            className="min-h-12 flex items-center justify-center rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary-hover"
           >
             Subscribe
           </Link>
           <button
             type="button"
             onClick={openContactSales}
-            className="min-h-12 flex items-center justify-center rounded-xl bg-white/10 border border-zinc-700 font-medium hover:bg-white/15 touch-manipulation"
+            className="min-h-12 flex items-center justify-center rounded-xl bg-white/10 border border-border font-medium hover:bg-white/15 touch-manipulation"
           >
             Contact Sales
           </button>
@@ -102,7 +102,7 @@ export default function SubscriptionRequiredPage() {
           <button
             type="button"
             onClick={() => logout({ redirect: true })}
-            className="min-h-11 text-sm text-zinc-500 hover:text-zinc-300"
+            className="min-h-11 text-sm text-muted-foreground hover:text-muted-foreground"
           >
             Logout
           </button>

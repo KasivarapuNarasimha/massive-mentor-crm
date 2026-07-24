@@ -65,7 +65,7 @@ export default function AdminMonitoringPage() {
   ];
 
   if (!cards) {
-    return <div className="h-64 bg-zinc-900 rounded-2xl animate-pulse max-w-7xl" />;
+    return <div className="h-64 bg-card rounded-2xl animate-pulse max-w-7xl" />;
   }
 
   const order = [
@@ -83,7 +83,7 @@ export default function AdminMonitoringPage() {
     <div className="max-w-7xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-semibold">System Monitoring</h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Professional health dashboard with color indicators — no raw JSON for operators.
         </p>
         <div className="flex flex-wrap gap-4 mt-3 text-sm">
@@ -106,11 +106,11 @@ export default function AdminMonitoringPage() {
           return (
             <div key={key} className={`rounded-2xl border p-4 ${border}`}>
               <div className="flex items-center justify-between gap-2">
-                <div className="text-[11px] uppercase tracking-wide text-zinc-500">{c.label}</div>
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{c.label}</div>
                 <HealthDot status={c.status} />
               </div>
-              <div className="text-xl font-semibold text-white mt-2">{c.value}</div>
-              {c.detail ? <div className="text-xs text-zinc-500 mt-1">{c.detail}</div> : null}
+              <div className="text-xl font-semibold text-foreground mt-2">{c.value}</div>
+              {c.detail ? <div className="text-xs text-muted-foreground mt-1">{c.detail}</div> : null}
               {typeof c.percent === "number" ? (
                 <div className="mt-3">
                   <ProgressBar

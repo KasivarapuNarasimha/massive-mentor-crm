@@ -190,7 +190,7 @@ export default function AdminBusinessManagePage() {
   };
 
   if (!biz) {
-    return <div className="h-48 max-w-6xl bg-zinc-900 rounded-2xl animate-pulse" />;
+    return <div className="h-48 max-w-6xl bg-card rounded-2xl animate-pulse" />;
   }
 
   const s = biz.stats || ({} as BizDetail["stats"]);
@@ -200,7 +200,7 @@ export default function AdminBusinessManagePage() {
       <button
         type="button"
         onClick={() => router.push("/admin/businesses")}
-        className="text-sm text-zinc-400 hover:text-white"
+        className="text-sm text-muted-foreground hover:text-foreground"
       >
         ← Back to customers
       </button>
@@ -208,7 +208,7 @@ export default function AdminBusinessManagePage() {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold">{biz.name}</h1>
-          <p className="text-sm text-zinc-400 mt-1 flex flex-wrap gap-2 items-center">
+          <p className="text-sm text-muted-foreground mt-1 flex flex-wrap gap-2 items-center">
             <StatusBadge value={biz.status} />
             <StatusBadge value={biz.plan} />
             <span>Business Management</span>
@@ -249,7 +249,7 @@ export default function AdminBusinessManagePage() {
       </div>
 
       {/* Business Info */}
-      <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+      <section className="bg-card border border-border rounded-2xl p-5">
         <h2 className="font-semibold mb-4">Business Info</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
           {[
@@ -262,15 +262,15 @@ export default function AdminBusinessManagePage() {
             ["Created", biz.createdAt ? new Date(biz.createdAt).toLocaleString() : "—"],
           ].map(([k, v]) => (
             <div key={k}>
-              <div className="text-xs text-zinc-500">{k}</div>
-              <div className="text-zinc-100 mt-0.5 break-all">{v}</div>
+              <div className="text-xs text-muted-foreground">{k}</div>
+              <div className="text-foreground mt-0.5 break-all">{v}</div>
             </div>
           ))}
         </div>
       </section>
 
       {/* Subscription */}
-      <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+      <section className="bg-card border border-border rounded-2xl p-5 space-y-4">
         <h2 className="font-semibold">Subscription</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <KpiCard label="Current Plan" value={String(biz.plan)} tone="info" />
@@ -295,14 +295,14 @@ export default function AdminBusinessManagePage() {
           <select
             value={plan}
             onChange={(e) => setPlan(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground min-h-11"
           >
             <option value="trial">Trial</option>
             <option value="basic">Basic</option>
             <option value="professional">Professional</option>
             <option value="enterprise">Enterprise</option>
           </select>
-          <button type="button" onClick={() => changePlan("upgrade")} className="min-h-11 px-4 bg-violet-500 text-zinc-950 rounded-xl text-sm font-medium">
+          <button type="button" onClick={() => changePlan("upgrade")} className="min-h-11 px-4 bg-violet-500 text-white rounded-xl text-sm font-medium">
             Upgrade
           </button>
           <button type="button" onClick={() => changePlan("downgrade")} className="min-h-11 px-4 bg-white/10 rounded-xl text-sm">
@@ -313,7 +313,7 @@ export default function AdminBusinessManagePage() {
           </button>
         </div>
         {biz.licenseKey && (
-          <p className="text-xs text-zinc-500 font-mono">License key: {biz.licenseKey}</p>
+          <p className="text-xs text-muted-foreground font-mono">License key: {biz.licenseKey}</p>
         )}
       </section>
 
@@ -342,17 +342,17 @@ export default function AdminBusinessManagePage() {
       </section>
 
       {/* Users */}
-      <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+      <section className="bg-card border border-border rounded-2xl p-5 space-y-4">
         <h2 className="font-semibold">Users</h2>
         <div className="space-y-2">
           {(biz.members || []).map((m) => (
             <div
               key={m.userId}
-              className="flex flex-wrap items-center justify-between gap-2 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm"
+              className="flex flex-wrap items-center justify-between gap-2 bg-background border border-border rounded-xl p-3 text-sm"
             >
               <div>
                 <div className="font-medium">{m.name || m.email}</div>
-                <div className="text-xs text-zinc-500">
+                <div className="text-xs text-muted-foreground">
                   {m.email} · {m.role} {m.isDisabled ? "· disabled" : ""}
                 </div>
               </div>
@@ -374,18 +374,18 @@ export default function AdminBusinessManagePage() {
               </div>
             </div>
           ))}
-          {!biz.members?.length && <p className="text-sm text-zinc-500">No members.</p>}
+          {!biz.members?.length && <p className="text-sm text-muted-foreground">No members.</p>}
         </div>
 
-        <form onSubmit={createUser} className="grid sm:grid-cols-2 gap-2 pt-2 border-t border-zinc-800">
-          <h3 className="sm:col-span-2 text-sm font-medium text-zinc-300">Add User</h3>
+        <form onSubmit={createUser} className="grid sm:grid-cols-2 gap-2 pt-2 border-t border-border">
+          <h3 className="sm:col-span-2 text-sm font-medium text-muted-foreground">Add User</h3>
           <input
             required
             type="email"
             placeholder="Email"
             value={addUser.email}
             onChange={(e) => setAddUser({ ...addUser, email: e.target.value })}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground"
           />
           <PasswordInput
             required
@@ -394,44 +394,44 @@ export default function AdminBusinessManagePage() {
             autoComplete="new-password"
             value={addUser.password}
             onChange={(e) => setAddUser({ ...addUser, password: e.target.value })}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground"
           />
           <input
             placeholder="Name"
             value={addUser.name}
             onChange={(e) => setAddUser({ ...addUser, name: e.target.value })}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground"
           />
           <select
             value={addUser.role}
             onChange={(e) => setAddUser({ ...addUser, role: e.target.value })}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground"
           >
             <option value="sales_executive">Sales Executive</option>
             <option value="sales_manager">Sales Manager</option>
             <option value="business_admin">Business Admin</option>
           </select>
-          <button type="submit" className="sm:col-span-2 min-h-11 bg-white text-zinc-950 rounded-xl text-sm font-medium">
+          <button type="submit" className="sm:col-span-2 min-h-11 bg-primary text-primary-foreground rounded-xl text-sm font-medium">
             Add User
           </button>
         </form>
       </section>
 
       {/* White label */}
-      <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-3">
+      <section className="bg-card border border-border rounded-2xl p-5 space-y-3">
         <h2 className="font-semibold">White Label</h2>
         <div className="grid sm:grid-cols-2 gap-3">
           {(["companyName", "logoUrl", "theme", "customDomain"] as const).map((k) => (
             <input
               key={k}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+              className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground"
               placeholder={k}
               value={wl[k]}
               onChange={(e) => setWl({ ...wl, [k]: e.target.value })}
             />
           ))}
         </div>
-        <button type="button" onClick={saveWl} className="min-h-11 px-4 bg-white text-zinc-950 rounded-xl text-sm font-medium">
+        <button type="button" onClick={saveWl} className="min-h-11 px-4 bg-primary text-primary-foreground rounded-xl text-sm font-medium">
           Save branding
         </button>
       </section>
@@ -446,12 +446,12 @@ export default function AdminBusinessManagePage() {
           value={supportReason}
           onChange={(e) => setSupportReason(e.target.value)}
           placeholder="Reason for support access (required)…"
-          className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-white min-h-[80px]"
+          className="w-full bg-background border border-border rounded-xl p-3 text-sm text-foreground min-h-[80px]"
         />
         <button
           type="button"
           onClick={supportLogin}
-          className="min-h-11 px-4 bg-amber-500 text-zinc-950 rounded-xl text-sm font-semibold"
+          className="min-h-11 px-4 bg-amber-500 text-white rounded-xl text-sm font-semibold"
         >
           Open customer CRM
         </button>

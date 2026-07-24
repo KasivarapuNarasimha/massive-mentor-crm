@@ -27,6 +27,8 @@ model User {
   /// Future MFA flags — no OTP flow yet; columns reserved for 2FA without redesign
   mfaEnabled    Boolean   @default(false)
   mfaEnrolledAt DateTime?
+  /// UI theme preference: light | dark | system (default)
+  themePreference String  @default("system")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

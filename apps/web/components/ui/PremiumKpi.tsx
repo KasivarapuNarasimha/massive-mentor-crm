@@ -113,7 +113,7 @@ export function PremiumKpi({
   growth,
   previous,
   sparkline,
-  tone = "from-zinc-500/15 to-zinc-500/5 border-zinc-500/20",
+  tone = "from-zinc-500/15 to-zinc-500/5 border-border/20",
   icon,
   loading,
   suffix = "",
@@ -129,7 +129,7 @@ export function PremiumKpi({
   const body = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-400">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           {label}
         </span>
         {icon ? (
@@ -147,7 +147,7 @@ export function PremiumKpi({
       ) : (
         <>
           <div className="mt-3 flex items-end justify-between gap-2">
-            <div className="text-2xl font-semibold tabular-nums tracking-tight text-white leading-none">
+            <div className="text-2xl font-semibold tabular-nums tracking-tight text-foreground leading-none">
               {display}
             </div>
             {sparkline && sparkline.length > 1 ? (
@@ -166,15 +166,15 @@ export function PremiumKpi({
                 {Math.abs(growth)}%
               </span>
             ) : (
-              <span className="text-[11px] text-zinc-600">—</span>
+              <span className="text-[11px] text-muted-foreground">—</span>
             )}
             {previous != null && (
-              <span className="text-[11px] text-zinc-500">
+              <span className="text-[11px] text-muted-foreground">
                 vs {formatMoney ? formatMoney(previous) : previous.toLocaleString()} prior
               </span>
             )}
             {previous == null && growth != null && (
-              <span className="text-[11px] text-zinc-500">vs prior</span>
+              <span className="text-[11px] text-muted-foreground">vs prior</span>
             )}
           </div>
         </>
@@ -208,7 +208,7 @@ export function PremiumKpi({
 export function PremiumKpiSkeleton({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 ${className}`}
+      className={`rounded-2xl border border-border bg-card/50 p-4 ${className}`}
       aria-hidden
     >
       <div className="mm-skeleton h-3 w-16 mb-4" />

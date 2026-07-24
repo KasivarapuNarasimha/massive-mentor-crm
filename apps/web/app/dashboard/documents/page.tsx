@@ -90,12 +90,12 @@ export default function DocumentsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold">Documents</h1>
-          <p className="text-zinc-400 text-sm sm:text-base mt-1">Attach files and links to entities.</p>
+          <p className="text-muted-foreground text-sm sm:text-base mt-1">Attach files and links to entities.</p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-white text-zinc-950 rounded-xl font-medium touch-manipulation"
+          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium touch-manipulation"
         >
           + Add Document
         </button>
@@ -104,31 +104,31 @@ export default function DocumentsPage() {
       <ExportFiltersBar module="documents" token={token} className="mb-4" />
 
       {isLoading ? (
-        <div className="h-40 bg-zinc-900 rounded-2xl animate-pulse" />
+        <div className="h-40 bg-card rounded-2xl animate-pulse" />
       ) : docs.length === 0 ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-12 text-center">No documents yet.</div>
+        <div className="bg-card border border-border rounded-2xl p-12 text-center">No documents yet.</div>
       ) : (
         <div className="grid gap-3">
           {docs.map((d) => (
             <div
               key={d.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start"
+              className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start"
             >
               <div className="min-w-0">
-                <div className="font-medium text-white">{d.title}</div>
+                <div className="font-medium text-foreground">{d.title}</div>
                 {d.url && (
                   <a href={d.url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 break-all">
                     {d.url}
                   </a>
                 )}
                 {d.entityType && (
-                  <div className="text-xs text-zinc-500 mt-1">
+                  <div className="text-xs text-muted-foreground mt-1">
                     {d.entityType}: {d.entityId}
                   </div>
                 )}
               </div>
               <div className="flex sm:flex-col items-center sm:items-end gap-2 text-xs">
-                <div className="text-zinc-500">{new Date(d.createdAt).toLocaleDateString()}</div>
+                <div className="text-muted-foreground">{new Date(d.createdAt).toLocaleDateString()}</div>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -153,27 +153,27 @@ export default function DocumentsPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-zinc-900 border border-zinc-800 p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
+          <div className="bg-card border border-border p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
             <h3 className="font-semibold mb-4 text-lg">{editingDoc ? "Edit Document" : "Add Document"}</h3>
             <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
               <input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Document title *"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
                 required
               />
               <input
                 value={formData.url}
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                 placeholder="URL or link"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <select
                   value={formData.entityType}
                   onChange={(e) => setFormData({ ...formData, entityType: e.target.value })}
-                  className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+                  className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
                 >
                   <option value="contact">contact</option>
                   <option value="deal">deal</option>
@@ -183,7 +183,7 @@ export default function DocumentsPage() {
                   value={formData.entityId}
                   onChange={(e) => setFormData({ ...formData, entityId: e.target.value })}
                   placeholder="Entity ID"
-                  className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+                  className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
                 />
               </div>
               <div className="flex gap-3">
@@ -193,7 +193,7 @@ export default function DocumentsPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 min-h-11 py-2.5 bg-white text-zinc-950 rounded-xl touch-manipulation"
+                  className="flex-1 min-h-11 py-2.5 bg-primary text-primary-foreground rounded-xl touch-manipulation"
                 >
                   {isSubmitting ? "Saving..." : editingDoc ? "Update" : "Add"}
                 </button>

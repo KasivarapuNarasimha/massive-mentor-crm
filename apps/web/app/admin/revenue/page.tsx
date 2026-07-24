@@ -45,7 +45,7 @@ export default function AdminRevenuePage() {
   }, [load]);
 
   if (loading && !data) {
-    return <div className="h-40 animate-pulse bg-zinc-900 rounded-2xl" />;
+    return <div className="h-40 animate-pulse bg-card rounded-2xl" />;
   }
 
   const kpis = [
@@ -69,15 +69,15 @@ export default function AdminRevenuePage() {
     <div className="max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">SaaS Revenue</h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Platform billing analytics (Razorpay SaaS payments, multi-tenant).
         </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {kpis.map((k) => (
-          <div key={k.label} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-            <div className="text-[10px] uppercase tracking-widest text-zinc-500">{k.label}</div>
+          <div key={k.label} className="rounded-2xl border border-border bg-card p-4">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{k.label}</div>
             <div className="text-xl font-semibold tabular-nums mt-1 text-emerald-400">
               {formatCurrency(k.value || 0, "INR")}
             </div>
@@ -87,14 +87,14 @@ export default function AdminRevenuePage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {counts.map((k) => (
-          <div key={k.label} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-            <div className="text-[10px] uppercase tracking-widest text-zinc-500">{k.label}</div>
+          <div key={k.label} className="rounded-2xl border border-border bg-card p-4">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{k.label}</div>
             <div className="text-2xl font-semibold tabular-nums mt-1">{k.value ?? 0}</div>
           </div>
         ))}
       </div>
 
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5">
+      <div className="rounded-2xl border border-border bg-card p-5">
         <h2 className="font-semibold mb-4">Revenue (30 days)</h2>
         <div className="flex items-end gap-0.5 h-32">
           {(data?.revenueChart || []).map((c) => (
@@ -108,11 +108,11 @@ export default function AdminRevenuePage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-x-auto">
-        <h2 className="font-semibold p-4 border-b border-zinc-800">Recent payments</h2>
+      <div className="rounded-2xl border border-border bg-card overflow-x-auto">
+        <h2 className="font-semibold p-4 border-b border-border">Recent payments</h2>
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-zinc-500 border-b border-zinc-800">
+            <tr className="text-left text-muted-foreground border-b border-border">
               <th className="p-3">When</th>
               <th className="p-3">Customer</th>
               <th className="p-3">Plan</th>
@@ -123,14 +123,14 @@ export default function AdminRevenuePage() {
           <tbody>
             {(data?.recentPayments || []).length === 0 && (
               <tr>
-                <td colSpan={5} className="p-6 text-center text-zinc-500">
+                <td colSpan={5} className="p-6 text-center text-muted-foreground">
                   No SaaS payments yet.
                 </td>
               </tr>
             )}
             {(data?.recentPayments || []).map((p) => (
-              <tr key={p.id} className="border-b border-zinc-800/50">
-                <td className="p-3 text-xs text-zinc-500">
+              <tr key={p.id} className="border-b border-border/50">
+                <td className="p-3 text-xs text-muted-foreground">
                   {p.paidAt ? new Date(p.paidAt).toLocaleString() : "—"}
                 </td>
                 <td className="p-3">{p.business?.name || "—"}</td>

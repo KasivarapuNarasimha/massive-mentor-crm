@@ -28,7 +28,7 @@ export function PasswordRulesChecklist({ password }: { password: string }) {
         return (
           <li
             key={r.id}
-            className={`text-xs flex items-center gap-2 ${ok ? "text-emerald-400" : "text-zinc-500"}`}
+            className={`text-xs flex items-center gap-2 ${ok ? "text-emerald-400" : "text-muted-foreground"}`}
           >
             <span className="w-3.5 text-center">{ok ? "✓" : "○"}</span>
             {r.label}

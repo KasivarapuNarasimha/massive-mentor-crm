@@ -8,18 +8,18 @@ import Link from "next/link";
  */
 export default function RegisterPage() {
   return (
-    <div className="min-h-dvh bg-zinc-950 text-white flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-8 text-center">
-        <div className="text-xs uppercase tracking-widest text-zinc-500 mb-3">Massive Mentor CRM</div>
+    <div className="min-h-dvh bg-background text-foreground flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-card border border-border rounded-3xl p-8 text-center">
+        <div className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Massive Mentor CRM</div>
         <h1 className="text-2xl font-semibold mb-3">Registration is closed</h1>
-        <p className="text-sm text-zinc-400 leading-relaxed mb-6">
+        <p className="text-sm text-muted-foreground leading-relaxed mb-6">
           New business accounts are created by our team after a sales consultation and demo.
           Contact us to start your free trial.
         </p>
         <div className="flex flex-col gap-3">
           <a
             href="mailto:team@massivementor.in?subject=CRM%20Trial%20Request"
-            className="min-h-11 flex items-center justify-center rounded-xl bg-white text-zinc-950 font-semibold"
+            className="min-h-11 flex items-center justify-center rounded-xl bg-primary text-primary-foreground font-semibold"
           >
             Contact Sales
           </a>
@@ -31,7 +31,7 @@ export default function RegisterPage() {
           >
             WhatsApp
           </a>
-          <Link href="/login" className="text-sm text-zinc-400 hover:text-white min-h-10 inline-flex items-center justify-center">
+          <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground min-h-10 inline-flex items-center justify-center">
             Already have an account? Sign in
           </Link>
         </div>

@@ -144,19 +144,19 @@ export function DataTable<T>({
                   onClick={() => setMenuOpen(false)}
                 />
                 <div
-                  className="absolute right-0 z-30 mt-1 w-52 rounded-xl border border-zinc-700 bg-zinc-900 p-2 shadow-xl"
+                  className="absolute right-0 z-30 mt-1 w-52 rounded-xl border border-border bg-card p-2 shadow-xl"
                   role="menu"
                 >
                   {columns.map((c) => (
                     <label
                       key={c.id}
-                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-zinc-300 hover:bg-white/5 cursor-pointer"
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:bg-white/5 cursor-pointer"
                     >
                       <input
                         type="checkbox"
                         checked={!hidden.has(c.id)}
                         onChange={() => toggleCol(c.id)}
-                        className="rounded border-zinc-600"
+                        className="rounded border-border"
                       />
                       {c.header}
                     </label>
@@ -195,8 +195,8 @@ export function DataTable<T>({
                 />
               </svg>
             </div>
-            <p className="text-sm font-medium text-zinc-300">{emptyTitle}</p>
-            <p className="text-xs text-zinc-500 max-w-sm">{emptyHint}</p>
+            <p className="text-sm font-medium text-muted-foreground">{emptyTitle}</p>
+            <p className="text-xs text-muted-foreground max-w-sm">{emptyHint}</p>
           </div>
         ) : (
           <table className="mm-table min-w-full">

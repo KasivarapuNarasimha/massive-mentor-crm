@@ -283,7 +283,7 @@ export default function AdminBusinessesPage() {
       key: "name",
       label: "Business",
       render: (r) => (
-        <Link href={`/admin/businesses/${r.id}`} className="font-medium text-white hover:text-violet-300">
+        <Link href={`/admin/businesses/${r.id}`} className="font-medium text-foreground hover:text-violet-300">
           {r.name}
         </Link>
       ),
@@ -337,14 +337,14 @@ export default function AdminBusinessesPage() {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Customer Management</h1>
-          <p className="text-sm text-zinc-400 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Multi-select bulk actions · enterprise table controls · never includes demo tenants.
           </p>
         </div>
         <button
           type="button"
           onClick={() => setShowCreate((v) => !v)}
-          className="min-h-11 px-4 py-2 bg-violet-500 text-zinc-950 rounded-xl text-sm font-semibold"
+          className="min-h-11 px-4 py-2 bg-violet-500 text-white rounded-xl text-sm font-semibold"
         >
           {showCreate ? "Close" : "Create business"}
         </button>
@@ -353,24 +353,24 @@ export default function AdminBusinessesPage() {
       {showCreate && (
         <form
           onSubmit={create}
-          className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 grid sm:grid-cols-2 gap-3"
+          className="bg-card border border-border rounded-2xl p-4 grid sm:grid-cols-2 gap-3"
         >
-          <p className="sm:col-span-2 text-xs text-zinc-500">
+          <p className="sm:col-span-2 text-xs text-muted-foreground">
             Sales-led onboarding: creates business, owner, 3-day trial, and emails login credentials
             (password is auto-generated). Business type configures dashboards, menus, modules, and
             forms from the industry template catalog (falls back to Generic CRM).
           </p>
           <input
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
             placeholder="Company name *"
             required
             value={form.companyName}
             onChange={(e) => setForm({ ...form, companyName: e.target.value })}
           />
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-zinc-400">Business type *</label>
+            <label className="text-xs text-muted-foreground">Business type *</label>
             <select
-              className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+              className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
               required
               value={form.templateSlug}
               onChange={(e) => setForm({ ...form, templateSlug: e.target.value })}
@@ -384,21 +384,21 @@ export default function AdminBusinessesPage() {
               ))}
             </select>
             {form.templateSlug ? (
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] text-muted-foreground">
                 {industryCatalog.find((t) => t.slug === form.templateSlug)?.description ||
                   "Configures CRM UI for this industry on first login."}
               </p>
             ) : null}
           </div>
           <input
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
             placeholder="Owner name *"
             required
             value={form.ownerName}
             onChange={(e) => setForm({ ...form, ownerName: e.target.value })}
           />
           <input
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
             placeholder="Owner email *"
             type="email"
             required
@@ -406,37 +406,37 @@ export default function AdminBusinessesPage() {
             onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
           />
           <input
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
             placeholder="Owner mobile"
             value={form.ownerMobile}
             onChange={(e) => setForm({ ...form, ownerMobile: e.target.value })}
           />
           <input
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white sm:col-span-2"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground sm:col-span-2"
             placeholder="Business address"
             value={form.businessAddress}
             onChange={(e) => setForm({ ...form, businessAddress: e.target.value })}
           />
           <input
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
             placeholder="GST number (optional)"
             value={form.gstNumber}
             onChange={(e) => setForm({ ...form, gstNumber: e.target.value })}
           />
           <input
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
             placeholder="Country"
             value={form.country}
             onChange={(e) => setForm({ ...form, country: e.target.value })}
           />
           <input
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
             placeholder="Timezone"
             value={form.timezone}
             onChange={(e) => setForm({ ...form, timezone: e.target.value })}
           />
           <select
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
             value={form.currency}
             onChange={(e) => setForm({ ...form, currency: e.target.value })}
           >
@@ -447,7 +447,7 @@ export default function AdminBusinessesPage() {
             ))}
           </select>
           <input
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm min-h-11 text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
             placeholder="Max users"
             type="number"
             min={1}
@@ -455,19 +455,19 @@ export default function AdminBusinessesPage() {
             onChange={(e) => setForm({ ...form, maxUsers: e.target.value })}
           />
           <textarea
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white sm:col-span-2 min-h-[80px]"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground sm:col-span-2 min-h-[80px]"
             placeholder="Internal notes (optional)"
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
-          <button type="submit" className="sm:col-span-2 min-h-11 bg-white text-zinc-950 rounded-xl font-medium">
+          <button type="submit" className="sm:col-span-2 min-h-11 bg-primary text-primary-foreground rounded-xl font-medium">
             Create customer + start 3-day trial
           </button>
         </form>
       )}
 
       {/* Bulk action bar */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 flex flex-wrap gap-2">
+      <div className="bg-card border border-border rounded-2xl p-3 flex flex-wrap gap-2">
         {(
           [
             ["suspend", "Bulk Suspend"],
@@ -490,13 +490,13 @@ export default function AdminBusinessesPage() {
             {label}
           </button>
         ))}
-        <span className="text-xs text-zinc-500 self-center ml-auto">
+        <span className="text-xs text-muted-foreground self-center ml-auto">
           {selectedCount ? `${selectedCount} selected` : "Select rows to enable bulk actions"}
         </span>
       </div>
 
       {loading ? (
-        <div className="h-48 bg-zinc-900 rounded-2xl animate-pulse" />
+        <div className="h-48 bg-card rounded-2xl animate-pulse" />
       ) : (
         <AdminDataTable
           rows={rows}
@@ -521,7 +521,7 @@ export default function AdminBusinessesPage() {
         onConfirm={runBulk}
       >
         {selectedNames.length > 0 && (
-          <div className="text-xs text-zinc-500 max-h-24 overflow-auto">
+          <div className="text-xs text-muted-foreground max-h-24 overflow-auto">
             {selectedNames.slice(0, 12).join(", ")}
             {selectedNames.length > 12 ? ` +${selectedNames.length - 12} more` : ""}
           </div>
@@ -530,7 +530,7 @@ export default function AdminBusinessesPage() {
           <select
             value={bulkPlan}
             onChange={(e) => setBulkPlan(e.target.value)}
-            className="w-full mt-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+            className="w-full mt-2 bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground"
           >
             <option value="trial">Trial</option>
             <option value="basic">Basic</option>
@@ -543,7 +543,7 @@ export default function AdminBusinessesPage() {
             value={bulkReason}
             onChange={(e) => setBulkReason(e.target.value)}
             placeholder="Reason (optional)"
-            className="w-full mt-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+            className="w-full mt-2 bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground"
           />
         )}
         {confirm?.action === "send_email" && (
@@ -552,13 +552,13 @@ export default function AdminBusinessesPage() {
               value={emailSubject}
               onChange={(e) => setEmailSubject(e.target.value)}
               placeholder="Email subject"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white"
+              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground"
             />
             <textarea
               value={emailBody}
               onChange={(e) => setEmailBody(e.target.value)}
               placeholder="Email body"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-white min-h-[80px]"
+              className="w-full bg-background border border-border rounded-xl p-3 text-sm text-foreground min-h-[80px]"
             />
           </div>
         )}
@@ -567,7 +567,7 @@ export default function AdminBusinessesPage() {
             value={notifMsg}
             onChange={(e) => setNotifMsg(e.target.value)}
             placeholder="Notification message"
-            className="w-full mt-2 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-white min-h-[80px]"
+            className="w-full mt-2 bg-background border border-border rounded-xl p-3 text-sm text-foreground min-h-[80px]"
           />
         )}
       </ConfirmDialog>

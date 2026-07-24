@@ -116,7 +116,7 @@ export default function ActivityTimelinePage() {
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="text-3xl font-semibold mb-2">Activity & Audit Log</h1>
-          <p className="text-zinc-400 text-sm">
+          <p className="text-muted-foreground text-sm">
             Human-readable trail of important account and CRM actions.
           </p>
         </div>
@@ -124,7 +124,7 @@ export default function ActivityTimelinePage() {
           <button
             type="button"
             onClick={toggleDebug}
-            className="text-[11px] px-2.5 py-1 rounded-lg border border-zinc-700 text-zinc-500 hover:text-zinc-300"
+            className="text-[11px] px-2.5 py-1 rounded-lg border border-border text-muted-foreground hover:text-muted-foreground"
             title="Show raw JSON payloads under each card"
           >
             {debugMode ? "Hide developer payloads" : "Developer mode"}
@@ -145,7 +145,7 @@ export default function ActivityTimelinePage() {
         <button
           type="button"
           onClick={exportCsv}
-          className="px-4 py-2 rounded-xl text-sm border border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+          className="px-4 py-2 rounded-xl text-sm border border-border text-foreground hover:bg-muted"
         >
           Export audit CSV
         </button>
@@ -155,7 +155,7 @@ export default function ActivityTimelinePage() {
         <select
           value={entityType}
           onChange={(e) => setEntityType(e.target.value)}
-          className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11 w-full sm:w-auto"
+          className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11 w-full sm:w-auto"
         >
           <option value="">All modules</option>
           <option value="contact">Contact</option>
@@ -170,7 +170,7 @@ export default function ActivityTimelinePage() {
         <select
           value={action}
           onChange={(e) => setAction(e.target.value)}
-          className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11 w-full sm:w-auto"
+          className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11 w-full sm:w-auto"
         >
           <option value="">All actions</option>
           <option value="create">Create</option>
@@ -185,7 +185,7 @@ export default function ActivityTimelinePage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search email, module, details…"
-          className="flex-1 w-full sm:min-w-[160px] bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+          className="flex-1 w-full sm:min-w-[160px] bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
         />
         <button
           type="button"
@@ -197,15 +197,15 @@ export default function ActivityTimelinePage() {
       </div>
 
       {isLoading ? (
-        <div className="animate-pulse h-40 bg-zinc-900 rounded" />
+        <div className="animate-pulse h-40 bg-card rounded" />
       ) : (
         <div className="space-y-6">
           <section>
-            <h2 className="text-sm font-semibold text-zinc-300 mb-3">
+            <h2 className="text-sm font-semibold text-muted-foreground mb-3">
               Audit trail ({audit.length})
             </h2>
             {audit.length === 0 ? (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center text-zinc-500 text-sm">
+              <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-sm">
                 No audit entries yet.
               </div>
             ) : (
@@ -227,11 +227,11 @@ export default function ActivityTimelinePage() {
           </section>
 
           <section>
-            <h2 className="text-sm font-semibold text-zinc-300 mb-3">
+            <h2 className="text-sm font-semibold text-muted-foreground mb-3">
               CRM activity ({activities.length})
             </h2>
             {activities.length === 0 ? (
-              <div className="text-zinc-500 text-sm">No CRM activity rows yet.</div>
+              <div className="text-muted-foreground text-sm">No CRM activity rows yet.</div>
             ) : (
               <div className="space-y-2">
                 {activities.map((a) => (

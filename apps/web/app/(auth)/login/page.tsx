@@ -97,31 +97,31 @@ export default function LoginPage() {
 
   if (isAuthenticated) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-zinc-950">
-        <div className="text-zinc-400 text-sm">Opening dashboard…</div>
+      <div className="min-h-dvh flex items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm">Opening dashboard…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-zinc-950 px-4 py-8 safe-x safe-bottom">
+    <div className="min-h-dvh flex items-center justify-center bg-background px-4 py-8 safe-x safe-bottom">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-medium mb-4">
             CUSTOMER PORTAL
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
             Massive Mentor
           </h1>
-          <p className="mt-2 text-zinc-400 text-sm sm:text-base">
+          <p className="mt-2 text-muted-foreground text-sm sm:text-base">
             Sign in to your business CRM workspace
           </p>
         </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 sm:p-8">
+        <div className="bg-card border border-border rounded-xl p-5 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5 adaptive-form">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-zinc-300 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-muted-foreground mb-2">
                 Email address
               </label>
               <input
@@ -131,19 +131,19 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="w-full px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11 bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/20"
+                className="w-full px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11 bg-input border border-input-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring"
                 placeholder="you@business.com"
               />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label htmlFor="password" className="block text-sm font-medium text-zinc-300">
+                <label htmlFor="password" className="block text-sm font-medium text-muted-foreground">
                   Password
                 </label>
                 <Link
                   href="/forgot-password"
-                  className="text-xs text-zinc-400 hover:text-white underline"
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
                 >
                   Forgot password?
                 </Link>
@@ -154,7 +154,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11 bg-zinc-950 border border-zinc-800 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/20"
+                className="w-full px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11 bg-input border border-input-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring"
                 placeholder="••••••••"
               />
             </div>
@@ -162,27 +162,27 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full min-h-12 bg-white text-zinc-950 font-medium py-3 rounded-lg hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2 touch-manipulation"
+              className="w-full min-h-12 bg-primary text-primary-foreground font-medium py-3 rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2 touch-manipulation"
             >
               {isSubmitting ? "Signing in..." : "Sign in"}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-zinc-400">
+          <div className="mt-6 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <button
               type="button"
               onClick={openTrialWhatsApp}
-              className="text-white hover:underline font-medium touch-manipulation cursor-pointer bg-transparent border-0 p-0 inline align-baseline"
+              className="text-foreground hover:underline font-medium touch-manipulation cursor-pointer bg-transparent border-0 p-0 inline align-baseline"
             >
               Contact sales for a trial
             </button>
           </div>
         </div>
 
-        <p className="text-center text-xs text-zinc-500 mt-8 space-y-1">
+        <p className="text-center text-xs text-muted-foreground mt-8 space-y-1">
           <span className="block">AI-powered business growth platform</span>
-          <span className="block text-zinc-600">
+          <span className="block text-muted-foreground">
             Each employee must use their own login — sharing accounts is not allowed.
           </span>
         </p>
@@ -196,11 +196,11 @@ export default function LoginPage() {
           aria-modal="true"
           aria-labelledby="session-limit-title"
         >
-          <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl p-5 sm:p-6">
-            <h2 id="session-limit-title" className="text-lg font-semibold text-white tracking-tight">
+          <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl border border-border bg-card shadow-2xl p-5 sm:p-6">
+            <h2 id="session-limit-title" className="text-lg font-semibold text-foreground tracking-tight">
               Account already active
             </h2>
-            <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
               This account is already active on another device
               {sessionConflict.maxSessions === 1
                 ? " (your plan allows 1 concurrent session)."
@@ -211,9 +211,9 @@ export default function LoginPage() {
                 {sessionConflict.activeSessions.map((s) => (
                   <li
                     key={s.id}
-                    className="rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-xs text-zinc-400"
+                    className="rounded-xl border border-border bg-background/60 px-3 py-2 text-xs text-muted-foreground"
                   >
-                    <div className="text-zinc-200 font-medium">
+                    <div className="text-foreground font-medium">
                       {s.deviceName || "Unknown device"}
                     </div>
                     <div>
@@ -229,7 +229,7 @@ export default function LoginPage() {
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => void continueAndLogoutPrevious()}
-                className="flex-1 min-h-11 rounded-xl bg-white text-zinc-950 font-semibold text-sm disabled:opacity-50"
+                className="flex-1 min-h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm disabled:opacity-50"
               >
                 Continue and log out previous session
               </button>
@@ -237,7 +237,7 @@ export default function LoginPage() {
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setSessionConflict(null)}
-                className="flex-1 min-h-11 rounded-xl border border-zinc-700 text-zinc-300 text-sm hover:bg-zinc-800"
+                className="flex-1 min-h-11 rounded-xl border border-border text-muted-foreground text-sm hover:bg-muted"
               >
                 Cancel
               </button>

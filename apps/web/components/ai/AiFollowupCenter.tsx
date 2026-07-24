@@ -204,24 +204,24 @@ function RecCardBody({ rec }: { rec: AiFollowupRec }) {
 
   return (
     <div className="min-w-0" title={tooltip}>
-      <div className="text-sm font-medium text-zinc-100 leading-snug line-clamp-2">
+      <div className="text-sm font-medium text-foreground leading-snug line-clamp-2">
         {actionHeadline(rec)}
       </div>
       <div className="mt-1 min-w-0">
-        <div className="text-sm font-semibold text-white truncate" title={name}>
+        <div className="text-sm font-semibold text-foreground truncate" title={name}>
           {name}
         </div>
         {metaLine ? (
-          <div className="text-xs text-zinc-400 truncate mt-0.5" title={metaLine}>
+          <div className="text-xs text-muted-foreground truncate mt-0.5" title={metaLine}>
             {metaLine}
           </div>
         ) : null}
       </div>
-      <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed line-clamp-2" title={rec.reason}>
+      <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed line-clamp-2" title={rec.reason}>
         {rec.reason}
       </p>
       {rec.confidence != null && (
-        <p className="text-[10px] text-zinc-600 mt-1">
+        <p className="text-[10px] text-muted-foreground mt-1">
           Confidence {Math.round(rec.confidence * 100)}% ·{" "}
           <span className="capitalize">{rec.priority}</span> priority
         </p>
@@ -343,24 +343,24 @@ export function AiFollowupCenter({ token, mode = "both", className = "", limit =
   return (
     <div className={`space-y-4 ${className}`}>
       {showSummary && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5">
+        <div className="bg-card border border-border rounded-2xl p-4 sm:p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-base font-semibold text-white">Today&apos;s AI Actions</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <h3 className="text-base font-semibold text-foreground">Today&apos;s AI Actions</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Counts from live CRM signals — click a bucket to jump to a lead
               </p>
             </div>
             <button
               type="button"
               onClick={refresh}
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-zinc-300"
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-muted-foreground"
             >
               Refresh
             </button>
           </div>
           {loading && !summary ? (
-            <div className="h-16 bg-zinc-800/50 animate-pulse rounded-xl" />
+            <div className="h-16 bg-muted/50 animate-pulse rounded-xl" />
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               {(
@@ -383,10 +383,10 @@ export function AiFollowupCenter({ token, mode = "both", className = "", limit =
                       setFilter(key as ActionFilter);
                       if (first) openAction(key, first, router);
                     }}
-                    className="text-left bg-zinc-950 border border-zinc-800 rounded-xl p-3 hover:border-zinc-600 disabled:opacity-50 transition-colors"
+                    className="text-left bg-background border border-border rounded-xl p-3 hover:border-border disabled:opacity-50 transition-colors"
                   >
-                    <div className="text-xs text-zinc-500">{label}</div>
-                    <div className="text-2xl font-semibold tabular-nums text-white mt-0.5">{n}</div>
+                    <div className="text-xs text-muted-foreground">{label}</div>
+                    <div className="text-2xl font-semibold tabular-nums text-foreground mt-0.5">{n}</div>
                   </button>
                 );
               })}
@@ -396,18 +396,18 @@ export function AiFollowupCenter({ token, mode = "both", className = "", limit =
       )}
 
       {showCenter && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 sm:p-5">
+        <div className="bg-card border border-border rounded-2xl p-4 sm:p-5">
           <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
             <div className="min-w-0">
-              <h3 className="text-base font-semibold text-white">🤖 AI Follow-up Center</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <h3 className="text-base font-semibold text-foreground">🤖 AI Follow-up Center</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 Sorted by priority · Lead name, company &amp; city only
               </p>
             </div>
             <button
               type="button"
               onClick={refresh}
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-zinc-300 shrink-0"
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-muted-foreground shrink-0"
             >
               Refresh
             </button>
@@ -425,12 +425,12 @@ export function AiFollowupCenter({ token, mode = "both", className = "", limit =
                   onClick={() => setFilter(f.key)}
                   className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-colors ${
                     active
-                      ? "bg-white text-zinc-950 border-white"
-                      : "bg-zinc-950 text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-zinc-200"
+                      ? "bg-primary text-primary-foreground border-white"
+                      : "bg-background text-muted-foreground border-border hover:border-border hover:text-foreground"
                   }`}
                 >
                   {f.label}
-                  <span className={`ml-1 tabular-nums ${active ? "text-zinc-600" : "text-zinc-600"}`}>
+                  <span className={`ml-1 tabular-nums ${active ? "text-muted-foreground" : "text-muted-foreground"}`}>
                     {count}
                   </span>
                 </button>
@@ -441,11 +441,11 @@ export function AiFollowupCenter({ token, mode = "both", className = "", limit =
           {loading && !items.length ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-16 bg-zinc-800/50 animate-pulse rounded-xl" />
+                <div key={i} className="h-16 bg-muted/50 animate-pulse rounded-xl" />
               ))}
             </div>
           ) : sortedFiltered.length === 0 ? (
-            <p className="text-sm text-zinc-500 py-6 text-center">
+            <p className="text-sm text-muted-foreground py-6 text-center">
               {items.length === 0
                 ? "No urgent follow-ups right now. Add leads or update CRM activity — the engine will recommend next steps automatically."
                 : `No ${filter === "all" ? "" : filter + " "}recommendations in this filter.`}
@@ -455,11 +455,11 @@ export function AiFollowupCenter({ token, mode = "both", className = "", limit =
               {sortedFiltered.map((rec) => (
                 <li
                   key={rec.id}
-                  className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 hover:border-zinc-700 transition-colors"
+                  className="bg-background border border-border rounded-xl p-3 hover:border-border transition-colors"
                 >
                   <div className="flex items-start gap-2">
                     <span
-                      className={`text-lg leading-none mt-0.5 shrink-0 ${URGENCY_DOT[rec.urgency] || "text-zinc-400"}`}
+                      className={`text-lg leading-none mt-0.5 shrink-0 ${URGENCY_DOT[rec.urgency] || "text-muted-foreground"}`}
                       title={`${rec.priority} priority · ${rec.urgency}`}
                     >
                       ●
@@ -474,7 +474,7 @@ export function AiFollowupCenter({ token, mode = "both", className = "", limit =
                               type="button"
                               disabled={acting === rec.id}
                               onClick={() => act(rec, btn, true)}
-                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-white/10 hover:bg-white/20 text-zinc-200 capitalize disabled:opacity-50"
+                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg bg-white/10 hover:bg-white/20 text-foreground capitalize disabled:opacity-50"
                             >
                               {btn}
                             </button>
@@ -484,7 +484,7 @@ export function AiFollowupCenter({ token, mode = "both", className = "", limit =
                           type="button"
                           disabled={acting === rec.id}
                           onClick={() => act(rec, "dismiss", false)}
-                          className="px-2.5 py-1 text-[11px] rounded-lg text-zinc-500 hover:text-zinc-300"
+                          className="px-2.5 py-1 text-[11px] rounded-lg text-muted-foreground hover:text-muted-foreground"
                         >
                           Dismiss
                         </button>
@@ -541,14 +541,14 @@ export function AiLeadRecommendationBadge({
       <div className="text-[10px] uppercase tracking-wider text-violet-300/80 font-medium">
         AI Recommendation
       </div>
-      <div className="text-xs text-zinc-200 mt-0.5 font-medium leading-snug line-clamp-2" title={headline}>
+      <div className="text-xs text-foreground mt-0.5 font-medium leading-snug line-clamp-2" title={headline}>
         {headline}
       </div>
-      <p className="text-[11px] text-zinc-500 mt-0.5 line-clamp-2" title={rec.reason}>
+      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2" title={rec.reason}>
         {rec.reason}
       </p>
       {rec.confidence != null && (
-        <p className="text-[10px] text-zinc-600 mt-0.5">
+        <p className="text-[10px] text-muted-foreground mt-0.5">
           Confidence {Math.round(rec.confidence * 100)}%
         </p>
       )}
@@ -558,7 +558,7 @@ export function AiLeadRecommendationBadge({
             key={btn}
             type="button"
             onClick={() => act(btn)}
-            className="px-2 py-0.5 text-[10px] rounded-md bg-white/10 hover:bg-white/15 capitalize text-zinc-300"
+            className="px-2 py-0.5 text-[10px] rounded-md bg-white/10 hover:bg-white/15 capitalize text-muted-foreground"
           >
             {btn}
           </button>

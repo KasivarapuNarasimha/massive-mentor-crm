@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
-import { Toaster } from "sonner";
+import { AppThemeProvider, ThemeSync } from "@/lib/theme";
+import { ThemeAwareToaster } from "@/components/theme/ThemeAwareToaster";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -28,7 +29,10 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   viewportFit: "cover",
-  themeColor: "#09090b",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+  ],
 };
 
 export default function RootLayout({
@@ -37,28 +41,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="bg-zinc-950 h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <body
-        className={`${inter.variable} font-sans antialiased bg-zinc-950 text-white min-h-full min-h-dvh tracking-tight`}
+        className={`${inter.variable} font-sans antialiased bg-background text-foreground min-h-full min-h-dvh tracking-tight`}
       >
-        <AuthProvider>{children}</AuthProvider>
-        <Toaster
-          position="top-center"
-          richColors
-          closeButton
-          theme="dark"
-          className="toaster group"
-          toastOptions={{
-            classNames: {
-              toast: "group toast group-[.toaster]:bg-zinc-900 group-[.toaster]:text-zinc-200 group-[.toaster]:border-zinc-800 group-[.toaster]:shadow-lg",
-              description: "group-[.toast]:text-zinc-400",
-              actionButton: "group-[.toast]:bg-white group-[.toast]:text-zinc-950",
-              cancelButton: "group-[.toast]:bg-zinc-800 group-[.toast]:text-zinc-200",
-              error: "group-[.toaster]:bg-red-950 group-[.toaster]:border-red-900 group-[.toaster]:text-red-400",
-              success: "group-[.toaster]:bg-emerald-950 group-[.toaster]:border-emerald-900 group-[.toaster]:text-emerald-400",
-            },
-          }}
-        />
+        <AppThemeProvider>
+          <AuthProvider>
+            <ThemeSync>
+              {children}
+              <ThemeAwareToaster />
+            </ThemeSync>
+          </AuthProvider>
+        </AppThemeProvider>
       </body>
     </html>
   );

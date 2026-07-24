@@ -224,11 +224,11 @@ export function AnalyticsDashboard() {
           <p className="mm-section-label">Insights</p>
           <h2
             id="analytics-heading"
-            className="text-xl sm:text-2xl font-semibold tracking-tight text-white mt-1.5"
+            className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground mt-1.5"
           >
             Analytics dashboard
           </h2>
-          <p className="text-sm text-zinc-500 mt-1.5 leading-relaxed">
+          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
             Full-tenant live aggregates · hover for details · click to drill down
           </p>
         </div>
@@ -277,10 +277,10 @@ export function AnalyticsDashboard() {
             onClick={() => router.push(k.href)}
             className={`group text-left rounded-3xl border bg-gradient-to-br ${k.tone} backdrop-blur-xl p-4 sm:p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-violet-950/30 focus-ring min-h-[104px]`}
           >
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-400 group-hover:text-zinc-300">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground group-hover:text-muted-foreground">
               {k.label}
             </div>
-            <div className="mt-2.5 text-2xl sm:text-3xl font-bold text-white tracking-tight tabular-nums">
+            <div className="mt-2.5 text-2xl sm:text-3xl font-bold text-foreground tracking-tight tabular-nums">
               {k.money ? (
                 <span key={k.value}>{fmtMoney(k.value, currency)}</span>
               ) : (

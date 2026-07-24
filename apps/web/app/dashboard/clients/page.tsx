@@ -166,16 +166,16 @@ export default function ClientsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Clients</h1>
-          <p className="text-zinc-400 mt-1 sm:mt-2 text-sm sm:text-base">
+          <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-base">
             Manage your existing clients and accounts.
           </p>
           {templateSlug ? (
-            <p className="text-xs text-zinc-500 mt-1">Template: {templateSlug}</p>
+            <p className="text-xs text-muted-foreground mt-1">Template: {templateSlug}</p>
           ) : null}
         </div>
         <button
           onClick={openCreate}
-          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-white text-zinc-950 rounded-xl font-medium hover:bg-zinc-200 focus-ring button-active transition-colors touch-manipulation"
+          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active transition-colors touch-manipulation"
         >
           + New Client
         </button>
@@ -195,12 +195,12 @@ export default function ClientsPage() {
           placeholder="Search clients..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm text-white focus:outline-none focus:border-zinc-600 min-h-11"
+          className="flex-1 bg-background border border-border rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm text-foreground focus:outline-none focus:border-border min-h-11"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm text-white focus:outline-none focus:border-zinc-600 min-h-11"
+          className="bg-background border border-border rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm text-foreground focus:outline-none focus:border-border min-h-11"
         >
           <option value="">All Statuses</option>
           {statusOptions.map((s) => (
@@ -210,23 +210,23 @@ export default function ClientsPage() {
       </div>
 
       {isLoading ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8">
+        <div className="bg-card border border-border rounded-2xl p-8">
           <div className="animate-pulse space-y-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-16 bg-zinc-800 rounded-xl" />
+              <div key={i} className="h-16 bg-muted rounded-xl" />
             ))}
           </div>
         </div>
       ) : filteredClients.length === 0 ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-12 text-center">
-          <div className="mx-auto w-16 h-16 bg-zinc-800 rounded-2xl flex items-center justify-center mb-6">
+        <div className="bg-card border border-border rounded-2xl p-12 text-center">
+          <div className="mx-auto w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6">
             <span className="text-3xl">🤝</span>
           </div>
           <h3 className="text-xl font-semibold mb-2">No clients found</h3>
-          <p className="text-zinc-400 mb-6">Start by adding your first client.</p>
+          <p className="text-muted-foreground mb-6">Start by adding your first client.</p>
           <button
             onClick={openCreate}
-            className="px-6 py-2.5 bg-white text-zinc-950 rounded-xl font-medium hover:bg-zinc-200 focus-ring button-active"
+            className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active"
           >
             Create Client
           </button>
@@ -238,22 +238,22 @@ export default function ClientsPage() {
             {filteredClients.map((client) => (
               <div
                 key={client.id}
-                className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3"
+                className="bg-card border border-border rounded-2xl p-4 space-y-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-medium text-white truncate">{client.name}</div>
+                    <div className="font-medium text-foreground truncate">{client.name}</div>
                     {client.email && (
-                      <div className="text-xs text-zinc-500 truncate">{client.email}</div>
+                      <div className="text-xs text-muted-foreground truncate">{client.email}</div>
                     )}
-                    <div className="text-sm text-zinc-400 mt-1">{client.company || "—"}</div>
+                    <div className="text-sm text-muted-foreground mt-1">{client.company || "—"}</div>
                   </div>
                   <span className="shrink-0 px-2.5 py-0.5 text-xs rounded-full bg-white/10 border border-white/10">
                     {client.status}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-zinc-300 tabular-nums">
+                  <span className="text-sm text-muted-foreground tabular-nums">
                     {client.value != null ? formatCurrency(client.value) : "—"}
                   </span>
                   <div className="flex gap-2">
@@ -278,10 +278,10 @@ export default function ClientsPage() {
           </div>
 
           {/* Desktop table */}
-          <div className="hidden md:block bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+          <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden">
             <div className="table-scroll">
               <table className="mm-table min-w-[640px]">
-                <thead className="border-b border-zinc-800 text-zinc-400">
+                <thead className="border-b border-border text-muted-foreground">
                   <tr>
                     <th className="text-left p-4 font-medium">Name</th>
                     <th className="text-left p-4 font-medium">Company</th>
@@ -290,24 +290,24 @@ export default function ClientsPage() {
                     <th className="text-right p-4 font-medium">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-border">
                   {filteredClients.map((client) => (
-                    <tr key={client.id} className="hover:bg-zinc-800/50 transition-colors">
+                    <tr key={client.id} className="hover:bg-muted/50 transition-colors">
                       <td className="p-4">
                         <div>
-                          <div className="font-medium text-white">{client.name}</div>
+                          <div className="font-medium text-foreground">{client.name}</div>
                           {client.email && (
-                            <div className="text-xs text-zinc-500">{client.email}</div>
+                            <div className="text-xs text-muted-foreground">{client.email}</div>
                           )}
                         </div>
                       </td>
-                      <td className="p-4 text-zinc-300">{client.company || "-"}</td>
+                      <td className="p-4 text-muted-foreground">{client.company || "-"}</td>
                       <td className="p-4">
                         <span className="inline-block px-2.5 py-0.5 text-xs rounded-full bg-white/10 text-white/80 border border-white/10">
                           {client.status}
                         </span>
                       </td>
-                      <td className="p-4 text-zinc-300">
+                      <td className="p-4 text-muted-foreground">
                         {client.value != null ? formatCurrency(client.value) : "-"}
                       </td>
                       <td className="p-4 text-right space-x-2">
@@ -337,10 +337,10 @@ export default function ClientsPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92dvh] flex flex-col overflow-hidden p-4 sm:p-6 safe-bottom">
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92dvh] flex flex-col overflow-hidden p-4 sm:p-6 safe-bottom">
             <h2 className="text-xl font-semibold mb-2">{editingClient ? "Edit Client" : "New Client"}</h2>
             {templateSlug ? (
-              <p className="text-xs text-zinc-500 mb-4">Fields from template: {templateSlug}</p>
+              <p className="text-xs text-muted-foreground mb-4">Fields from template: {templateSlug}</p>
             ) : (
               <div className="mb-4" />
             )}
@@ -367,7 +367,7 @@ export default function ClientsPage() {
                 type="submit"
                 form="client-form"
                 disabled={isSubmitting}
-                className="flex-1 px-5 py-2.5 bg-white text-zinc-950 rounded-xl font-medium hover:bg-zinc-200 disabled:opacity-50"
+                className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover disabled:opacity-50"
               >
                 {isSubmitting ? "Saving..." : editingClient ? "Update Client" : "Create Client"}
               </button>

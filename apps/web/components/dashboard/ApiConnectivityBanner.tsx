@@ -65,7 +65,7 @@ export function ApiConnectivityBanner() {
           type="button"
           disabled={checking}
           onClick={() => void probe()}
-          className="shrink-0 min-h-9 px-3 rounded-lg bg-red-500 text-zinc-950 text-xs font-semibold disabled:opacity-50"
+          className="shrink-0 min-h-9 px-3 rounded-lg bg-red-500 text-white text-xs font-semibold disabled:opacity-50"
         >
           {checking ? "Checking…" : "Retry"}
         </button>

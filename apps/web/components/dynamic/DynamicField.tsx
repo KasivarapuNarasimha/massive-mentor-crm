@@ -100,9 +100,9 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
             checked={Boolean(value)}
             disabled={disabled}
             onChange={(e) => onChange(field.key, e.target.checked)}
-            className="h-4 w-4 rounded border-zinc-600"
+            className="h-4 w-4 rounded border-border"
           />
-          <label htmlFor={id} className="text-sm text-zinc-300">
+          <label htmlFor={id} className="text-sm text-muted-foreground">
             {field.label}
           </label>
         </div>
@@ -136,7 +136,7 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
               onChange={(e) => onChange(field.key, e.target.value === "" ? "" : e.target.value)}
               className={`${inputClass} pl-8`}
             />
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
               {/* Symbol from app currency preference when available */}
               {typeof window !== "undefined"
                 ? (() => {

@@ -22,24 +22,24 @@ export default function LandingPage() {
   // Authenticated users briefly see redirect cue; never infinite Loading
   if (isAuthenticated && !isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-950">
-        <div className="text-zinc-400 text-sm">Opening dashboard…</div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-muted-foreground text-sm">Opening dashboard…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
-      <nav className="border-b border-zinc-800">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      <nav className="border-b border-border">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="font-semibold tracking-tight text-xl">Massive Mentor</div>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="text-sm hover:text-zinc-300">
+            <Link href="/login" className="text-sm hover:text-muted-foreground">
               Sign in
             </Link>
             <a
               href="mailto:team@massivementor.in?subject=CRM%20Demo"
-              className="text-sm bg-white text-zinc-950 px-4 py-1.5 rounded-lg font-medium hover:bg-zinc-200"
+              className="text-sm bg-primary text-primary-foreground px-4 py-1.5 rounded-lg font-medium hover:bg-primary-hover"
             >
               Contact sales
             </a>
@@ -57,28 +57,28 @@ export default function LandingPage() {
             <br />
             with an AI mentor.
           </h1>
-          <p className="text-lg sm:text-xl text-zinc-400 mb-10">
+          <p className="text-lg sm:text-xl text-muted-foreground mb-10">
             CRM, finance, role portals, and AI mentorship — built for real multi-tenant operations.
           </p>
 
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <a
               href="mailto:team@massivementor.in?subject=CRM%20Demo%20Request"
-              className="px-8 py-3 bg-white text-zinc-950 rounded-xl font-medium hover:bg-zinc-200 transition-colors"
+              className="px-8 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover transition-colors"
             >
               Book a demo
             </a>
             <Link
               href="/login"
-              className="px-8 py-3 border border-zinc-700 hover:bg-zinc-900 rounded-xl font-medium transition-colors"
+              className="px-8 py-3 border border-border hover:bg-card rounded-xl font-medium transition-colors"
             >
               Sign in
             </Link>
           </div>
           {isLoading && (
-            <p className="text-xs text-zinc-600 mt-6">Checking session…</p>
+            <p className="text-xs text-muted-foreground mt-6">Checking session…</p>
           )}
-          <p className="text-xs text-zinc-500 mt-8">No credit card required</p>
+          <p className="text-xs text-muted-foreground mt-8">No credit card required</p>
         </div>
       </main>
     </div>

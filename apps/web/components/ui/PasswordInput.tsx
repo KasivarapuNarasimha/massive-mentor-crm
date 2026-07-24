@@ -140,7 +140,7 @@ export function PasswordInput({
         type="button"
         tabIndex={0}
         onClick={toggle}
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-10 min-h-10 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/25 touch-manipulation"
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center min-w-10 min-h-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/25 touch-manipulation"
         aria-label={visible ? "Hide password" : "Show password"}
         aria-pressed={visible}
         aria-controls={inputId}

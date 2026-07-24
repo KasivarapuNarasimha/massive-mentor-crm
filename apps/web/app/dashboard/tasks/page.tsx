@@ -126,12 +126,12 @@ export default function TasksPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold">Tasks</h1>
-          <p className="text-zinc-400 text-sm sm:text-base mt-1">Track follow-ups and action items.</p>
+          <p className="text-muted-foreground text-sm sm:text-base mt-1">Track follow-ups and action items.</p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-white text-zinc-950 rounded-xl font-medium touch-manipulation"
+          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium touch-manipulation"
         >
           + New Task
         </button>
@@ -143,23 +143,23 @@ export default function TasksPage() {
         placeholder="Search tasks..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-4 w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11"
+        className="mb-4 w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11"
       />
 
       {isLoading ? (
-        <div className="h-40 bg-zinc-900 rounded-2xl animate-pulse" />
+        <div className="h-40 bg-card rounded-2xl animate-pulse" />
       ) : filtered.length === 0 ? (
-        <div className="text-center p-10 bg-zinc-900 border border-zinc-800 rounded-2xl">No tasks</div>
+        <div className="text-center p-10 bg-card border border-border rounded-2xl">No tasks</div>
       ) : (
         <div className="space-y-3">
           {filtered.map((task) => (
             <div
               key={task.id}
-              className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center"
+              className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center"
             >
               <div className="min-w-0">
-                <div className="font-medium text-white">{task.title}</div>
-                <div className="text-xs text-zinc-500 mt-1">
+                <div className="font-medium text-foreground">{task.title}</div>
+                <div className="text-xs text-muted-foreground mt-1">
                   {task.priority && `${task.priority}`}
                   {task.dueDate && ` · Due ${task.dueDate.split("T")[0]}`}
                 </div>
@@ -188,36 +188,36 @@ export default function TasksPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-zinc-900 border border-zinc-800 p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
+          <div className="bg-card border border-border p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
             <h3 className="font-semibold mb-4 text-lg">{editingTask ? "Edit Task" : "New Task"}</h3>
             <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
               <input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Task title *"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
                 required
               />
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Description"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 h-24 text-base sm:text-sm"
+                className="w-full bg-background border border-border rounded-xl p-3 h-24 text-base sm:text-sm"
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="block text-xs text-zinc-500">
+                <label className="block text-xs text-muted-foreground">
                   Due date
                   <input
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white text-base sm:text-sm min-h-11"
+                    className="mt-1 w-full bg-background border border-border rounded-xl p-3 text-foreground text-base sm:text-sm min-h-11"
                   />
                 </label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+                  className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
                 >
                   <option value="todo">todo</option>
                   <option value="in_progress">in_progress</option>
@@ -227,7 +227,7 @@ export default function TasksPage() {
               <select
                 value={formData.priority}
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
               >
                 <option value="low">low</option>
                 <option value="medium">medium</option>
@@ -240,7 +240,7 @@ export default function TasksPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 min-h-11 py-2.5 bg-white text-zinc-950 rounded-xl touch-manipulation"
+                  className="flex-1 min-h-11 py-2.5 bg-primary text-primary-foreground rounded-xl touch-manipulation"
                 >
                   {isSubmitting ? "Saving..." : editingTask ? "Update" : "Create"}
                 </button>

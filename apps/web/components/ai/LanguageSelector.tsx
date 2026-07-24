@@ -43,7 +43,7 @@ export function LanguageSelector({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className={`bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-600 disabled:opacity-50 ${className}`}
+      className={`bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-border disabled:opacity-50 ${className}`}
     >
       {SUPPORTED_LANGUAGES.map((lang) => (
         <option key={lang.code} value={lang.code}>

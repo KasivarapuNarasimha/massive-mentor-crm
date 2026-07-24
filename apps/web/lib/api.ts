@@ -403,6 +403,15 @@ class ApiClient {
     });
   }
 
+  /** Persist appearance preference (light | dark | system) */
+  async patchThemePreference(theme: string, token: string) {
+    return this.request<{ themePreference: string }>("/auth/theme", {
+      method: "PATCH",
+      body: JSON.stringify({ theme }),
+      token,
+    });
+  }
+
   // Profile endpoints
   async getProfile(token: string) {
     return this.request<{ profile: unknown }>("/profile", {

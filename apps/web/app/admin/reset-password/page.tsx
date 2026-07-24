@@ -10,7 +10,7 @@ import { PORTAL_TOKENS, PORTAL_USER_KEYS } from "@/lib/portal-config";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 
 const INPUT =
-  "portal-login-input w-full min-h-11 px-4 py-3 bg-zinc-950 border border-zinc-700 rounded-xl text-base sm:text-sm text-white placeholder:text-zinc-400";
+  "portal-login-input w-full min-h-11 px-4 py-3 bg-background border border-border rounded-xl text-base sm:text-sm text-foreground placeholder:text-muted-foreground";
 
 function AdminResetForm() {
   const router = useRouter();
@@ -75,7 +75,7 @@ function AdminResetForm() {
     }
   };
 
-  if (checking) return <div className="text-zinc-500 text-sm py-6">Validating…</div>;
+  if (checking) return <div className="text-muted-foreground text-sm py-6">Validating…</div>;
   if (!valid) {
     return (
       <div className="space-y-3 text-sm">
@@ -90,12 +90,12 @@ function AdminResetForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       {emailHint && (
-        <p className="text-xs text-zinc-500">
-          Account <span className="text-zinc-300">{emailHint}</span>
+        <p className="text-xs text-muted-foreground">
+          Account <span className="text-muted-foreground">{emailHint}</span>
         </p>
       )}
       <div>
-        <label htmlFor="admin-np" className="block text-sm text-zinc-300 mb-2">
+        <label htmlFor="admin-np" className="block text-sm text-muted-foreground mb-2">
           New password
         </label>
         <PasswordInput
@@ -109,7 +109,7 @@ function AdminResetForm() {
         <PasswordRulesChecklist password={password} />
       </div>
       <div>
-        <label htmlFor="admin-cp" className="block text-sm text-zinc-300 mb-2">
+        <label htmlFor="admin-cp" className="block text-sm text-muted-foreground mb-2">
           Confirm password
         </label>
         <PasswordInput
@@ -127,11 +127,11 @@ function AdminResetForm() {
       <button
         type="submit"
         disabled={!canSubmit}
-        className="w-full min-h-12 bg-violet-500 text-zinc-950 font-semibold rounded-xl disabled:opacity-40"
+        className="w-full min-h-12 bg-violet-500 text-white font-semibold rounded-xl disabled:opacity-40"
       >
         {busy ? "Updating…" : "Update password"}
       </button>
-      <p className="text-xs text-zinc-500 text-center">
+      <p className="text-xs text-muted-foreground text-center">
         All Super Admin sessions will be revoked immediately.
       </p>
     </form>
@@ -140,20 +140,20 @@ function AdminResetForm() {
 
 export default function AdminResetPasswordPage() {
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-zinc-950 px-4 py-10">
+    <div className="min-h-dvh flex items-center justify-center bg-background px-4 py-10">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="inline-flex px-3 py-1 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/30 text-xs font-medium mb-4">
             SUPER ADMIN PORTAL
           </div>
-          <h1 className="text-2xl font-semibold text-white">Reset password</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Reset password</h1>
         </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 sm:p-8">
-          <Suspense fallback={<div className="text-zinc-500 text-sm">Loading…</div>}>
+        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
+          <Suspense fallback={<div className="text-muted-foreground text-sm">Loading…</div>}>
             <AdminResetForm />
           </Suspense>
         </div>
-        <p className="text-center text-sm text-zinc-500 mt-6">
+        <p className="text-center text-sm text-muted-foreground mt-6">
           <Link href="/admin/login" className="underline">
             Back to sign in
           </Link>

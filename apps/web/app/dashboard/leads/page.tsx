@@ -1090,7 +1090,7 @@ export default function LeadsPage() {
   };
 
   const inputClass =
-    "bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-600 w-full min-w-0";
+    "bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-border w-full min-w-0";
   const selectClass = `${inputClass} appearance-none`;
 
   return (
@@ -1099,7 +1099,7 @@ export default function LeadsPage() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-6 gap-3 shrink-0">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Leads</h1>
-          <p className="text-zinc-400 mt-1.5 text-sm sm:text-base">
+          <p className="text-muted-foreground mt-1.5 text-sm sm:text-base">
             Manage your sales leads and prospects.
           </p>
         </div>
@@ -1107,7 +1107,7 @@ export default function LeadsPage() {
           <button
             type="button"
             onClick={downloadCsvTemplate}
-            className="min-h-11 px-4 sm:px-5 py-2.5 bg-white/5 border border-zinc-700 rounded-xl text-sm font-medium hover:bg-white/10 transition-colors text-zinc-300 touch-manipulation"
+            className="min-h-11 px-4 sm:px-5 py-2.5 bg-white/5 border border-border rounded-xl text-sm font-medium hover:bg-white/10 transition-colors text-muted-foreground touch-manipulation"
             title="Download a CSV with headers that match the backend schema"
           >
             CSV template
@@ -1129,7 +1129,7 @@ export default function LeadsPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="min-h-11 px-4 sm:px-5 py-2.5 bg-white text-zinc-950 rounded-xl text-sm font-medium hover:bg-zinc-200 transition-colors touch-manipulation"
+            className="min-h-11 px-4 sm:px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary-hover transition-colors touch-manipulation"
           >
             + New Lead
           </button>
@@ -1138,13 +1138,13 @@ export default function LeadsPage() {
 
       {/* Total + optional import summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 col-span-1">
-          <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-1">Total Leads</div>
-          <div className="text-2xl font-semibold tabular-nums text-white">
+        <div className="bg-card border border-border rounded-2xl p-4 col-span-1">
+          <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Total Leads</div>
+          <div className="text-2xl font-semibold tabular-nums text-foreground">
             {isLoading ? "—" : serverTotal.toLocaleString()}
           </div>
           {!isLoading && (
-            <div className="text-xs text-zinc-500 mt-1">
+            <div className="text-xs text-muted-foreground mt-1">
               {leads.length < serverTotal
                 ? `Showing ${leads.length.toLocaleString()} of ${serverTotal.toLocaleString()}`
                 : totalFiltered !== serverTotal
@@ -1156,15 +1156,15 @@ export default function LeadsPage() {
 
         {importReport && (
           <>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-wider text-zinc-500 mb-1">
+            <div className="bg-card border border-border rounded-2xl p-4">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
                 Parsed rows
               </div>
               <div className="text-2xl font-semibold tabular-nums">
                 {importReport.parsedRows.toLocaleString()}
               </div>
             </div>
-            <div className="bg-zinc-900 border border-emerald-900/40 rounded-2xl p-4">
+            <div className="bg-card border border-emerald-900/40 rounded-2xl p-4">
               <div className="text-[11px] uppercase tracking-wider text-emerald-500/80 mb-1">
                 Imported
               </div>
@@ -1172,7 +1172,7 @@ export default function LeadsPage() {
                 {importReport.imported.toLocaleString()}
               </div>
             </div>
-            <div className="bg-zinc-900 border border-sky-900/40 rounded-2xl p-4">
+            <div className="bg-card border border-sky-900/40 rounded-2xl p-4">
               <div className="text-[11px] uppercase tracking-wider text-sky-400/80 mb-1">
                 Updated existing
               </div>
@@ -1180,7 +1180,7 @@ export default function LeadsPage() {
                 {(importReport.updated ?? 0).toLocaleString()}
               </div>
             </div>
-            <div className="bg-zinc-900 border border-amber-900/40 rounded-2xl p-4">
+            <div className="bg-card border border-amber-900/40 rounded-2xl p-4">
               <div className="text-[11px] uppercase tracking-wider text-amber-500/80 mb-1">
                 Duplicates skipped
               </div>
@@ -1188,7 +1188,7 @@ export default function LeadsPage() {
                 {importReport.skippedDuplicates.toLocaleString()}
               </div>
             </div>
-            <div className="bg-zinc-900 border border-red-900/40 rounded-2xl p-4">
+            <div className="bg-card border border-red-900/40 rounded-2xl p-4">
               <div className="text-[11px] uppercase tracking-wider text-red-400/80 mb-1">
                 Failed rows
               </div>
@@ -1201,11 +1201,11 @@ export default function LeadsPage() {
       </div>
 
       {importReport && (
-        <div className="mb-6 border border-zinc-800 rounded-2xl bg-zinc-950/80 p-4 space-y-3">
+        <div className="mb-6 border border-border rounded-2xl bg-background/80 p-4 space-y-3">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
-              <h3 className="text-sm font-semibold text-white">Import report</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">
+              <h3 className="text-sm font-semibold text-foreground">Import report</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
                 {importReport.imported + (importReport.updated || 0) > 0
                   ? `${importReport.imported} created, ${importReport.updated ?? 0} updated in the database.`
                   : "No rows were written. Fix issues below or re-map columns."}
@@ -1213,7 +1213,7 @@ export default function LeadsPage() {
                   <>
                     {" "}
                     Status auto-normalized to:{" "}
-                    <span className="text-zinc-400 font-mono">
+                    <span className="text-muted-foreground font-mono">
                       {importReport.allowedStatuses.join(", ")}
                     </span>
                   </>
@@ -1223,23 +1223,23 @@ export default function LeadsPage() {
             <button
               type="button"
               onClick={() => setImportReport(null)}
-              className="text-xs text-zinc-500 hover:text-zinc-300 shrink-0"
+              className="text-xs text-muted-foreground hover:text-muted-foreground shrink-0"
             >
               Dismiss
             </button>
           </div>
 
           {importReport.errors && importReport.errors.length > 0 ? (
-            <div className="max-h-56 overflow-auto space-y-2 bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+            <div className="max-h-56 overflow-auto space-y-2 bg-card border border-border rounded-xl p-3">
               {importReport.errors.map((err, i) => (
                 <div
                   key={`${err.row}-${err.column || "x"}-${i}`}
-                  className="text-sm border-b border-zinc-800/60 last:border-0 pb-2 last:pb-0"
+                  className="text-sm border-b border-border/60 last:border-0 pb-2 last:pb-0"
                 >
                   <div className="font-mono text-red-300/90 leading-snug">
                     {formatImportError(err)}
                     {err.column ? (
-                      <span className="ml-2 text-[10px] uppercase tracking-wide text-zinc-500">
+                      <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">
                         [{err.column}]
                       </span>
                     ) : null}
@@ -1250,7 +1250,7 @@ export default function LeadsPage() {
                     </div>
                   )}
                   {err.detectedColumns && err.detectedColumns.length > 0 && (
-                    <div className="text-[11px] text-zinc-500 mt-0.5 font-mono">
+                    <div className="text-[11px] text-muted-foreground mt-0.5 font-mono">
                       Detected columns: {err.detectedColumns.join(", ")}
                     </div>
                   )}
@@ -1262,9 +1262,9 @@ export default function LeadsPage() {
           ) : null}
 
           {importReport.report && (
-            <details className="text-xs text-zinc-500">
-              <summary className="cursor-pointer hover:text-zinc-300">Full report text</summary>
-              <pre className="mt-2 whitespace-pre-wrap font-mono bg-zinc-900 rounded-lg p-3 max-h-40 overflow-auto text-zinc-400">
+            <details className="text-xs text-muted-foreground">
+              <summary className="cursor-pointer hover:text-muted-foreground">Full report text</summary>
+              <pre className="mt-2 whitespace-pre-wrap font-mono bg-card rounded-lg p-3 max-h-40 overflow-auto text-muted-foreground">
                 {importReport.report}
               </pre>
             </details>
@@ -1303,7 +1303,7 @@ export default function LeadsPage() {
           </span>
           <button
             type="button"
-            className="underline text-violet-300 hover:text-white"
+            className="underline text-violet-300 hover:text-foreground"
             onClick={() => {
               setSearch("");
               setStatusFilter("");
@@ -1318,7 +1318,7 @@ export default function LeadsPage() {
       {/* Filters — status + config-driven filter fields */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-4 items-stretch sm:items-center">
         {templateSlug && (
-          <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 border border-zinc-700 text-zinc-400 w-fit">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 border border-border text-muted-foreground w-fit">
             Template: {templateSlug}
           </span>
         )}
@@ -1367,16 +1367,16 @@ export default function LeadsPage() {
 
       {/* Enterprise sticky bulk toolbar */}
       {selectedIds.size > 0 && (
-        <div className="mb-4 sticky z-20 bg-zinc-900/98 backdrop-blur-md border border-zinc-700 rounded-2xl p-3 shadow-xl shadow-black/50 space-y-3 top-[var(--mm-chrome-h,6.5rem)]">
+        <div className="mb-4 sticky z-20 bg-card/98 backdrop-blur-md border border-border rounded-2xl p-3 shadow-xl shadow-black/50 space-y-3 top-[var(--mm-chrome-h,6.5rem)]">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            <div className="text-sm text-zinc-300 shrink-0 flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-white tabular-nums px-2 py-1 rounded-lg bg-white/10">
+            <div className="text-sm text-muted-foreground shrink-0 flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-foreground tabular-nums px-2 py-1 rounded-lg bg-white/10">
                 {selectedIds.size} selected
               </span>
               <button
                 type="button"
                 onClick={toggleSelectAllPage}
-                className="text-xs px-2.5 py-1.5 rounded-lg bg-white/5 border border-zinc-700 hover:bg-white/10"
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-white/5 border border-border hover:bg-white/10"
               >
                 {allPageSelected ? "Deselect page" : "Select page"}
               </button>
@@ -1384,14 +1384,14 @@ export default function LeadsPage() {
                 type="button"
                 onClick={selectAllResults}
                 disabled={allResultsSelected}
-                className="text-xs px-2.5 py-1.5 rounded-lg bg-white/5 border border-zinc-700 hover:bg-white/10 disabled:opacity-40"
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-white/5 border border-border hover:bg-white/10 disabled:opacity-40"
               >
                 Select all results ({filteredLeads.length})
               </button>
               <button
                 type="button"
                 onClick={clearSelection}
-                className="text-xs text-zinc-500 hover:text-zinc-300 underline px-1"
+                className="text-xs text-muted-foreground hover:text-muted-foreground underline px-1"
               >
                 Clear selection
               </button>
@@ -1507,20 +1507,20 @@ export default function LeadsPage() {
 
       {/* List — natural height only (no forced min-h / stretch that leaves blank space) */}
       {isLoading ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 shrink-0">
+        <div className="bg-card border border-border rounded-2xl p-8 shrink-0">
           <div className="animate-pulse space-y-4">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-12 bg-zinc-800 rounded-xl" />
+              <div key={i} className="h-12 bg-muted rounded-xl" />
             ))}
           </div>
         </div>
       ) : filteredLeads.length === 0 ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 sm:p-12 text-center shrink-0">
-          <div className="mx-auto w-16 h-16 bg-zinc-800 rounded-2xl flex items-center justify-center mb-6">
+        <div className="bg-card border border-border rounded-2xl p-8 sm:p-12 text-center shrink-0">
+          <div className="mx-auto w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6">
             <span className="text-3xl">🎯</span>
           </div>
           <h3 className="text-xl font-semibold mb-2">No leads found</h3>
-          <p className="text-zinc-400 mb-6">
+          <p className="text-muted-foreground mb-6">
             {leads.length === 0
               ? "Start by adding your first lead or importing a file."
               : "Try adjusting search or filters."}
@@ -1528,16 +1528,16 @@ export default function LeadsPage() {
           {leads.length === 0 && (
             <button
               onClick={openCreate}
-              className="px-6 py-2.5 bg-white text-zinc-950 rounded-xl font-medium hover:bg-zinc-200"
+              className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover"
             >
               Create Lead
             </button>
           )}
         </div>
       ) : (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden w-full min-w-0 shrink-0 self-start">
+        <div className="bg-card border border-border rounded-2xl overflow-hidden w-full min-w-0 shrink-0 self-start">
           {/* Mobile cards */}
-          <div className="md:hidden divide-y divide-zinc-800">
+          <div className="md:hidden divide-y divide-border">
             {pageLeads.map((lead) => (
               <div key={lead.id} className="p-4 space-y-2">
                 <div className="flex items-start gap-3">
@@ -1545,21 +1545,21 @@ export default function LeadsPage() {
                     type="checkbox"
                     checked={selectedIds.has(lead.id)}
                     onChange={() => toggleSelect(lead.id)}
-                    className="mt-1 h-4 w-4 rounded border-zinc-600 bg-zinc-950"
+                    className="mt-1 h-4 w-4 rounded border-border bg-background"
                     aria-label={`Select ${lead.name}`}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium text-white truncate">{lead.name}</div>
-                    <div className="text-sm text-zinc-400">{lead.phone || "—"}</div>
+                    <div className="font-medium text-foreground truncate">{lead.name}</div>
+                    <div className="text-sm text-muted-foreground">{lead.phone || "—"}</div>
                     <div
-                      className="text-xs text-zinc-500 truncate max-w-full"
+                      className="text-xs text-muted-foreground truncate max-w-full"
                       title={lead.company || undefined}
                     >
                       {lead.company || "—"}
                     </div>
                     <div className="flex flex-wrap gap-2 mt-2 text-xs">
                       {lead.district && (
-                        <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-300">
+                        <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-muted-foreground">
                           {lead.district}
                         </span>
                       )}
@@ -1569,7 +1569,7 @@ export default function LeadsPage() {
                       {lead.aiScore != null ? (
                         <ScoreBadge score={lead.aiScore} />
                       ) : (
-                        <span className="text-zinc-600">No score</span>
+                        <span className="text-muted-foreground">No score</span>
                       )}
                     </div>
                     <AiLeadRecommendationBadge
@@ -1611,7 +1611,7 @@ export default function LeadsPage() {
                         if (el) el.indeterminate = somePageSelected && !allPageSelected;
                       }}
                       onChange={toggleSelectAllPage}
-                      className="h-4 w-4 rounded border-zinc-600 bg-zinc-950"
+                      className="h-4 w-4 rounded border-border bg-background"
                       aria-label="Select all on page"
                     />
                   </th>
@@ -1636,7 +1636,7 @@ export default function LeadsPage() {
                         type="checkbox"
                         checked={selectedIds.has(lead.id)}
                         onChange={() => toggleSelect(lead.id)}
-                        className="h-4 w-4 rounded border-zinc-600 bg-zinc-950"
+                        className="h-4 w-4 rounded border-border bg-background"
                         aria-label={`Select ${lead.name}`}
                       />
                     </td>
@@ -1653,11 +1653,11 @@ export default function LeadsPage() {
                             </span>
                           ) : isName ? (
                             <div>
-                              <div className="font-medium text-white truncate" title={display}>
+                              <div className="font-medium text-foreground truncate" title={display}>
                                 {display}
                               </div>
                               {lead.email ? (
-                                <div className="text-xs text-zinc-500 truncate" title={String(lead.email)}>
+                                <div className="text-xs text-muted-foreground truncate" title={String(lead.email)}>
                                   {String(lead.email)}
                                 </div>
                               ) : null}
@@ -1672,7 +1672,7 @@ export default function LeadsPage() {
                               ) : null}
                             </div>
                           ) : (
-                            <div className="text-zinc-300 truncate" title={display !== "—" ? display : undefined}>
+                            <div className="text-muted-foreground truncate" title={display !== "—" ? display : undefined}>
                               {display}
                             </div>
                           )}
@@ -1681,7 +1681,7 @@ export default function LeadsPage() {
                     })}
                     <td className="p-3">
                       <span
-                        className={`text-xs ${lead.assignedTo ? "text-zinc-300" : "text-zinc-600"}`}
+                        className={`text-xs ${lead.assignedTo ? "text-muted-foreground" : "text-muted-foreground"}`}
                         title={lead.assignedTo || undefined}
                       >
                         {assigneeLabel(lead.assignedTo)}
@@ -1699,7 +1699,7 @@ export default function LeadsPage() {
                           <ScoreBadge score={lead.aiScore} />
                         </button>
                       ) : (
-                        <span className="text-xs text-zinc-600">—</span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="p-3 text-right whitespace-nowrap space-x-1.5">
@@ -1735,16 +1735,16 @@ export default function LeadsPage() {
           </div>
 
           {/* Pagination */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-zinc-800 text-sm text-zinc-400">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-border text-sm text-muted-foreground">
             <div>
               Showing{" "}
-              <span className="text-zinc-200 tabular-nums">
+              <span className="text-foreground tabular-nums">
                 {totalFiltered === 0 ? 0 : pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, totalFiltered)}
               </span>{" "}
               of{" "}
-              <span className="text-zinc-200 tabular-nums">{totalFiltered.toLocaleString()}</span>
+              <span className="text-foreground tabular-nums">{totalFiltered.toLocaleString()}</span>
               {serverTotal !== totalFiltered && (
-                <span className="text-zinc-600">
+                <span className="text-muted-foreground">
                   {" "}
                   · {serverTotal.toLocaleString()} total in CRM
                 </span>
@@ -1755,18 +1755,18 @@ export default function LeadsPage() {
                 type="button"
                 disabled={safePage <= 1 || isLoading}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1.5 rounded-lg bg-white/5 border border-zinc-800 hover:bg-white/10 disabled:opacity-40"
+                className="px-3 py-1.5 rounded-lg bg-white/5 border border-border hover:bg-white/10 disabled:opacity-40"
               >
                 Previous
               </button>
-              <span className="tabular-nums text-zinc-300 px-2">
+              <span className="tabular-nums text-muted-foreground px-2">
                 {safePage} / {totalPages}
               </span>
               <button
                 type="button"
                 disabled={safePage >= totalPages || isLoading}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="px-3 py-1.5 rounded-lg bg-white/5 border border-zinc-800 hover:bg-white/10 disabled:opacity-40"
+                className="px-3 py-1.5 rounded-lg bg-white/5 border border-border hover:bg-white/10 disabled:opacity-40"
               >
                 Next
               </button>
@@ -1778,11 +1778,11 @@ export default function LeadsPage() {
       {/* Create/Edit Modal — DynamicForm from BusinessConfig fields */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-            <h2 className="text-xl font-semibold p-6 flex-shrink-0 border-b border-zinc-700">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+            <h2 className="text-xl font-semibold p-6 flex-shrink-0 border-b border-border">
               {editingLead ? "Edit Lead" : "New Lead"}
               {templateSlug ? (
-                <span className="block text-xs font-normal text-zinc-500 mt-1">
+                <span className="block text-xs font-normal text-muted-foreground mt-1">
                   Fields from template: {templateSlug}
                 </span>
               ) : null}
@@ -1797,8 +1797,8 @@ export default function LeadsPage() {
                 statusOptions={statusOptions.map((s) => ({ key: s.key, label: s.label }))}
                 disabled={isSubmitting}
               />
-              <div className="mt-4 p-3 bg-zinc-950 border border-zinc-800 rounded-xl">
-                <label className="block text-xs text-zinc-400 mb-1.5 tracking-wide">
+              <div className="mt-4 p-3 bg-background border border-border rounded-xl">
+                <label className="block text-xs text-muted-foreground mb-1.5 tracking-wide">
                   Assign To
                 </label>
                 <input
@@ -1806,13 +1806,13 @@ export default function LeadsPage() {
                   value={teamSearch}
                   onChange={(e) => setTeamSearch(e.target.value)}
                   placeholder="Search team members…"
-                  className="w-full mb-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full mb-2 bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground"
                   disabled={isSubmitting}
                 />
                 <select
                   value={formAssigneeId}
                   onChange={(e) => setFormAssigneeId(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-sm text-white min-h-11"
+                  className="w-full bg-card border border-border rounded-lg px-3 py-2.5 text-sm text-foreground min-h-11"
                   disabled={isSubmitting}
                 >
                   <option value="">Unassigned</option>
@@ -1822,17 +1822,17 @@ export default function LeadsPage() {
                     </option>
                   ))}
                 </select>
-                <p className="text-[11px] text-zinc-500 mt-1.5">
+                <p className="text-[11px] text-muted-foreground mt-1.5">
                   Stores user id · shown as name. Sales executives only see leads assigned to them
                   (or created by them).
                 </p>
               </div>
               {editingLead && (
                 <div className="mt-5 space-y-3">
-                  <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-xl">
+                  <div className="p-3 bg-background border border-border rounded-xl">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-xs text-zinc-400 mb-1 tracking-widest">AI LEAD SCORE</div>
+                        <div className="text-xs text-muted-foreground mb-1 tracking-widest">AI LEAD SCORE</div>
                         {(() => {
                           const live = leads.find((l) => l.id === editingLead.id);
                           const currentScore = (live?.aiScore ?? editingLead.aiScore) as
@@ -1842,7 +1842,7 @@ export default function LeadsPage() {
                           return currentScore != null ? (
                             <ScoreBadge score={currentScore} />
                           ) : (
-                            <span className="text-xs text-zinc-500">Not scored yet</span>
+                            <span className="text-xs text-muted-foreground">Not scored yet</span>
                           );
                         })()}
                       </div>
@@ -1871,14 +1871,14 @@ export default function LeadsPage() {
                       />
                     </div>
                   ) : (
-                    <p className="text-xs text-zinc-500 px-1">
+                    <p className="text-xs text-muted-foreground px-1">
                       No active AI follow-up for this lead. Engine updates when CRM data changes.
                     </p>
                   )}
                 </div>
               )}
             </div>
-            <div className="p-6 flex-shrink-0 border-t border-zinc-700">
+            <div className="p-6 flex-shrink-0 border-t border-border">
               <div className="flex gap-3">
                 <button
                   type="button"
@@ -1891,7 +1891,7 @@ export default function LeadsPage() {
                   type="submit"
                   form="lead-form"
                   disabled={isSubmitting}
-                  className="flex-1 px-5 py-2.5 bg-white text-zinc-950 rounded-xl font-medium hover:bg-zinc-200 disabled:opacity-50"
+                  className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover disabled:opacity-50"
                 >
                   {isSubmitting ? "Saving..." : editingLead ? "Update Lead" : "Create Lead"}
                 </button>
@@ -1904,9 +1904,9 @@ export default function LeadsPage() {
       {/* Assign User modal — workspace user ids only */}
       {assignModalOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-1">Assign User</h3>
-            <p className="text-xs text-zinc-500 mb-4">
+            <p className="text-xs text-muted-foreground mb-4">
               Assign {selectedIds.size} selected lead(s) to an active workspace member.
             </p>
             <input
@@ -1945,7 +1945,7 @@ export default function LeadsPage() {
                 type="button"
                 disabled={bulkBusy || !assignValue.trim()}
                 onClick={runBulkAssign}
-                className="flex-1 px-4 py-2.5 bg-white text-zinc-950 rounded-xl text-sm font-medium disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium disabled:opacity-50"
               >
                 {bulkBusy ? "Assigning…" : "Assign"}
               </button>
@@ -1957,17 +1957,17 @@ export default function LeadsPage() {
       {/* Bulk Edit modal */}
       {bulkEditOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto p-5 sm:p-6">
-            <h3 className="text-lg font-semibold text-white">Bulk Edit</h3>
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto p-5 sm:p-6">
+            <h3 className="text-lg font-semibold text-foreground">Bulk Edit</h3>
             <p className="text-sm text-sky-300/90 mt-1 font-medium">
               Preview: {selectedIds.size} lead{selectedIds.size === 1 ? "" : "s"} will be updated
             </p>
-            <p className="text-xs text-zinc-500 mt-1 mb-4">
+            <p className="text-xs text-muted-foreground mt-1 mb-4">
               Leave a field empty to keep existing values. Changes are audited.
             </p>
             <div className="space-y-3 adaptive-form">
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Status</label>
+                <label className="block text-xs text-muted-foreground mb-1">Status</label>
                 <select
                   value={bulkEditForm.status}
                   onChange={(e) => setBulkEditForm({ ...bulkEditForm, status: e.target.value })}
@@ -1982,7 +1982,7 @@ export default function LeadsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Assigned User</label>
+                <label className="block text-xs text-muted-foreground mb-1">Assigned User</label>
                 <select
                   value={bulkEditForm.assignedTo}
                   onChange={(e) => setBulkEditForm({ ...bulkEditForm, assignedTo: e.target.value })}
@@ -1998,7 +1998,7 @@ export default function LeadsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Lead Source</label>
+                <label className="block text-xs text-muted-foreground mb-1">Lead Source</label>
                 <input
                   value={bulkEditForm.source}
                   onChange={(e) => setBulkEditForm({ ...bulkEditForm, source: e.target.value })}
@@ -2007,7 +2007,7 @@ export default function LeadsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Priority</label>
+                <label className="block text-xs text-muted-foreground mb-1">Priority</label>
                 <select
                   value={bulkEditForm.priority}
                   onChange={(e) => setBulkEditForm({ ...bulkEditForm, priority: e.target.value })}
@@ -2021,7 +2021,7 @@ export default function LeadsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Tags (comma-separated)</label>
+                <label className="block text-xs text-muted-foreground mb-1">Tags (comma-separated)</label>
                 <input
                   value={bulkEditForm.tags}
                   onChange={(e) => setBulkEditForm({ ...bulkEditForm, tags: e.target.value })}
@@ -2030,7 +2030,7 @@ export default function LeadsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Company</label>
+                <label className="block text-xs text-muted-foreground mb-1">Company</label>
                 <input
                   value={bulkEditForm.company}
                   onChange={(e) => setBulkEditForm({ ...bulkEditForm, company: e.target.value })}
@@ -2039,7 +2039,7 @@ export default function LeadsPage() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Custom field key</label>
+                  <label className="block text-xs text-muted-foreground mb-1">Custom field key</label>
                   <input
                     value={bulkEditForm.customKey}
                     onChange={(e) => setBulkEditForm({ ...bulkEditForm, customKey: e.target.value })}
@@ -2048,7 +2048,7 @@ export default function LeadsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-zinc-400 mb-1">Custom field value</label>
+                  <label className="block text-xs text-muted-foreground mb-1">Custom field value</label>
                   <input
                     value={bulkEditForm.customValue}
                     onChange={(e) => setBulkEditForm({ ...bulkEditForm, customValue: e.target.value })}
@@ -2081,7 +2081,7 @@ export default function LeadsPage() {
       {/* Bulk Delete confirmation */}
       {bulkDeleteOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-zinc-900 border border-red-900/40 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 sm:p-6">
+          <div className="bg-card border border-red-900/40 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 sm:p-6">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-red-500/15 text-red-400 flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2094,13 +2094,13 @@ export default function LeadsPage() {
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">Delete leads?</h3>
-                <p className="text-sm text-zinc-300 mt-2 leading-relaxed">
+                <h3 className="text-lg font-semibold text-foreground">Delete leads?</h3>
+                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
                   Are you sure you want to permanently delete{" "}
-                  <span className="font-semibold text-white tabular-nums">{selectedIds.size}</span> selected
+                  <span className="font-semibold text-foreground tabular-nums">{selectedIds.size}</span> selected
                   lead{selectedIds.size === 1 ? "" : "s"}?
                 </p>
-                <p className="text-xs text-zinc-500 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   Soft delete by default — leads move to Trash and can be restored (Undo). Super Admin /
                   Business Admin can purge permanently later. This action is written to the audit log.
                 </p>
@@ -2130,19 +2130,19 @@ export default function LeadsPage() {
       {/* Follow-up modal */}
       {followUpModalOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-1">Create Follow-up</h3>
-            <p className="text-xs text-zinc-500 mb-4">
+            <p className="text-xs text-muted-foreground mb-4">
               Create a task for each of the {selectedIds.size} selected lead(s).
             </p>
-            <label className="block text-sm text-zinc-300 mb-1.5">Task title prefix</label>
+            <label className="block text-sm text-muted-foreground mb-1.5">Task title prefix</label>
             <input
               type="text"
               value={followUpTitle}
               onChange={(e) => setFollowUpTitle(e.target.value)}
               className={`${inputClass} mb-3`}
             />
-            <label className="block text-sm text-zinc-300 mb-1.5">Due in (days)</label>
+            <label className="block text-sm text-muted-foreground mb-1.5">Due in (days)</label>
             <input
               type="number"
               min="0"
@@ -2162,7 +2162,7 @@ export default function LeadsPage() {
                 type="button"
                 disabled={bulkBusy}
                 onClick={runBulkFollowUp}
-                className="flex-1 px-4 py-2.5 bg-white text-zinc-950 rounded-xl text-sm font-medium disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium disabled:opacity-50"
               >
                 {bulkBusy ? "Creating…" : "Create tasks"}
               </button>
@@ -2174,26 +2174,26 @@ export default function LeadsPage() {
       {/* AI Score Result Modal */}
       {scoreResult && (
         <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold">AI Lead Score</h3>
-                <p className="text-xs text-zinc-400">{scoreResult.leadName}</p>
+                <p className="text-xs text-muted-foreground">{scoreResult.leadName}</p>
               </div>
               <button
                 onClick={() => setScoreResult(null)}
-                className="text-zinc-400 hover:text-white text-xl leading-none"
+                className="text-muted-foreground hover:text-foreground text-xl leading-none"
                 aria-label="Close"
               >
                 ×
               </button>
             </div>
             <div className="text-center py-2">
-              <div className="text-7xl font-bold tabular-nums text-white mb-3">{scoreResult.score}</div>
+              <div className="text-7xl font-bold tabular-nums text-foreground mb-3">{scoreResult.score}</div>
               <ScoreBadge score={scoreResult.score} />
-              <div className="mt-5 p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-left">
-                <div className="text-xs uppercase tracking-widest text-zinc-400 mb-2">Reason</div>
-                <p className="text-sm text-zinc-200 leading-relaxed whitespace-pre-wrap">
+              <div className="mt-5 p-4 bg-background border border-border rounded-xl text-left">
+                <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Reason</div>
+                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
                   {scoreResult.explanation}
                 </p>
               </div>
@@ -2212,7 +2212,7 @@ export default function LeadsPage() {
               <button
                 type="button"
                 onClick={() => setScoreResult(null)}
-                className="flex-1 px-5 py-2.5 bg-white text-zinc-950 rounded-xl font-medium hover:bg-zinc-200"
+                className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover"
               >
                 Close
               </button>

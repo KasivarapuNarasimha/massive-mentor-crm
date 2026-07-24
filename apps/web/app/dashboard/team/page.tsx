@@ -169,21 +169,21 @@ export default function TeamPage() {
   };
 
   const inputClass =
-    "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-600";
+    "w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-border";
 
   return (
     <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-start justify-between gap-3 mb-6">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold mb-2">Team & Roles</h1>
-          <p className="text-zinc-400 text-sm">
+          <p className="text-muted-foreground text-sm">
             Your role:{" "}
-            <span className="font-mono text-zinc-200">{portal?.role || role}</span>
+            <span className="font-mono text-foreground">{portal?.role || role}</span>
             {portal ? (
-              <span className="text-zinc-500"> · Portal: {portal.portalLabel}</span>
+              <span className="text-muted-foreground"> · Portal: {portal.portalLabel}</span>
             ) : null}
           </p>
-          <p className="text-xs text-zinc-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Each employee signs in with their own email and password. Their role loads the matching
             dashboard, sidebar, charts, AI tools, and permissions automatically.
           </p>
@@ -192,7 +192,7 @@ export default function TeamPage() {
           <button
             type="button"
             onClick={() => setShowCreate((v) => !v)}
-            className="w-full sm:w-auto min-h-11 px-4 py-2.5 bg-white text-zinc-950 rounded-xl text-sm font-medium touch-manipulation"
+            className="w-full sm:w-auto min-h-11 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium touch-manipulation"
           >
             {showCreate ? "Close" : "Add Team Member"}
           </button>
@@ -202,15 +202,15 @@ export default function TeamPage() {
       {canManage && showCreate && (
         <form
           onSubmit={createUser}
-          className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mb-6 space-y-4"
+          className="bg-card border border-border rounded-2xl p-6 mb-6 space-y-4"
         >
           <h3 className="font-semibold">Create user (email + password + role)</h3>
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             User joins this business. On login they only see the portal for their assigned role.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Name</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Name</label>
               <input
                 className={inputClass}
                 value={name}
@@ -219,7 +219,7 @@ export default function TeamPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Role *</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Role *</label>
               <select
                 className={inputClass}
                 value={newRole}
@@ -234,7 +234,7 @@ export default function TeamPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Email *</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Email *</label>
               <input
                 className={inputClass}
                 type="email"
@@ -245,7 +245,7 @@ export default function TeamPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Password *</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Password *</label>
               <PasswordInput
                 className={inputClass}
                 value={password}
@@ -260,25 +260,25 @@ export default function TeamPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-2.5 bg-white text-zinc-950 rounded-xl font-medium disabled:opacity-50"
+            className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium disabled:opacity-50"
           >
             {submitting ? "Creating…" : "Create user"}
           </button>
         </form>
       )}
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+      <div className="bg-card border border-border rounded-2xl p-6">
         <h3 className="font-semibold mb-4">Business users</h3>
         {loading ? (
-          <div className="h-24 animate-pulse bg-zinc-800 rounded-xl" />
+          <div className="h-24 animate-pulse bg-muted rounded-xl" />
         ) : users.length === 0 ? (
           <div className="py-10 text-center space-y-3">
-            <p className="text-sm text-zinc-300 font-medium">No team members yet</p>
+            <p className="text-sm text-muted-foreground font-medium">No team members yet</p>
             {canManage && (
               <button
                 type="button"
                 onClick={() => setShowCreate(true)}
-                className="px-5 py-2.5 bg-white text-zinc-950 rounded-xl text-sm font-medium"
+                className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium"
               >
                 Add Team Member
               </button>
@@ -292,17 +292,17 @@ export default function TeamPage() {
               return (
                 <div
                   key={u.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border border-zinc-800 bg-zinc-950/50"
+                  className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl border border-border bg-background/50"
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="w-10 h-10 rounded-full bg-zinc-700 ring-1 ring-zinc-600 flex items-center justify-center text-sm font-semibold shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-muted ring-1 ring-border flex items-center justify-center text-sm font-semibold shrink-0">
                       {(u.name || u.email || "?")[0].toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-white truncate">
+                      <div className="text-sm font-medium text-foreground truncate">
                         {u.name || "—"}
                         {isSelf && (
-                          <span className="ml-2 text-[10px] text-zinc-500 font-normal">(you)</span>
+                          <span className="ml-2 text-[10px] text-muted-foreground font-normal">(you)</span>
                         )}
                         {u.isOwner && (
                           <span className="ml-2 text-[10px] text-emerald-500/80 font-normal">
@@ -310,8 +310,8 @@ export default function TeamPage() {
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-zinc-500 truncate">{u.email}</div>
-                      <div className="text-[11px] text-zinc-600 mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+                      <div className="text-xs text-muted-foreground truncate">{u.email}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
                         <span>
                           Last login:{" "}
                           {u.lastLoginAt
@@ -337,7 +337,7 @@ export default function TeamPage() {
 
                     {canManage ? (
                       <select
-                        className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-xs max-w-[140px]"
+                        className="bg-background border border-border rounded-lg px-2 py-1 text-xs max-w-[140px]"
                         value={u.role}
                         onChange={(e) => changeRole(u.id, e.target.value)}
                         title="Assign role"
@@ -349,7 +349,7 @@ export default function TeamPage() {
                         ))}
                       </select>
                     ) : (
-                      <span className="font-mono text-xs text-zinc-400">{u.role}</span>
+                      <span className="font-mono text-xs text-muted-foreground">{u.role}</span>
                     )}
 
                     {canManage && !isSelf && (
@@ -357,14 +357,14 @@ export default function TeamPage() {
                         <button
                           type="button"
                           onClick={() => openEdit(u)}
-                          className="text-xs px-2 py-1 rounded-lg border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                          className="text-xs px-2 py-1 rounded-lg border border-border text-muted-foreground hover:bg-muted"
                         >
                           Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => toggleDisable(u)}
-                          className="text-xs px-2 py-1 rounded-lg border border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                          className="text-xs px-2 py-1 rounded-lg border border-border text-muted-foreground hover:bg-muted"
                         >
                           {disabled ? "Enable" : "Disable"}
                         </button>
@@ -392,15 +392,15 @@ export default function TeamPage() {
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setEditUser(null)} />
           <form
             onSubmit={saveEdit}
-            className="relative w-full max-w-sm bg-zinc-900 border border-zinc-700 rounded-2xl p-6 space-y-3"
+            className="relative w-full max-w-sm bg-card border border-border rounded-2xl p-6 space-y-3"
           >
             <h3 className="text-lg font-semibold">Edit user</h3>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Name</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Name</label>
               <input className={inputClass} value={editName} onChange={(e) => setEditName(e.target.value)} />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Email</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Email</label>
               <input
                 className={inputClass}
                 type="email"
@@ -410,7 +410,7 @@ export default function TeamPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Role</label>
+              <label className="text-xs text-muted-foreground mb-1 block">Role</label>
               <select className={inputClass} value={editRole} onChange={(e) => setEditRole(e.target.value)}>
                 {roles.map((r) => (
                   <option key={r.key} value={r.key}>
@@ -420,7 +420,7 @@ export default function TeamPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">New password (optional)</label>
+              <label className="text-xs text-muted-foreground mb-1 block">New password (optional)</label>
               <PasswordInput
                 className={inputClass}
                 value={editPassword}
@@ -434,14 +434,14 @@ export default function TeamPage() {
               <button
                 type="button"
                 onClick={() => setEditUser(null)}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm border border-zinc-700 text-zinc-300"
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm border border-border text-muted-foreground"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={editSaving}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-white text-zinc-950 disabled:opacity-40"
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-primary text-primary-foreground disabled:opacity-40"
               >
                 {editSaving ? "Saving…" : "Save"}
               </button>

@@ -60,7 +60,7 @@ function ChartTooltip({ tip }: { tip: NonNullable<TooltipState> }) {
   const trend = tip.trend;
   return (
     <div
-      className="pointer-events-none absolute z-20 min-w-[160px] max-w-[220px] rounded-xl border border-zinc-700 bg-zinc-950/95 px-3 py-2 shadow-xl backdrop-blur-sm text-left"
+      className="pointer-events-none absolute z-20 min-w-[160px] max-w-[220px] rounded-xl border border-border bg-background/95 px-3 py-2 shadow-xl backdrop-blur-sm text-left"
       style={{
         left: tip.x,
         top: tip.y,
@@ -70,11 +70,11 @@ function ChartTooltip({ tip }: { tip: NonNullable<TooltipState> }) {
     >
       <div className="flex items-center gap-2 mb-1">
         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: tip.color }} />
-        <span className="text-xs font-medium text-white truncate">{tip.point.name}</span>
+        <span className="text-xs font-medium text-foreground truncate">{tip.point.name}</span>
       </div>
       <div className="text-sm font-semibold tabular-nums text-emerald-400">
         {fmt(tip.point.value)}
-        <span className="text-zinc-500 font-normal text-xs ml-1.5">
+        <span className="text-muted-foreground font-normal text-xs ml-1.5">
           ({tip.pct.toFixed(1)}%)
         </span>
       </div>
@@ -86,11 +86,11 @@ function ChartTooltip({ tip }: { tip: NonNullable<TooltipState> }) {
         >
           {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(1)}% vs prior
           {tip.point.previous != null && (
-            <span className="text-zinc-500"> · was {fmt(tip.point.previous)}</span>
+            <span className="text-muted-foreground"> · was {fmt(tip.point.previous)}</span>
           )}
         </div>
       )}
-      <div className="text-[10px] text-zinc-500 mt-1">Click to open related records</div>
+      <div className="text-[10px] text-muted-foreground mt-1">Click to open related records</div>
     </div>
   );
 }
@@ -98,10 +98,10 @@ function ChartTooltip({ tip }: { tip: NonNullable<TooltipState> }) {
 function EmptyChart({ height, label }: { height: number; label?: string }) {
   return (
     <div
-      className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 text-center px-4"
+      className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background/40 text-center px-4"
       style={{ minHeight: height }}
     >
-      <svg className="w-8 h-8 text-zinc-700 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-8 h-8 text-muted-foreground mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -109,8 +109,8 @@ function EmptyChart({ height, label }: { height: number; label?: string }) {
           d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
         />
       </svg>
-      <p className="text-xs text-zinc-500">No Data Available</p>
-      <p className="text-[10px] text-zinc-600 mt-0.5">
+      <p className="text-xs text-muted-foreground">No Data Available</p>
+      <p className="text-[10px] text-muted-foreground mt-0.5">
         {label || "Metrics appear when CRM activity is recorded"}
       </p>
     </div>
@@ -189,7 +189,7 @@ export function ConfigChart({
             {v}%
           </text>
         </svg>
-        <p className="text-[10px] text-zinc-500 mt-1">Target attainment</p>
+        <p className="text-[10px] text-muted-foreground mt-1">Target attainment</p>
       </div>
     );
   }
@@ -255,14 +255,14 @@ export function ConfigChart({
               <li key={s.name + s.idx}>
                 <button
                   type="button"
-                  className="w-full flex items-center gap-2 text-left rounded-lg px-1.5 py-1 hover:bg-zinc-800/60 transition-colors"
+                  className="w-full flex items-center gap-2 text-left rounded-lg px-1.5 py-1 hover:bg-muted/60 transition-colors"
                   onMouseEnter={() => setHoverIdx(s.idx)}
                   onMouseLeave={() => setHoverIdx(null)}
                   onClick={() => onDrill?.(s)}
                 >
                   <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.color }} />
-                  <span className="text-zinc-300 truncate flex-1">{s.name}</span>
-                  <span className="text-zinc-400 tabular-nums shrink-0">
+                  <span className="text-muted-foreground truncate flex-1">{s.name}</span>
+                  <span className="text-muted-foreground tabular-nums shrink-0">
                     {fmt(s.value)} · {pct.toFixed(0)}%
                   </span>
                 </button>
@@ -300,7 +300,7 @@ export function ConfigChart({
               className="w-full flex justify-center"
             >
               <div
-                className="h-9 rounded-md flex items-center justify-center text-xs text-zinc-950 font-medium transition-all duration-200 ease-out"
+                className="h-9 rounded-md flex items-center justify-center text-xs text-foreground font-medium transition-all duration-200 ease-out"
                 style={{
                   width: `${w}%`,
                   background: color,

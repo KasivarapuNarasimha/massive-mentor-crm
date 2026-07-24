@@ -54,7 +54,7 @@ type Payment = {
 };
 
 const inputClass =
-  "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-600";
+  "w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-border";
 
 export default function FinancePage() {
   const { token } = useAuth();
@@ -273,7 +273,7 @@ export default function FinancePage() {
   };
 
   if (loading && !kpis) {
-    return <div className="h-40 animate-pulse bg-zinc-900 rounded-2xl" />;
+    return <div className="h-40 animate-pulse bg-card rounded-2xl" />;
   }
 
   return (
@@ -281,12 +281,12 @@ export default function FinancePage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold">Finance</h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Invoices, expenses, payments, GST/tax, P&amp;L, and cash flow — amounts in your business currency
           </p>
         </div>
         <span
-          className="text-xs font-medium px-3 py-1.5 rounded-full border border-zinc-700 bg-zinc-900 text-zinc-300 tabular-nums"
+          className="text-xs font-medium px-3 py-1.5 rounded-full border border-border bg-card text-muted-foreground tabular-nums"
           title="From Business Profile currency setting"
         >
           Currency: {currency}
@@ -307,7 +307,7 @@ export default function FinancePage() {
             type="button"
             onClick={() => setTab(t)}
             className={`min-h-11 px-4 py-2.5 rounded-xl text-sm capitalize touch-manipulation ${
-              tab === t ? "bg-white text-zinc-950" : "bg-zinc-900 border border-zinc-800 text-zinc-300"
+              tab === t ? "bg-primary text-primary-foreground" : "bg-card border border-border text-muted-foreground"
             }`}
           >
             {t}
@@ -328,8 +328,8 @@ export default function FinancePage() {
               ["Month revenue", kpis.monthRevenue],
               ["Year revenue", kpis.yearRevenue],
             ].map(([label, val]) => (
-              <div key={String(label)} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3 sm:p-4 min-w-0">
-                <div className="text-[10px] sm:text-xs text-zinc-500 leading-snug">{label}</div>
+              <div key={String(label)} className="bg-card border border-border rounded-2xl p-3 sm:p-4 min-w-0">
+                <div className="text-[10px] sm:text-xs text-muted-foreground leading-snug">{label}</div>
                 <div className="text-lg sm:text-2xl font-semibold tabular-nums mt-1 truncate">
                   {money(Number(val))}
                 </div>
@@ -338,7 +338,7 @@ export default function FinancePage() {
           </div>
 
           {pnl && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <div className="bg-card border border-border rounded-2xl p-5">
               <h3 className="font-semibold mb-3">Profit &amp; Loss</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                 <div>Revenue: <strong>{money(pnl.revenue)}</strong></div>
@@ -349,14 +349,14 @@ export default function FinancePage() {
             </div>
           )}
 
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+          <div className="bg-card border border-border rounded-2xl p-5">
             <h3 className="font-semibold mb-3">Cash flow (12 months)</h3>
             <div className="space-y-2">
               {cashFlow.map((c) => {
                 const max = Math.max(...cashFlow.map((x) => Math.max(x.inflow, x.outflow, 1)));
                 return (
                   <div key={c.month} className="text-xs">
-                    <div className="flex justify-between text-zinc-400 mb-0.5">
+                    <div className="flex justify-between text-muted-foreground mb-0.5">
                       <span>{c.month}</span>
                       <span className={c.net >= 0 ? "text-emerald-400" : "text-red-400"}>
                         net {money(c.net)}
@@ -384,22 +384,22 @@ export default function FinancePage() {
 
       {tab === "invoices" && (
         <div className="space-y-4">
-          <form onSubmit={createInvoice} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <form onSubmit={createInvoice} className="bg-card border border-border rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <h3 className="sm:col-span-2 font-semibold">Create invoice</h3>
             <input className={inputClass} placeholder="Client name" value={invForm.clientName} onChange={(e) => setInvForm({ ...invForm, clientName: e.target.value })} />
             <input className={inputClass} type="number" step="0.01" placeholder="Amount" required value={invForm.amount} onChange={(e) => setInvForm({ ...invForm, amount: e.target.value })} />
             <input className={inputClass} type="number" step="0.01" placeholder="Tax rate %" value={invForm.taxRate} onChange={(e) => setInvForm({ ...invForm, taxRate: e.target.value })} />
             <input className={inputClass} type="date" value={invForm.dueDate} onChange={(e) => setInvForm({ ...invForm, dueDate: e.target.value })} />
             <input className={inputClass + " sm:col-span-2"} placeholder="Description" value={invForm.description} onChange={(e) => setInvForm({ ...invForm, description: e.target.value })} />
-            <button type="submit" className="sm:col-span-2 px-4 py-2 bg-white text-zinc-950 rounded-xl text-sm font-medium">Save invoice</button>
+            <button type="submit" className="sm:col-span-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">Save invoice</button>
           </form>
           <input className={inputClass} placeholder="Search invoices…" value={search} onChange={(e) => { setSearch(e.target.value); setInvPage(1); }} />
           <div className="space-y-2">
             {invoices.map((inv) => (
-              <div key={inv.id} className="flex flex-wrap justify-between gap-2 bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm">
+              <div key={inv.id} className="flex flex-wrap justify-between gap-2 bg-card border border-border rounded-xl p-3 text-sm">
                 <div>
                   <div className="font-medium">{inv.number} · {inv.clientName || "—"}</div>
-                  <div className="text-xs text-zinc-500">{inv.status} · tax {money(inv.taxAmount)}</div>
+                  <div className="text-xs text-muted-foreground">{inv.status} · tax {money(inv.taxAmount)}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold tabular-nums">{money(inv.total)}</span>
@@ -414,20 +414,20 @@ export default function FinancePage() {
 
       {tab === "expenses" && (
         <div className="space-y-4">
-          <form onSubmit={createExpense} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <form onSubmit={createExpense} className="bg-card border border-border rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <h3 className="sm:col-span-2 font-semibold">Record expense</h3>
             <input className={inputClass} placeholder="Title" required value={expForm.title} onChange={(e) => setExpForm({ ...expForm, title: e.target.value })} />
             <input className={inputClass} type="number" step="0.01" placeholder="Amount" required value={expForm.amount} onChange={(e) => setExpForm({ ...expForm, amount: e.target.value })} />
             <input className={inputClass} placeholder="Category" value={expForm.category} onChange={(e) => setExpForm({ ...expForm, category: e.target.value })} />
             <input className={inputClass} placeholder="Vendor" value={expForm.vendor} onChange={(e) => setExpForm({ ...expForm, vendor: e.target.value })} />
-            <button type="submit" className="sm:col-span-2 px-4 py-2 bg-white text-zinc-950 rounded-xl text-sm font-medium">Save expense</button>
+            <button type="submit" className="sm:col-span-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">Save expense</button>
           </form>
           <div className="space-y-2">
             {expenses.map((ex) => (
-              <div key={ex.id} className="flex justify-between bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm">
+              <div key={ex.id} className="flex justify-between bg-card border border-border rounded-xl p-3 text-sm">
                 <div>
                   <div className="font-medium">{ex.title}</div>
-                  <div className="text-xs text-zinc-500">{ex.category} · {ex.vendor || "—"}</div>
+                  <div className="text-xs text-muted-foreground">{ex.category} · {ex.vendor || "—"}</div>
                 </div>
                 <span className="font-semibold tabular-nums text-red-300">{money(ex.total)}</span>
               </div>
@@ -439,7 +439,7 @@ export default function FinancePage() {
 
       {tab === "payments" && (
         <div className="space-y-4">
-          <form onSubmit={createPayment} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <form onSubmit={createPayment} className="bg-card border border-border rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <h3 className="sm:col-span-2 font-semibold">Record payment</h3>
             <input className={inputClass} type="number" step="0.01" placeholder="Amount" required value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} />
             <input className={inputClass} placeholder="Invoice ID (optional)" value={payForm.invoiceId} onChange={(e) => setPayForm({ ...payForm, invoiceId: e.target.value })} />
@@ -451,14 +451,14 @@ export default function FinancePage() {
               <option value="other">Other</option>
             </select>
             <input className={inputClass} placeholder="Reference" value={payForm.reference} onChange={(e) => setPayForm({ ...payForm, reference: e.target.value })} />
-            <button type="submit" className="sm:col-span-2 px-4 py-2 bg-white text-zinc-950 rounded-xl text-sm font-medium">Save payment</button>
+            <button type="submit" className="sm:col-span-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">Save payment</button>
           </form>
           <div className="space-y-2">
             {payments.map((p) => (
-              <div key={p.id} className="flex justify-between bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-sm">
+              <div key={p.id} className="flex justify-between bg-card border border-border rounded-xl p-3 text-sm">
                 <div>
                   <div className="font-medium">{p.method} · {p.invoice?.number || "unlinked"}</div>
-                  <div className="text-xs text-zinc-500">{new Date(p.paidAt).toLocaleString()}</div>
+                  <div className="text-xs text-muted-foreground">{new Date(p.paidAt).toLocaleString()}</div>
                 </div>
                 <span className="font-semibold tabular-nums text-emerald-400">{money(p.amount)}</span>
               </div>

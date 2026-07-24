@@ -58,11 +58,11 @@ export function PageHeader({
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
       <div className="min-w-0">
         {eyebrow ? <p className="mm-section-label mb-1.5">{eyebrow}</p> : null}
-        <h1 className="text-2xl sm:text-[1.75rem] font-semibold tracking-tight text-white leading-tight">
+        <h1 className="text-2xl sm:text-[1.75rem] font-semibold tracking-tight text-foreground leading-tight">
           {title}
         </h1>
         {description ? (
-          <p className="text-zinc-400 mt-1.5 text-sm sm:text-[0.9375rem] leading-relaxed max-w-2xl">
+          <p className="text-muted-foreground mt-1.5 text-sm sm:text-[0.9375rem] leading-relaxed max-w-2xl">
             {description}
           </p>
         ) : null}
@@ -100,27 +100,27 @@ export function ResponsiveModal({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-[2px]"
         aria-label="Close"
         onClick={onClose}
       />
       <div
         className={[
-          "relative z-10 w-full bg-zinc-900/95 border border-zinc-700/80 shadow-2xl",
+          "relative z-10 w-full bg-card/95 border border-border shadow-2xl",
           "rounded-t-3xl sm:rounded-2xl",
           "max-h-[92dvh] sm:max-h-[90vh] flex flex-col",
           "sm:max-w-lg",
           "safe-bottom mm-fade-up",
         ].join(" ")}
       >
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-zinc-800 shrink-0">
-          <h2 id="mm-modal-title" className="text-lg font-semibold text-white tracking-tight">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border shrink-0">
+          <h2 id="mm-modal-title" className="text-lg font-semibold text-foreground tracking-tight">
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 -mr-1 text-zinc-500 hover:text-white rounded-lg min-w-11 min-h-11 focus-ring"
+            className="p-2 -mr-1 text-muted-foreground hover:text-foreground rounded-lg min-w-11 min-h-11 focus-ring"
             aria-label="Close dialog"
           >
             ×
@@ -128,7 +128,7 @@ export function ResponsiveModal({
         </div>
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">{children}</div>
         {footer ? (
-          <div className="shrink-0 border-t border-zinc-800 px-4 sm:px-6 py-3 safe-bottom bg-zinc-950/40">
+          <div className="shrink-0 border-t border-border px-4 sm:px-6 py-3 safe-bottom bg-background/40">
             {footer}
           </div>
         ) : null}

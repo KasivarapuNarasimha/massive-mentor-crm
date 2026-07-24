@@ -16,13 +16,13 @@ const MAP: Record<string, string> = {
   deleted: "bg-red-500/15 text-red-300 border-red-500/30",
   expired: "bg-red-500/15 text-red-300 border-red-500/30",
   overdue: "bg-red-500/15 text-red-300 border-red-500/30",
-  info: "bg-zinc-700/40 text-zinc-300 border-zinc-600",
+  info: "bg-muted/40 text-muted-foreground border-border",
 };
 
 export function StatusBadge({ value }: { value?: string | null }) {
   const v = (value || "—").toString();
   const key = v.toLowerCase().replace(/\s+/g, "_");
-  const cls = MAP[key] || "bg-zinc-800 text-zinc-300 border-zinc-700";
+  const cls = MAP[key] || "bg-muted text-muted-foreground border-border";
   return (
     <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-medium border capitalize ${cls}`}>
       {v.replace(/_/g, " ")}
@@ -40,7 +40,7 @@ export function HealthDot({ status }: { status: "healthy" | "warning" | "critica
   const label =
     status === "healthy" || status === "ok" ? "Healthy" : status === "warning" ? "Warning" : "Critical";
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-zinc-300">
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
       <span className={`w-2.5 h-2.5 rounded-full ${color}`} />
       {label}
     </span>

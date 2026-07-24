@@ -4,6 +4,7 @@ import {
   login,
   logout,
   getCurrentUser,
+  updateThemePreference,
   forgotPasswordCustomer,
   validatePasswordResetToken,
   resetPasswordWithToken,
@@ -18,6 +19,7 @@ router.post("/register", registerLimiter, register);
 router.post("/login", loginLimiter, login);
 router.post("/logout", requireAuth, logout);
 router.get("/me", requireAuth, getCurrentUser);
+router.patch("/theme", requireAuth, updateThemePreference);
 
 // Forgot / reset password (Customer Portal)
 router.post("/forgot-password", passwordResetLimiter, forgotPasswordCustomer);

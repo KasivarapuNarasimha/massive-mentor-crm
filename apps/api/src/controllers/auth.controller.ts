@@ -1,5 +1,11 @@
 import { Request, Response } from "express";
-import { loginUser, getUserById, loginSchema } from "../services/auth.service.js";
+import {
+  loginUser,
+  getUserById,
+  loginSchema,
+  updateUserThemePreference,
+  normalizeThemePreference,
+} from "../services/auth.service.js";
 // registerUser intentionally not imported — public signup is permanently disabled
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { ensureDefaultBusiness } from "../services/business.service.js";
@@ -137,6 +143,7 @@ export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
           ...user,
           businessId: business.id,
           role: user.role,
+          themePreference: normalizeThemePreference(user.themePreference),
         },
         business: {
           id: business.id,
@@ -153,6 +160,29 @@ export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
     res.status(500).json({
       success: false,
       error: "Failed to fetch user",
+    });
+  }
+}
+
+/** PATCH /api/auth/theme — persist appearance preference (light | dark | system) */
+export async function updateThemePreference(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: "Not authenticated" });
+    }
+    const themePreference = await updateUserThemePreference(
+      req.user.id,
+      req.body?.theme ?? req.body?.themePreference
+    );
+    res.json({
+      success: true,
+      data: { themePreference },
+    });
+  } catch (error) {
+    console.error("[auth] updateThemePreference:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to save theme preference",
     });
   }
 }

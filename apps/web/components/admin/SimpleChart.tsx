@@ -13,8 +13,8 @@ export function BarChart({
 }) {
   const max = Math.max(...points.map((p) => p.value), 1);
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-      <h3 className="text-sm font-semibold text-white mb-4">{title}</h3>
+    <div className="bg-card border border-border rounded-2xl p-4">
+      <h3 className="text-sm font-semibold text-foreground mb-4">{title}</h3>
       <div className="flex items-end gap-1.5 h-36">
         {points.map((p) => (
           <div key={p.label} className="flex-1 flex flex-col items-center gap-1 min-w-0 h-full justify-end">
@@ -23,7 +23,7 @@ export function BarChart({
               style={{ height: `${Math.max(4, (p.value / max) * 100)}%` }}
               title={`${p.label}: ${p.value}`}
             />
-            <div className="text-[9px] text-zinc-500 truncate w-full text-center">
+            <div className="text-[9px] text-muted-foreground truncate w-full text-center">
               {p.label.slice(-5)}
             </div>
           </div>
@@ -56,10 +56,10 @@ export function ProgressBar({
   return (
     <div>
       <div className="flex justify-between text-xs mb-1">
-        <span className="text-zinc-400">{label}</span>
-        <span className="text-zinc-300 tabular-nums">{pct}%</span>
+        <span className="text-muted-foreground">{label}</span>
+        <span className="text-muted-foreground tabular-nums">{pct}%</span>
       </div>
-      <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+      <div className="h-2 rounded-full bg-muted overflow-hidden">
         <div className={`h-full ${bar}`} style={{ width: `${pct}%` }} />
       </div>
     </div>

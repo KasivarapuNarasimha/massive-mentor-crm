@@ -162,7 +162,7 @@ export default function AdminSupportPage() {
     <div className="max-w-7xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-semibold">Support Dashboard</h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Tickets and platform audit in professional tables. Support login is on each business Manage page.
         </p>
       </div>
@@ -174,7 +174,7 @@ export default function AdminSupportPage() {
         <KpiCard label="Resolved" value={tickets.filter((t) => t.status === "resolved").length} tone="success" />
       </div>
 
-      <form onSubmit={create} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+      <form onSubmit={create} className="bg-card border border-border rounded-2xl p-4 space-y-3">
         <h2 className="font-semibold">New ticket</h2>
         <div className="grid sm:grid-cols-2 gap-2">
           <input
@@ -182,12 +182,12 @@ export default function AdminSupportPage() {
             placeholder="Subject"
             value={form.subject}
             onChange={(e) => setForm({ ...form, subject: e.target.value })}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground min-h-11"
           />
           <select
             value={form.priority}
             onChange={(e) => setForm({ ...form, priority: e.target.value })}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground min-h-11"
           >
             <option value="low">Low</option>
             <option value="normal">Normal</option>
@@ -198,17 +198,17 @@ export default function AdminSupportPage() {
             placeholder="Business ID (optional)"
             value={form.businessId}
             onChange={(e) => setForm({ ...form, businessId: e.target.value })}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white min-h-11 sm:col-span-2"
+            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground min-h-11 sm:col-span-2"
           />
           <textarea
             required
             placeholder="Details"
             value={form.body}
             onChange={(e) => setForm({ ...form, body: e.target.value })}
-            className="sm:col-span-2 bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-white min-h-[90px]"
+            className="sm:col-span-2 bg-background border border-border rounded-xl p-3 text-sm text-foreground min-h-[90px]"
           />
         </div>
-        <button type="submit" className="min-h-11 px-4 bg-white text-zinc-950 rounded-xl text-sm font-medium">
+        <button type="submit" className="min-h-11 px-4 bg-primary text-primary-foreground rounded-xl text-sm font-medium">
           Create ticket
         </button>
       </form>
@@ -219,7 +219,7 @@ export default function AdminSupportPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground"
           >
             <option value="">All statuses</option>
             <option value="open">Open</option>
@@ -230,7 +230,7 @@ export default function AdminSupportPage() {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground"
           >
             <option value="">All priorities</option>
             <option value="low">Low</option>
@@ -242,7 +242,7 @@ export default function AdminSupportPage() {
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"
+            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground"
           />
         </div>
         <AdminDataTable

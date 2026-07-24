@@ -726,8 +726,10 @@ function withCommon(menus: MenuItem[]): MenuItem[] {
   const seenRoutes = new Set(menus.map((m) => m.route));
   const footer: MenuItem[] = [
     menu("profile", "Profile", "/dashboard/profile", 90),
-    menu("notifications", "Notifications", "/dashboard/activity", 91),
-    menu("help", "Help Center", "/dashboard/mentor", 92),
+    // Appearance is available to every role (no permission gate)
+    menu("appearance", "Appearance", "/dashboard/settings/appearance", 91),
+    menu("notifications", "Notifications", "/dashboard/activity", 92),
+    menu("help", "Help Center", "/dashboard/mentor", 93),
   ];
   const extras = footer.filter((m) => !seenRoutes.has(m.route));
   return [...menus, ...extras];

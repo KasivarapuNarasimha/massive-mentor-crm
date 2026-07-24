@@ -29,9 +29,9 @@ export function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center sm:p-4">
       <button type="button" className="absolute inset-0 bg-black/70" aria-label="Close" onClick={onCancel} />
-      <div className="relative z-10 w-full sm:max-w-md bg-zinc-900 border border-zinc-700 rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl">
-        <h3 className="text-lg font-semibold text-white">{title}</h3>
-        <p className="text-sm text-zinc-400 mt-2 leading-relaxed">{message}</p>
+      <div className="relative z-10 w-full sm:max-w-md bg-card border border-border rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl">
+        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+        <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{message}</p>
         {children ? <div className="mt-4">{children}</div> : null}
         <div className="flex gap-2 mt-6">
           <button
@@ -47,7 +47,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy}
             className={`flex-1 min-h-11 rounded-xl text-sm font-semibold disabled:opacity-50 ${
-              danger ? "bg-red-500 text-white" : "bg-violet-500 text-zinc-950"
+              danger ? "bg-red-500 text-white" : "bg-violet-500 text-white"
             }`}
           >
             {busy ? "Working…" : confirmLabel}

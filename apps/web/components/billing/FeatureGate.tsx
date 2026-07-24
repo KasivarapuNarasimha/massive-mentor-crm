@@ -28,7 +28,7 @@ export function FeatureGate({
 
   if (loading) {
     return (
-      <div className="m-6 h-40 animate-pulse rounded-2xl bg-zinc-900 border border-zinc-800" />
+      <div className="m-6 h-40 animate-pulse rounded-2xl bg-card border border-border" />
     );
   }
 
@@ -52,14 +52,14 @@ export function FeatureGate({
             />
           </svg>
         </div>
-        <h1 className="text-2xl font-semibold text-white tracking-tight">{label}</h1>
-        <p className="mt-3 text-sm text-zinc-400 leading-relaxed">
+        <h1 className="text-2xl font-semibold text-foreground tracking-tight">{label}</h1>
+        <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
           Available on the <span className="text-violet-300 font-medium">{plan}</span>{" "}
           plan and above. Upgrade to unlock this module for your workspace.
         </p>
         <Link
           href="/dashboard/billing"
-          className="mt-8 inline-flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-sky-600 px-6 text-sm font-semibold text-white shadow-lg shadow-violet-900/25 hover:opacity-95 transition"
+          className="mt-8 inline-flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-violet-600 to-sky-600 px-6 text-sm font-semibold text-foreground shadow-lg shadow-violet-900/25 hover:opacity-95 transition"
         >
           View plans &amp; upgrade
         </Link>

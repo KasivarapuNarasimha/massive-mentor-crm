@@ -55,7 +55,7 @@ const CALLBACK_URL =
   "https://api.massivementor.in/api/integrations/whatsapp/webhook";
 
 const inputClass =
-  "w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-zinc-600";
+  "w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-border";
 
 function randomVerifyToken(): string {
   const bytes = new Uint8Array(16);
@@ -100,25 +100,25 @@ function StepRow({
           ? "border-emerald-500/30 bg-emerald-500/5"
           : active
             ? "border-violet-500/40 bg-violet-500/10"
-            : "border-zinc-800 bg-zinc-950/60"
+            : "border-border bg-background/60"
       }`}
     >
       <span
         className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
           done
-            ? "bg-emerald-500 text-zinc-950"
+            ? "bg-emerald-500 text-white"
             : active
               ? "bg-violet-500 text-white"
-              : "bg-zinc-800 text-zinc-500"
+              : "bg-muted text-muted-foreground"
         }`}
       >
         {done ? "✓" : "·"}
       </span>
       <div className="min-w-0">
-        <div className={`text-sm font-medium ${done ? "text-emerald-300" : "text-zinc-200"}`}>
+        <div className={`text-sm font-medium ${done ? "text-emerald-300" : "text-foreground"}`}>
           {label}
         </div>
-        {detail ? <p className="text-xs text-zinc-500 mt-0.5">{detail}</p> : null}
+        {detail ? <p className="text-xs text-muted-foreground mt-0.5">{detail}</p> : null}
       </div>
     </div>
   );
@@ -385,7 +385,7 @@ export default function IntegrationsPage() {
         </span>
       );
     return (
-      <span className="px-2.5 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-400 border border-zinc-700">
+      <span className="px-2.5 py-0.5 rounded-full text-xs bg-muted text-muted-foreground border border-border">
         Not Connected
       </span>
     );
@@ -397,27 +397,27 @@ export default function IntegrationsPage() {
   return (
     <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
       <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">Integrations</h1>
-      <p className="text-zinc-400 mb-8 text-sm sm:text-base">
-        Connect <strong className="text-zinc-300">your own</strong> Meta WhatsApp Cloud API. Each
+      <p className="text-muted-foreground mb-8 text-sm sm:text-base">
+        Connect <strong className="text-muted-foreground">your own</strong> Meta WhatsApp Cloud API. Each
         workspace keeps separate credentials.
       </p>
 
       {isLoading ? (
-        <div className="h-48 bg-zinc-900 border border-zinc-800 rounded-2xl animate-pulse" />
+        <div className="h-48 bg-card border border-border rounded-2xl animate-pulse" />
       ) : (
         <div className="space-y-6">
-          <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <section className="bg-card border border-border rounded-2xl p-6">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
               <div>
                 <h2 className="text-lg font-semibold">WhatsApp Cloud API</h2>
-                <p className="text-xs text-zinc-500 mt-1">Self-service multi-tenant setup</p>
+                <p className="text-xs text-muted-foreground mt-1">Self-service multi-tenant setup</p>
               </div>
               {statusBadge(connectionStatus)}
             </div>
 
             {/* Setup wizard progress */}
             <div className="mb-6 space-y-2">
-              <h3 className="text-sm font-semibold text-zinc-200 mb-2">Setup Wizard</h3>
+              <h3 className="text-sm font-semibold text-foreground mb-2">Setup Wizard</h3>
               <StepRow
                 done={step1Done}
                 active={!step1Done}
@@ -452,8 +452,8 @@ export default function IntegrationsPage() {
 
             {/* Webhook status panel */}
             <div className="mb-6 grid sm:grid-cols-3 gap-3">
-              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
-                <div className="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">
+              <div className="p-3 rounded-xl bg-background border border-border">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
                   Webhook status
                 </div>
                 <div
@@ -466,11 +466,11 @@ export default function IntegrationsPage() {
                   {webhookVerified || lastWebhookAt ? "Verified" : "Not Verified"}
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 sm:col-span-2">
-                <div className="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">
+              <div className="p-3 rounded-xl bg-background border border-border sm:col-span-2">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
                   Last webhook received
                 </div>
-                <div className="text-sm text-zinc-200">
+                <div className="text-sm text-foreground">
                   {lastWebhookAt
                     ? new Date(lastWebhookAt).toLocaleString()
                     : "No events yet — send a message or wait for delivery status"}
@@ -479,10 +479,10 @@ export default function IntegrationsPage() {
             </div>
 
             {/* Callback + Verify Token */}
-            <div className="mb-6 p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
+            <div className="mb-6 p-4 rounded-xl bg-background border border-border space-y-4">
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                  <span className="text-xs font-medium text-zinc-300">Callback URL</span>
+                  <span className="text-xs font-medium text-muted-foreground">Callback URL</span>
                   <button
                     type="button"
                     onClick={() => copyText("Callback URL", CALLBACK_URL)}
@@ -495,7 +495,7 @@ export default function IntegrationsPage() {
               </div>
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
-                  <span className="text-xs font-medium text-zinc-300">Verify Token</span>
+                  <span className="text-xs font-medium text-muted-foreground">Verify Token</span>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -525,43 +525,43 @@ export default function IntegrationsPage() {
               wa?.configPreview?.wabaName) && (
               <div className="mb-6 p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
                 <h3 className="text-sm font-semibold text-emerald-200 mb-2">Detected from Meta</h3>
-                <div className="grid sm:grid-cols-2 gap-2 text-xs text-zinc-400">
+                <div className="grid sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
                   {wa.configPreview?.displayName && (
                     <div>
                       Display name:{" "}
-                      <span className="text-zinc-100">{wa.configPreview.displayName}</span>
+                      <span className="text-foreground">{wa.configPreview.displayName}</span>
                     </div>
                   )}
                   {wa.configPreview?.phoneDisplay && (
                     <div>
                       Phone:{" "}
-                      <span className="text-zinc-100">{wa.configPreview.phoneDisplay}</span>
+                      <span className="text-foreground">{wa.configPreview.phoneDisplay}</span>
                     </div>
                   )}
                   {wa.configPreview?.wabaName && (
                     <div>
                       WhatsApp Business Account:{" "}
-                      <span className="text-zinc-100">{wa.configPreview.wabaName}</span>
+                      <span className="text-foreground">{wa.configPreview.wabaName}</span>
                     </div>
                   )}
                   {wa.configPreview?.qualityRating && (
                     <div>
                       Quality:{" "}
-                      <span className="text-zinc-100">{wa.configPreview.qualityRating}</span>
+                      <span className="text-foreground">{wa.configPreview.qualityRating}</span>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            <div className="mb-6 p-4 rounded-xl border border-violet-500/20 bg-violet-500/5 text-sm text-zinc-300">
+            <div className="mb-6 p-4 rounded-xl border border-violet-500/20 bg-violet-500/5 text-sm text-muted-foreground">
               <h3 className="font-semibold text-violet-200 mb-2">Meta setup</h3>
-              <ol className="list-decimal list-inside space-y-1.5 text-xs text-zinc-400">
+              <ol className="list-decimal list-inside space-y-1.5 text-xs text-muted-foreground">
                 <li>
                   Meta Developers → your app → WhatsApp → Configuration
                 </li>
                 <li>Paste Callback URL + Verify Token → Verify and save</li>
-                <li>Subscribe to the <strong className="text-zinc-300">messages</strong> field</li>
+                <li>Subscribe to the <strong className="text-muted-foreground">messages</strong> field</li>
                 <li>
                   Permanent System User token (EAA…) + Phone Number ID → form below → Test Connection
                   → Save
@@ -577,7 +577,7 @@ export default function IntegrationsPage() {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">
+                <label className="block text-xs text-muted-foreground mb-1">
                   Access Token {wa?.configPreview?.hasAccessToken ? "(leave blank to keep current)" : "*"}
                 </label>
                 <PasswordInput
@@ -589,7 +589,7 @@ export default function IntegrationsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Phone Number ID *</label>
+                <label className="block text-xs text-muted-foreground mb-1">Phone Number ID *</label>
                 <input
                   value={phoneNumberId}
                   onChange={(e) => setPhoneNumberId(e.target.value)}
@@ -598,7 +598,7 @@ export default function IntegrationsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">Verify Token *</label>
+                <label className="block text-xs text-muted-foreground mb-1">Verify Token *</label>
                 <input
                   value={verifyToken}
                   onChange={(e) => setVerifyToken(e.target.value)}
@@ -607,7 +607,7 @@ export default function IntegrationsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">
+                <label className="block text-xs text-muted-foreground mb-1">
                   Meta App Secret{" "}
                   {wa?.configPreview?.hasAppSecret
                     ? "(leave blank to keep current)"
@@ -620,13 +620,13 @@ export default function IntegrationsPage() {
                   placeholder="From Meta App → Settings → Basic → App Secret"
                   className={inputClass}
                 />
-                <p className="text-[11px] text-zinc-500 mt-1">
-                  Used to verify <code className="text-zinc-400">X-Hub-Signature-256</code> on
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Used to verify <code className="text-muted-foreground">X-Hub-Signature-256</code> on
                   incoming webhooks. Never shared between workspaces.
                 </p>
               </div>
               <div>
-                <label className="block text-xs text-zinc-500 mb-1">API Version</label>
+                <label className="block text-xs text-muted-foreground mb-1">API Version</label>
                 <input
                   value={apiVersion}
                   onChange={(e) => setApiVersion(e.target.value)}
@@ -662,7 +662,7 @@ export default function IntegrationsPage() {
                   type="button"
                   disabled={saving}
                   onClick={saveWhatsApp}
-                  className="px-4 py-2 rounded-xl text-sm bg-white text-zinc-950 font-medium hover:bg-zinc-200 disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl text-sm bg-primary text-primary-foreground font-medium hover:bg-primary-hover disabled:opacity-50"
                 >
                   {saving ? "Saving…" : "Save & connect"}
                 </button>
@@ -670,9 +670,9 @@ export default function IntegrationsPage() {
             </div>
 
             {/* Send test WhatsApp */}
-            <div className="mt-8 pt-6 border-t border-zinc-800">
+            <div className="mt-8 pt-6 border-t border-border">
               <h3 className="font-medium mb-1">Send Test WhatsApp Message</h3>
-              <p className="text-xs text-zinc-500 mb-3">
+              <p className="text-xs text-muted-foreground mb-3">
                 Sends a sample message using this workspace&apos;s credentials. Use international
                 format (e.g. 9198xxxxxxxx). Default destination can be your own WhatsApp number.
               </p>
@@ -711,15 +711,15 @@ export default function IntegrationsPage() {
                   {history.map((h) => (
                     <div
                       key={h.id}
-                      className="text-xs p-2 rounded-lg bg-zinc-950 border border-zinc-800 flex justify-between gap-2"
+                      className="text-xs p-2 rounded-lg bg-background border border-border flex justify-between gap-2"
                     >
                       <div className="min-w-0">
-                        <div className="text-zinc-300 truncate">
+                        <div className="text-muted-foreground truncate">
                           → {h.to}: {h.body}
                         </div>
                         {h.error && <div className="text-red-400 mt-0.5">{h.error}</div>}
                       </div>
-                      <div className="shrink-0 text-zinc-500 text-right">
+                      <div className="shrink-0 text-muted-foreground text-right">
                         <div>{h.status}</div>
                         <div>{new Date(h.createdAt).toLocaleString()}</div>
                       </div>

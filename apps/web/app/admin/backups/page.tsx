@@ -253,10 +253,10 @@ export default function AdminBackupsPage() {
       label: "Progress",
       render: (r) => (
         <div className="w-24">
-          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-violet-500" style={{ width: `${r.progress}%` }} />
           </div>
-          <div className="text-[10px] text-zinc-500 mt-0.5">{r.progress}%</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">{r.progress}%</div>
         </div>
       ),
     },
@@ -329,7 +329,7 @@ export default function AdminBackupsPage() {
     <div className="max-w-7xl space-y-8 p-1">
       <div>
         <h1 className="text-2xl font-semibold">Backup &amp; Restore</h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Encrypted platform and per-business backups. Restore requires verification + one-time confirmation.
         </p>
       </div>
@@ -339,17 +339,17 @@ export default function AdminBackupsPage() {
           type="button"
           disabled={busy}
           onClick={createFull}
-          className="px-4 py-2.5 rounded-xl bg-violet-500 text-zinc-950 font-semibold text-sm disabled:opacity-50"
+          className="px-4 py-2.5 rounded-xl bg-violet-500 text-white font-semibold text-sm disabled:opacity-50"
         >
           Manual full backup
         </button>
         <div className="flex gap-2 items-end">
           <div>
-            <label className="block text-xs text-zinc-500 mb-1">Business ID</label>
+            <label className="block text-xs text-muted-foreground mb-1">Business ID</label>
             <input
               value={businessId}
               onChange={(e) => setBusinessId(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-sm w-64"
+              className="px-3 py-2 rounded-xl bg-card border border-border text-sm w-64"
               placeholder="cuid…"
             />
           </div>
@@ -357,19 +357,19 @@ export default function AdminBackupsPage() {
             type="button"
             disabled={busy}
             onClick={createBusiness}
-            className="px-4 py-2.5 rounded-xl bg-zinc-100 text-zinc-950 font-medium text-sm disabled:opacity-50"
+            className="px-4 py-2.5 rounded-xl bg-secondary text-secondary-foreground font-medium text-sm disabled:opacity-50"
           >
             Backup business
           </button>
         </div>
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-xs text-zinc-500 mb-1">
+          <label className="block text-xs text-muted-foreground mb-1">
             Full restore phrase (type exactly <code className="text-amber-300">RESTORE PLATFORM</code>)
           </label>
           <input
             value={confirmPhrase}
             onChange={(e) => setConfirmPhrase(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-sm w-full max-w-md"
+            className="px-3 py-2 rounded-xl bg-card border border-border text-sm w-full max-w-md"
           />
         </div>
       </div>
@@ -387,7 +387,7 @@ export default function AdminBackupsPage() {
             type="button"
             disabled={busy}
             onClick={confirmRestore}
-            className="px-4 py-2 rounded-xl bg-amber-500 text-zinc-950 font-semibold text-sm"
+            className="px-4 py-2 rounded-xl bg-amber-500 text-white font-semibold text-sm"
           >
             Confirm one-click restore
           </button>
@@ -406,7 +406,7 @@ export default function AdminBackupsPage() {
 
       <section>
         <h2 className="text-lg font-medium mb-3">Automatic schedules</h2>
-        <p className="text-xs text-zinc-500 mb-3">Daily / weekly / monthly jobs run inside the API process.</p>
+        <p className="text-xs text-muted-foreground mb-3">Daily / weekly / monthly jobs run inside the API process.</p>
         <AdminDataTable columns={scols} rows={schedules} emptyMessage="No schedules" />
       </section>
     </div>

@@ -112,10 +112,10 @@ export function ExportFiltersBar({
 
   return (
     <div
-      className={`flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 ${className}`}
+      className={`flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end bg-card/60 border border-border rounded-xl p-3 ${className}`}
     >
       <div className="flex-1 min-w-[140px]">
-        <label className="block text-[10px] uppercase tracking-wide text-zinc-500 mb-1">Search</label>
+        <label className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Search</label>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -125,16 +125,16 @@ export function ExportFiltersBar({
         />
       </div>
       <div>
-        <label className="block text-[10px] uppercase tracking-wide text-zinc-500 mb-1">From</label>
+        <label className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-1">From</label>
         <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputClass} />
       </div>
       <div>
-        <label className="block text-[10px] uppercase tracking-wide text-zinc-500 mb-1">To</label>
+        <label className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-1">To</label>
         <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputClass} />
       </div>
       {statusOptions && statusOptions.length > 0 && (
         <div>
-          <label className="block text-[10px] uppercase tracking-wide text-zinc-500 mb-1">Status</label>
+          <label className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Status</label>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
