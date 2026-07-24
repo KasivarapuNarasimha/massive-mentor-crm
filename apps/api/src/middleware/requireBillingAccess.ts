@@ -22,10 +22,13 @@ const ALLOW_PREFIXES = [
   "/ready",
   "/api/platform",
   "/api/demo",
+  // Meta WhatsApp Cloud API webhook (public GET challenge + POST events)
+  "/api/integrations/whatsapp/webhook",
 ];
 
 function isAllowedPath(path: string): boolean {
   const p = path.split("?")[0] || path;
+  if (p === "/api/integrations/whatsapp/webhook") return true;
   return ALLOW_PREFIXES.some(
     (prefix) => p === prefix || p.startsWith(prefix + "/")
   );

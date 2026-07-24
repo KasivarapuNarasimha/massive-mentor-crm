@@ -98,7 +98,8 @@ export default function IntegrationsPage() {
     const res = await api.post(
       "/integrations/whatsapp/validate",
       {
-        accessToken: accessToken.trim(),
+        // Strip accidental "Bearer " prefix / whitespace before send
+        accessToken: accessToken.trim().replace(/^Bearer\s+/i, "").trim(),
         phoneNumberId: phoneNumberId.trim(),
         apiVersion,
       },
@@ -129,7 +130,9 @@ export default function IntegrationsPage() {
       phoneNumberId: phoneNumberId.trim(),
       apiVersion: apiVersion || "v19.0",
     };
-    if (accessToken.trim()) config.accessToken = accessToken.trim();
+    if (accessToken.trim()) {
+      config.accessToken = accessToken.trim().replace(/^Bearer\s+/i, "").trim();
+    }
     if (verifyToken.trim()) config.verifyToken = verifyToken.trim();
 
     const res = await api.post("/integrations/configure", { provider: "whatsapp", config }, token);
@@ -207,6 +210,23 @@ export default function IntegrationsPage() {
                 </p>
               </div>
               {statusBadge(wa?.status || "not_connected")}
+            </div>
+
+            <div className="mb-4 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-400 space-y-1">
+              <div className="font-medium text-zinc-300">Meta webhook Callback URL</div>
+              <code className="block break-all text-emerald-400/90">
+                https://api.massivementor.in/api/integrations/whatsapp/webhook
+              </code>
+              <p className="text-zinc-500">
+                In Meta Developers → WhatsApp → Configuration: paste this URL, set Verify Token to
+                match the field below (or server env <code className="text-zinc-400">WHATSAPP_VERIFY_TOKEN</code>
+                ), subscribe to <strong className="text-zinc-400">messages</strong>.
+              </p>
+              <p className="text-zinc-500">
+                Access Token must be a permanent <strong className="text-zinc-400">System User</strong>{" "}
+                token (starts with <code className="text-zinc-400">EAA</code>). Paste the raw token only —
+                do not include the word <code className="text-zinc-400">Bearer</code>.
+              </p>
             </div>
 
             {wa?.lastError && (

@@ -4,6 +4,10 @@ import { getIntegration } from "./integration.service.js";
 import { recordAudit } from "./audit.service.js";
 import { notifyUser } from "./notification.service.js";
 import { env } from "../config/env.js";
+import {
+  normalizePhoneNumberId,
+  normalizeWhatsAppAccessToken,
+} from "./whatsapp-token.util.js";
 
 type WaConfig = {
   accessToken?: string;
@@ -36,18 +40,26 @@ export async function sendWhatsAppCloudMessage(opts: {
   const integration = await getIntegration(opts.userId, "whatsapp");
   const cfg = getWaConfig(integration?.config);
 
-  const accessToken =
+  const accessToken = normalizeWhatsAppAccessToken(
     cfg.accessToken ||
-    (env as { WHATSAPP_ACCESS_TOKEN?: string }).WHATSAPP_ACCESS_TOKEN ||
-    process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId =
-    cfg.phoneNumberId ||
-    process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const apiVersion = cfg.apiVersion || process.env.WHATSAPP_API_VERSION || "v19.0";
+      (env as { WHATSAPP_ACCESS_TOKEN?: string }).WHATSAPP_ACCESS_TOKEN ||
+      process.env.WHATSAPP_ACCESS_TOKEN ||
+      ""
+  );
+  const phoneNumberId = normalizePhoneNumberId(
+    cfg.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || ""
+  );
+  const apiVersion = (
+    cfg.apiVersion ||
+    process.env.WHATSAPP_API_VERSION ||
+    "v19.0"
+  )
+    .trim()
+    .replace(/^\//, "");
 
   if (!accessToken || !phoneNumberId) {
     throw new Error(
-      "WhatsApp Cloud API not configured. Set Integration config (accessToken, phoneNumberId) or WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID env vars."
+      "WhatsApp Cloud API not configured. Set Integration config (accessToken, phoneNumberId) or WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID env vars. If the token was saved before a key rotation, re-enter it."
     );
   }
 
@@ -87,12 +99,14 @@ export async function sendWhatsAppCloudMessage(opts: {
     };
   }
 
+  // Meta Graph API: exactly one Bearer prefix + raw system-user token (EAA…)
   const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
+      Accept: "application/json",
     },
     body: JSON.stringify(payload),
   });
@@ -103,7 +117,11 @@ export async function sendWhatsAppCloudMessage(opts: {
   };
 
   if (!res.ok) {
-    const errMsg = json.error?.message || `WhatsApp API error ${res.status}`;
+    let errMsg = json.error?.message || `WhatsApp API error ${res.status}`;
+    if (/cannot parse access token|invalid oauth/i.test(errMsg)) {
+      errMsg +=
+        " — Re-save a permanent System User token from Meta (raw EAA… only, no “Bearer ” prefix).";
+    }
     const failed = await prisma.whatsAppMessage.create({
       data: {
         businessId,

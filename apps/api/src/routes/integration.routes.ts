@@ -9,9 +9,17 @@ import {
   createCalendarEventHandler,
   validateWhatsAppHandler,
 } from "../controllers/integration.controller.js";
+import {
+  whatsAppWebhookVerify,
+  whatsAppWebhookReceive,
+} from "../controllers/whatsapp-webhook.controller.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router: Router = Router();
+
+// —— Public Meta Cloud API webhook (no JWT; Meta cannot send Authorization) ——
+router.get("/whatsapp/webhook", whatsAppWebhookVerify);
+router.post("/whatsapp/webhook", whatsAppWebhookReceive);
 
 router.get("/", requireAuth, getIntegrations);
 router.post("/configure", requireAuth, configureIntegration);

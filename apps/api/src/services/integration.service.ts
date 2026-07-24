@@ -3,6 +3,10 @@ import {
   decryptConfigSecrets,
   encryptConfigSecrets,
 } from "../lib/secret-crypto.js";
+import {
+  normalizePhoneNumberId,
+  normalizeWhatsAppAccessToken,
+} from "./whatsapp-token.util.js";
 
 export type IntegrationProvider = "whatsapp" | "gmail" | "google_calendar";
 
@@ -130,23 +134,58 @@ export async function validateWhatsAppCredentials(opts: {
   phoneNumberId: string;
   apiVersion?: string;
 }): Promise<{ ok: boolean; displayName?: string; error?: string }> {
-  const apiVersion = opts.apiVersion || "v19.0";
-  const url = `https://graph.facebook.com/${apiVersion}/${opts.phoneNumberId}?fields=display_phone_number,verified_name,quality_rating`;
+  const accessToken = normalizeWhatsAppAccessToken(opts.accessToken);
+  const phoneNumberId = normalizePhoneNumberId(opts.phoneNumberId);
+  const apiVersion = (opts.apiVersion || "v19.0").trim().replace(/^\//, "") || "v19.0";
+
+  if (!accessToken) {
+    return {
+      ok: false,
+      error:
+        "Access token is empty or could not be decrypted. Paste a permanent System User token from Meta (starts with EAA…), without the word Bearer.",
+    };
+  }
+  if (!phoneNumberId) {
+    return { ok: false, error: "Phone Number ID is required" };
+  }
+  // Common paste mistakes that cause Meta "Cannot parse access token"
+  if (/\s/.test(accessToken) || accessToken.includes("Bearer")) {
+    return {
+      ok: false,
+      error:
+        "Access token format invalid. Paste only the raw token (EAA…), not “Bearer EAA…” and no spaces/newlines.",
+    };
+  }
+
+  const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}?fields=display_phone_number,verified_name,quality_rating`;
   try {
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${opts.accessToken}` },
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
     });
     const json = (await res.json().catch(() => ({}))) as {
       display_phone_number?: string;
       verified_name?: string;
-      error?: { message?: string };
+      error?: { message?: string; type?: string; code?: number };
     };
     if (!res.ok) {
-      return { ok: false, error: json.error?.message || `Meta API error ${res.status}` };
+      const msg = json.error?.message || `Meta API error ${res.status}`;
+      // Surface actionable guidance for the common OAuth parse error
+      if (/cannot parse access token|invalid oauth/i.test(msg)) {
+        return {
+          ok: false,
+          error:
+            `${msg}. Fix: use a permanent WhatsApp Cloud API / System User token from Meta Business Settings (not App Secret, not temporary expired token). Do not prefix with Bearer. Token should start with EAA.`,
+        };
+      }
+      return { ok: false, error: msg };
     }
     return {
       ok: true,
-      displayName: json.verified_name || json.display_phone_number || opts.phoneNumberId,
+      displayName: json.verified_name || json.display_phone_number || phoneNumberId,
     };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Network error validating credentials" };
@@ -164,13 +203,22 @@ export async function configureAndValidateWhatsApp(
 ) {
   const existing = await getIntegration(userId, "whatsapp");
   const prev = (existing?.config || {}) as Record<string, unknown>;
-  const accessToken = (config.accessToken || prev.accessToken || "") as string;
-  const phoneNumberId = (config.phoneNumberId || prev.phoneNumberId || "") as string;
-  const apiVersion = (config.apiVersion || prev.apiVersion || "v19.0") as string;
-  const verifyToken = config.verifyToken !== undefined ? config.verifyToken : prev.verifyToken;
+  const accessToken = normalizeWhatsAppAccessToken(
+    (config.accessToken || prev.accessToken || "") as string
+  );
+  const phoneNumberId = normalizePhoneNumberId(
+    (config.phoneNumberId || prev.phoneNumberId || "") as string
+  );
+  const apiVersion = String(config.apiVersion || prev.apiVersion || "v19.0").trim() || "v19.0";
+  const verifyToken =
+    config.verifyToken !== undefined
+      ? String(config.verifyToken || "").trim()
+      : String(prev.verifyToken || "").trim();
 
   if (!accessToken || !phoneNumberId) {
-    throw new Error("Access Token and Phone Number ID are required");
+    throw new Error(
+      "Access Token and Phone Number ID are required. If you left the token blank, re-enter a permanent System User token from Meta."
+    );
   }
 
   const validation = await validateWhatsAppCredentials({ accessToken, phoneNumberId, apiVersion });

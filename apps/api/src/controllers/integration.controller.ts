@@ -70,10 +70,15 @@ export async function validateWhatsAppHandler(req: AuthenticatedRequest, res: Re
       apiVersion?: string;
     };
     const { validateWhatsAppCredentials } = await import("../services/integration.service.js");
+    const { normalizeWhatsAppAccessToken } = await import("../services/whatsapp-token.util.js");
     if (!accessToken || !phoneNumberId) {
       return res.status(400).json({ success: false, error: "accessToken and phoneNumberId required" });
     }
-    const result = await validateWhatsAppCredentials({ accessToken, phoneNumberId, apiVersion });
+    const result = await validateWhatsAppCredentials({
+      accessToken: normalizeWhatsAppAccessToken(accessToken),
+      phoneNumberId,
+      apiVersion,
+    });
     if (!result.ok) {
       return res.status(400).json({ success: false, error: result.error, data: result });
     }
