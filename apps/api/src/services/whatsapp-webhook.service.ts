@@ -20,9 +20,8 @@ export { normalizeWhatsAppAccessToken, normalizePhoneNumberId } from "./whatsapp
 
 /**
  * GET verification: hub.mode=subscribe + hub.verify_token match + return hub.challenge.
- * Accepts:
- *  - process.env.WHATSAPP_VERIFY_TOKEN (platform default)
- *  - any active WhatsApp integration verifyToken
+ * Self-service multi-tenant: each client sets their own Verify Token in Integrations.
+ * Optional process.env.WHATSAPP_VERIFY_TOKEN only as platform emergency fallback.
  */
 export async function verifyWhatsAppWebhookChallenge(opts: {
   mode: string;
@@ -42,18 +41,27 @@ export async function verifyWhatsAppWebhookChallenge(opts: {
     return { ok: true, challenge: opts.challenge };
   }
 
-  // Match any tenant that stored this verify token
+  // Match any tenant that stored this verify token, then mark webhook verified
   const rows = await prisma.integration.findMany({
     where: { provider: "whatsapp", isActive: true },
-    select: { config: true },
-    take: 500,
+    select: { id: true, userId: true, businessId: true, config: true },
+    take: 2000,
   });
   for (const row of rows) {
     const cfg = decryptConfigSecrets(
       (row.config || {}) as Record<string, unknown>
-    ) as WaIntegrationConfig;
+    ) as WaIntegrationConfig & { webhookVerifiedAt?: string };
     const vt = String(cfg.verifyToken || "").trim();
     if (vt && vt === opts.token) {
+      try {
+        const { markWhatsAppWebhookVerified } = await import("./integration.service.js");
+        await markWhatsAppWebhookVerified({
+          userId: row.userId,
+          businessId: row.businessId,
+        });
+      } catch (e) {
+        console.error("[whatsapp-webhook] mark verified failed", e);
+      }
       return { ok: true, challenge: opts.challenge };
     }
   }
@@ -61,26 +69,24 @@ export async function verifyWhatsAppWebhookChallenge(opts: {
   return { ok: false };
 }
 
-/** Find owner userId for a Meta phone_number_id */
+/** Find tenant owner userId for a Meta phone_number_id (incoming webhooks). */
 export async function findUserIdByPhoneNumberId(
   phoneNumberId: string
 ): Promise<string | null> {
-  const id = normalizePhoneNumberId(phoneNumberId);
-  if (!id) return null;
-  const rows = await prisma.integration.findMany({
-    where: { provider: "whatsapp", isActive: true },
-    select: { userId: true, config: true },
-    take: 500,
-  });
-  for (const row of rows) {
-    const cfg = decryptConfigSecrets(
-      (row.config || {}) as Record<string, unknown>
-    ) as WaIntegrationConfig;
-    if (normalizePhoneNumberId(cfg.phoneNumberId) === id) {
-      return row.userId;
-    }
-  }
-  return null;
+  const { findIntegrationByPhoneNumberId } = await import("./integration.service.js");
+  const hit = await findIntegrationByPhoneNumberId(phoneNumberId);
+  return hit?.userId || null;
+}
+
+/** Full tenant resolution for inbound events */
+export async function findTenantByPhoneNumberId(phoneNumberId: string): Promise<{
+  userId: string;
+  businessId: string | null;
+} | null> {
+  const { findIntegrationByPhoneNumberId } = await import("./integration.service.js");
+  const hit = await findIntegrationByPhoneNumberId(phoneNumberId);
+  if (!hit) return null;
+  return { userId: hit.userId, businessId: hit.businessId || null };
 }
 
 /**
@@ -126,11 +132,12 @@ export async function processWhatsAppWebhookPayload(body: unknown): Promise<void
       const value = change.value;
       if (!value) continue;
       const phoneNumberId = value.metadata?.phone_number_id || "";
-      const userId = phoneNumberId
-        ? await findUserIdByPhoneNumberId(phoneNumberId)
+      const tenant = phoneNumberId
+        ? await findTenantByPhoneNumberId(phoneNumberId)
         : null;
+      const userId = tenant?.userId || null;
 
-      // Delivery / read / failed statuses
+      // Delivery / read / failed statuses (matched by waMessageId globally)
       for (const st of value.statuses || []) {
         await applyWhatsAppStatusUpdate({
           id: st.id,
@@ -139,9 +146,16 @@ export async function processWhatsAppWebhookPayload(body: unknown): Promise<void
         });
       }
 
-      // Inbound messages
+      // Inbound messages → correct tenant via phone_number_id
       for (const msg of value.messages || []) {
-        if (!userId || !msg.from) continue;
+        if (!userId || !msg.from) {
+          if (msg.from && phoneNumberId) {
+            console.warn(
+              `[whatsapp-webhook] no tenant for phone_number_id=${phoneNumberId}`
+            );
+          }
+          continue;
+        }
         let text = "";
         if (msg.type === "text") text = msg.text?.body || "";
         else if (msg.type === "button") text = msg.button?.text || "[button]";

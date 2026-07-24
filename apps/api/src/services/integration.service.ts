@@ -1,3 +1,8 @@
+/**
+ * Multi-tenant integrations (WhatsApp Cloud API is fully self-service per business).
+ * No platform-wide hardcoded Meta tokens — each tenant stores its own credentials.
+ */
+import crypto from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import {
   decryptConfigSecrets,
@@ -7,15 +12,98 @@ import {
   normalizePhoneNumberId,
   normalizeWhatsAppAccessToken,
 } from "./whatsapp-token.util.js";
+import { getUserBusinessId } from "./field-engine.service.js";
 
 export type IntegrationProvider = "whatsapp" | "gmail" | "google_calendar";
+
+/** Public connection status for UI */
+export type WhatsAppConnectionStatus =
+  | "connected"
+  | "verification_pending"
+  | "invalid_token"
+  | "not_connected";
+
+export const WHATSAPP_CALLBACK_URL =
+  process.env.WHATSAPP_WEBHOOK_PUBLIC_URL ||
+  "https://api.massivementor.in/api/integrations/whatsapp/webhook";
+
+function deriveWhatsAppStatus(opts: {
+  configured: boolean;
+  status: string | null | undefined;
+  hasVerifyToken: boolean;
+  webhookVerifiedAt?: string | null;
+  lastError?: string | null;
+}): WhatsAppConnectionStatus {
+  const s = (opts.status || "").toLowerCase();
+  if (s === "invalid_token" || s === "error") return "invalid_token";
+  if (!opts.configured) return "not_connected";
+  if (s === "connected" && opts.webhookVerifiedAt) return "connected";
+  if (s === "connected" || s === "verification_pending") {
+    // Meta Graph OK but client may still need to complete webhook in Meta console
+    if (!opts.hasVerifyToken || !opts.webhookVerifiedAt) return "verification_pending";
+    return "connected";
+  }
+  if (opts.configured) return "verification_pending";
+  return "not_connected";
+}
+
+/**
+ * Resolve WhatsApp integration for any member of the tenant.
+ * Prefer business-scoped row; fall back to any active member connection on that business.
+ */
+export async function getWhatsAppIntegrationForTenant(userId: string) {
+  const businessId = await getUserBusinessId(userId);
+
+  if (businessId) {
+    const byBiz = await prisma.integration.findFirst({
+      where: {
+        provider: "whatsapp",
+        businessId,
+        isActive: true,
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (byBiz) {
+      return {
+        ...byBiz,
+        config: decryptConfigSecrets((byBiz.config || {}) as Record<string, unknown>),
+      };
+    }
+
+    // Legacy: user-owned integration on a member of this business
+    const memberIds = (
+      await prisma.businessMember.findMany({
+        where: { businessId },
+        select: { userId: true },
+      })
+    ).map((m) => m.userId);
+    if (memberIds.length) {
+      const legacy = await prisma.integration.findFirst({
+        where: {
+          provider: "whatsapp",
+          userId: { in: memberIds },
+          isActive: true,
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (legacy) {
+        return {
+          ...legacy,
+          config: decryptConfigSecrets((legacy.config || {}) as Record<string, unknown>),
+        };
+      }
+    }
+  }
+
+  // Solo / no business yet — user-scoped
+  return getIntegration(userId, "whatsapp");
+}
 
 export async function getIntegration(userId: string, provider: string) {
   const row = await prisma.integration.findUnique({
     where: { userId_provider: { userId, provider } },
   });
   if (!row) return null;
-  // Decrypt secrets for runtime use (never send full config to list UI)
   return {
     ...row,
     config: decryptConfigSecrets((row.config || {}) as Record<string, unknown>),
@@ -24,19 +112,49 @@ export async function getIntegration(userId: string, provider: string) {
 
 export async function listIntegrations(userId: string) {
   const providers: IntegrationProvider[] = ["whatsapp", "gmail", "google_calendar"];
+  const businessId = await getUserBusinessId(userId);
+
   const rows = await Promise.all(
     providers.map(async (provider) => {
-      const int = await getIntegration(userId, provider);
+      const int =
+        provider === "whatsapp"
+          ? await getWhatsAppIntegrationForTenant(userId)
+          : await getIntegration(userId, provider);
       const cfg = (int?.config || {}) as Record<string, unknown>;
       const configured = isProviderConfigured(provider, cfg);
+      const hasVerifyToken = !!cfg.verifyToken;
+      const webhookVerifiedAt = (cfg.webhookVerifiedAt as string) || null;
+
+      let status = int?.status || (configured ? "connected" : "not_connected");
+      let connectionStatus: WhatsAppConnectionStatus | string = status;
+      if (provider === "whatsapp") {
+        connectionStatus = deriveWhatsAppStatus({
+          configured,
+          status,
+          hasVerifyToken,
+          webhookVerifiedAt,
+          lastError: int?.lastError,
+        });
+        status = connectionStatus;
+      }
+
       return {
         provider,
         isActive: int?.isActive ?? false,
         configured,
-        status: int?.status || (configured ? "connected" : "not_connected"),
+        status,
+        connectionStatus: provider === "whatsapp" ? connectionStatus : status,
         lastValidatedAt: int?.lastValidatedAt || null,
         lastError: int?.lastError || null,
-        // Never return full secrets — only presence flags + masked previews
+        businessId: int?.businessId || businessId || null,
+        webhook: provider === "whatsapp"
+          ? {
+              callbackUrl: WHATSAPP_CALLBACK_URL,
+              verifyToken: hasVerifyToken ? String(cfg.verifyToken) : null,
+              hasVerifyToken,
+              webhookVerifiedAt,
+            }
+          : null,
         configPreview: maskConfig(provider, cfg),
         mvp: provider === "whatsapp",
       };
@@ -66,7 +184,11 @@ function maskConfig(provider: string, cfg: Record<string, unknown>) {
       accessTokenPreview: token ? `${token.slice(0, 6)}…${token.slice(-4)}` : null,
       phoneNumberId: cfg.phoneNumberId ? String(cfg.phoneNumberId) : null,
       hasVerifyToken: !!cfg.verifyToken,
+      // Safe to return verify token to the tenant that owns it (needed for Meta setup)
+      verifyToken: cfg.verifyToken ? String(cfg.verifyToken) : null,
       apiVersion: (cfg.apiVersion as string) || "v19.0",
+      displayName: cfg.displayName ? String(cfg.displayName) : null,
+      webhookVerifiedAt: cfg.webhookVerifiedAt ? String(cfg.webhookVerifiedAt) : null,
     };
   }
   return { configuredKeys: Object.keys(cfg) };
@@ -76,14 +198,17 @@ export async function upsertIntegration(
   userId: string,
   provider: string,
   config: Record<string, unknown>,
-  opts?: { isActive?: boolean; status?: string; lastError?: string | null; lastValidatedAt?: Date | null }
+  opts?: {
+    isActive?: boolean;
+    status?: string;
+    lastError?: string | null;
+    lastValidatedAt?: Date | null;
+    businessId?: string | null;
+  }
 ) {
-  // Merge with existing config so partial updates don't wipe tokens
-  // getIntegration returns decrypted secrets — re-encrypt before persist
   const existing = await getIntegration(userId, provider);
   const prev = (existing?.config || {}) as Record<string, unknown>;
   const merged = { ...prev, ...config };
-  // Drop empty string overwrites for secrets
   for (const key of Object.keys(merged)) {
     if (merged[key] === "" || merged[key] === undefined) {
       if (prev[key] !== undefined) merged[key] = prev[key];
@@ -92,11 +217,16 @@ export async function upsertIntegration(
   }
 
   const encryptedConfig = encryptConfigSecrets(merged);
+  const businessId =
+    opts?.businessId !== undefined
+      ? opts.businessId
+      : existing?.businessId || (await getUserBusinessId(userId));
 
   const row = await prisma.integration.upsert({
     where: { userId_provider: { userId, provider } },
     create: {
       userId,
+      businessId: businessId || null,
       provider,
       config: encryptedConfig as object,
       isActive: opts?.isActive ?? true,
@@ -107,6 +237,7 @@ export async function upsertIntegration(
     update: {
       config: encryptedConfig as object,
       isActive: opts?.isActive ?? true,
+      ...(businessId ? { businessId } : {}),
       ...(opts?.status !== undefined ? { status: opts.status } : {}),
       ...(opts?.lastError !== undefined ? { lastError: opts.lastError } : {}),
       ...(opts?.lastValidatedAt !== undefined ? { lastValidatedAt: opts.lastValidatedAt } : {}),
@@ -125,10 +256,6 @@ export async function toggleIntegration(userId: string, provider: string, isActi
   });
 }
 
-/**
- * Validate WhatsApp Cloud API credentials against Meta Graph API
- * without sending a customer message.
- */
 export async function validateWhatsAppCredentials(opts: {
   accessToken: string;
   phoneNumberId: string;
@@ -148,7 +275,6 @@ export async function validateWhatsAppCredentials(opts: {
   if (!phoneNumberId) {
     return { ok: false, error: "Phone Number ID is required" };
   }
-  // Common paste mistakes that cause Meta "Cannot parse access token"
   if (/\s/.test(accessToken) || accessToken.includes("Bearer")) {
     return {
       ok: false,
@@ -173,12 +299,10 @@ export async function validateWhatsAppCredentials(opts: {
     };
     if (!res.ok) {
       const msg = json.error?.message || `Meta API error ${res.status}`;
-      // Surface actionable guidance for the common OAuth parse error
       if (/cannot parse access token|invalid oauth/i.test(msg)) {
         return {
           ok: false,
-          error:
-            `${msg}. Fix: use a permanent WhatsApp Cloud API / System User token from Meta Business Settings (not App Secret, not temporary expired token). Do not prefix with Bearer. Token should start with EAA.`,
+          error: `${msg}. Fix: use a permanent WhatsApp Cloud API / System User token from Meta (starts with EAA). Do not prefix with Bearer.`,
         };
       }
       return { ok: false, error: msg };
@@ -192,6 +316,14 @@ export async function validateWhatsAppCredentials(opts: {
   }
 }
 
+export function generateWhatsAppVerifyToken(): string {
+  return `mm_wa_${crypto.randomBytes(16).toString("hex")}`;
+}
+
+/**
+ * Self-service connect: validate Meta credentials, store per tenant, return webhook setup.
+ * Never uses platform-global WhatsApp tokens for tenant traffic.
+ */
 export async function configureAndValidateWhatsApp(
   userId: string,
   config: {
@@ -201,7 +333,8 @@ export async function configureAndValidateWhatsApp(
     apiVersion?: string;
   }
 ) {
-  const existing = await getIntegration(userId, "whatsapp");
+  const businessId = await getUserBusinessId(userId);
+  const existing = await getWhatsAppIntegrationForTenant(userId);
   const prev = (existing?.config || {}) as Record<string, unknown>;
   const accessToken = normalizeWhatsAppAccessToken(
     (config.accessToken || prev.accessToken || "") as string
@@ -210,15 +343,29 @@ export async function configureAndValidateWhatsApp(
     (config.phoneNumberId || prev.phoneNumberId || "") as string
   );
   const apiVersion = String(config.apiVersion || prev.apiVersion || "v19.0").trim() || "v19.0";
-  const verifyToken =
+
+  let verifyToken =
     config.verifyToken !== undefined
       ? String(config.verifyToken || "").trim()
       : String(prev.verifyToken || "").trim();
+  if (!verifyToken) {
+    verifyToken = generateWhatsAppVerifyToken();
+  }
 
   if (!accessToken || !phoneNumberId) {
     throw new Error(
-      "Access Token and Phone Number ID are required. If you left the token blank, re-enter a permanent System User token from Meta."
+      "Access Token and Phone Number ID are required. Paste a permanent System User token from your Meta Business account."
     );
+  }
+
+  // Enforce unique phone_number_id across tenants (one WABA number → one CRM workspace)
+  if (businessId) {
+    const conflict = await findIntegrationByPhoneNumberId(phoneNumberId);
+    if (conflict && conflict.businessId && conflict.businessId !== businessId) {
+      throw new Error(
+        "This Phone Number ID is already connected to another Massive Mentor workspace. Disconnect it there first, or use a different WhatsApp number."
+      );
+    }
   }
 
   const validation = await validateWhatsAppCredentials({ accessToken, phoneNumberId, apiVersion });
@@ -227,41 +374,121 @@ export async function configureAndValidateWhatsApp(
       userId,
       "whatsapp",
       { accessToken, phoneNumberId, verifyToken, apiVersion },
-      { status: "error", lastError: validation.error || "Validation failed", isActive: false }
+      {
+        status: "invalid_token",
+        lastError: validation.error || "Validation failed",
+        isActive: false,
+        businessId,
+      }
     );
     throw new Error(validation.error || "WhatsApp credential validation failed");
   }
 
+  // Graph credentials OK — webhook subscription still pending until Meta completes GET verify
   const row = await upsertIntegration(
     userId,
     "whatsapp",
-    { accessToken, phoneNumberId, verifyToken, apiVersion, displayName: validation.displayName },
     {
-      status: "connected",
+      accessToken,
+      phoneNumberId,
+      verifyToken,
+      apiVersion,
+      displayName: validation.displayName,
+      // Preserve existing webhookVerifiedAt if re-saving same token
+      webhookVerifiedAt: prev.webhookVerifiedAt || null,
+    },
+    {
+      status: prev.webhookVerifiedAt ? "connected" : "verification_pending",
       lastError: null,
       lastValidatedAt: new Date(),
       isActive: true,
+      businessId,
     }
   );
+
+  const connectionStatus = deriveWhatsAppStatus({
+    configured: true,
+    status: row.status,
+    hasVerifyToken: true,
+    webhookVerifiedAt: (row.config as { webhookVerifiedAt?: string }).webhookVerifiedAt,
+  });
 
   return {
     integration: {
       provider: "whatsapp",
-      status: "connected",
+      status: connectionStatus,
+      connectionStatus,
       isActive: true,
       displayName: validation.displayName,
       lastValidatedAt: row.lastValidatedAt,
+      businessId: row.businessId,
+      webhook: {
+        callbackUrl: WHATSAPP_CALLBACK_URL,
+        verifyToken,
+      },
       configPreview: maskConfig("whatsapp", {
         accessToken,
         phoneNumberId,
         verifyToken,
         apiVersion,
+        displayName: validation.displayName,
+        webhookVerifiedAt: (row.config as { webhookVerifiedAt?: string }).webhookVerifiedAt,
       }),
     },
   };
 }
 
-/** Real WhatsApp Cloud API send (persists history). */
+/** Used by webhook routing — no secrets returned */
+export async function findIntegrationByPhoneNumberId(phoneNumberId: string) {
+  const id = normalizePhoneNumberId(phoneNumberId);
+  if (!id) return null;
+  const rows = await prisma.integration.findMany({
+    where: { provider: "whatsapp" },
+    select: { id: true, userId: true, businessId: true, config: true, isActive: true, status: true },
+    take: 2000,
+  });
+  for (const row of rows) {
+    const cfg = decryptConfigSecrets((row.config || {}) as Record<string, unknown>);
+    if (normalizePhoneNumberId(String(cfg.phoneNumberId || "")) === id) {
+      return {
+        ...row,
+        config: cfg,
+      };
+    }
+  }
+  return null;
+}
+
+/** Mark tenant webhook verified after successful Meta GET challenge */
+export async function markWhatsAppWebhookVerified(opts: {
+  userId: string;
+  businessId?: string | null;
+}): Promise<void> {
+  const int =
+    opts.businessId
+      ? await prisma.integration.findFirst({
+          where: { provider: "whatsapp", businessId: opts.businessId },
+          orderBy: { updatedAt: "desc" },
+        })
+      : await prisma.integration.findUnique({
+          where: { userId_provider: { userId: opts.userId, provider: "whatsapp" } },
+        });
+  if (!int) return;
+  const cfg = decryptConfigSecrets((int.config || {}) as Record<string, unknown>);
+  const next = {
+    ...cfg,
+    webhookVerifiedAt: new Date().toISOString(),
+  };
+  await prisma.integration.update({
+    where: { id: int.id },
+    data: {
+      config: encryptConfigSecrets(next) as object,
+      status: "connected",
+      lastError: null,
+    },
+  });
+}
+
 export async function sendWhatsAppMessage(
   userId: string,
   to: string,
@@ -285,9 +512,6 @@ export async function sendWhatsAppMessage(
   };
 }
 
-/**
- * Gmail / Calendar are not in MVP — throw clear errors (UI hides send forms).
- */
 export async function sendGmail(_userId: string, _to: string, _subject: string, _body: string) {
   throw new Error(
     "Gmail is not enabled in this release. WhatsApp is the supported messaging integration."

@@ -37,17 +37,25 @@ export async function sendWhatsAppCloudMessage(opts: {
   templateParams?: string[];
 }) {
   const businessId = await getUserBusinessId(opts.userId);
-  const integration = await getIntegration(opts.userId, "whatsapp");
+  // Tenant credentials only — never fall back to another client's tokens
+  const { getWhatsAppIntegrationForTenant } = await import("./integration.service.js");
+  const integration =
+    (await getWhatsAppIntegrationForTenant(opts.userId)) ||
+    (await getIntegration(opts.userId, "whatsapp"));
   const cfg = getWaConfig(integration?.config);
 
+  // Optional env fallback is platform-level only for emergency/dev — not used when tenant configured
   const accessToken = normalizeWhatsAppAccessToken(
     cfg.accessToken ||
-      (env as { WHATSAPP_ACCESS_TOKEN?: string }).WHATSAPP_ACCESS_TOKEN ||
-      process.env.WHATSAPP_ACCESS_TOKEN ||
-      ""
+      (!integration
+        ? (env as { WHATSAPP_ACCESS_TOKEN?: string }).WHATSAPP_ACCESS_TOKEN ||
+          process.env.WHATSAPP_ACCESS_TOKEN ||
+          ""
+        : "")
   );
   const phoneNumberId = normalizePhoneNumberId(
-    cfg.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || ""
+    cfg.phoneNumberId ||
+      (!integration ? process.env.WHATSAPP_PHONE_NUMBER_ID || "" : "")
   );
   const apiVersion = (
     cfg.apiVersion ||

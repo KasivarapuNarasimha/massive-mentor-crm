@@ -324,6 +324,7 @@ model Business {
   approvalRequests   ApprovalRequest[]
   subscriptions      Subscription[]
   billingPayments    BillingPayment[]
+  integrations       Integration[]
   currentPlanId      String?
   currentPlan        SubscriptionPlan? @relation(fields: [currentPlanId], references: [id], onDelete: SetNull)
 
@@ -979,12 +980,16 @@ model Integration {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// Tenant workspace that owns this connection (shared by all members for WhatsApp)
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
   provider    String   // "whatsapp" | "gmail" | "google_calendar"
   config      Json     // tokens etc. (never return secrets to non-admin clients)
   isActive    Boolean  @default(true)
   /// Last successful credential validation timestamp
   lastValidatedAt DateTime?
-  /// Connected | not_connected | error
+  /// connected | verification_pending | invalid_token | not_connected | error
   status      String   @default("not_connected")
   lastError   String?
   createdAt   DateTime @default(now())
@@ -992,6 +997,7 @@ model Integration {
 
   @@unique([userId, provider])
   @@index([userId])
+  @@index([businessId, provider])
 }
 
 model Team {
