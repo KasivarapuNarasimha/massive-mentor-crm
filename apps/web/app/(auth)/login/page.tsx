@@ -83,6 +83,18 @@ export default function LoginPage() {
     setIsSubmitting(false);
   };
 
+  const TRIAL_WHATSAPP_URL =
+    "https://wa.me/919182920047?text=Hi%20Massive%20Mentor,%20I%20want%20a%20CRM%20trial.";
+
+  const openTrialWhatsApp = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const w = window.open(TRIAL_WHATSAPP_URL, "_blank", "noopener,noreferrer");
+    if (!w) {
+      window.location.href = TRIAL_WHATSAPP_URL;
+    }
+  };
+
   if (isAuthenticated) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-zinc-950">
@@ -158,12 +170,13 @@ export default function LoginPage() {
 
           <div className="mt-6 text-center text-sm text-zinc-400">
             Don&apos;t have an account?{" "}
-            <a
-              href="mailto:team@massivementor.in?subject=CRM%20Trial"
-              className="text-white hover:underline font-medium"
+            <button
+              type="button"
+              onClick={openTrialWhatsApp}
+              className="text-white hover:underline font-medium touch-manipulation cursor-pointer bg-transparent border-0 p-0 inline align-baseline"
             >
               Contact sales for a trial
-            </a>
+            </button>
           </div>
         </div>
 
