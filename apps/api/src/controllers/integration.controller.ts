@@ -91,6 +91,39 @@ export async function validateWhatsAppHandler(req: AuthenticatedRequest, res: Re
   }
 }
 
+/** Test Connection — uses saved tenant credentials against Graph API */
+export async function testWhatsAppConnectionHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const { testWhatsAppConnection } = await import("../services/integration.service.js");
+    const result = await testWhatsAppConnection(req.user.id);
+    if (!result.ok) {
+      return res.status(400).json({
+        success: false,
+        error: result.error || "Connection failed",
+        data: result,
+      });
+    }
+    res.json({
+      success: true,
+      data: {
+        status: "Connected",
+        connectionStatus: result.connectionStatus,
+        displayName: result.displayName,
+        phoneDisplay: result.phoneDisplay,
+        wabaName: result.wabaName,
+        wabaId: result.wabaId,
+        qualityRating: result.qualityRating,
+      },
+    });
+  } catch (error: unknown) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Test connection failed",
+    });
+  }
+}
+
 export async function toggleIntegrationHandler(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });

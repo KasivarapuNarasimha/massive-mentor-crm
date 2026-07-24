@@ -153,6 +153,14 @@ export async function listIntegrations(userId: string) {
               verifyToken: hasVerifyToken ? String(cfg.verifyToken) : null,
               hasVerifyToken,
               webhookVerifiedAt,
+              lastWebhookReceivedAt: cfg.lastWebhookReceivedAt
+                ? String(cfg.lastWebhookReceivedAt)
+                : null,
+              status: webhookVerifiedAt
+                ? "verified"
+                : configured
+                  ? "not_verified"
+                  : "not_verified",
             }
           : null,
         configPreview: maskConfig(provider, cfg),
@@ -188,7 +196,14 @@ function maskConfig(provider: string, cfg: Record<string, unknown>) {
       verifyToken: cfg.verifyToken ? String(cfg.verifyToken) : null,
       apiVersion: (cfg.apiVersion as string) || "v19.0",
       displayName: cfg.displayName ? String(cfg.displayName) : null,
+      phoneDisplay: cfg.phoneDisplay ? String(cfg.phoneDisplay) : null,
+      wabaName: cfg.wabaName ? String(cfg.wabaName) : null,
+      wabaId: cfg.wabaId ? String(cfg.wabaId) : null,
+      qualityRating: cfg.qualityRating ? String(cfg.qualityRating) : null,
       webhookVerifiedAt: cfg.webhookVerifiedAt ? String(cfg.webhookVerifiedAt) : null,
+      lastWebhookReceivedAt: cfg.lastWebhookReceivedAt
+        ? String(cfg.lastWebhookReceivedAt)
+        : null,
     };
   }
   return { configuredKeys: Object.keys(cfg) };
@@ -256,11 +271,21 @@ export async function toggleIntegration(userId: string, provider: string, isActi
   });
 }
 
+export type WhatsAppValidateResult = {
+  ok: boolean;
+  displayName?: string;
+  phoneDisplay?: string;
+  wabaName?: string;
+  wabaId?: string;
+  qualityRating?: string;
+  error?: string;
+};
+
 export async function validateWhatsAppCredentials(opts: {
   accessToken: string;
   phoneNumberId: string;
   apiVersion?: string;
-}): Promise<{ ok: boolean; displayName?: string; error?: string }> {
+}): Promise<WhatsAppValidateResult> {
   const accessToken = normalizeWhatsAppAccessToken(opts.accessToken);
   const phoneNumberId = normalizePhoneNumberId(opts.phoneNumberId);
   const apiVersion = (opts.apiVersion || "v19.0").trim().replace(/^\//, "") || "v19.0";
@@ -283,7 +308,14 @@ export async function validateWhatsAppCredentials(opts: {
     };
   }
 
-  const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}?fields=display_phone_number,verified_name,quality_rating`;
+  const fields = [
+    "display_phone_number",
+    "verified_name",
+    "quality_rating",
+    "code_verification_status",
+    "whatsapp_business_account{id,name}",
+  ].join(",");
+  const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}?fields=${encodeURIComponent(fields)}`;
   try {
     const res = await fetch(url, {
       method: "GET",
@@ -295,6 +327,8 @@ export async function validateWhatsAppCredentials(opts: {
     const json = (await res.json().catch(() => ({}))) as {
       display_phone_number?: string;
       verified_name?: string;
+      quality_rating?: string;
+      whatsapp_business_account?: { id?: string; name?: string };
       error?: { message?: string; type?: string; code?: number };
     };
     if (!res.ok) {
@@ -302,18 +336,81 @@ export async function validateWhatsAppCredentials(opts: {
       if (/cannot parse access token|invalid oauth/i.test(msg)) {
         return {
           ok: false,
-          error: `${msg}. Fix: use a permanent WhatsApp Cloud API / System User token from Meta (starts with EAA). Do not prefix with Bearer.`,
+          error: `${msg}. Fix: use a permanent System User token from Meta (starts with EAA). Do not prefix with Bearer.`,
         };
       }
       return { ok: false, error: msg };
     }
+    const waba = json.whatsapp_business_account;
     return {
       ok: true,
       displayName: json.verified_name || json.display_phone_number || phoneNumberId,
+      phoneDisplay: json.display_phone_number || undefined,
+      wabaName: waba?.name || undefined,
+      wabaId: waba?.id || undefined,
+      qualityRating: json.quality_rating || undefined,
     };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Network error validating credentials" };
   }
+}
+
+/** Test Connection using already-saved tenant credentials. */
+export async function testWhatsAppConnection(
+  userId: string
+): Promise<WhatsAppValidateResult & { connectionStatus?: string }> {
+  const int = await getWhatsAppIntegrationForTenant(userId);
+  const cfg = (int?.config || {}) as Record<string, unknown>;
+  const accessToken = normalizeWhatsAppAccessToken(String(cfg.accessToken || ""));
+  const phoneNumberId = normalizePhoneNumberId(String(cfg.phoneNumberId || ""));
+  const apiVersion = String(cfg.apiVersion || "v19.0");
+
+  if (!accessToken || !phoneNumberId) {
+    return {
+      ok: false,
+      error: "No saved WhatsApp credentials. Enter Access Token and Phone Number ID, then Save first.",
+      connectionStatus: "not_connected",
+    };
+  }
+
+  const result = await validateWhatsAppCredentials({ accessToken, phoneNumberId, apiVersion });
+  if (result.ok) {
+    await upsertIntegration(
+      userId,
+      "whatsapp",
+      {
+        displayName: result.displayName,
+        phoneDisplay: result.phoneDisplay,
+        wabaName: result.wabaName,
+        wabaId: result.wabaId,
+        qualityRating: result.qualityRating,
+      },
+      {
+        status: cfg.webhookVerifiedAt ? "connected" : "verification_pending",
+        lastError: null,
+        lastValidatedAt: new Date(),
+        isActive: true,
+        businessId: int?.businessId || (await getUserBusinessId(userId)),
+      }
+    );
+    return {
+      ...result,
+      connectionStatus: cfg.webhookVerifiedAt ? "connected" : "verification_pending",
+    };
+  }
+
+  await upsertIntegration(
+    userId,
+    "whatsapp",
+    {},
+    {
+      status: "invalid_token",
+      lastError: result.error || "Test connection failed",
+      isActive: false,
+      businessId: int?.businessId || (await getUserBusinessId(userId)),
+    }
+  );
+  return { ...result, connectionStatus: "invalid_token" };
 }
 
 export function generateWhatsAppVerifyToken(): string {
@@ -394,8 +491,13 @@ export async function configureAndValidateWhatsApp(
       verifyToken,
       apiVersion,
       displayName: validation.displayName,
-      // Preserve existing webhookVerifiedAt if re-saving same token
+      phoneDisplay: validation.phoneDisplay || null,
+      wabaName: validation.wabaName || null,
+      wabaId: validation.wabaId || null,
+      qualityRating: validation.qualityRating || null,
+      // Preserve webhook activity timestamps
       webhookVerifiedAt: prev.webhookVerifiedAt || null,
+      lastWebhookReceivedAt: prev.lastWebhookReceivedAt || null,
     },
     {
       status: prev.webhookVerifiedAt ? "connected" : "verification_pending",
@@ -406,11 +508,12 @@ export async function configureAndValidateWhatsApp(
     }
   );
 
+  const cfgOut = row.config as Record<string, unknown>;
   const connectionStatus = deriveWhatsAppStatus({
     configured: true,
     status: row.status,
     hasVerifyToken: true,
-    webhookVerifiedAt: (row.config as { webhookVerifiedAt?: string }).webhookVerifiedAt,
+    webhookVerifiedAt: cfgOut.webhookVerifiedAt as string | undefined,
   });
 
   return {
@@ -420,11 +523,15 @@ export async function configureAndValidateWhatsApp(
       connectionStatus,
       isActive: true,
       displayName: validation.displayName,
+      phoneDisplay: validation.phoneDisplay,
+      wabaName: validation.wabaName,
       lastValidatedAt: row.lastValidatedAt,
       businessId: row.businessId,
       webhook: {
         callbackUrl: WHATSAPP_CALLBACK_URL,
         verifyToken,
+        status: cfgOut.webhookVerifiedAt ? "verified" : "not_verified",
+        lastWebhookReceivedAt: cfgOut.lastWebhookReceivedAt || null,
       },
       configPreview: maskConfig("whatsapp", {
         accessToken,
@@ -432,10 +539,47 @@ export async function configureAndValidateWhatsApp(
         verifyToken,
         apiVersion,
         displayName: validation.displayName,
-        webhookVerifiedAt: (row.config as { webhookVerifiedAt?: string }).webhookVerifiedAt,
+        phoneDisplay: validation.phoneDisplay,
+        wabaName: validation.wabaName,
+        wabaId: validation.wabaId,
+        qualityRating: validation.qualityRating,
+        webhookVerifiedAt: cfgOut.webhookVerifiedAt,
+        lastWebhookReceivedAt: cfgOut.lastWebhookReceivedAt,
       }),
     },
   };
+}
+
+/** Touch lastWebhookReceivedAt for tenant (POST events from Meta). */
+export async function touchWhatsAppWebhookActivity(opts: {
+  userId: string;
+  businessId?: string | null;
+}): Promise<void> {
+  const int =
+    opts.businessId
+      ? await prisma.integration.findFirst({
+          where: { provider: "whatsapp", businessId: opts.businessId },
+          orderBy: { updatedAt: "desc" },
+        })
+      : await prisma.integration.findUnique({
+          where: { userId_provider: { userId: opts.userId, provider: "whatsapp" } },
+        });
+  if (!int) return;
+  const cfg = decryptConfigSecrets((int.config || {}) as Record<string, unknown>);
+  const next = {
+    ...cfg,
+    lastWebhookReceivedAt: new Date().toISOString(),
+    // Receiving events implies Meta already completed verification
+    webhookVerifiedAt: cfg.webhookVerifiedAt || new Date().toISOString(),
+  };
+  await prisma.integration.update({
+    where: { id: int.id },
+    data: {
+      config: encryptConfigSecrets(next) as object,
+      status: "connected",
+      lastError: null,
+    },
+  });
 }
 
 /** Used by webhook routing — no secrets returned */

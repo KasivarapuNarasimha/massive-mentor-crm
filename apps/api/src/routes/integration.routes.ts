@@ -8,6 +8,7 @@ import {
   sendGmailHandler,
   createCalendarEventHandler,
   validateWhatsAppHandler,
+  testWhatsAppConnectionHandler,
 } from "../controllers/integration.controller.js";
 import {
   whatsAppWebhookVerify,
@@ -25,6 +26,7 @@ router.get("/", requireAuth, getIntegrations);
 router.post("/configure", requireAuth, configureIntegration);
 router.post("/toggle", requireAuth, toggleIntegrationHandler);
 router.post("/whatsapp/validate", requireAuth, validateWhatsAppHandler);
+router.post("/whatsapp/test-connection", requireAuth, testWhatsAppConnectionHandler);
 router.post("/whatsapp/send", requireAuth, sendWhatsApp);
 router.get("/whatsapp/history", requireAuth, listWhatsAppHistory);
 router.post("/gmail/send", requireAuth, sendGmailHandler);

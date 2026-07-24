@@ -14,13 +14,14 @@ type IntegrationRow = {
   connectionStatus?: string;
   lastValidatedAt?: string | null;
   lastError?: string | null;
-  mvp?: boolean;
   businessId?: string | null;
   webhook?: {
     callbackUrl?: string;
     verifyToken?: string | null;
     hasVerifyToken?: boolean;
     webhookVerifiedAt?: string | null;
+    lastWebhookReceivedAt?: string | null;
+    status?: string;
   } | null;
   configPreview?: {
     hasAccessToken?: boolean;
@@ -30,7 +31,12 @@ type IntegrationRow = {
     verifyToken?: string | null;
     apiVersion?: string;
     displayName?: string | null;
+    phoneDisplay?: string | null;
+    wabaName?: string | null;
+    wabaId?: string | null;
+    qualityRating?: string | null;
     webhookVerifiedAt?: string | null;
+    lastWebhookReceivedAt?: string | null;
   };
 };
 
@@ -75,6 +81,48 @@ async function copyText(label: string, text: string) {
   }
 }
 
+function StepRow({
+  done,
+  active,
+  label,
+  detail,
+}: {
+  done: boolean;
+  active?: boolean;
+  label: string;
+  detail?: string;
+}) {
+  return (
+    <div
+      className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 ${
+        done
+          ? "border-emerald-500/30 bg-emerald-500/5"
+          : active
+            ? "border-violet-500/40 bg-violet-500/10"
+            : "border-zinc-800 bg-zinc-950/60"
+      }`}
+    >
+      <span
+        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+          done
+            ? "bg-emerald-500 text-zinc-950"
+            : active
+              ? "bg-violet-500 text-white"
+              : "bg-zinc-800 text-zinc-500"
+        }`}
+      >
+        {done ? "✓" : "·"}
+      </span>
+      <div className="min-w-0">
+        <div className={`text-sm font-medium ${done ? "text-emerald-300" : "text-zinc-200"}`}>
+          {label}
+        </div>
+        {detail ? <p className="text-xs text-zinc-500 mt-0.5">{detail}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 export default function IntegrationsPage() {
   const { token } = useAuth();
   const [integrations, setIntegrations] = useState<IntegrationRow[]>([]);
@@ -86,27 +134,42 @@ export default function IntegrationsPage() {
   const [apiVersion, setApiVersion] = useState("v19.0");
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [testingConn, setTestingConn] = useState(false);
+  const [testConnResult, setTestConnResult] = useState<"Connected" | "Failed" | null>(null);
 
   const [testTo, setTestTo] = useState("");
-  const [testMsg, setTestMsg] = useState("Hello from Massive Mentor — test message.");
+  const [testMsg, setTestMsg] = useState("Hello from Massive Mentor CRM — connection test.");
   const [sending, setSending] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
   const wa = integrations.find((i) => i.provider === "whatsapp");
 
-  const connectionStatus = useMemo(() => {
-    return (
-      wa?.connectionStatus ||
-      wa?.status ||
-      "not_connected"
-    ).toLowerCase();
-  }, [wa]);
+  const connectionStatus = useMemo(
+    () => (wa?.connectionStatus || wa?.status || "not_connected").toLowerCase(),
+    [wa]
+  );
 
   const displayVerifyToken =
     verifyToken.trim() ||
     wa?.webhook?.verifyToken ||
     wa?.configPreview?.verifyToken ||
     "";
+
+  const webhookVerified = !!(
+    wa?.webhook?.webhookVerifiedAt ||
+    wa?.configPreview?.webhookVerifiedAt
+  );
+  const lastWebhookAt =
+    wa?.webhook?.lastWebhookReceivedAt || wa?.configPreview?.lastWebhookReceivedAt || null;
+
+  const step1Done = webhookVerified || !!lastWebhookAt;
+  const step2Done = !!(
+    wa?.configured &&
+    wa?.lastValidatedAt &&
+    connectionStatus !== "invalid_token" &&
+    connectionStatus !== "not_connected"
+  );
+  const step3Done = connectionStatus === "connected";
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -115,18 +178,12 @@ export default function IntegrationsPage() {
     if (res.success && res.data?.integrations) {
       setIntegrations(res.data.integrations);
       const w = res.data.integrations.find((i) => i.provider === "whatsapp");
-      if (w?.configPreview?.phoneNumberId) {
-        setPhoneNumberId(w.configPreview.phoneNumberId);
-      }
-      if (w?.configPreview?.apiVersion) {
-        setApiVersion(w.configPreview.apiVersion);
-      }
-      // Prefill verify token from server (tenant-owned, safe for this user)
+      if (w?.configPreview?.phoneNumberId) setPhoneNumberId(w.configPreview.phoneNumberId);
+      if (w?.configPreview?.apiVersion) setApiVersion(w.configPreview.apiVersion);
       const vt = w?.webhook?.verifyToken || w?.configPreview?.verifyToken;
-      if (vt && !verifyToken) setVerifyToken(vt);
+      if (vt) setVerifyToken((prev) => prev || vt);
     }
     setIsLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on token
   }, [token]);
 
   const loadHistory = useCallback(async () => {
@@ -136,8 +193,7 @@ export default function IntegrationsPage() {
       token
     );
     if (res.success && res.data) {
-      const items = (res.data as { items?: HistoryItem[] }).items || [];
-      setHistory(items);
+      setHistory((res.data as { items?: HistoryItem[] }).items || []);
     }
   }, [token]);
 
@@ -153,6 +209,7 @@ export default function IntegrationsPage() {
       return;
     }
     setValidating(true);
+    setTestConnResult(null);
     const res = await api.post(
       "/integrations/whatsapp/validate",
       {
@@ -163,11 +220,61 @@ export default function IntegrationsPage() {
       token
     );
     setValidating(false);
-    if (res.success) {
-      const name = (res.data as { displayName?: string })?.displayName;
-      toast.success(name ? `Valid — ${name}` : "Credentials are valid");
+    if (res.success && res.data) {
+      const d = res.data as {
+        displayName?: string;
+        phoneDisplay?: string;
+        wabaName?: string;
+      };
+      setTestConnResult("Connected");
+      toast.success(
+        [
+          d.displayName ? `Number: ${d.displayName}` : "Credentials valid",
+          d.phoneDisplay ? `Phone: ${d.phoneDisplay}` : null,
+          d.wabaName ? `WABA: ${d.wabaName}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      );
     } else {
+      setTestConnResult("Failed");
       toast.error(res.error || "Validation failed");
+    }
+  };
+
+  const testConnection = async () => {
+    if (!token) return;
+    // Prefer live body tokens if user is typing; else saved credentials
+    if (accessToken.trim() && phoneNumberId.trim()) {
+      await validateOnly();
+      return;
+    }
+    setTestingConn(true);
+    setTestConnResult(null);
+    const res = await api.post("/integrations/whatsapp/test-connection", {}, token);
+    setTestingConn(false);
+    if (res.success && res.data) {
+      const d = res.data as {
+        status?: string;
+        displayName?: string;
+        phoneDisplay?: string;
+        wabaName?: string;
+      };
+      setTestConnResult("Connected");
+      toast.success(
+        [
+          d.status || "Connected",
+          d.displayName ? `· ${d.displayName}` : null,
+          d.wabaName ? `· ${d.wabaName}` : null,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
+      await load();
+    } else {
+      setTestConnResult("Failed");
+      toast.error(res.error || "Connection failed");
+      await load();
     }
   };
 
@@ -198,19 +305,33 @@ export default function IntegrationsPage() {
     setSaving(false);
     if (res.success) {
       const data = res.data as {
-        integration?: { status?: string; webhook?: { verifyToken?: string } };
+        integration?: {
+          status?: string;
+          displayName?: string;
+          phoneDisplay?: string;
+          wabaName?: string;
+          webhook?: { verifyToken?: string };
+        };
       };
-      if (data?.integration?.webhook?.verifyToken) {
-        setVerifyToken(data.integration.webhook.verifyToken);
-      }
+      const ig = data?.integration;
+      if (ig?.webhook?.verifyToken) setVerifyToken(ig.webhook.verifyToken);
       toast.success(
-        data?.integration?.status === "verification_pending"
-          ? "Credentials saved — complete Meta webhook setup below"
+        ig?.status === "verification_pending"
+          ? "Credentials saved — complete webhook setup (Step 1)"
           : "WhatsApp connected"
       );
+      if (ig?.displayName || ig?.wabaName) {
+        toast.message(
+          [ig.displayName && `Display: ${ig.displayName}`, ig.wabaName && `WABA: ${ig.wabaName}`]
+            .filter(Boolean)
+            .join(" · ")
+        );
+      }
       setAccessToken("");
+      setTestConnResult("Connected");
       await load();
     } else {
+      setTestConnResult("Failed");
       toast.error(res.error || "Failed to save — credentials not valid");
     }
   };
@@ -230,7 +351,7 @@ export default function IntegrationsPage() {
     setSending(false);
     if (res.success) {
       const st = (res.data as { status?: string })?.status || "sent";
-      toast.success(`WhatsApp message ${st}`);
+      toast.success(`Test WhatsApp message ${st}`);
       await loadHistory();
     } else {
       toast.error(res.error || "Send failed");
@@ -271,8 +392,8 @@ export default function IntegrationsPage() {
     <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
       <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">Integrations</h1>
       <p className="text-zinc-400 mb-8 text-sm sm:text-base">
-        Connect <strong className="text-zinc-300">your own</strong> Meta WhatsApp Cloud API account.
-        Each workspace stores its own tokens — unlimited clients, no shared credentials.
+        Connect <strong className="text-zinc-300">your own</strong> Meta WhatsApp Cloud API. Each
+        workspace keeps separate credentials.
       </p>
 
       {isLoading ? (
@@ -283,14 +404,75 @@ export default function IntegrationsPage() {
             <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
               <div>
                 <h2 className="text-lg font-semibold">WhatsApp Cloud API</h2>
-                <p className="text-xs text-zinc-500 mt-1">
-                  Self-service · multi-tenant · Meta Graph API
-                </p>
+                <p className="text-xs text-zinc-500 mt-1">Self-service multi-tenant setup</p>
               </div>
               {statusBadge(connectionStatus)}
             </div>
 
-            {/* Callback + Verify Token + copy */}
+            {/* Setup wizard progress */}
+            <div className="mb-6 space-y-2">
+              <h3 className="text-sm font-semibold text-zinc-200 mb-2">Setup Wizard</h3>
+              <StepRow
+                done={step1Done}
+                active={!step1Done}
+                label="Step 1: Verify Webhook"
+                detail={
+                  step1Done
+                    ? "Meta verified your Callback URL"
+                    : "Copy Callback URL + Verify Token into Meta Developers"
+                }
+              />
+              <StepRow
+                done={step2Done}
+                active={step1Done && !step2Done}
+                label="Step 2: Validate Credentials"
+                detail={
+                  step2Done
+                    ? "Graph API accepted Access Token + Phone Number ID"
+                    : "Enter token + Phone Number ID → Validate / Test Connection"
+                }
+              />
+              <StepRow
+                done={step3Done}
+                active={step2Done && !step3Done}
+                label="Step 3: Connected"
+                detail={
+                  step3Done
+                    ? "Ready to send and receive WhatsApp messages"
+                    : "Complete webhook verification and save valid credentials"
+                }
+              />
+            </div>
+
+            {/* Webhook status panel */}
+            <div className="mb-6 grid sm:grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+                <div className="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">
+                  Webhook status
+                </div>
+                <div
+                  className={`text-sm font-semibold ${
+                    webhookVerified || lastWebhookAt
+                      ? "text-emerald-400"
+                      : "text-amber-300"
+                  }`}
+                >
+                  {webhookVerified || lastWebhookAt ? "Verified" : "Not Verified"}
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 sm:col-span-2">
+                <div className="text-[10px] uppercase tracking-wide text-zinc-500 mb-1">
+                  Last webhook received
+                </div>
+                <div className="text-sm text-zinc-200">
+                  {lastWebhookAt
+                    ? new Date(lastWebhookAt).toLocaleString()
+                    : "No events yet — send a message or wait for delivery status"}
+                </div>
+              </div>
+            </div>
+
+            {/* Callback + Verify Token */}
             <div className="mb-6 p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-4">
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
@@ -331,41 +513,52 @@ export default function IntegrationsPage() {
               </div>
             </div>
 
-            {/* Meta setup steps */}
+            {/* Detected profile */}
+            {(wa?.configPreview?.displayName ||
+              wa?.configPreview?.phoneDisplay ||
+              wa?.configPreview?.wabaName) && (
+              <div className="mb-6 p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+                <h3 className="text-sm font-semibold text-emerald-200 mb-2">Detected from Meta</h3>
+                <div className="grid sm:grid-cols-2 gap-2 text-xs text-zinc-400">
+                  {wa.configPreview?.displayName && (
+                    <div>
+                      Display name:{" "}
+                      <span className="text-zinc-100">{wa.configPreview.displayName}</span>
+                    </div>
+                  )}
+                  {wa.configPreview?.phoneDisplay && (
+                    <div>
+                      Phone:{" "}
+                      <span className="text-zinc-100">{wa.configPreview.phoneDisplay}</span>
+                    </div>
+                  )}
+                  {wa.configPreview?.wabaName && (
+                    <div>
+                      WhatsApp Business Account:{" "}
+                      <span className="text-zinc-100">{wa.configPreview.wabaName}</span>
+                    </div>
+                  )}
+                  {wa.configPreview?.qualityRating && (
+                    <div>
+                      Quality:{" "}
+                      <span className="text-zinc-100">{wa.configPreview.qualityRating}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="mb-6 p-4 rounded-xl border border-violet-500/20 bg-violet-500/5 text-sm text-zinc-300">
-              <h3 className="font-semibold text-violet-200 mb-2">Meta setup (per client)</h3>
+              <h3 className="font-semibold text-violet-200 mb-2">Meta setup</h3>
               <ol className="list-decimal list-inside space-y-1.5 text-xs text-zinc-400">
                 <li>
-                  Open{" "}
-                  <a
-                    href="https://developers.facebook.com/apps"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-violet-300 underline"
-                  >
-                    Meta for Developers
-                  </a>{" "}
-                  → your app → <strong className="text-zinc-300">WhatsApp → Configuration</strong>.
+                  Meta Developers → your app → WhatsApp → Configuration
                 </li>
+                <li>Paste Callback URL + Verify Token → Verify and save</li>
+                <li>Subscribe to the <strong className="text-zinc-300">messages</strong> field</li>
                 <li>
-                  Set <strong className="text-zinc-300">Callback URL</strong> to the value above
-                  (Copy Callback URL).
-                </li>
-                <li>
-                  Set <strong className="text-zinc-300">Verify token</strong> to the same string as
-                  this page (Copy Verify Token), then click <strong className="text-zinc-300">Verify and save</strong>.
-                </li>
-                <li>
-                  Subscribe to the <strong className="text-zinc-300">messages</strong> webhook field.
-                </li>
-                <li>
-                  Create a permanent <strong className="text-zinc-300">System User</strong> token
-                  (starts with <code className="text-zinc-300">EAA</code>) with{" "}
-                  <code className="text-zinc-300">whatsapp_business_messaging</code> permission.
-                </li>
-                <li>
-                  Copy <strong className="text-zinc-300">Phone number ID</strong> from WhatsApp → API
-                  Setup. Paste Access Token + Phone Number ID below → Validate → Save &amp; connect.
+                  Permanent System User token (EAA…) + Phone Number ID → form below → Test Connection
+                  → Save
                 </li>
               </ol>
             </div>
@@ -373,33 +566,6 @@ export default function IntegrationsPage() {
             {wa?.lastError && (
               <div className="mb-4 p-3 rounded-xl bg-red-950/40 border border-red-900/50 text-sm text-red-300">
                 {wa.lastError}
-              </div>
-            )}
-
-            {wa?.configured && wa.configPreview && (
-              <div className="mb-4 grid sm:grid-cols-2 gap-2 text-xs text-zinc-400">
-                <div>
-                  Display name:{" "}
-                  <span className="text-zinc-200">{wa.configPreview.displayName || "—"}</span>
-                </div>
-                <div>
-                  Token:{" "}
-                  <span className="text-zinc-200">
-                    {wa.configPreview.accessTokenPreview || "saved"}
-                  </span>
-                </div>
-                <div>
-                  Phone Number ID:{" "}
-                  <span className="text-zinc-200">{wa.configPreview.phoneNumberId || "—"}</span>
-                </div>
-                <div>
-                  API: <span className="text-zinc-200">{wa.configPreview.apiVersion || "v19.0"}</span>
-                </div>
-                {wa.lastValidatedAt && (
-                  <div className="sm:col-span-2">
-                    Last validated: {new Date(wa.lastValidatedAt).toLocaleString()}
-                  </div>
-                )}
               </div>
             )}
 
@@ -412,7 +578,7 @@ export default function IntegrationsPage() {
                   autoComplete="off"
                   value={accessToken}
                   onChange={(e) => setAccessToken(e.target.value)}
-                  placeholder="EAA… (raw System User token, no Bearer)"
+                  placeholder="EAA… (raw System User token)"
                   className={inputClass}
                 />
               </div>
@@ -443,14 +609,29 @@ export default function IntegrationsPage() {
                   className={inputClass}
                 />
               </div>
-              <div className="flex flex-wrap gap-2 pt-2">
+
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={testingConn || validating}
+                  onClick={testConnection}
+                  className="px-4 py-2 rounded-xl text-sm bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 disabled:opacity-50"
+                >
+                  {testingConn || validating ? "Testing…" : "Test Connection"}
+                </button>
+                {testConnResult === "Connected" && (
+                  <span className="text-xs font-semibold text-emerald-400">Connected</span>
+                )}
+                {testConnResult === "Failed" && (
+                  <span className="text-xs font-semibold text-red-400">Failed</span>
+                )}
                 <button
                   type="button"
                   disabled={validating}
                   onClick={validateOnly}
                   className="px-4 py-2 rounded-xl text-sm bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50"
                 >
-                  {validating ? "Validating…" : "Validate credentials"}
+                  {validating ? "Validating…" : "Validate (form values)"}
                 </button>
                 <button
                   type="button"
@@ -463,17 +644,18 @@ export default function IntegrationsPage() {
               </div>
             </div>
 
+            {/* Send test WhatsApp */}
             <div className="mt-8 pt-6 border-t border-zinc-800">
-              <h3 className="font-medium mb-3">Test message</h3>
+              <h3 className="font-medium mb-1">Send Test WhatsApp Message</h3>
               <p className="text-xs text-zinc-500 mb-3">
-                Uses <strong className="text-zinc-400">this workspace&apos;s</strong> token only.
-                International format, e.g. 9198xxxxxxxx.
+                Sends a sample message using this workspace&apos;s credentials. Use international
+                format (e.g. 9198xxxxxxxx). Default destination can be your own WhatsApp number.
               </p>
               <div className="space-y-2">
                 <input
                   value={testTo}
                   onChange={(e) => setTestTo(e.target.value)}
-                  placeholder="Recipient phone"
+                  placeholder="Recipient phone (international)"
                   className={inputClass}
                 />
                 <textarea
@@ -487,7 +669,7 @@ export default function IntegrationsPage() {
                   onClick={sendTest}
                   className="px-4 py-2 rounded-xl text-sm bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 disabled:opacity-40"
                 >
-                  {sending ? "Sending…" : "Send test WhatsApp"}
+                  {sending ? "Sending…" : "Send Test WhatsApp Message"}
                 </button>
                 {!canSend && (
                   <p className="text-xs text-amber-400/90">
@@ -521,13 +703,6 @@ export default function IntegrationsPage() {
                 </div>
               </div>
             )}
-          </section>
-
-          <section className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 opacity-80">
-            <h2 className="text-lg font-semibold text-zinc-300">Gmail & Google Calendar</h2>
-            <p className="text-sm text-zinc-500 mt-2">
-              Not included in this release. Coming with full Google OAuth in a future update.
-            </p>
           </section>
         </div>
       )}

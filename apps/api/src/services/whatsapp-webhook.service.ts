@@ -137,6 +137,18 @@ export async function processWhatsAppWebhookPayload(body: unknown): Promise<void
         : null;
       const userId = tenant?.userId || null;
 
+      if (tenant) {
+        try {
+          const { touchWhatsAppWebhookActivity } = await import("./integration.service.js");
+          await touchWhatsAppWebhookActivity({
+            userId: tenant.userId,
+            businessId: tenant.businessId,
+          });
+        } catch (e) {
+          console.error("[whatsapp-webhook] touch activity failed", e);
+        }
+      }
+
       // Delivery / read / failed statuses (matched by waMessageId globally)
       for (const st of value.statuses || []) {
         await applyWhatsAppStatusUpdate({
