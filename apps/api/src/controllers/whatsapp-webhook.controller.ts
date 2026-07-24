@@ -14,23 +14,38 @@ import {
 
 /** Meta subscription verification (no signature — uses verify_token query params) */
 export async function whatsAppWebhookVerify(req: Request, res: Response) {
-  const mode = String(req.query["hub.mode"] || req.query["hub_mode"] || "");
-  const token = String(
-    req.query["hub.verify_token"] || req.query["hub_verify_token"] || ""
-  );
-  const challenge = String(
-    req.query["hub.challenge"] || req.query["hub_challenge"] || ""
-  );
-
-  const result = await verifyWhatsAppWebhookChallenge({ mode, token, challenge });
-  if (!result.ok || result.challenge == null) {
-    console.warn(
-      `[whatsapp-webhook] GET verify failed mode=${mode} tokenPresent=${!!token}`
+  try {
+    const mode = String(req.query["hub.mode"] ?? req.query["hub_mode"] ?? "");
+    const token = String(
+      req.query["hub.verify_token"] ?? req.query["hub_verify_token"] ?? ""
     );
-    return res.status(403).send("Forbidden");
+    const challenge = String(
+      req.query["hub.challenge"] ?? req.query["hub_challenge"] ?? ""
+    );
+
+    console.log(
+      `[whatsapp-webhook] GET public handler path=${req.path} originalUrl=${req.originalUrl}`
+    );
+
+    const result = await verifyWhatsAppWebhookChallenge({ mode, token, challenge });
+    if (!result.ok || result.challenge == null) {
+      console.warn(
+        `[whatsapp-webhook] GET Forbidden reason=${result.reason || "unknown"} ` +
+          `mode=${mode} tokenPresent=${!!token} challengePresent=${!!challenge}`
+      );
+      // Meta expects 403 when verify fails — but body can help debugging via logs only
+      return res.status(403).type("text/plain").send("Forbidden");
+    }
+
+    // Success: return ONLY the challenge string (Meta requirement)
+    console.log(
+      `[whatsapp-webhook] GET OK returning challenge matched=${result.matchedUserId || result.reason}`
+    );
+    return res.status(200).type("text/plain").send(String(result.challenge));
+  } catch (e) {
+    console.error("[whatsapp-webhook] GET handler error", e);
+    return res.status(500).type("text/plain").send("Error");
   }
-  // Meta expects the raw challenge string (not JSON)
-  res.status(200).type("text/plain").send(result.challenge);
 }
 
 /**
@@ -75,7 +90,6 @@ export async function whatsAppWebhookReceive(req: Request, res: Response) {
       });
     }
 
-    // Process after signature OK (async errors logged; Meta still gets 200)
     void processWhatsAppWebhookPayload(parsed).catch((err) => {
       console.error("[whatsapp-webhook] process error", err);
     });

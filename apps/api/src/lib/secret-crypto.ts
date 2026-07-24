@@ -51,6 +51,12 @@ export function decryptSecret(stored: string | null | undefined): string {
   }
 }
 
+/**
+ * High-value secrets only.
+ * NOTE: `verifyToken` is intentionally NOT encrypted — Meta sends it in cleartext
+ * on webhook GET (hub.verify_token). Encrypting it caused decrypt failures to yield
+ * "" and broke Meta subscription verification (HTTP 403 Forbidden).
+ */
 const SECRET_KEYS = new Set([
   "accessToken",
   "refreshToken",
@@ -58,7 +64,6 @@ const SECRET_KEYS = new Set([
   "apiKey",
   "apiSecret",
   "appSecret",
-  "verifyToken",
   "webhookSecret",
   "password",
   "privateKey",
@@ -76,6 +81,11 @@ export function encryptConfigSecrets(
       out[k] = encryptSecret(v);
     }
   }
+  // If verifyToken was previously encrypted, decrypt once so future reads/match work
+  if (typeof out.verifyToken === "string" && out.verifyToken.startsWith(PREFIX)) {
+    const plain = decryptSecret(out.verifyToken);
+    if (plain) out.verifyToken = plain;
+  }
   return out;
 }
 
@@ -89,5 +99,21 @@ export function decryptConfigSecrets(
       out[k] = decryptSecret(v);
     }
   }
+  // Always try to surface plaintext verifyToken (handles legacy enc:v1 values)
+  if (typeof out.verifyToken === "string" && out.verifyToken.startsWith(PREFIX)) {
+    const plain = decryptSecret(out.verifyToken);
+    out.verifyToken = plain || out.verifyToken;
+  }
   return out;
+}
+
+/** Extract verify token from raw config (handles legacy encrypted values). */
+export function extractVerifyToken(config: Record<string, unknown> | null | undefined): string {
+  if (!config) return "";
+  const raw = config.verifyToken;
+  if (typeof raw !== "string" || !raw) return "";
+  if (raw.startsWith(PREFIX)) {
+    return decryptSecret(raw) || "";
+  }
+  return raw.trim();
 }

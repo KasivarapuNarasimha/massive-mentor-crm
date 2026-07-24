@@ -10,14 +10,12 @@ import {
   validateWhatsAppHandler,
   testWhatsAppConnectionHandler,
 } from "../controllers/integration.controller.js";
-import { whatsAppWebhookVerify } from "../controllers/whatsapp-webhook.controller.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router: Router = Router();
 
-// GET verification only (no raw body). POST is mounted in index.ts with express.raw
-// so X-Hub-Signature-256 can be verified against the exact request bytes.
-router.get("/whatsapp/webhook", whatsAppWebhookVerify);
+// WhatsApp webhook GET+POST are mounted in index.ts BEFORE requireBillingAccess
+// so they are fully public (no JWT / billing). Do not re-register them here.
 
 router.get("/", requireAuth, getIntegrations);
 router.post("/configure", requireAuth, configureIntegration);

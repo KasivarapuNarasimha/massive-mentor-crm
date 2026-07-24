@@ -181,7 +181,14 @@ app.post(
   }
 );
 
-// Meta WhatsApp Cloud API webhook — raw body required for X-Hub-Signature-256
+// Meta WhatsApp Cloud API webhook — PUBLIC (before billing/auth).
+// GET: hub verification. POST: raw body for X-Hub-Signature-256.
+app.get("/api/integrations/whatsapp/webhook", async (req, res) => {
+  const { whatsAppWebhookVerify } = await import(
+    "./controllers/whatsapp-webhook.controller.js"
+  );
+  return whatsAppWebhookVerify(req, res);
+});
 app.post(
   "/api/integrations/whatsapp/webhook",
   express.raw({ type: "application/json", limit: "2mb" }),

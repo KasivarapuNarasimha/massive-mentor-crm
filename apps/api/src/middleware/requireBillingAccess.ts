@@ -27,8 +27,14 @@ const ALLOW_PREFIXES = [
 ];
 
 function isAllowedPath(path: string): boolean {
-  const p = path.split("?")[0] || path;
-  if (p === "/api/integrations/whatsapp/webhook") return true;
+  // Strip query string — Meta GET verify includes ?hub.mode=...
+  const p = (path.split("?")[0] || path).replace(/\/$/, "") || path;
+  if (
+    p === "/api/integrations/whatsapp/webhook" ||
+    p.endsWith("/integrations/whatsapp/webhook")
+  ) {
+    return true;
+  }
   return ALLOW_PREFIXES.some(
     (prefix) => p === prefix || p.startsWith(prefix + "/")
   );

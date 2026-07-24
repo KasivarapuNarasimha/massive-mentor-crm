@@ -4,7 +4,7 @@
  */
 import crypto from "node:crypto";
 import { prisma } from "../lib/prisma.js";
-import { decryptConfigSecrets } from "../lib/secret-crypto.js";
+import { decryptConfigSecrets, extractVerifyToken } from "../lib/secret-crypto.js";
 import {
   applyWhatsAppStatusUpdate,
   recordInboundWhatsApp,
@@ -157,15 +157,34 @@ export async function authenticateWhatsAppWebhookPost(opts: {
 /**
  * GET verification: hub.mode=subscribe + hub.verify_token match + return hub.challenge.
  * Self-service multi-tenant: each client sets their own Verify Token in Integrations.
- * Optional process.env.WHATSAPP_VERIFY_TOKEN only as platform emergency fallback.
+ * Optional process.env.WHATSAPP_VERIFY_TOKEN as platform fallback.
  */
 export async function verifyWhatsAppWebhookChallenge(opts: {
   mode: string;
   token: string;
   challenge: string;
-}): Promise<{ ok: boolean; challenge?: string }> {
-  if (opts.mode !== "subscribe" || !opts.token || !opts.challenge) {
-    return { ok: false };
+}): Promise<{ ok: boolean; challenge?: string; reason?: string; matchedUserId?: string }> {
+  const mode = String(opts.mode || "").trim();
+  const token = String(opts.token || "").trim();
+  const challenge = String(opts.challenge || "").trim();
+
+  console.log(
+    `[whatsapp-webhook] GET verify attempt mode=${JSON.stringify(mode)} ` +
+      `tokenLen=${token.length} tokenPrefix=${token.slice(0, 12)}… ` +
+      `challengeLen=${challenge.length}`
+  );
+
+  if (mode !== "subscribe") {
+    console.warn(`[whatsapp-webhook] GET 403 reason=bad_mode expected=subscribe got=${mode}`);
+    return { ok: false, reason: `hub.mode must be "subscribe" (got "${mode}")` };
+  }
+  if (!token) {
+    console.warn("[whatsapp-webhook] GET 403 reason=missing_verify_token");
+    return { ok: false, reason: "hub.verify_token is missing" };
+  }
+  if (!challenge) {
+    console.warn("[whatsapp-webhook] GET 403 reason=missing_challenge");
+    return { ok: false, reason: "hub.challenge is missing" };
   }
 
   const envToken = (
@@ -173,22 +192,73 @@ export async function verifyWhatsAppWebhookChallenge(opts: {
     process.env.META_WHATSAPP_VERIFY_TOKEN ||
     ""
   ).trim();
-  if (envToken && opts.token === envToken) {
-    return { ok: true, challenge: opts.challenge };
+  if (envToken) {
+    console.log(
+      `[whatsapp-webhook] env WHATSAPP_VERIFY_TOKEN present len=${envToken.length} match=${envToken === token}`
+    );
+    if (envToken === token) {
+      console.log("[whatsapp-webhook] GET matched platform WHATSAPP_VERIFY_TOKEN");
+      return { ok: true, challenge, reason: "matched_env_WHATSAPP_VERIFY_TOKEN" };
+    }
+  } else {
+    console.log("[whatsapp-webhook] no platform WHATSAPP_VERIFY_TOKEN env set");
   }
 
-  // Match any tenant that stored this verify token, then mark webhook verified
+  // All WhatsApp integrations (including inactive) — token may be saved before isActive flip
   const rows = await prisma.integration.findMany({
-    where: { provider: "whatsapp", isActive: true },
-    select: { id: true, userId: true, businessId: true, config: true },
-    take: 2000,
+    where: { provider: "whatsapp" },
+    select: { id: true, userId: true, businessId: true, isActive: true, status: true, config: true },
+    take: 5000,
   });
+
+  console.log(`[whatsapp-webhook] scanning ${rows.length} whatsapp integration row(s)`);
+
+  let scannedWithToken = 0;
+  let decryptEmpty = 0;
   for (const row of rows) {
-    const cfg = decryptConfigSecrets(
-      (row.config || {}) as Record<string, unknown>
-    ) as WaIntegrationConfig & { webhookVerifiedAt?: string };
-    const vt = String(cfg.verifyToken || "").trim();
-    if (vt && vt === opts.token) {
+    const rawCfg = (row.config || {}) as Record<string, unknown>;
+    const vt = extractVerifyToken(rawCfg);
+    if (!vt) {
+      // Also try decrypted bag
+      const cfg = decryptConfigSecrets(rawCfg);
+      const vt2 = String(cfg.verifyToken || "").trim();
+      if (!vt2) {
+        if (rawCfg.verifyToken) decryptEmpty++;
+        continue;
+      }
+      scannedWithToken++;
+      console.log(
+        `[whatsapp-webhook] candidate userId=${row.userId} businessId=${row.businessId} ` +
+          `active=${row.isActive} status=${row.status} storedTokenPrefix=${vt2.slice(0, 12)}… match=${vt2 === token}`
+      );
+      if (vt2 === token) {
+        try {
+          const { markWhatsAppWebhookVerified } = await import("./integration.service.js");
+          await markWhatsAppWebhookVerified({
+            userId: row.userId,
+            businessId: row.businessId,
+          });
+        } catch (e) {
+          console.error("[whatsapp-webhook] mark verified failed", e);
+        }
+        console.log(
+          `[whatsapp-webhook] GET matched tenant userId=${row.userId} businessId=${row.businessId}`
+        );
+        return {
+          ok: true,
+          challenge,
+          matchedUserId: row.userId,
+          reason: "matched_tenant_verify_token",
+        };
+      }
+      continue;
+    }
+    scannedWithToken++;
+    console.log(
+      `[whatsapp-webhook] candidate userId=${row.userId} businessId=${row.businessId} ` +
+        `active=${row.isActive} status=${row.status} storedTokenPrefix=${vt.slice(0, 12)}… match=${vt === token}`
+    );
+    if (vt === token) {
       try {
         const { markWhatsAppWebhookVerified } = await import("./integration.service.js");
         await markWhatsAppWebhookVerified({
@@ -198,11 +268,28 @@ export async function verifyWhatsAppWebhookChallenge(opts: {
       } catch (e) {
         console.error("[whatsapp-webhook] mark verified failed", e);
       }
-      return { ok: true, challenge: opts.challenge };
+      console.log(
+        `[whatsapp-webhook] GET matched tenant userId=${row.userId} businessId=${row.businessId}`
+      );
+      return {
+        ok: true,
+        challenge,
+        matchedUserId: row.userId,
+        reason: "matched_tenant_verify_token",
+      };
     }
   }
 
-  return { ok: false };
+  console.warn(
+    `[whatsapp-webhook] GET 403 reason=no_matching_verify_token ` +
+      `hub.verify_token=${token.slice(0, 16)}… scannedRows=${rows.length} ` +
+      `withToken=${scannedWithToken} decryptEmpty=${decryptEmpty}`
+  );
+  return {
+    ok: false,
+    reason:
+      "No Integration verifyToken matched hub.verify_token. Save WhatsApp settings in CRM first (or set WHATSAPP_VERIFY_TOKEN env).",
+  };
 }
 
 /** Find tenant owner userId for a Meta phone_number_id (incoming webhooks). */
