@@ -57,6 +57,7 @@ const SECRET_KEYS = new Set([
   "clientSecret",
   "apiKey",
   "apiSecret",
+  "appSecret",
   "verifyToken",
   "webhookSecret",
   "password",

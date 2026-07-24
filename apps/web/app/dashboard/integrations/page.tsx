@@ -28,6 +28,7 @@ type IntegrationRow = {
     accessTokenPreview?: string | null;
     phoneNumberId?: string | null;
     hasVerifyToken?: boolean;
+    hasAppSecret?: boolean;
     verifyToken?: string | null;
     apiVersion?: string;
     displayName?: string | null;
@@ -131,6 +132,7 @@ export default function IntegrationsPage() {
   const [accessToken, setAccessToken] = useState("");
   const [phoneNumberId, setPhoneNumberId] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
+  const [appSecret, setAppSecret] = useState("");
   const [apiVersion, setApiVersion] = useState("v19.0");
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
@@ -300,6 +302,9 @@ export default function IntegrationsPage() {
     if (accessToken.trim()) {
       config.accessToken = accessToken.trim().replace(/^Bearer\s+/i, "").trim();
     }
+    if (appSecret.trim()) {
+      config.appSecret = appSecret.trim();
+    }
 
     const res = await api.post("/integrations/configure", { provider: "whatsapp", config }, token);
     setSaving(false);
@@ -328,6 +333,7 @@ export default function IntegrationsPage() {
         );
       }
       setAccessToken("");
+      setAppSecret("");
       setTestConnResult("Connected");
       await load();
     } else {
@@ -599,6 +605,25 @@ export default function IntegrationsPage() {
                   placeholder="Must match Meta webhook verify token"
                   className={inputClass}
                 />
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1">
+                  Meta App Secret{" "}
+                  {wa?.configPreview?.hasAppSecret
+                    ? "(leave blank to keep current)"
+                    : "* required for webhook signature"}
+                </label>
+                <PasswordInput
+                  autoComplete="off"
+                  value={appSecret}
+                  onChange={(e) => setAppSecret(e.target.value)}
+                  placeholder="From Meta App → Settings → Basic → App Secret"
+                  className={inputClass}
+                />
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  Used to verify <code className="text-zinc-400">X-Hub-Signature-256</code> on
+                  incoming webhooks. Never shared between workspaces.
+                </p>
               </div>
               <div>
                 <label className="block text-xs text-zinc-500 mb-1">API Version</label>

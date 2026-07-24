@@ -1,6 +1,8 @@
 /**
  * WhatsApp Cloud API webhook verification + inbound event processing.
+ * POST payloads are authenticated with X-Hub-Signature-256 (HMAC-SHA256 of raw body).
  */
+import crypto from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { decryptConfigSecrets } from "../lib/secret-crypto.js";
 import {
@@ -13,10 +15,144 @@ export type WaIntegrationConfig = {
   accessToken?: string;
   phoneNumberId?: string;
   verifyToken?: string;
+  /** Meta App Secret — used for X-Hub-Signature-256 on inbound webhooks */
+  appSecret?: string;
   apiVersion?: string;
 };
 
 export { normalizeWhatsAppAccessToken, normalizePhoneNumberId } from "./whatsapp-token.util.js";
+
+/**
+ * Verify Meta X-Hub-Signature-256 header.
+ * Header format: sha256=<hex hmac of raw body with App Secret>
+ */
+export function verifyMetaHubSignature256(opts: {
+  rawBody: Buffer | string;
+  signatureHeader: string | undefined | null;
+  appSecret: string;
+}): boolean {
+  const secret = (opts.appSecret || "").trim();
+  const header = (opts.signatureHeader || "").trim();
+  if (!secret || !header) return false;
+
+  const expectedPrefix = "sha256=";
+  if (!header.startsWith(expectedPrefix)) return false;
+  const theirHex = header.slice(expectedPrefix.length).trim().toLowerCase();
+  if (!/^[0-9a-f]+$/.test(theirHex)) return false;
+
+  const raw =
+    typeof opts.rawBody === "string"
+      ? Buffer.from(opts.rawBody, "utf8")
+      : opts.rawBody;
+  const digest = crypto
+    .createHmac("sha256", secret)
+    .update(raw)
+    .digest("hex");
+
+  try {
+    const a = Buffer.from(digest, "hex");
+    const b = Buffer.from(theirHex, "hex");
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+/** Extract first phone_number_id from a Meta webhook JSON body (if present). */
+export function extractPhoneNumberIdFromWebhookBody(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const root = body as {
+    entry?: Array<{
+      changes?: Array<{ value?: { metadata?: { phone_number_id?: string } } }>;
+    }>;
+  };
+  for (const entry of root.entry || []) {
+    for (const change of entry.changes || []) {
+      const id = change.value?.metadata?.phone_number_id;
+      if (id) return normalizePhoneNumberId(id);
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve App Secret(s) that may sign this webhook:
+ * 1) Tenant integration appSecret (by phone_number_id)
+ * 2) Platform env WHATSAPP_APP_SECRET / META_APP_SECRET
+ */
+export async function resolveWhatsAppAppSecretsForPayload(
+  body: unknown
+): Promise<string[]> {
+  const secrets: string[] = [];
+  const phoneId = extractPhoneNumberIdFromWebhookBody(body);
+  if (phoneId) {
+    try {
+      const { findIntegrationByPhoneNumberId } = await import("./integration.service.js");
+      const hit = await findIntegrationByPhoneNumberId(phoneId);
+      const secret = String(
+        (hit?.config as WaIntegrationConfig | undefined)?.appSecret || ""
+      ).trim();
+      if (secret) secrets.push(secret);
+    } catch {
+      /* ignore lookup errors */
+    }
+  }
+  const envSecret = (
+    process.env.WHATSAPP_APP_SECRET ||
+    process.env.META_APP_SECRET ||
+    process.env.FACEBOOK_APP_SECRET ||
+    ""
+  ).trim();
+  if (envSecret && !secrets.includes(envSecret)) secrets.push(envSecret);
+  return secrets;
+}
+
+/**
+ * Authenticate POST webhook: require valid X-Hub-Signature-256 when any App Secret is known.
+ * Returns false if signature invalid or missing when secrets exist.
+ * If no App Secret is configured anywhere, reject in production; allow in development with warning.
+ */
+export async function authenticateWhatsAppWebhookPost(opts: {
+  rawBody: Buffer;
+  signatureHeader: string | undefined | null;
+  parsedBody: unknown;
+}): Promise<{ ok: boolean; reason?: string }> {
+  const secrets = await resolveWhatsAppAppSecretsForPayload(opts.parsedBody);
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (secrets.length === 0) {
+    if (isProd) {
+      return {
+        ok: false,
+        reason:
+          "No App Secret configured for this webhook (set App Secret on the workspace Integration or WHATSAPP_APP_SECRET)",
+      };
+    }
+    console.warn(
+      "[whatsapp-webhook] no App Secret configured — skipping signature check (development only)"
+    );
+    return { ok: true };
+  }
+
+  if (!opts.signatureHeader) {
+    return { ok: false, reason: "Missing X-Hub-Signature-256 header" };
+  }
+
+  for (const secret of secrets) {
+    if (
+      verifyMetaHubSignature256({
+        rawBody: opts.rawBody,
+        signatureHeader: opts.signatureHeader,
+        appSecret: secret,
+      })
+    ) {
+      return { ok: true };
+    }
+  }
+
+  return { ok: false, reason: "Invalid X-Hub-Signature-256" };
+}
 
 /**
  * GET verification: hub.mode=subscribe + hub.verify_token match + return hub.challenge.

@@ -181,6 +181,18 @@ app.post(
   }
 );
 
+// Meta WhatsApp Cloud API webhook — raw body required for X-Hub-Signature-256
+app.post(
+  "/api/integrations/whatsapp/webhook",
+  express.raw({ type: "application/json", limit: "2mb" }),
+  async (req, res) => {
+    const { whatsAppWebhookReceive } = await import(
+      "./controllers/whatsapp-webhook.controller.js"
+    );
+    return whatsAppWebhookReceive(req, res);
+  }
+);
+
 // 10mb for pasted CSV text; large Excel files use multipart /import/file instead
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));

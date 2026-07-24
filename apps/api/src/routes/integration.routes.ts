@@ -10,17 +10,14 @@ import {
   validateWhatsAppHandler,
   testWhatsAppConnectionHandler,
 } from "../controllers/integration.controller.js";
-import {
-  whatsAppWebhookVerify,
-  whatsAppWebhookReceive,
-} from "../controllers/whatsapp-webhook.controller.js";
+import { whatsAppWebhookVerify } from "../controllers/whatsapp-webhook.controller.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router: Router = Router();
 
-// —— Public Meta Cloud API webhook (no JWT; Meta cannot send Authorization) ——
+// GET verification only (no raw body). POST is mounted in index.ts with express.raw
+// so X-Hub-Signature-256 can be verified against the exact request bytes.
 router.get("/whatsapp/webhook", whatsAppWebhookVerify);
-router.post("/whatsapp/webhook", whatsAppWebhookReceive);
 
 router.get("/", requireAuth, getIntegrations);
 router.post("/configure", requireAuth, configureIntegration);

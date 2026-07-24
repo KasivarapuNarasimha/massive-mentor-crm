@@ -192,6 +192,7 @@ function maskConfig(provider: string, cfg: Record<string, unknown>) {
       accessTokenPreview: token ? `${token.slice(0, 6)}…${token.slice(-4)}` : null,
       phoneNumberId: cfg.phoneNumberId ? String(cfg.phoneNumberId) : null,
       hasVerifyToken: !!cfg.verifyToken,
+      hasAppSecret: !!cfg.appSecret,
       // Safe to return verify token to the tenant that owns it (needed for Meta setup)
       verifyToken: cfg.verifyToken ? String(cfg.verifyToken) : null,
       apiVersion: (cfg.apiVersion as string) || "v19.0",
@@ -427,6 +428,7 @@ export async function configureAndValidateWhatsApp(
     accessToken?: string;
     phoneNumberId?: string;
     verifyToken?: string;
+    appSecret?: string;
     apiVersion?: string;
   }
 ) {
@@ -449,6 +451,12 @@ export async function configureAndValidateWhatsApp(
     verifyToken = generateWhatsAppVerifyToken();
   }
 
+  // Meta App Secret for X-Hub-Signature-256 (optional on first save if platform env set)
+  const appSecret =
+    config.appSecret !== undefined
+      ? String(config.appSecret || "").trim()
+      : String(prev.appSecret || "").trim();
+
   if (!accessToken || !phoneNumberId) {
     throw new Error(
       "Access Token and Phone Number ID are required. Paste a permanent System User token from your Meta Business account."
@@ -470,7 +478,7 @@ export async function configureAndValidateWhatsApp(
     await upsertIntegration(
       userId,
       "whatsapp",
-      { accessToken, phoneNumberId, verifyToken, apiVersion },
+      { accessToken, phoneNumberId, verifyToken, appSecret, apiVersion },
       {
         status: "invalid_token",
         lastError: validation.error || "Validation failed",
@@ -489,6 +497,7 @@ export async function configureAndValidateWhatsApp(
       accessToken,
       phoneNumberId,
       verifyToken,
+      appSecret: appSecret || prev.appSecret || null,
       apiVersion,
       displayName: validation.displayName,
       phoneDisplay: validation.phoneDisplay || null,

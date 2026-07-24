@@ -39,6 +39,7 @@ export async function configureIntegration(req: AuthenticatedRequest, res: Respo
         accessToken: config.accessToken as string | undefined,
         phoneNumberId: config.phoneNumberId as string | undefined,
         verifyToken: config.verifyToken as string | undefined,
+        appSecret: config.appSecret as string | undefined,
         apiVersion: config.apiVersion as string | undefined,
       });
       return res.json({ success: true, data: result });
