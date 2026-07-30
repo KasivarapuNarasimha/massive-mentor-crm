@@ -5,8 +5,13 @@ import * as ctrl from "../controllers/billing.controller.js";
 const router: Router = Router();
 
 router.get("/access", requireAuth, ctrl.getAccess);
-/** Live subscription sync (SSE) — Super Admin changes push here */
+/**
+ * Live subscription sync (SSE) — Super Admin changes push here.
+ * Full path: GET /api/billing/stream (mounted at app.use("/api/billing", ...)).
+ * HEAD is registered explicitly so `curl -I` / health probes get 401 (auth) not 404.
+ */
 router.get("/stream", requireAuth, ctrl.subscriptionStream);
+router.head("/stream", requireAuth, ctrl.subscriptionStreamHead);
 router.get("/overview", requireAuth, ctrl.getOverview);
 router.get("/plans", requireAuth, ctrl.listPlans);
 router.post("/checkout/order", requireAuth, ctrl.createOrder);

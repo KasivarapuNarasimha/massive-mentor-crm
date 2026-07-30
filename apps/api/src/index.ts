@@ -327,6 +327,8 @@ app.get("/api", (_req, res) => {
     version: "1.0.0",
     endpoints: {
       auth: "/api/auth",
+      billing: "/api/billing (access, stream SSE, overview, checkout)",
+      billingStream: "GET /api/billing/stream (SSE, requires Bearer token)",
       platform: "/api/platform",
       backups: "/api/backups (tenant) | /api/platform/backups (super admin)",
       crm: "/api/crm",

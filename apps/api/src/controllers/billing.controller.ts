@@ -19,8 +19,25 @@ export async function getAccess(req: AuthenticatedRequest, res: Response) {
 }
 
 /**
+ * HEAD /api/billing/stream — for curl -I / uptime probes.
+ * requireAuth already returned 401 if no Bearer token.
+ * With a valid token, return 200 with SSE content-type (no body).
+ */
+export async function subscriptionStreamHead(req: AuthenticatedRequest, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ success: false, error: "Not authenticated" });
+  }
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("X-Accel-Buffering", "no");
+  return res.status(200).end();
+}
+
+/**
  * GET /api/billing/stream — Server-Sent Events for live subscription sync.
  * Super Admin plan changes push here so open CRM tabs refresh in seconds.
+ * Mounted as: app.use("/api/billing", billingRoutes) + router.get("/stream")
+ * → full path /api/billing/stream
  */
 export async function subscriptionStream(req: AuthenticatedRequest, res: Response) {
   try {
