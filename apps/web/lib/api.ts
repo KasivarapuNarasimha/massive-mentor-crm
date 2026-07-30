@@ -299,10 +299,13 @@ class ApiClient {
 
   /** Customer portal forgot password */
   async forgotPassword(email: string) {
-    return this.request<{ message: string }>("/auth/forgot-password", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    });
+    return this.request<{ message: string; delivered?: boolean; mode?: string }>(
+      "/auth/forgot-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }
+    );
   }
 
   async validateResetToken(token: string) {
@@ -511,16 +514,46 @@ class ApiClient {
     );
   }
 
-  /** Soft-delete (trash) or permanent purge — POST /api/leads/bulk-delete */
+  /**
+   * Soft-delete (trash) or permanent purge — POST /api/leads/bulk-delete
+   * scope: "ids" (default) uses body.ids
+   * scope: "all_filtered" deletes every lead matching search/status (all pages)
+   */
   async bulkDeleteLeads(
-    body: { ids: string[]; permanent?: boolean },
+    body: {
+      ids?: string[];
+      permanent?: boolean;
+      scope?: "ids" | "all_filtered";
+      search?: string;
+      status?: string;
+    },
     token?: string | null
   ) {
-    return this.post<{ deleted: number; failed: number; ids: string[]; permanent: boolean }>(
-      "/leads/bulk-delete",
-      body,
-      token
-    );
+    return this.post<{
+      deleted: number;
+      failed: number;
+      ids: string[];
+      permanent: boolean;
+      scope?: string;
+      matched?: number;
+    }>("/leads/bulk-delete", body, token);
+  }
+
+  /** Compose + send email to lead(s) via platform SMTP — POST /api/leads/send-email */
+  async sendLeadEmail(
+    body: {
+      contactIds: string[];
+      to?: string;
+      subject: string;
+      body: string;
+    },
+    token?: string | null
+  ) {
+    return this.post<{
+      sent: number;
+      failed: number;
+      results: Array<{ id: string; ok: boolean; error?: string }>;
+    }>("/leads/send-email", body, token);
   }
 
   /** Undo soft-delete — POST /api/leads/bulk-restore */

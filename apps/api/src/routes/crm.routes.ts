@@ -44,6 +44,7 @@ import {
   bulkEditLeadsHandler,
   bulkDeleteLeadsHandler,
   bulkRestoreLeadsHandler,
+  sendLeadEmailHandler,
 } from "../controllers/crm.controller.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { requireAiQuota } from "../middleware/aiQuota.js";
@@ -54,6 +55,7 @@ const router: Router = Router();
 router.post("/leads/bulk-edit", requireAuth, bulkEditLeadsHandler);
 router.post("/leads/bulk-delete", requireAuth, bulkDeleteLeadsHandler);
 router.post("/leads/bulk-restore", requireAuth, bulkRestoreLeadsHandler);
+router.post("/leads/send-email", requireAuth, sendLeadEmailHandler);
 
 // =====================
 // Contacts (Leads + Clients)

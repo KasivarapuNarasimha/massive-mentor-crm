@@ -15,6 +15,7 @@ import {
   requestPasswordReset,
   validateResetToken,
   completePasswordReset,
+  PasswordResetEmailError,
   type ResetPortal,
 } from "../services/password-reset.service.js";
 import { SessionLimitError } from "../services/session.service.js";
@@ -214,17 +215,23 @@ export async function forgotPasswordCustomer(req: Request, res: Response) {
       portal: "customer" satisfies ResetPortal,
       ...meta,
     });
-    // Always 200 + same message
     res.json({ success: true, data });
   } catch (error) {
-    console.error("[auth] forgotPasswordCustomer:", error);
-    // Still generic — never leak
-    res.json({
-      success: true,
-      data: {
-        message:
-          "If an account exists with this email, a password reset link has been sent.",
-      },
+    if (error instanceof PasswordResetEmailError) {
+      console.error(
+        `[auth] forgotPasswordCustomer delivery error code=${error.code}:`,
+        error.message
+      );
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+      });
+    }
+    console.error("[auth] forgotPasswordCustomer unexpected:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Could not process password reset. Please try again later.",
     });
   }
 }
@@ -247,13 +254,21 @@ export async function forgotPasswordAdmin(req: Request, res: Response) {
     });
     res.json({ success: true, data });
   } catch (error) {
-    console.error("[auth] forgotPasswordAdmin:", error);
-    res.json({
-      success: true,
-      data: {
-        message:
-          "If an account exists with this email, a password reset link has been sent.",
-      },
+    if (error instanceof PasswordResetEmailError) {
+      console.error(
+        `[auth] forgotPasswordAdmin delivery error code=${error.code}:`,
+        error.message
+      );
+      return res.status(503).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+      });
+    }
+    console.error("[auth] forgotPasswordAdmin unexpected:", error);
+    return res.status(500).json({
+      success: false,
+      error: "Could not process password reset. Please try again later.",
     });
   }
 }

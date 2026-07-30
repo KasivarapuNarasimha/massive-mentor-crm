@@ -4,6 +4,7 @@ import {
   bulkEditLeadsHandler,
   bulkDeleteLeadsHandler,
   bulkRestoreLeadsHandler,
+  sendLeadEmailHandler,
 } from "../controllers/crm.controller.js";
 
 /**
@@ -11,11 +12,13 @@ import {
  * POST /api/leads/bulk-edit
  * POST /api/leads/bulk-delete
  * POST /api/leads/bulk-restore
+ * POST /api/leads/send-email
  */
 const router: Router = Router();
 
 router.post("/bulk-edit", requireAuth, bulkEditLeadsHandler);
 router.post("/bulk-delete", requireAuth, bulkDeleteLeadsHandler);
 router.post("/bulk-restore", requireAuth, bulkRestoreLeadsHandler);
+router.post("/send-email", requireAuth, sendLeadEmailHandler);
 
 export default router;

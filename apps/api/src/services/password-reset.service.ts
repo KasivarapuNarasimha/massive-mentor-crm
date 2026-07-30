@@ -55,17 +55,40 @@ function portalLabel(portal: ResetPortal): string {
   return portal === "admin" ? "Super Admin" : "Customer";
 }
 
+export class PasswordResetEmailError extends Error {
+  constructor(
+    message: string,
+    public readonly code: "SMTP_NOT_CONFIGURED" | "SMTP_SEND_FAILED" | "TOKEN_CREATE_FAILED"
+  ) {
+    super(message);
+    this.name = "PasswordResetEmailError";
+  }
+}
+
+function maskEmailAddr(email: string): string {
+  const [local, domain] = email.split("@");
+  if (!domain) return "***";
+  const l = local || "";
+  return `${l.length <= 2 ? "**" : `${l.slice(0, 2)}***`}@${domain}`;
+}
+
 /**
- * Request password reset. Always returns the same generic message (no enumeration).
+ * Request password reset.
+ * - Unknown / ineligible emails: generic success (anti-enumeration).
+ * - Eligible account + email failure: throws PasswordResetEmailError so UI can show a real error.
  */
 export async function requestPasswordReset(opts: {
   email: string;
   portal: ResetPortal;
   ip?: string | null;
   userAgent?: string | null;
-}): Promise<{ message: string }> {
+}): Promise<{ message: string; delivered?: boolean; mode?: string }> {
   const email = opts.email.toLowerCase().trim();
   const ttl = env.PASSWORD_RESET_TTL_MINUTES || 30;
+
+  console.log(
+    `[password-reset] request portal=${opts.portal} email=${maskEmailAddr(email)} ip=${opts.ip || "n/a"}`
+  );
 
   const user = await prisma.user.findUnique({
     where: { email },
@@ -78,87 +101,136 @@ export async function requestPasswordReset(opts: {
     },
   });
 
-  // Always take roughly similar path; only send when eligible for this portal
-  if (user && !user.isDisabled) {
-    const isSuperAdmin = user.platformRole === "super_admin";
-    const eligible =
-      (opts.portal === "admin" && isSuperAdmin) ||
-      (opts.portal === "customer" && !isSuperAdmin);
-
-    // Demo accounts: still generic response, but do not issue reset for pure demo isolation preference
-    // Super Admin cannot reset via customer portal and vice versa
-    if (eligible) {
-      // Invalidate previous unused tokens for this user+portal
-      await prisma.passwordResetToken.updateMany({
-        where: {
-          userId: user.id,
-          portal: opts.portal,
-          usedAt: null,
-        },
-        data: { usedAt: new Date() },
-      });
-
-      const raw = generateRawToken();
-      const tokenHash = hashResetToken(raw);
-      const expiresAt = new Date(Date.now() + ttl * 60 * 1000);
-
-      await prisma.passwordResetToken.create({
-        data: {
-          userId: user.id,
-          tokenHash,
-          portal: opts.portal,
-          expiresAt,
-          requestIp: opts.ip || null,
-          userAgent: opts.userAgent || null,
-        },
-      });
-
-      const resetUrl = `${appBaseForPortal(opts.portal)}${resetPath(opts.portal)}?token=${encodeURIComponent(raw)}`;
-      const mail = buildPasswordResetEmail({
-        name: user.name,
-        resetUrl,
-        portalLabel: portalLabel(opts.portal),
-        ttlMinutes: ttl,
-      });
-
-      try {
-        await sendEmail({
-          to: user.email,
-          subject: mail.subject,
-          text: mail.text,
-          html: mail.html,
-          sensitive: true,
-        });
-      } catch (err) {
-        // Never log token/URL; mask email
-        const local = user.email.split("@")[0] || "";
-        const domain = user.email.split("@")[1] || "";
-        const masked = `${local.slice(0, 2)}***@${domain}`;
-        console.error(
-          "[password-reset] email delivery failed for",
-          masked,
-          err instanceof Error ? err.message : "error"
-        );
-        // Still return generic message — do not leak existence beyond that
-      }
-
-      await recordAudit({
-        actorUserId: user.id,
-        action: "password_reset_requested",
-        entityType: "user",
-        entityId: user.id,
-        metadata: {
-          portal: opts.portal,
-          email: user.email,
-          expiresAt: expiresAt.toISOString(),
-        },
-        ip: opts.ip,
-        userAgent: opts.userAgent,
-      });
-    }
+  if (!user || user.isDisabled) {
+    console.log(
+      `[password-reset] no eligible user for ${maskEmailAddr(email)} (generic OK response)`
+    );
+    return { message: GENERIC_OK };
   }
 
-  return { message: GENERIC_OK };
+  const isSuperAdmin = user.platformRole === "super_admin";
+  const eligible =
+    (opts.portal === "admin" && isSuperAdmin) ||
+    (opts.portal === "customer" && !isSuperAdmin);
+
+  // Super Admin cannot reset via customer portal and vice versa
+  if (!eligible) {
+    console.log(
+      `[password-reset] user found but not eligible for portal=${opts.portal} (generic OK)`
+    );
+    return { message: GENERIC_OK };
+  }
+
+  // Invalidate previous unused tokens for this user+portal
+  await prisma.passwordResetToken.updateMany({
+    where: {
+      userId: user.id,
+      portal: opts.portal,
+      usedAt: null,
+    },
+    data: { usedAt: new Date() },
+  });
+
+  const raw = generateRawToken();
+  const tokenHash = hashResetToken(raw);
+  const expiresAt = new Date(Date.now() + ttl * 60 * 1000);
+
+  try {
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        portal: opts.portal,
+        expiresAt,
+        requestIp: opts.ip || null,
+        userAgent: opts.userAgent || null,
+      },
+    });
+    console.log(
+      `[password-reset] token created userId=${user.id} portal=${opts.portal} expiresAt=${expiresAt.toISOString()}`
+    );
+  } catch (err) {
+    console.error(
+      "[password-reset] token create FAILED:",
+      err instanceof Error ? err.message : err
+    );
+    throw new PasswordResetEmailError(
+      "Could not create a reset link. Please try again in a moment.",
+      "TOKEN_CREATE_FAILED"
+    );
+  }
+
+  const resetUrl = `${appBaseForPortal(opts.portal)}${resetPath(opts.portal)}?token=${encodeURIComponent(raw)}`;
+  const mail = buildPasswordResetEmail({
+    name: user.name,
+    resetUrl,
+    portalLabel: portalLabel(opts.portal),
+    ttlMinutes: ttl,
+  });
+
+  let delivery: { delivered: boolean; mode: string };
+  try {
+    delivery = await sendEmail({
+      to: user.email,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+      sensitive: true,
+    });
+    console.log(
+      `[password-reset] email ok to=${maskEmailAddr(user.email)} mode=${delivery.mode} delivered=${delivery.delivered}`
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[password-reset] EMAIL DELIVERY FAILED to=${maskEmailAddr(user.email)}:`,
+      msg
+    );
+    // Invalidate the unused token so a broken send doesn't leave a valid link hanging only in DB
+    await prisma.passwordResetToken
+      .updateMany({
+        where: { tokenHash, usedAt: null },
+        data: { usedAt: new Date() },
+      })
+      .catch(() => undefined);
+
+    const isConfig = /not configured|SMTP_HOST|SMTP_USER|SMTP_PASS/i.test(msg);
+    throw new PasswordResetEmailError(
+      isConfig
+        ? "Email is not configured on the server. Please contact support or your administrator."
+        : "We could not send the reset email. Please try again in a few minutes or contact support.",
+      isConfig ? "SMTP_NOT_CONFIGURED" : "SMTP_SEND_FAILED"
+    );
+  }
+
+  await recordAudit({
+    actorUserId: user.id,
+    action: "password_reset_requested",
+    entityType: "user",
+    entityId: user.id,
+    metadata: {
+      portal: opts.portal,
+      email: user.email,
+      expiresAt: expiresAt.toISOString(),
+      emailMode: delivery.mode,
+      delivered: delivery.delivered,
+    },
+    ip: opts.ip,
+    userAgent: opts.userAgent,
+  });
+
+  // Console-only mode (dev without SMTP) still returns success so QA can use API logs
+  if (!delivery.delivered && delivery.mode === "console") {
+    console.warn(
+      "[password-reset] SMTP not configured — link was printed to API console only (development)."
+    );
+  }
+
+  return {
+    message: GENERIC_OK,
+    delivered: delivery.delivered,
+    mode: delivery.mode,
+  };
 }
 
 /**

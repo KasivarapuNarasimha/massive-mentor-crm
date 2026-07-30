@@ -778,11 +778,18 @@ export async function bulkEditLeads(
 /**
  * Soft-delete selected leads (trash). Undo via bulkRestoreLeads within retention window.
  */
+const BULK_DELETE_MAX_IDS = 25_000;
+const BULK_DELETE_CHUNK = 500;
+
+/**
+ * Soft-delete or permanently purge leads by explicit IDs (chunked).
+ * Supports large selections (up to 25k) via batched updates.
+ */
 export async function bulkSoftDeleteLeads(
   userId: string,
   ids: string[],
   opts?: { permanent?: boolean }
-): Promise<{ deleted: number; failed: number; ids: string[]; permanent: boolean }> {
+): Promise<{ deleted: number; failed: number; ids: string[]; permanent: boolean; scope: "ids" }> {
   if (!(await canBulkDeleteLeads(userId))) {
     throw new Error(
       "You do not have permission to bulk-delete leads. Contact a Business Admin or CEO."
@@ -790,7 +797,9 @@ export async function bulkSoftDeleteLeads(
   }
   const unique = [...new Set(ids.filter(Boolean))];
   if (!unique.length) throw new Error("Select at least one lead");
-  if (unique.length > 500) throw new Error("Maximum 500 leads per bulk delete");
+  if (unique.length > BULK_DELETE_MAX_IDS) {
+    throw new Error(`Maximum ${BULK_DELETE_MAX_IDS.toLocaleString()} leads per bulk delete`);
+  }
 
   const permanent = !!opts?.permanent;
   if (permanent) {
@@ -801,38 +810,44 @@ export async function bulkSoftDeleteLeads(
   }
 
   const scope = await buildCrmScope(userId);
-  const contacts = await prisma.contact.findMany({
-    where: andTenant(scope.where, {
-      id: { in: unique },
-      type: "lead",
-      ...(permanent ? {} : { deletedAt: null }),
-    }) as never,
-    select: { id: true, name: true },
-  });
-
   let deleted = 0;
   const okIds: string[] = [];
-  for (const c of contacts) {
-    try {
-      if (permanent) {
-        await prisma.contact.delete({ where: { id: c.id } });
-      } else {
-        await prisma.contact.update({
-          where: { id: c.id },
+
+  for (let i = 0; i < unique.length; i += BULK_DELETE_CHUNK) {
+    const chunk = unique.slice(i, i + BULK_DELETE_CHUNK);
+    const contacts = await prisma.contact.findMany({
+      where: andTenant(scope.where, {
+        id: { in: chunk },
+        type: "lead",
+        ...(permanent ? {} : { deletedAt: null }),
+      }) as never,
+      select: { id: true, name: true },
+    });
+
+    if (permanent) {
+      for (const c of contacts) {
+        try {
+          await prisma.contact.delete({ where: { id: c.id } });
+          deleted++;
+          okIds.push(c.id);
+        } catch {
+          /* skip */
+        }
+      }
+    } else {
+      const idsToSoft = contacts.map((c) => c.id);
+      if (idsToSoft.length) {
+        const result = await prisma.contact.updateMany({
+          where: andTenant(scope.where, {
+            id: { in: idsToSoft },
+            type: "lead",
+            deletedAt: null,
+          }) as never,
           data: { deletedAt: new Date(), deletedByUserId: userId },
         });
+        deleted += result.count;
+        okIds.push(...idsToSoft);
       }
-      await logActivity({
-        userId,
-        entityType: "contact",
-        entityId: c.id,
-        action: permanent ? "permanently_deleted" : "soft_deleted",
-        details: { name: c.name, bulk: true },
-      }).catch(() => undefined);
-      deleted++;
-      okIds.push(c.id);
-    } catch {
-      /* skip */
     }
   }
 
@@ -847,12 +862,239 @@ export async function bulkSoftDeleteLeads(
       deleted,
       failed: unique.length - deleted,
       permanent,
+      scope: "ids",
       ids: okIds.slice(0, 100),
     },
   });
 
   scheduleFollowupRefresh(userId);
-  return { deleted, failed: unique.length - deleted, ids: okIds, permanent };
+  return {
+    deleted,
+    failed: Math.max(0, unique.length - deleted),
+    ids: okIds,
+    permanent,
+    scope: "ids",
+  };
+}
+
+/**
+ * Soft-delete ALL leads matching list filters (search/status) — not just the current page.
+ * Uses a single updateMany for soft delete so 20k+ rows are efficient.
+ */
+export async function bulkSoftDeleteLeadsByFilter(
+  userId: string,
+  filters: { search?: string; status?: string },
+  opts?: { permanent?: boolean }
+): Promise<{
+  deleted: number;
+  failed: number;
+  ids: string[];
+  permanent: boolean;
+  scope: "all_filtered";
+  matched: number;
+}> {
+  if (!(await canBulkDeleteLeads(userId))) {
+    throw new Error(
+      "You do not have permission to bulk-delete leads. Contact a Business Admin or CEO."
+    );
+  }
+
+  const permanent = !!opts?.permanent;
+  if (permanent) {
+    const role = await resolveActorRole(userId);
+    if (!BULK_DELETE_ROLES.has(role)) {
+      throw new Error("Only Business Admin / CEO can permanently delete leads");
+    }
+  }
+
+  const where = await buildContactListWhere(userId, {
+    type: "lead",
+    search: filters.search?.trim() || undefined,
+    status: filters.status?.trim() || undefined,
+    trashOnly: false,
+    includeDeleted: false,
+  });
+
+  const matched = await prisma.contact.count({ where: where as never });
+  if (matched === 0) {
+    throw new Error("No leads match the current filters");
+  }
+  if (matched > BULK_DELETE_MAX_IDS) {
+    throw new Error(
+      `Too many matching leads (${matched.toLocaleString()}). Refine filters (max ${BULK_DELETE_MAX_IDS.toLocaleString()}).`
+    );
+  }
+
+  // Sample IDs for undo (first 200) — full undo of 20k would require storing all IDs
+  const sample = await prisma.contact.findMany({
+    where: where as never,
+    select: { id: true },
+    take: 200,
+    orderBy: { updatedAt: "desc" },
+  });
+  const sampleIds = sample.map((c) => c.id);
+
+  let deleted = 0;
+  if (permanent) {
+    // Permanent: delete in chunks
+    let cursor: string | undefined;
+    for (;;) {
+      const batch = await prisma.contact.findMany({
+        where: where as never,
+        select: { id: true },
+        take: BULK_DELETE_CHUNK,
+        ...(cursor
+          ? { cursor: { id: cursor }, skip: 1 }
+          : {}),
+        orderBy: { id: "asc" },
+      });
+      if (!batch.length) break;
+      for (const c of batch) {
+        try {
+          await prisma.contact.delete({ where: { id: c.id } });
+          deleted++;
+        } catch {
+          /* skip */
+        }
+      }
+      cursor = batch[batch.length - 1]?.id;
+      if (batch.length < BULK_DELETE_CHUNK) break;
+    }
+  } else {
+    const result = await prisma.contact.updateMany({
+      where: where as never,
+      data: { deletedAt: new Date(), deletedByUserId: userId },
+    });
+    deleted = result.count;
+  }
+
+  const businessId = await getUserBusinessId(userId);
+  await recordAudit({
+    businessId,
+    actorUserId: userId,
+    action: permanent
+      ? "lead_bulk_delete_all_filtered_permanent"
+      : "lead_bulk_delete_all_filtered",
+    entityType: "contact",
+    metadata: {
+      matched,
+      deleted,
+      permanent,
+      scope: "all_filtered",
+      filters: {
+        search: filters.search || null,
+        status: filters.status || null,
+      },
+      sampleIds,
+    },
+  });
+
+  scheduleFollowupRefresh(userId);
+  return {
+    deleted,
+    failed: Math.max(0, matched - deleted),
+    ids: sampleIds,
+    permanent,
+    scope: "all_filtered",
+    matched,
+  };
+}
+
+/**
+ * Send email to one or more leads via platform SMTP.
+ */
+export async function sendLeadEmails(
+  userId: string,
+  input: {
+    contactIds: string[];
+    to?: string;
+    subject: string;
+    body: string;
+  }
+): Promise<{ sent: number; failed: number; results: Array<{ id: string; ok: boolean; error?: string }> }> {
+  const subject = String(input.subject || "").trim();
+  const body = String(input.body || "").trim();
+  if (!subject) throw new Error("Subject is required");
+  if (!body) throw new Error("Email body is required");
+  if (subject.length > 200) throw new Error("Subject is too long");
+  if (body.length > 50_000) throw new Error("Email body is too long");
+
+  const ids = [...new Set((input.contactIds || []).filter(Boolean))];
+  if (!ids.length) throw new Error("Select at least one lead");
+  if (ids.length > 50) throw new Error("Maximum 50 recipients per send");
+
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const singleTo = input.to?.trim();
+  if (singleTo && !emailRe.test(singleTo)) {
+    throw new Error("Invalid recipient email address");
+  }
+
+  const scope = await buildCrmScope(userId);
+  const contacts = await prisma.contact.findMany({
+    where: andTenant(scope.where, {
+      id: { in: ids },
+      type: "lead",
+      deletedAt: null,
+    }) as never,
+    select: { id: true, name: true, email: true },
+  });
+
+  if (!contacts.length) throw new Error("No matching leads found");
+
+  const { sendEmail } = await import("./email.service.js");
+  const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+  let sent = 0;
+  let failed = 0;
+
+  for (const c of contacts) {
+    const to = singleTo || (c.email || "").trim();
+    if (!to || !emailRe.test(to)) {
+      failed++;
+      results.push({ id: c.id, ok: false, error: "Lead has no valid email" });
+      continue;
+    }
+    try {
+      const delivery = await sendEmail({
+        to,
+        subject,
+        text: body,
+        html: body.replace(/\n/g, "<br/>\n"),
+      });
+      if (!delivery.delivered && delivery.mode === "console") {
+        // Dev: still count as sent for UX
+        console.warn(`[crm-email] console-only delivery to ${to}`);
+      }
+      await logActivity({
+        userId,
+        entityType: "contact",
+        entityId: c.id,
+        action: "email_sent",
+        details: { subject, to, mode: delivery.mode },
+      }).catch(() => undefined);
+      sent++;
+      results.push({ id: c.id, ok: true });
+    } catch (err) {
+      failed++;
+      const msg = err instanceof Error ? err.message : "Send failed";
+      console.error(`[crm-email] failed contactId=${c.id}:`, msg);
+      results.push({ id: c.id, ok: false, error: msg });
+    }
+  }
+
+  const businessId = await getUserBusinessId(userId);
+  await recordAudit({
+    businessId,
+    actorUserId: userId,
+    action: "lead_email_sent",
+    entityType: "contact",
+    metadata: { sent, failed, subject, contactIds: ids.slice(0, 50) },
+  });
+
+  if (sent === 0 && failed > 0) {
+    throw new Error(results[0]?.error || "Failed to send email");
+  }
+
+  return { sent, failed, results };
 }
 
 /** Restore soft-deleted leads (undo). */

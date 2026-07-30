@@ -15,16 +15,37 @@ function isProduction(): boolean {
   return env.NODE_ENV === "production";
 }
 
+/** Strip wrapping quotes often left in .env values (Hostinger paste). */
+function cleanSmtpSecret(value: string | undefined): string {
+  let v = String(value || "").trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim();
+  }
+  return v;
+}
+
+function smtpCredentials() {
+  return {
+    host: cleanSmtpSecret(env.SMTP_HOST),
+    port: Number(env.SMTP_PORT || 587),
+    user: cleanSmtpSecret(env.SMTP_USER),
+    pass: cleanSmtpSecret(env.SMTP_PASS),
+    from: cleanSmtpSecret(env.SMTP_FROM) || cleanSmtpSecret(env.SMTP_USER),
+    secure: env.SMTP_SECURE === true || Number(env.SMTP_PORT || 587) === 465,
+  };
+}
+
 function smtpConfigured(): boolean {
-  const host = (env.SMTP_HOST || "").trim();
-  const user = (env.SMTP_USER || "").trim();
-  const pass = (env.SMTP_PASS || "").trim();
+  const { host, user, pass } = smtpCredentials();
   const ok = !!(host && user && pass);
   // One-line proof when sendEmail is invoked (no secrets)
   if (!(globalThis as { __mmSmtpLogged?: boolean }).__mmSmtpLogged) {
     (globalThis as { __mmSmtpLogged?: boolean }).__mmSmtpLogged = true;
     console.log(
-      `[email] smtpConfigured()=${ok} host=${host || "(empty)"} user=${user ? maskEmail(user) : "(empty)"} pass=${pass ? "set" : "empty"}`
+      `[email] smtpConfigured()=${ok} host=${host || "(empty)"} user=${user ? maskEmail(user) : "(empty)"} pass=${pass ? `set(len=${pass.length})` : "empty"}`
     );
   }
   return ok;
@@ -62,13 +83,10 @@ function logEmailToConsoleDev(input: SendEmailInput) {
  * Hostinger typically: smtp.hostinger.com:465 or :587
  */
 async function sendViaRawSmtp(input: SendEmailInput): Promise<void> {
-  const host = (env.SMTP_HOST || "").trim();
-  const port = Number(env.SMTP_PORT || 587);
-  const user = (env.SMTP_USER || "").trim();
-  const pass = (env.SMTP_PASS || "").trim();
-  const from = (env.SMTP_FROM || user).trim();
-  // Hostinger: 465 = SSL; 587 = STARTTLS
-  const forceSecure = env.SMTP_SECURE === true || port === 465;
+  const { host, port, user, pass, from, secure: forceSecure } = smtpCredentials();
+  if (!host || !user || !pass) {
+    throw new Error("SMTP credentials incomplete");
+  }
 
   const boundary = `mm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   const html = input.html || input.text.replace(/\n/g, "<br/>\n");
@@ -270,28 +288,43 @@ async function sendViaNodemailer(input: SendEmailInput): Promise<void> {
   if (!nodemailer) {
     throw new Error("nodemailer_not_installed");
   }
-  const port = Number(env.SMTP_PORT || 587);
-  const secure = env.SMTP_SECURE === true || port === 465;
+  const { host, port, user, pass, from, secure } = smtpCredentials();
+  if (!host || !user || !pass) {
+    throw new Error("SMTP credentials incomplete");
+  }
   const transporter = nodemailer.createTransport({
-    host: (env.SMTP_HOST || "").trim(),
+    host,
     port,
     secure,
-    auth: {
-      user: (env.SMTP_USER || "").trim(),
-      pass: (env.SMTP_PASS || "").trim(),
-    },
+    auth: { user, pass },
+    connectionTimeout: 20_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 30_000,
     tls: {
       // Hostinger / many shared hosts need this on some Windows Node builds
       rejectUnauthorized: env.NODE_ENV === "production",
+      servername: host,
     },
+    requireTLS: !secure && port === 587,
   });
-  await transporter.sendMail({
-    from: env.SMTP_FROM || env.SMTP_USER,
+  // Verify connectivity before send — clearer logs when auth/host is wrong
+  try {
+    await transporter.verify();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[email] SMTP verify failed:", msg);
+    throw new Error(`SMTP verify failed: ${msg}`);
+  }
+  const info = await transporter.sendMail({
+    from: from || user,
     to: input.to,
     subject: input.subject,
     text: input.text,
     html: input.html || input.text.replace(/\n/g, "<br/>"),
   });
+  console.log(
+    `[email] nodemailer messageId=${info.messageId || "n/a"} response=${info.response || "n/a"}`
+  );
 }
 
 /**

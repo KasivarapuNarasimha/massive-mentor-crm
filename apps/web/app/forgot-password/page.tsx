@@ -16,14 +16,33 @@ export default function CustomerForgotPasswordPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    const res = await api.forgotPassword(email.trim());
-    setBusy(false);
-    // Always same UX message (anti-enumeration)
-    setSent(true);
-    const msg =
-      res.data?.message ||
-      "If an account exists with this email, a password reset link has been sent.";
-    toast.success(msg);
+    try {
+      const res = await api.forgotPassword(email.trim());
+      if (!res.success) {
+        toast.error(
+          res.error ||
+            "We could not send the reset email. Please try again or contact support."
+        );
+        return;
+      }
+      // Success path: generic anti-enumeration message (or delivery confirmation)
+      setSent(true);
+      const msg =
+        res.data?.message ||
+        "If an account exists with this email, a password reset link has been sent.";
+      toast.success(msg);
+      if (res.data?.delivered === false && res.data?.mode === "console") {
+        toast.message("Dev mode: check the API terminal for the reset link (SMTP not configured).");
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Network error while sending reset email. Please try again."
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

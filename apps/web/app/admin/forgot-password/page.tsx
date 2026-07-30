@@ -16,12 +16,29 @@ export default function AdminForgotPasswordPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    await api.platformForgotPassword(email.trim());
-    setBusy(false);
-    setSent(true);
-    toast.success(
-      "If an account exists with this email, a password reset link has been sent."
-    );
+    try {
+      const res = await api.platformForgotPassword(email.trim());
+      if (!res.success) {
+        toast.error(
+          res.error ||
+            "We could not send the reset email. Please try again or contact support."
+        );
+        return;
+      }
+      setSent(true);
+      toast.success(
+        res.data?.message ||
+          "If an account exists with this email, a password reset link has been sent."
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Network error while sending reset email. Please try again."
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

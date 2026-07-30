@@ -251,14 +251,63 @@ export async function bulkEditLeadsHandler(req: AuthenticatedRequest, res: Respo
 export async function bulkDeleteLeadsHandler(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const ids = Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : [];
     const permanent = !!req.body?.permanent;
-    const { bulkSoftDeleteLeads } = await import("../services/crm.service.js");
+    const scope =
+      req.body?.scope === "all_filtered" || req.body?.mode === "all_filtered"
+        ? "all_filtered"
+        : "ids";
+    const { bulkSoftDeleteLeads, bulkSoftDeleteLeadsByFilter } = await import(
+      "../services/crm.service.js"
+    );
+
+    if (scope === "all_filtered") {
+      const data = await bulkSoftDeleteLeadsByFilter(
+        req.user.id,
+        {
+          search: typeof req.body?.search === "string" ? req.body.search : undefined,
+          status: typeof req.body?.status === "string" ? req.body.status : undefined,
+        },
+        { permanent }
+      );
+      return res.json({ success: true, data });
+    }
+
+    const ids = Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : [];
     const data = await bulkSoftDeleteLeads(req.user.id, ids, { permanent });
     res.json({ success: true, data });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Bulk delete failed";
     const status = message.includes("permission") ? 403 : 400;
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
+/** POST /api/crm/leads/send-email — compose & send via SMTP */
+export async function sendLeadEmailHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const contactIds = Array.isArray(req.body?.contactIds)
+      ? (req.body.contactIds as string[])
+      : req.body?.contactId
+        ? [String(req.body.contactId)]
+        : [];
+    const { sendLeadEmails } = await import("../services/crm.service.js");
+    const data = await sendLeadEmails(req.user.id, {
+      contactIds,
+      to: typeof req.body?.to === "string" ? req.body.to : undefined,
+      subject: String(req.body?.subject || ""),
+      body: String(req.body?.body || req.body?.text || ""),
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to send email";
+    console.error("[crm] sendLeadEmail:", message);
+    const status =
+      /permission|not authenticated/i.test(message)
+        ? 403
+        : /SMTP|not configured|delivery/i.test(message)
+          ? 503
+          : 400;
     res.status(status).json({ success: false, error: message });
   }
 }

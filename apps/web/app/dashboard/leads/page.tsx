@@ -160,7 +160,16 @@ export default function LeadsPage() {
   const [followUpDays, setFollowUpDays] = useState("1");
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  /** "selected" = current selection; "all_filtered" = every lead matching search/status */
+  const [bulkDeleteScope, setBulkDeleteScope] = useState<"selected" | "all_filtered">("selected");
   const [bulkProgress, setBulkProgress] = useState<string | null>(null);
+  /** In-app compose email modal */
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailContactIds, setEmailContactIds] = useState<string[]>([]);
+  const [emailSending, setEmailSending] = useState(false);
   const [bulkEditForm, setBulkEditForm] = useState({
     status: "",
     assignedTo: "",
@@ -566,14 +575,21 @@ export default function LeadsPage() {
   }, [loadConfig, loadTeam]);
 
   useEffect(() => {
-    if (showModal || assignModalOpen || followUpModalOpen || bulkEditOpen || bulkDeleteOpen) {
+    if (
+      showModal ||
+      assignModalOpen ||
+      followUpModalOpen ||
+      bulkEditOpen ||
+      bulkDeleteOpen ||
+      emailModalOpen
+    ) {
       const original = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => {
         document.body.style.overflow = original;
       };
     }
-  }, [showModal, assignModalOpen, followUpModalOpen, bulkEditOpen, bulkDeleteOpen]);
+  }, [showModal, assignModalOpen, followUpModalOpen, bulkEditOpen, bulkDeleteOpen, emailModalOpen]);
 
   // Enrich leads with description meta (legacy import) + customFields for filters
   const enriched = useMemo(() => {
@@ -652,12 +668,15 @@ export default function LeadsPage() {
     });
   };
 
-  const selectAllResults = () => {
-    setSelectedIds(new Set(filteredLeads.map((l) => l.id)));
+  /** Select only rows on the current page (client-visible set). */
+  const selectCurrentPage = () => {
+    setSelectedIds(new Set(pageLeads.map((l) => l.id)));
   };
 
   const allResultsSelected =
-    filteredLeads.length > 0 && filteredLeads.every((l) => selectedIds.has(l.id));
+    pageLeads.length > 0 &&
+    pageLeads.every((l) => selectedIds.has(l.id)) &&
+    selectedIds.size === pageLeads.length;
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -913,17 +932,87 @@ export default function LeadsPage() {
     }
   };
 
-  const runBulkEmail = () => {
-    const withEmail = selectedLeads.filter((l) => l.email && l.email.includes("@"));
+  const openEmailCompose = (leadsToEmail: Contact[]) => {
+    const withEmail = leadsToEmail.filter((l) => l.email && String(l.email).includes("@"));
     if (withEmail.length === 0) {
-      toast.error("No selected leads have an email address");
+      toast.error("No valid email address on the selected lead(s)");
       return;
     }
-    const emails = withEmail.map((l) => l.email).join(",");
-    window.location.href = `mailto:?bcc=${encodeURIComponent(emails)}&subject=${encodeURIComponent(
-      "Follow up from Massive Mentor"
-    )}`;
-    toast.success(`Composing email to ${withEmail.length} lead(s)`);
+    const ids = withEmail.map((l) => l.id);
+    const first = withEmail[0];
+    setEmailContactIds(ids);
+    setEmailTo(
+      withEmail.length === 1
+        ? String(first.email)
+        : withEmail.map((l) => String(l.email)).join(", ")
+    );
+    setEmailSubject(
+      withEmail.length === 1
+        ? `Following up — ${first.name}`
+        : `Following up with ${withEmail.length} contacts`
+    );
+    setEmailBody(
+      withEmail.length === 1
+        ? `Hi ${first.name},\n\n`
+        : `Hi,\n\n`
+    );
+    setEmailModalOpen(true);
+  };
+
+  const runBulkEmail = () => {
+    openEmailCompose(selectedLeads);
+  };
+
+  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
+  const sendComposedEmail = async () => {
+    if (!token) return;
+    const subject = emailSubject.trim();
+    const body = emailBody.trim();
+    if (!subject) {
+      toast.error("Subject is required");
+      return;
+    }
+    if (!body) {
+      toast.error("Email body is required");
+      return;
+    }
+    // Single recipient: validate To field; multi: send per contact with their own email
+    const singleTo =
+      emailContactIds.length === 1 ? emailTo.split(",")[0]?.trim() || undefined : undefined;
+    if (emailContactIds.length === 1 && singleTo && !isValidEmail(singleTo)) {
+      toast.error("Enter a valid recipient email address");
+      return;
+    }
+    if (emailContactIds.length > 1) {
+      // Multi: To field is display-only list; each lead uses stored email
+    }
+    setEmailSending(true);
+    const res = await api.sendLeadEmail(
+      {
+        contactIds: emailContactIds,
+        to: singleTo,
+        subject,
+        body,
+      },
+      token
+    );
+    setEmailSending(false);
+    if (res.success && res.data) {
+      toast.success(
+        res.data.sent === 1
+          ? "Email sent successfully"
+          : `Sent ${res.data.sent} email(s)`,
+        {
+          description: res.data.failed
+            ? `${res.data.failed} failed`
+            : undefined,
+        }
+      );
+      setEmailModalOpen(false);
+    } else {
+      toast.error(res.error || "Failed to send email");
+    }
   };
 
   const runBulkFollowUp = async () => {
@@ -1054,31 +1143,63 @@ export default function LeadsPage() {
   };
 
   const runBulkDelete = async () => {
-    if (!token || selectedLeads.length === 0 || !canBulkDelete) return;
+    if (!token || !canBulkDelete) return;
+    if (bulkDeleteScope === "selected" && selectedIds.size === 0) {
+      toast.error("Select at least one lead");
+      return;
+    }
     setBulkBusy(true);
-    setBulkProgress(`Moving ${selectedIds.size} lead(s) to trash…`);
-    const ids = [...selectedIds];
-    const res = await api.bulkDeleteLeads({ ids, permanent: false }, token);
+    const countLabel =
+      bulkDeleteScope === "all_filtered"
+        ? serverTotal.toLocaleString()
+        : String(selectedIds.size);
+    setBulkProgress(`Moving ${countLabel} lead(s) to trash…`);
+
+    const res =
+      bulkDeleteScope === "all_filtered"
+        ? await api.bulkDeleteLeads(
+            {
+              scope: "all_filtered",
+              search: search.trim() || undefined,
+              status: statusFilter || undefined,
+              permanent: false,
+            },
+            token
+          )
+        : await api.bulkDeleteLeads(
+            { ids: [...selectedIds], permanent: false, scope: "ids" },
+            token
+          );
+
     setBulkBusy(false);
     setBulkProgress(null);
     setBulkDeleteOpen(false);
     if (res.success && res.data) {
-      const restoreIds = res.data.ids || ids;
-      toast.success(`Moved ${res.data.deleted} lead(s) to trash`, {
-        description: "Undo available for a short time",
-        duration: 12000,
-        action: {
-          label: "Undo",
-          onClick: () => {
-            void (async () => {
-              const r = await api.bulkRestoreLeads({ ids: restoreIds }, token);
-              if (r.success) {
-                toast.success(`Restored ${r.data?.restored ?? restoreIds.length} lead(s)`);
-                await loadLeads();
-              } else toast.error(r.error || "Restore failed");
-            })();
-          },
-        },
+      const restoreIds = res.data.ids || [];
+      const canUndo =
+        bulkDeleteScope === "selected" && restoreIds.length > 0 && restoreIds.length <= 500;
+      toast.success(`Moved ${res.data.deleted.toLocaleString()} lead(s) to trash`, {
+        description:
+          bulkDeleteScope === "all_filtered"
+            ? `All filtered results (${(res.data.matched ?? res.data.deleted).toLocaleString()} matched)`
+            : canUndo
+              ? "Undo available for a short time"
+              : undefined,
+        duration: canUndo ? 12000 : 5000,
+        action: canUndo
+          ? {
+              label: "Undo",
+              onClick: () => {
+                void (async () => {
+                  const r = await api.bulkRestoreLeads({ ids: restoreIds }, token);
+                  if (r.success) {
+                    toast.success(`Restored ${r.data?.restored ?? restoreIds.length} lead(s)`);
+                    await loadLeads();
+                  } else toast.error(r.error || "Restore failed");
+                })();
+              },
+            }
+          : undefined,
       });
       clearSelection();
       await loadLeads();
@@ -1382,12 +1503,17 @@ export default function LeadsPage() {
               </button>
               <button
                 type="button"
-                onClick={selectAllResults}
+                onClick={selectCurrentPage}
                 disabled={allResultsSelected}
                 className="text-xs px-2.5 py-1.5 rounded-lg bg-white/5 border border-border hover:bg-white/10 disabled:opacity-40"
               >
-                Select all results ({filteredLeads.length})
+                Select this page ({pageLeads.length})
               </button>
+              {serverTotal > pageLeads.length && (
+                <span className="text-xs text-amber-300/90">
+                  {serverTotal.toLocaleString()} match filters — use Delete → &quot;All filtered&quot; for full set
+                </span>
+              )}
               <button
                 type="button"
                 onClick={clearSelection}
@@ -1487,7 +1613,10 @@ export default function LeadsPage() {
               <button
                 type="button"
                 disabled={bulkBusy}
-                onClick={() => setBulkDeleteOpen(true)}
+                onClick={() => {
+                  setBulkDeleteScope("selected");
+                  setBulkDeleteOpen(true);
+                }}
                 className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium border border-red-500 disabled:opacity-50 inline-flex items-center gap-1.5"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -1710,6 +1839,15 @@ export default function LeadsPage() {
                         className="px-2.5 py-1 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30 disabled:opacity-50"
                       >
                         Score
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openEmailCompose([lead])}
+                        disabled={bulkBusy || !lead.email}
+                        title={lead.email ? `Email ${lead.email}` : "No email on this lead"}
+                        className="px-2.5 py-1 text-xs bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 rounded-lg border border-sky-500/30 disabled:opacity-50"
+                      >
+                        Email
                       </button>
                       <button
                         type="button"
@@ -2078,10 +2216,10 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Bulk Delete confirmation */}
+      {/* Bulk Delete confirmation — current selection OR all filtered results */}
       {bulkDeleteOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-red-900/40 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 sm:p-6">
+          <div className="bg-card border border-red-900/40 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-5 sm:p-6">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-red-500/15 text-red-400 flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2093,17 +2231,70 @@ export default function LeadsPage() {
                   />
                 </svg>
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <h3 className="text-lg font-semibold text-foreground">Delete leads?</h3>
                 <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                  Are you sure you want to permanently delete{" "}
-                  <span className="font-semibold text-foreground tabular-nums">{selectedIds.size}</span> selected
-                  lead{selectedIds.size === 1 ? "" : "s"}?
+                  Choose what to delete. Soft-delete moves leads to Trash (audit logged).
                 </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Soft delete by default — leads move to Trash and can be restored (Undo). Super Admin /
-                  Business Admin can purge permanently later. This action is written to the audit log.
-                </p>
+                <div className="mt-4 space-y-2">
+                  <label
+                    className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                      bulkDeleteScope === "selected"
+                        ? "border-red-500/50 bg-red-500/10"
+                        : "border-border hover:bg-muted/40"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="bulk-delete-scope"
+                      className="mt-1"
+                      checked={bulkDeleteScope === "selected"}
+                      onChange={() => setBulkDeleteScope("selected")}
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-foreground">
+                        Delete selected ({selectedIds.size.toLocaleString()})
+                      </span>
+                      <span className="block text-xs text-muted-foreground mt-0.5">
+                        Only the leads currently checked (this page or multi-page selection).
+                      </span>
+                    </span>
+                  </label>
+                  <label
+                    className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                      bulkDeleteScope === "all_filtered"
+                        ? "border-red-500/50 bg-red-500/10"
+                        : "border-border hover:bg-muted/40"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="bulk-delete-scope"
+                      className="mt-1"
+                      checked={bulkDeleteScope === "all_filtered"}
+                      onChange={() => setBulkDeleteScope("all_filtered")}
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-foreground">
+                        Delete all filtered results ({serverTotal.toLocaleString()})
+                      </span>
+                      <span className="block text-xs text-muted-foreground mt-0.5">
+                        Every lead matching current search/status — all pages (up to 25,000).
+                        {search || statusFilter ? (
+                          <span className="block mt-1 text-amber-200/90">
+                            Filters: {statusFilter ? `status=${statusFilter}` : ""}
+                            {statusFilter && search ? " · " : ""}
+                            {search ? `search="${search}"` : ""}
+                          </span>
+                        ) : (
+                          <span className="block mt-1 text-amber-200/90">
+                            No filters — this deletes ALL leads in CRM.
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                  </label>
+                </div>
               </div>
             </div>
             <div className="flex gap-3 mt-6">
@@ -2116,11 +2307,79 @@ export default function LeadsPage() {
               </button>
               <button
                 type="button"
-                disabled={bulkBusy}
-                onClick={runBulkDelete}
+                disabled={
+                  bulkBusy ||
+                  (bulkDeleteScope === "selected" && selectedIds.size === 0) ||
+                  (bulkDeleteScope === "all_filtered" && serverTotal === 0)
+                }
+                onClick={() => void runBulkDelete()}
                 className="flex-1 min-h-11 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
               >
-                {bulkBusy ? "Deleting…" : "Move to Trash"}
+                {bulkBusy
+                  ? "Deleting…"
+                  : bulkDeleteScope === "all_filtered"
+                    ? `Trash ${serverTotal.toLocaleString()} filtered`
+                    : `Trash ${selectedIds.size.toLocaleString()} selected`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Compose email modal */}
+      {emailModalOpen && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-5 sm:p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-foreground">Compose email</h3>
+            <p className="text-xs text-muted-foreground mt-1 mb-4">
+              Sent via platform email (SMTP).{" "}
+              {emailContactIds.length > 1
+                ? `${emailContactIds.length} recipients will each get a personal copy.`
+                : "Recipient is prefilled from the lead."}
+            </p>
+            <label className="block text-sm text-muted-foreground mb-1.5">To</label>
+            <input
+              type="text"
+              value={emailTo}
+              onChange={(e) => setEmailTo(e.target.value)}
+              disabled={emailContactIds.length > 1}
+              className={`${inputClass} mb-3 ${emailContactIds.length > 1 ? "opacity-80" : ""}`}
+              placeholder="recipient@example.com"
+              autoComplete="email"
+            />
+            <label className="block text-sm text-muted-foreground mb-1.5">Subject</label>
+            <input
+              type="text"
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              className={`${inputClass} mb-3`}
+              placeholder="Subject"
+              maxLength={200}
+            />
+            <label className="block text-sm text-muted-foreground mb-1.5">Message</label>
+            <textarea
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              className={`${inputClass} min-h-[160px] mb-4 resize-y`}
+              placeholder="Write your message…"
+              rows={8}
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setEmailModalOpen(false)}
+                disabled={emailSending}
+                className="flex-1 min-h-11 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={emailSending}
+                onClick={() => void sendComposedEmail()}
+                className="flex-1 min-h-11 px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+              >
+                {emailSending ? "Sending…" : "Send email"}
               </button>
             </div>
           </div>
