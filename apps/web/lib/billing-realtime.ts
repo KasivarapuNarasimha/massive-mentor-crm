@@ -92,7 +92,7 @@ export function connectBillingStream(
             }
           }
         }
-      } catch (err) {
+      } catch {
         if (ac.signal.aborted || closed) break;
         opts?.onStatus?.("error");
         // Exponential backoff, cap 30s
