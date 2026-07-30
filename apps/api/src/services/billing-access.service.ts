@@ -11,6 +11,7 @@ export type BillingAccess = {
   isTrial: boolean;
   isLocked: boolean;
   planStatus: string;
+  licenseStatus?: string | null;
   trialEndsAt: Date | null;
   trialDaysRemaining: number | null;
   subscriptionEndsAt: Date | null;
@@ -195,40 +196,54 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
     console.warn(
       `[billing-access] healing stuck isTrial=true on paid plan businessId=${bizRaw.id} plan=${bizRaw.plan} planStatus=${bizRaw.planStatus}`
     );
+    const healedSubEnd =
+      bizRaw.subscriptionEndsAt ||
+      (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        return d;
+      })();
+    const healedPlanStatus =
+      bizRaw.planStatus === "trial" || !bizRaw.planStatus ? "active" : bizRaw.planStatus;
+    const healedLicense =
+      bizRaw.licenseStatus === "trial" || !bizRaw.licenseStatus
+        ? "active"
+        : bizRaw.licenseStatus;
     await prisma.business
       .update({
         where: { id: bizRaw.id },
         data: {
           isTrial: false,
           isLocked: false,
-          planStatus:
-            bizRaw.planStatus === "trial" || !bizRaw.planStatus
-              ? "active"
-              : bizRaw.planStatus,
-          licenseStatus:
-            bizRaw.licenseStatus === "trial" || !bizRaw.licenseStatus
-              ? "active"
-              : bizRaw.licenseStatus,
-          // Ensure paid window exists so evaluate path doesn't fall into trial
-          subscriptionEndsAt:
-            bizRaw.subscriptionEndsAt ||
-            (() => {
-              const d = new Date();
-              d.setDate(d.getDate() + 30);
-              return d;
-            })(),
+          planStatus: healedPlanStatus,
+          licenseStatus: healedLicense,
+          subscriptionEndsAt: healedSubEnd,
         },
       })
       .catch(() => undefined);
     bizRaw.isTrial = false;
     bizRaw.isLocked = false;
-    if (bizRaw.planStatus === "trial") bizRaw.planStatus = "active";
-    if (bizRaw.licenseStatus === "trial") bizRaw.licenseStatus = "active";
-    if (!bizRaw.subscriptionEndsAt) {
-      const d = new Date();
-      d.setDate(d.getDate() + 30);
-      bizRaw.subscriptionEndsAt = d;
-    }
+    bizRaw.planStatus = healedPlanStatus;
+    bizRaw.licenseStatus = healedLicense;
+    bizRaw.subscriptionEndsAt = healedSubEnd;
+    // Notify open tabs after heal
+    void import("./subscription-realtime.service.js")
+      .then(({ publishSubscriptionChange }) =>
+        publishSubscriptionChange(bizRaw.id, {
+          plan: bizRaw.plan,
+          planStatus: healedPlanStatus,
+          isTrial: false,
+          licenseStatus: healedLicense,
+          isLocked: false,
+          subscriptionEndsAt:
+            healedSubEnd instanceof Date
+              ? healedSubEnd.toISOString()
+              : String(healedSubEnd),
+          source: "self_heal",
+          action: "heal_isTrial",
+        })
+      )
+      .catch(() => undefined);
   }
 
   // Normalize 3-day free trial (repair inflated remaining days from bad data)
@@ -261,6 +276,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
       businessId: biz.id,
       businessName: biz.name,
       plan: biz.plan,
+      licenseStatus: (biz as { licenseStatus?: string }).licenseStatus ?? null,
     };
   }
 
@@ -277,6 +293,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
       businessId: biz.id,
       businessName: biz.name,
       plan: biz.plan,
+      licenseStatus: (biz as { licenseStatus?: string }).licenseStatus ?? null,
     };
   }
 
@@ -293,6 +310,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
       businessId: biz.id,
       businessName: biz.name,
       plan: biz.plan,
+      licenseStatus: (biz as { licenseStatus?: string }).licenseStatus ?? null,
     };
   }
 
@@ -316,6 +334,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
       businessId: biz.id,
       businessName: biz.name,
       plan: biz.plan,
+      licenseStatus: (biz as { licenseStatus?: string }).licenseStatus ?? null,
     };
   }
 
@@ -332,6 +351,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
       businessId: biz.id,
       businessName: biz.name,
       plan: biz.plan,
+      licenseStatus: (biz as { licenseStatus?: string }).licenseStatus ?? null,
     };
   }
 
@@ -357,6 +377,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
         businessId: biz.id,
         businessName: biz.name,
         plan: biz.plan,
+      licenseStatus: (biz as { licenseStatus?: string }).licenseStatus ?? null,
       };
     }
     // Trial expired
@@ -372,6 +393,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
       businessId: biz.id,
       businessName: biz.name,
       plan: biz.plan,
+      licenseStatus: (biz as { licenseStatus?: string }).licenseStatus ?? null,
     };
   }
 
@@ -391,6 +413,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
         businessId: biz.id,
         businessName: biz.name,
         plan: biz.plan,
+      licenseStatus: (biz as { licenseStatus?: string }).licenseStatus ?? null,
       };
     }
     return {
@@ -405,6 +428,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
       businessId: biz.id,
       businessName: biz.name,
       plan: biz.plan,
+      licenseStatus: (biz as { licenseStatus?: string }).licenseStatus ?? null,
     };
   }
 

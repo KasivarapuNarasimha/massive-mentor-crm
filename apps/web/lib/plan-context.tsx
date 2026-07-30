@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -20,13 +21,19 @@ import {
   requiredPlanName,
 } from "@/lib/plan-entitlements";
 import { FeatureLockModal } from "@/components/billing/FeatureLockModal";
-import { subscribeDataChanged } from "@/lib/data-events";
+import { emitDataChanged, subscribeDataChanged } from "@/lib/data-events";
+import { connectBillingStream } from "@/lib/billing-realtime";
 
 type PlanContextValue = {
   tier: PlanTier;
   plan: string | null;
   isTrial: boolean;
   planStatus: string | null;
+  licenseStatus: string | null;
+  trialDaysRemaining: number | null;
+  isLocked: boolean;
+  /** open | connecting | closed | error — for diagnostics */
+  liveStatus: "idle" | "connecting" | "open" | "closed" | "error";
   loading: boolean;
   can: (feature: FeatureKey) => boolean;
   requireFeature: (feature: FeatureKey) => boolean;
@@ -37,46 +44,127 @@ type PlanContextValue = {
 
 const PlanContext = createContext<PlanContextValue | null>(null);
 
+/** Fallback only — real-time SSE is primary */
+const FALLBACK_POLL_MS = 5 * 60_000;
+
 export function PlanProvider({ children }: { children: ReactNode }) {
   const { token, isAuthenticated } = useAuth();
   const [tier, setTier] = useState<PlanTier>("trial");
   const [plan, setPlan] = useState<string | null>(null);
   const [isTrial, setIsTrial] = useState(true);
   const [planStatus, setPlanStatus] = useState<string | null>(null);
+  const [licenseStatus, setLicenseStatus] = useState<string | null>(null);
+  const [trialDaysRemaining, setTrialDaysRemaining] = useState<number | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<PlanContextValue["liveStatus"]>("idle");
   const [loading, setLoading] = useState(true);
   const [lockFeature, setLockFeature] = useState<FeatureKey | null>(null);
+  const refreshInFlight = useRef<Promise<void> | null>(null);
+
+  const applyAccess = useCallback(
+    (a: {
+      isTrial?: boolean;
+      plan?: string | null;
+      planStatus?: string | null;
+      licenseStatus?: string | null;
+      trialDaysRemaining?: number | null;
+      isLocked?: boolean;
+    }) => {
+      const p = a.plan ?? null;
+      const trial = !!a.isTrial;
+      setPlan(p);
+      setIsTrial(trial);
+      setPlanStatus(a.planStatus ?? null);
+      setLicenseStatus(a.licenseStatus ?? null);
+      setTrialDaysRemaining(
+        !trial
+          ? null
+          : a.trialDaysRemaining == null
+            ? null
+            : Math.min(Math.max(0, a.trialDaysRemaining), 30)
+      );
+      setIsLocked(!!a.isLocked);
+      setTier(resolvePlanTier(p, trial));
+    },
+    []
+  );
 
   const refresh = useCallback(async () => {
     if (!token || !isAuthenticated) {
       setLoading(false);
       return;
     }
-    try {
-      const res = await api.get<{
-        access: {
-          isTrial: boolean;
-          plan?: string | null;
-          planStatus?: string;
-        };
-      }>("/billing/access", token);
-      if (res.success && res.data?.access) {
-        const a = res.data.access;
-        const p = a.plan || null;
-        setPlan(p);
-        setIsTrial(!!a.isTrial);
-        setPlanStatus(a.planStatus || null);
-        setTier(resolvePlanTier(p, !!a.isTrial));
-      }
-    } finally {
-      setLoading(false);
+    if (refreshInFlight.current) {
+      await refreshInFlight.current;
+      return;
     }
-  }, [token, isAuthenticated]);
+    const run = (async () => {
+      try {
+        const res = await api.get<{
+          access: {
+            isTrial: boolean;
+            plan?: string | null;
+            planStatus?: string;
+            licenseStatus?: string | null;
+            trialDaysRemaining?: number | null;
+            isLocked?: boolean;
+          };
+        }>("/billing/access", token);
+        if (res.success && res.data?.access) {
+          applyAccess(res.data.access);
+        }
+      } finally {
+        setLoading(false);
+        refreshInFlight.current = null;
+      }
+    })();
+    refreshInFlight.current = run;
+    await run;
+  }, [token, isAuthenticated, applyAccess]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  // Live sync: Super Admin plan changes must appear without re-login
+  // Primary: SSE real-time stream from Super Admin / payment activations
+  useEffect(() => {
+    if (!token || !isAuthenticated) return;
+
+    const disconnect = connectBillingStream(
+      token,
+      (payload) => {
+        // Apply push payload immediately for instant UI
+        if (
+          payload.plan !== undefined ||
+          payload.isTrial !== undefined ||
+          payload.planStatus !== undefined
+        ) {
+          applyAccess({
+            plan: payload.plan,
+            isTrial: payload.isTrial,
+            planStatus: payload.planStatus,
+            licenseStatus: payload.licenseStatus,
+            trialDaysRemaining: payload.trialDaysRemaining,
+            isLocked: payload.isLocked,
+          });
+        }
+        // Authoritative re-fetch (heals edge cases) + notify other UI
+        void refresh().then(() => {
+          emitDataChanged({ module: "billing", action: "update" });
+        });
+      },
+      {
+        onStatus: (s) => setLiveStatus(s),
+      }
+    );
+
+    return () => {
+      disconnect();
+      setLiveStatus("closed");
+    };
+  }, [token, isAuthenticated, applyAccess, refresh]);
+
+  // Secondary: local events (same-tab payment success) + focus
   useEffect(() => {
     if (!token || !isAuthenticated) return;
     const unsub = subscribeDataChanged((ev) => {
@@ -86,8 +174,8 @@ export function PlanProvider({ children }: { children: ReactNode }) {
     const onVis = () => {
       if (document.visibilityState === "visible") void refresh();
     };
-    // Poll modestly so admin-side plan updates propagate without hard refresh
-    const poll = window.setInterval(() => void refresh(), 45_000);
+    // Fallback poll only (5 min) — not the primary sync path
+    const poll = window.setInterval(() => void refresh(), FALLBACK_POLL_MS);
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVis);
     return () => {
@@ -109,7 +197,6 @@ export function PlanProvider({ children }: { children: ReactNode }) {
 
   const closeLock = useCallback(() => setLockFeature(null), []);
 
-  /** Returns true if allowed; otherwise opens lock modal and returns false */
   const requireFeature = useCallback(
     (feature: FeatureKey) => {
       if (canAccessFeature(tier, feature)) return true;
@@ -125,6 +212,10 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       plan,
       isTrial,
       planStatus,
+      licenseStatus,
+      trialDaysRemaining,
+      isLocked,
+      liveStatus,
       loading,
       can,
       requireFeature,
@@ -132,7 +223,22 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       closeLock,
       refresh,
     }),
-    [tier, plan, isTrial, planStatus, loading, can, requireFeature, openLock, closeLock, refresh]
+    [
+      tier,
+      plan,
+      isTrial,
+      planStatus,
+      licenseStatus,
+      trialDaysRemaining,
+      isLocked,
+      liveStatus,
+      loading,
+      can,
+      requireFeature,
+      openLock,
+      closeLock,
+      refresh,
+    ]
   );
 
   return (
@@ -152,12 +258,15 @@ export function PlanProvider({ children }: { children: ReactNode }) {
 export function usePlan(): PlanContextValue {
   const ctx = useContext(PlanContext);
   if (!ctx) {
-    // Safe fallback when used outside provider (e.g. auth pages)
     return {
       tier: "enterprise",
       plan: null,
       isTrial: false,
       planStatus: "active",
+      licenseStatus: "active",
+      trialDaysRemaining: null,
+      isLocked: false,
+      liveStatus: "idle",
       loading: false,
       can: () => true,
       requireFeature: () => true,

@@ -307,7 +307,7 @@ const APPEARANCE_HREF = "/dashboard/settings/appearance";
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { user, logout, token } = useAuth();
   const { portal, workspaceRole, setWorkspaceRole, isLoading: portalLoading } = usePortal();
-  const { can, requireFeature } = usePlan();
+  const { can, requireFeature, plan, isTrial, planStatus, licenseStatus } = usePlan();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   /** Desktop collapse — icons-only rail */
@@ -732,6 +732,23 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 CRM
               </div>
             )}
+            {/* Live plan / license badge — updates via SSE when Super Admin changes subscription */}
+            <div
+              className={`hidden md:flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border tracking-wide shrink-0 font-semibold capitalize ${
+                isTrial
+                  ? "bg-sky-500/10 text-sky-300 border-sky-500/25"
+                  : planStatus === "suspended" || licenseStatus === "expired"
+                    ? "bg-red-500/10 text-red-300 border-red-500/25"
+                    : "bg-violet-500/10 text-violet-200 border-violet-500/25"
+              }`}
+              data-testid="plan-badge"
+              title={`Plan: ${plan || "—"} · Status: ${planStatus || "—"} · License: ${licenseStatus || "—"}`}
+            >
+              <span>{isTrial ? "Trial" : plan || "Plan"}</span>
+              {licenseStatus ? (
+                <span className="opacity-70 font-normal normal-case">· {licenseStatus}</span>
+              ) : null}
+            </div>
           </div>
 
           <div className="relative flex items-center gap-2 sm:gap-3" ref={userMenuRef}>

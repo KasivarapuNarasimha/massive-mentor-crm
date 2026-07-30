@@ -1,81 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
-import { subscribeDataChanged } from "@/lib/data-events";
+import { usePlan } from "@/lib/plan-context";
 
 /**
- * Top trial countdown banner — blue / orange / red by days remaining.
- * Hides immediately when Super Admin / payment ends trial (poll + events).
+ * Top trial countdown banner — driven by live PlanProvider (SSE + access).
+ * Hides instantly when Super Admin ends trial / activates a paid plan.
  */
 export function TrialBanner() {
-  const { token, isAuthenticated } = useAuth();
-  const [days, setDays] = useState<number | null>(null);
-  const [isTrial, setIsTrial] = useState(false);
-  const [planLabel, setPlanLabel] = useState<string | null>(null);
+  const { isTrial, trialDaysRemaining, plan, loading } = usePlan();
 
-  useEffect(() => {
-    if (!token || !isAuthenticated) return;
-    let cancelled = false;
+  if (loading) return null;
+  if (!isTrial || trialDaysRemaining == null) return null;
 
-    const load = async () => {
-      const res = await api.get<{
-        access: {
-          allowed: boolean;
-          isTrial: boolean;
-          trialDaysRemaining: number | null;
-          reason?: string;
-          plan?: string | null;
-          planStatus?: string;
-        };
-      }>("/billing/access", token);
-      if (cancelled || !res.success || !res.data?.access) return;
-      const a = res.data.access;
-      if (!a.allowed && a.reason) {
-        setIsTrial(false);
-        return;
-      }
-      // Paid active plan must never show trial chrome
-      const paidActive =
-        !a.isTrial &&
-        a.plan &&
-        a.plan !== "trial" &&
-        (a.planStatus === "active" || a.planStatus === "past_due");
-      if (paidActive) {
-        setIsTrial(false);
-        setDays(null);
-        setPlanLabel(a.plan || null);
-        return;
-      }
-      setIsTrial(!!a.isTrial);
-      setPlanLabel(a.plan || null);
-      const rem = a.trialDaysRemaining;
-      setDays(rem == null ? null : Math.min(Math.max(0, rem), 3));
-    };
-
-    void load();
-    const unsub = subscribeDataChanged((ev) => {
-      if (ev.module === "billing" || ev.module === "all") void load();
-    });
-    const poll = window.setInterval(() => void load(), 45_000);
-    const onVis = () => {
-      if (document.visibilityState === "visible") void load();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", onVis);
-
-    return () => {
-      cancelled = true;
-      unsub();
-      window.clearInterval(poll);
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", onVis);
-    };
-  }, [token, isAuthenticated]);
-
-  if (!isTrial || days == null) return null;
+  // Product rule: free trial display capped at 3 days remaining
+  const days = Math.min(Math.max(0, trialDaysRemaining), 3);
 
   const tone =
     days <= 0
@@ -103,8 +42,8 @@ export function TrialBanner() {
     >
       <span className="font-medium">
         {msg}
-        {planLabel && planLabel !== "trial" ? (
-          <span className="opacity-80 font-normal"> · Preview plan: {planLabel}</span>
+        {plan && plan !== "trial" ? (
+          <span className="opacity-80 font-normal"> · Plan: {plan}</span>
         ) : null}
       </span>
       <Link

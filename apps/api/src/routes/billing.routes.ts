@@ -5,6 +5,8 @@ import * as ctrl from "../controllers/billing.controller.js";
 const router: Router = Router();
 
 router.get("/access", requireAuth, ctrl.getAccess);
+/** Live subscription sync (SSE) — Super Admin changes push here */
+router.get("/stream", requireAuth, ctrl.subscriptionStream);
 router.get("/overview", requireAuth, ctrl.getOverview);
 router.get("/plans", requireAuth, ctrl.listPlans);
 router.post("/checkout/order", requireAuth, ctrl.createOrder);

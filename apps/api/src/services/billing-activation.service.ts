@@ -267,6 +267,29 @@ export async function activateSubscriptionFromPayment(opts: {
     },
   });
 
+  // Push live update to open CRM sessions (no poll wait)
+  try {
+    const planKey = plan.code.split("_")[0] || plan.code;
+    const { publishSubscriptionChange } = await import(
+      "./subscription-realtime.service.js"
+    );
+    publishSubscriptionChange(payment.businessId, {
+      plan: planKey,
+      planStatus: "active",
+      isTrial: false,
+      licenseStatus: "active",
+      isLocked: false,
+      subscriptionEndsAt: end.toISOString(),
+      action: "activate",
+      source: opts.activatedBy === "admin" ? "super_admin" : "customer_payment",
+    });
+  } catch (e) {
+    console.warn(
+      "[billing] realtime publish failed:",
+      e instanceof Error ? e.message : e
+    );
+  }
+
   const owner = await prisma.user.findUnique({
     where: { id: payment.business.ownerUserId },
   });

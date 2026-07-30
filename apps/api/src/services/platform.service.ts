@@ -307,6 +307,23 @@ export async function setBusinessStatus(
     },
   });
 
+  try {
+    const { publishSubscriptionChange } = await import(
+      "./subscription-realtime.service.js"
+    );
+    publishSubscriptionChange(businessId, {
+      plan: updated.plan,
+      planStatus: updated.planStatus,
+      isTrial: updated.isTrial,
+      licenseStatus: updated.licenseStatus,
+      isLocked: updated.isLocked || status === "suspended",
+      action: status === "suspended" ? "suspend" : "activate",
+      source: "super_admin",
+    });
+  } catch {
+    /* non-fatal */
+  }
+
   await recordAudit({
     businessId,
     actorUserId,
@@ -688,6 +705,31 @@ export async function changePlan(
   console.log(
     `[platform] changePlan businessId=${businessId} action=${action} ${fromPlan}→${String(data.plan ?? plan)} isTrial=${updated.isTrial} planStatus=${updated.planStatus} license=${updated.licenseStatus}`
   );
+
+  // Real-time push to open CRM sessions for this tenant
+  try {
+    const { publishSubscriptionChange } = await import(
+      "./subscription-realtime.service.js"
+    );
+    publishSubscriptionChange(businessId, {
+      plan: updated.plan,
+      planStatus: updated.planStatus,
+      isTrial: updated.isTrial,
+      licenseStatus: updated.licenseStatus,
+      isLocked: updated.isLocked,
+      subscriptionEndsAt: updated.subscriptionEndsAt
+        ? updated.subscriptionEndsAt.toISOString()
+        : null,
+      trialEndsAt: updated.trialEndsAt ? updated.trialEndsAt.toISOString() : null,
+      action,
+      source: "super_admin",
+    });
+  } catch (e) {
+    console.warn(
+      "[platform] realtime publish failed:",
+      e instanceof Error ? e.message : e
+    );
+  }
 
   return updated;
 }
