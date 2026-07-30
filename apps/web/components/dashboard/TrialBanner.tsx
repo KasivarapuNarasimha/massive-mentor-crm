@@ -4,35 +4,74 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { subscribeDataChanged } from "@/lib/data-events";
 
 /**
  * Top trial countdown banner — blue / orange / red by days remaining.
+ * Hides immediately when Super Admin / payment ends trial (poll + events).
  */
 export function TrialBanner() {
   const { token, isAuthenticated } = useAuth();
   const [days, setDays] = useState<number | null>(null);
   const [isTrial, setIsTrial] = useState(false);
+  const [planLabel, setPlanLabel] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token || !isAuthenticated) return;
     let cancelled = false;
-    (async () => {
+
+    const load = async () => {
       const res = await api.get<{
-        access: { allowed: boolean; isTrial: boolean; trialDaysRemaining: number | null; reason?: string };
+        access: {
+          allowed: boolean;
+          isTrial: boolean;
+          trialDaysRemaining: number | null;
+          reason?: string;
+          plan?: string | null;
+          planStatus?: string;
+        };
       }>("/billing/access", token);
       if (cancelled || !res.success || !res.data?.access) return;
       const a = res.data.access;
       if (!a.allowed && a.reason) {
-        // Hard lock handled by dashboard layout redirect
+        setIsTrial(false);
+        return;
+      }
+      // Paid active plan must never show trial chrome
+      const paidActive =
+        !a.isTrial &&
+        a.plan &&
+        a.plan !== "trial" &&
+        (a.planStatus === "active" || a.planStatus === "past_due");
+      if (paidActive) {
+        setIsTrial(false);
+        setDays(null);
+        setPlanLabel(a.plan || null);
         return;
       }
       setIsTrial(!!a.isTrial);
-      // Product rule: free trial is 3 days — never display inflated remaining
+      setPlanLabel(a.plan || null);
       const rem = a.trialDaysRemaining;
       setDays(rem == null ? null : Math.min(Math.max(0, rem), 3));
-    })();
+    };
+
+    void load();
+    const unsub = subscribeDataChanged((ev) => {
+      if (ev.module === "billing" || ev.module === "all") void load();
+    });
+    const poll = window.setInterval(() => void load(), 45_000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+
     return () => {
       cancelled = true;
+      unsub();
+      window.clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
     };
   }, [token, isAuthenticated]);
 
@@ -62,7 +101,12 @@ export function TrialBanner() {
       role="status"
       data-testid="trial-banner"
     >
-      <span className="font-medium">{msg}</span>
+      <span className="font-medium">
+        {msg}
+        {planLabel && planLabel !== "trial" ? (
+          <span className="opacity-80 font-normal"> · Preview plan: {planLabel}</span>
+        ) : null}
+      </span>
       <Link
         href="/dashboard/billing"
         className="underline font-semibold shrink-0 hover:opacity-90"

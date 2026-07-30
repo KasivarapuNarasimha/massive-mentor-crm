@@ -40,6 +40,11 @@ router.post("/businesses/:id/reset-trial", requirePlatformAdmin, ctrl.resetTrial
 router.delete("/businesses/:id", requirePlatformAdmin, ctrl.deleteBusiness);
 router.post("/businesses/:id/restore", requirePlatformAdmin, ctrl.restoreBusiness);
 router.post("/businesses/:id/plan", requirePlatformAdmin, ctrl.changePlan);
+router.get(
+  "/businesses/:id/subscription-history",
+  requirePlatformAdmin,
+  ctrl.subscriptionHistory
+);
 router.put("/businesses/:id/white-label", requirePlatformAdmin, ctrl.updateWhiteLabel);
 router.get("/businesses/:id/usage", requirePlatformAdmin, ctrl.usage);
 router.get("/businesses/:id/export", requirePlatformAdmin, ctrl.exportBusiness);

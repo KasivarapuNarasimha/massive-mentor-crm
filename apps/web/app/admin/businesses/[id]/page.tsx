@@ -26,6 +26,8 @@ type BizDetail = {
   status: string;
   plan: string;
   planStatus: string;
+  isTrial?: boolean;
+  isLocked?: boolean;
   licenseKey?: string;
   licenseStatus: string;
   trialEndsAt?: string | null;
@@ -52,6 +54,28 @@ type BizDetail = {
     apiUsage: number;
   };
   whiteLabel?: Record<string, string> | null;
+  subscriptionEvents?: Array<{
+    id: string;
+    action: string;
+    fromPlan?: string | null;
+    toPlan?: string | null;
+    createdAt: string;
+    metadata?: Record<string, unknown> | null;
+  }>;
+};
+
+type HistoryRow = {
+  id: string;
+  action: string;
+  previousPlan: string | null;
+  newPlan: string | null;
+  changedBy: string;
+  changedByEmail: string | null;
+  paymentId: string | null;
+  date: string;
+  reason: string | null;
+  licenseStatus: string | null;
+  expiryDate: string | null;
 };
 
 export default function AdminBusinessManagePage() {
@@ -59,6 +83,9 @@ export default function AdminBusinessManagePage() {
   const router = useRouter();
   const [biz, setBiz] = useState<BizDetail | null>(null);
   const [plan, setPlan] = useState("professional");
+  const [planDays, setPlanDays] = useState(30);
+  const [planReason, setPlanReason] = useState("");
+  const [history, setHistory] = useState<HistoryRow[]>([]);
   const [supportReason, setSupportReason] = useState("");
   const [confirm, setConfirm] = useState<"suspend" | "activate" | "delete" | null>(null);
   const [addUser, setAddUser] = useState({ email: "", password: "", name: "", role: "sales_executive" });
@@ -69,7 +96,10 @@ export default function AdminBusinessManagePage() {
 
   const load = useCallback(async () => {
     if (!id) return;
-    const res = await api.platformGetBusiness(id, token());
+    const [res, hist] = await Promise.all([
+      api.platformGetBusiness(id, token()),
+      api.platformSubscriptionHistory(id, token(), 50),
+    ]);
     if (res.success && res.data) {
       const d = res.data as unknown as BizDetail;
       setBiz(d);
@@ -82,17 +112,42 @@ export default function AdminBusinessManagePage() {
         customDomain: white.customDomain || "",
       });
     } else toast.error(res.error || "Not found");
+    if (hist.success && hist.data?.history) {
+      setHistory(hist.data.history);
+    }
   }, [id]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const changePlan = async (action: "upgrade" | "downgrade" | "renew" | "activate") => {
-    const res = await api.platformChangePlan(id, { action, plan, days: 30 }, token());
+  const runPlanAction = async (
+    action:
+      | "upgrade"
+      | "downgrade"
+      | "renew"
+      | "activate"
+      | "extend_trial"
+      | "cancel"
+      | "activate_license"
+      | "suspend_license"
+  ) => {
+    setBusy(true);
+    const res = await api.platformChangePlan(
+      id,
+      {
+        action,
+        plan: action === "extend_trial" || action === "cancel" ? undefined : plan,
+        days: planDays,
+        reason: planReason.trim() || undefined,
+      },
+      token()
+    );
+    setBusy(false);
     if (res.success) {
-      toast.success(`Plan ${action} complete`);
-      load();
+      toast.success(`Subscription: ${action.replace(/_/g, " ")} applied — customer CRM will sync within ~1 min (or on next page load)`);
+      setPlanReason("");
+      void load();
     } else toast.error(res.error || "Failed");
   };
 
@@ -269,14 +324,21 @@ export default function AdminBusinessManagePage() {
         </div>
       </section>
 
-      {/* Subscription */}
+      {/* Subscription management — syncs immediately to customer CRM */}
       <section className="bg-card border border-border rounded-2xl p-5 space-y-4">
-        <h2 className="font-semibold">Subscription</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">Subscription</h2>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <StatusBadge value={biz.planStatus} />
+            {biz.isTrial ? <StatusBadge value="isTrial" /> : null}
+            {biz.isLocked ? <StatusBadge value="locked" /> : null}
+          </div>
+        </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <KpiCard label="Current Plan" value={String(biz.plan)} tone="info" />
           <KpiCard
             label="Trial Days Left"
-            value={biz.trialDaysLeft != null ? biz.trialDaysLeft : "—"}
+            value={biz.isTrial && biz.trialDaysLeft != null ? biz.trialDaysLeft : "—"}
             hint={biz.trialEndsAt ? new Date(biz.trialEndsAt).toLocaleDateString() : undefined}
           />
           <KpiCard
@@ -291,29 +353,152 @@ export default function AdminBusinessManagePage() {
           />
           <KpiCard label="License" value={biz.licenseStatus} />
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <select
-            value={plan}
-            onChange={(e) => setPlan(e.target.value)}
-            className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground min-h-11"
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
+          <label className="text-xs text-muted-foreground space-y-1">
+            Target plan
+            <select
+              value={plan}
+              onChange={(e) => setPlan(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground min-h-11"
+            >
+              <option value="trial">Trial</option>
+              <option value="basic">Basic (Starter)</option>
+              <option value="professional">Professional</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </label>
+          <label className="text-xs text-muted-foreground space-y-1">
+            Period (days)
+            <input
+              type="number"
+              min={1}
+              max={3650}
+              value={planDays}
+              onChange={(e) => setPlanDays(Math.max(1, parseInt(e.target.value, 10) || 30))}
+              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground min-h-11"
+            />
+          </label>
+          <label className="text-xs text-muted-foreground space-y-1 sm:col-span-2">
+            Reason (audit)
+            <input
+              type="text"
+              value={planReason}
+              onChange={(e) => setPlanReason(e.target.value)}
+              placeholder="Optional reason for history"
+              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground min-h-11"
+            />
+          </label>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runPlanAction("upgrade")}
+            className="min-h-11 px-4 bg-violet-500 text-white rounded-xl text-sm font-medium disabled:opacity-50"
           >
-            <option value="trial">Trial</option>
-            <option value="basic">Basic</option>
-            <option value="professional">Professional</option>
-            <option value="enterprise">Enterprise</option>
-          </select>
-          <button type="button" onClick={() => changePlan("upgrade")} className="min-h-11 px-4 bg-violet-500 text-white rounded-xl text-sm font-medium">
-            Upgrade
+            Upgrade Plan
           </button>
-          <button type="button" onClick={() => changePlan("downgrade")} className="min-h-11 px-4 bg-white/10 rounded-xl text-sm">
-            Downgrade
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runPlanAction("downgrade")}
+            className="min-h-11 px-4 bg-white/10 rounded-xl text-sm disabled:opacity-50"
+          >
+            Downgrade Plan
           </button>
-          <button type="button" onClick={() => changePlan("renew")} className="min-h-11 px-4 bg-white/10 rounded-xl text-sm">
-            Renew 30d
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runPlanAction("renew")}
+            className="min-h-11 px-4 bg-emerald-600/90 text-white rounded-xl text-sm font-medium disabled:opacity-50"
+          >
+            Renew Subscription
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runPlanAction("extend_trial")}
+            className="min-h-11 px-4 bg-sky-600/90 text-white rounded-xl text-sm disabled:opacity-50"
+          >
+            Extend Trial
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runPlanAction("activate_license")}
+            className="min-h-11 px-4 bg-white/10 rounded-xl text-sm disabled:opacity-50"
+          >
+            Activate License
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runPlanAction("suspend_license")}
+            className="min-h-11 px-4 bg-amber-500/20 text-amber-200 rounded-xl text-sm disabled:opacity-50"
+          >
+            Suspend License
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runPlanAction("cancel")}
+            className="min-h-11 px-4 bg-red-500/20 text-red-300 rounded-xl text-sm disabled:opacity-50"
+          >
+            Cancel Subscription
           </button>
         </div>
         {biz.licenseKey && (
           <p className="text-xs text-muted-foreground font-mono">License key: {biz.licenseKey}</p>
+        )}
+        <p className="text-[11px] text-muted-foreground">
+          Paid upgrades clear trial flags immediately. Customer CRM refreshes on next billing access poll
+          (focus / ~45s) without logout.
+        </p>
+      </section>
+
+      {/* Subscription history */}
+      <section className="bg-card border border-border rounded-2xl p-5 space-y-3">
+        <h2 className="font-semibold">Subscription History</h2>
+        {history.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No plan changes recorded yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                  <th className="py-2 pr-3 font-medium">Date</th>
+                  <th className="py-2 pr-3 font-medium">Previous</th>
+                  <th className="py-2 pr-3 font-medium">New</th>
+                  <th className="py-2 pr-3 font-medium">By</th>
+                  <th className="py-2 pr-3 font-medium">License</th>
+                  <th className="py-2 pr-3 font-medium">Payment</th>
+                  <th className="py-2 pr-3 font-medium">Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id} className="border-b border-border/60">
+                    <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
+                      {h.date ? new Date(h.date).toLocaleString() : "—"}
+                    </td>
+                    <td className="py-2 pr-3">{h.previousPlan || "—"}</td>
+                    <td className="py-2 pr-3 font-medium">{h.newPlan || h.action}</td>
+                    <td className="py-2 pr-3">
+                      <div>{h.changedBy}</div>
+                      {h.changedByEmail ? (
+                        <div className="text-[11px] text-muted-foreground">{h.changedByEmail}</div>
+                      ) : null}
+                    </td>
+                    <td className="py-2 pr-3">{h.licenseStatus || "—"}</td>
+                    <td className="py-2 pr-3 font-mono text-[11px]">{h.paymentId || "—"}</td>
+                    <td className="py-2 pr-3 text-muted-foreground max-w-[12rem] truncate" title={h.reason || ""}>
+                      {h.reason || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 

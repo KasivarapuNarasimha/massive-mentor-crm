@@ -1071,10 +1071,41 @@ class ApiClient {
 
   async platformChangePlan(
     id: string,
-    body: { action: string; plan: string; days?: number },
+    body: {
+      action: string;
+      plan?: string;
+      days?: number;
+      reason?: string;
+      paymentId?: string;
+    },
     token: string
   ) {
     return this.post(`/platform/businesses/${id}/plan`, body, token);
+  }
+
+  async platformSubscriptionHistory(id: string, token: string, limit = 100) {
+    return this.get<{
+      history: Array<{
+        id: string;
+        action: string;
+        previousPlan: string | null;
+        newPlan: string | null;
+        changedBy: string;
+        changedByEmail: string | null;
+        paymentId: string | null;
+        date: string;
+        reason: string | null;
+        licenseStatus: string | null;
+        expiryDate: string | null;
+      }>;
+    }>(
+      `/platform/businesses/${id}/subscription-history?limit=${limit}`,
+      token
+    );
+  }
+
+  async platformExtendTrial(id: string, days: number, token: string) {
+    return this.post(`/platform/businesses/${id}/extend-trial`, { days }, token);
   }
 
   async platformWhiteLabel(id: string, whiteLabel: Record<string, unknown>, token: string) {

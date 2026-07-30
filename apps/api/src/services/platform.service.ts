@@ -136,11 +136,13 @@ export async function getBusinessDetail(businessId: string) {
     status: b.status,
     plan: b.plan,
     planStatus: b.planStatus,
+    isTrial: b.isTrial,
+    isLocked: b.isLocked,
     licenseKey: b.licenseKey,
     licenseStatus: b.licenseStatus,
     trialEndsAt: b.trialEndsAt,
     subscriptionEndsAt: b.subscriptionEndsAt,
-    trialDaysLeft,
+    trialDaysLeft: b.isTrial ? trialDaysLeft : null,
     setupFeePaid: b.setupFeePaid,
     billingEmail: b.billingEmail,
     templateSlug: b.templateSlug,
@@ -240,8 +242,19 @@ export async function createCustomerBusiness(input: {
       portalKind: "customer",
       isDemo: false,
       plan,
-      planStatus: "active",
+      planStatus: plan === "trial" ? "trial" : "active",
+      isTrial: plan === "trial",
+      isLocked: false,
       trialEndsAt: plan === "trial" ? trialEnds : null,
+      trialStartDate: plan === "trial" ? new Date() : null,
+      subscriptionEndsAt:
+        plan === "trial"
+          ? null
+          : (() => {
+              const d = new Date();
+              d.setDate(d.getDate() + 30);
+              return d;
+            })(),
       licenseStatus: plan === "trial" ? "trial" : "active",
       licenseKey: `MM-${crypto.randomBytes(8).toString("hex").toUpperCase()}`,
       billingEmail: email,
@@ -416,44 +429,242 @@ export async function restoreBusiness(actorUserId: string, businessId: string) {
   return updated;
 }
 
+export type SubscriptionManageAction =
+  | "activate"
+  | "upgrade"
+  | "downgrade"
+  | "renew"
+  | "extend_trial"
+  | "cancel"
+  | "activate_license"
+  | "suspend_license";
+
+/**
+ * Super Admin subscription lifecycle.
+ * CRITICAL: paid plans must clear isTrial + isLocked or CRM keeps showing trial UI.
+ */
 export async function changePlan(
   actorUserId: string,
   businessId: string,
-  action: "activate" | "upgrade" | "downgrade" | "renew",
+  action: SubscriptionManageAction,
   toPlan: string,
-  days?: number
+  days?: number,
+  opts?: { reason?: string; paymentId?: string }
 ) {
-  const plan = assertPlan(toPlan);
   const b = await prisma.business.findFirst({
     where: { id: businessId, isDemo: false, portalKind: "customer" },
   });
   if (!b) throw new Error("Business not found");
 
-  const ends = new Date();
-  ends.setDate(ends.getDate() + (days || 30));
+  const periodDays = Math.max(1, Math.min(3650, days || 30));
+  const now = new Date();
+  const ends = new Date(now);
+  ends.setDate(ends.getDate() + periodDays);
+
+  const fromPlan = b.plan;
+  const fromStatus = b.planStatus;
+  const fromLicense = b.licenseStatus;
+  const reason = (opts?.reason || "").trim() || undefined;
+
+  // Resolve target plan for plan-change actions
+  let plan = b.plan as PlanKey;
+  if (
+    action === "activate" ||
+    action === "upgrade" ||
+    action === "downgrade" ||
+    action === "renew"
+  ) {
+    plan = assertPlan(toPlan || b.plan);
+  } else if (action === "extend_trial") {
+    plan = "trial";
+  }
+
+  const paid = plan !== "trial" && action !== "extend_trial" && action !== "cancel";
+
+  let data: Record<string, unknown> = {};
+
+  if (action === "extend_trial") {
+    const base =
+      b.trialEndsAt && new Date(b.trialEndsAt).getTime() > now.getTime()
+        ? new Date(b.trialEndsAt)
+        : now;
+    const trialEnd = new Date(base);
+    trialEnd.setDate(trialEnd.getDate() + periodDays);
+    data = {
+      plan: "trial",
+      planStatus: "trial",
+      isTrial: true,
+      isLocked: false,
+      status: "active",
+      licenseStatus: "trial",
+      trialEndsAt: trialEnd,
+      trialStartDate: b.trialStartDate || now,
+      trialDays: Math.max(b.trialDays || 0, periodDays),
+      suspendedAt: null,
+      suspendedReason: null,
+    };
+  } else if (action === "cancel") {
+    data = {
+      planStatus: "cancelled",
+      isLocked: false,
+      // Keep plan code for history; end subscription now
+      subscriptionEndsAt: now,
+      licenseStatus: "expired",
+      isTrial: false,
+      status: "active",
+    };
+  } else if (action === "activate_license") {
+    if (plan !== "trial") {
+      data = {
+        plan,
+        planStatus: "active",
+        isTrial: false,
+        isLocked: false,
+        status: "active",
+        licenseStatus: "active",
+        licenseKey: b.licenseKey || `MM-${crypto.randomBytes(8).toString("hex").toUpperCase()}`,
+        subscriptionEndsAt:
+          b.subscriptionEndsAt && new Date(b.subscriptionEndsAt) > now
+            ? b.subscriptionEndsAt
+            : ends,
+        suspendedAt: null,
+        suspendedReason: null,
+      };
+    } else {
+      data = {
+        licenseStatus: "active",
+        licenseKey: b.licenseKey || `MM-${crypto.randomBytes(8).toString("hex").toUpperCase()}`,
+        isLocked: false,
+        status: "active",
+        planStatus:
+          b.planStatus === "cancelled" || b.planStatus === "expired" ? "active" : b.planStatus,
+        isTrial: true,
+      };
+    }
+  } else if (action === "suspend_license") {
+    data = {
+      licenseStatus: "expired",
+      planStatus: "suspended",
+      status: "suspended",
+      isLocked: true,
+      isTrial: false,
+      suspendedAt: now,
+      suspendedReason: reason || "License suspended by Super Admin",
+    };
+  } else {
+    // activate | upgrade | downgrade | renew
+    if (paid) {
+      // Renew extends from current end if still in future
+      let subEnd = ends;
+      if (
+        action === "renew" &&
+        b.subscriptionEndsAt &&
+        new Date(b.subscriptionEndsAt).getTime() > now.getTime()
+      ) {
+        subEnd = new Date(b.subscriptionEndsAt);
+        subEnd.setDate(subEnd.getDate() + periodDays);
+      }
+      data = {
+        plan,
+        planStatus: "active",
+        status: "active",
+        // Root cause fix: leave trial mode completely
+        isTrial: false,
+        isLocked: false,
+        licenseStatus: "active",
+        licenseKey: b.licenseKey || `MM-${crypto.randomBytes(8).toString("hex").toUpperCase()}`,
+        subscriptionEndsAt: subEnd,
+        // Keep historical trial dates but stop treating business as trial
+        trialEndsAt: b.trialEndsAt,
+        suspendedAt: null,
+        suspendedReason: null,
+      };
+    } else {
+      // Switch to trial plan
+      data = {
+        plan: "trial",
+        planStatus: "trial",
+        isTrial: true,
+        isLocked: false,
+        status: "active",
+        licenseStatus: "trial",
+        trialEndsAt: ends,
+        trialStartDate: now,
+        trialDays: periodDays,
+        subscriptionEndsAt: null,
+        suspendedAt: null,
+        suspendedReason: null,
+      };
+    }
+  }
 
   const updated = await prisma.business.update({
     where: { id: businessId },
-    data: {
-      plan,
-      planStatus: "active",
-      status: "active",
-      licenseStatus: plan === "trial" ? "trial" : "active",
-      subscriptionEndsAt: plan === "trial" ? null : ends,
-      trialEndsAt: plan === "trial" ? ends : b.trialEndsAt,
-      suspendedAt: null,
-      suspendedReason: null,
-    },
+    data: data as never,
   });
+
+  // Keep Subscription row in sync for paid activations
+  if (paid && (action === "activate" || action === "upgrade" || action === "downgrade" || action === "renew")) {
+    try {
+      await prisma.subscription.updateMany({
+        where: { businessId, status: "active" },
+        data: { status: "cancelled" },
+      });
+      await prisma.subscription.create({
+        data: {
+          businessId,
+          status: "active",
+          startDate: now,
+          endDate: (data.subscriptionEndsAt as Date) || ends,
+          renewalDate: (data.subscriptionEndsAt as Date) || ends,
+          createdById: actorUserId,
+          notes: `Super Admin ${action}: ${fromPlan} → ${plan}`,
+          paymentId: opts?.paymentId || null,
+        },
+      });
+    } catch (e) {
+      console.warn(
+        "[platform] subscription row sync skipped:",
+        e instanceof Error ? e.message : e
+      );
+    }
+  }
+
+  const eventAction =
+    action === "extend_trial"
+      ? "trial_extend"
+      : action === "activate_license"
+        ? "activate"
+        : action === "suspend_license"
+          ? "cancel"
+          : action === "cancel"
+            ? "cancel"
+            : action;
 
   await prisma.subscriptionEvent.create({
     data: {
       businessId,
       actorUserId,
-      action,
-      fromPlan: b.plan,
-      toPlan: plan,
-      metadata: { days: days || 30 },
+      action: eventAction,
+      fromPlan,
+      toPlan: String(data.plan ?? plan),
+      metadata: {
+        action,
+        reason: reason || null,
+        changedBy: "super_admin",
+        actorUserId,
+        paymentId: opts?.paymentId || null,
+        previousPlan: fromPlan,
+        newPlan: String(data.plan ?? plan),
+        previousPlanStatus: fromStatus,
+        newPlanStatus: updated.planStatus,
+        previousLicenseStatus: fromLicense,
+        licenseStatus: updated.licenseStatus,
+        expiryDate: updated.subscriptionEndsAt || updated.trialEndsAt || null,
+        days: periodDays,
+        isTrial: updated.isTrial,
+        isLocked: updated.isLocked,
+      },
     },
   });
 
@@ -463,10 +674,78 @@ export async function changePlan(
     action: `platform_plan_${action}`,
     entityType: "business",
     entityId: businessId,
-    metadata: { fromPlan: b.plan, toPlan: plan },
+    metadata: {
+      fromPlan,
+      toPlan: String(data.plan ?? plan),
+      reason: reason || null,
+      licenseStatus: updated.licenseStatus,
+      planStatus: updated.planStatus,
+      isTrial: updated.isTrial,
+      subscriptionEndsAt: updated.subscriptionEndsAt,
+    },
   });
 
+  console.log(
+    `[platform] changePlan businessId=${businessId} action=${action} ${fromPlan}→${String(data.plan ?? plan)} isTrial=${updated.isTrial} planStatus=${updated.planStatus} license=${updated.licenseStatus}`
+  );
+
   return updated;
+}
+
+/** Full subscription history for Super Admin audit UI */
+export async function getSubscriptionHistory(businessId: string, limit = 100) {
+  const b = await prisma.business.findFirst({
+    where: { id: businessId, isDemo: false, portalKind: "customer" },
+    select: { id: true },
+  });
+  if (!b) throw new Error("Business not found");
+
+  const events = await prisma.subscriptionEvent.findMany({
+    where: { businessId },
+    orderBy: { createdAt: "desc" },
+    take: Math.min(500, Math.max(1, limit)),
+  });
+
+  const actorIds = [
+    ...new Set(events.map((e) => e.actorUserId).filter(Boolean) as string[]),
+  ];
+  const actors = actorIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: actorIds } },
+        select: { id: true, email: true, name: true, platformRole: true },
+      })
+    : [];
+  const actorMap = new Map(actors.map((a) => [a.id, a]));
+
+  return events.map((e) => {
+    const meta = (e.metadata || {}) as Record<string, unknown>;
+    const actor = e.actorUserId ? actorMap.get(e.actorUserId) : null;
+    const changedByRole =
+      meta.changedBy === "customer"
+        ? "Customer"
+        : actor?.platformRole === "super_admin"
+          ? "Super Admin"
+          : meta.changedBy === "super_admin"
+            ? "Super Admin"
+            : e.actorUserId
+              ? "User"
+              : "System";
+    return {
+      id: e.id,
+      action: e.action,
+      previousPlan: e.fromPlan || meta.previousPlan || null,
+      newPlan: e.toPlan || meta.newPlan || null,
+      changedBy: changedByRole,
+      changedByEmail: actor?.email || null,
+      changedByName: actor?.name || null,
+      paymentId: meta.paymentId || meta.razorpayPaymentId || null,
+      date: e.createdAt,
+      reason: meta.reason || null,
+      licenseStatus: meta.licenseStatus || null,
+      expiryDate: meta.expiryDate || null,
+      metadata: meta,
+    };
+  });
 }
 
 export async function updateWhiteLabel(

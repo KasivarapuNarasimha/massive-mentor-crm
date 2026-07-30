@@ -163,6 +163,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
       subscriptionEndsAt: true,
       trialDays: true,
       gracePeriodDays: true,
+      licenseStatus: true,
       createdAt: true,
     },
   });
@@ -181,8 +182,65 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
     };
   }
 
+  // Self-heal: Super Admin (or payment) set a paid plan but left isTrial=true —
+  // CRM would keep showing Trial banner. Clear trial when plan is paid + active.
+  const planLower = String(bizRaw.plan || "").toLowerCase();
+  const looksPaidPlan =
+    planLower &&
+    planLower !== "trial" &&
+    (bizRaw.planStatus === "active" ||
+      bizRaw.planStatus === "past_due" ||
+      bizRaw.licenseStatus === "active");
+  if (looksPaidPlan && bizRaw.isTrial) {
+    console.warn(
+      `[billing-access] healing stuck isTrial=true on paid plan businessId=${bizRaw.id} plan=${bizRaw.plan} planStatus=${bizRaw.planStatus}`
+    );
+    await prisma.business
+      .update({
+        where: { id: bizRaw.id },
+        data: {
+          isTrial: false,
+          isLocked: false,
+          planStatus:
+            bizRaw.planStatus === "trial" || !bizRaw.planStatus
+              ? "active"
+              : bizRaw.planStatus,
+          licenseStatus:
+            bizRaw.licenseStatus === "trial" || !bizRaw.licenseStatus
+              ? "active"
+              : bizRaw.licenseStatus,
+          // Ensure paid window exists so evaluate path doesn't fall into trial
+          subscriptionEndsAt:
+            bizRaw.subscriptionEndsAt ||
+            (() => {
+              const d = new Date();
+              d.setDate(d.getDate() + 30);
+              return d;
+            })(),
+        },
+      })
+      .catch(() => undefined);
+    bizRaw.isTrial = false;
+    bizRaw.isLocked = false;
+    if (bizRaw.planStatus === "trial") bizRaw.planStatus = "active";
+    if (bizRaw.licenseStatus === "trial") bizRaw.licenseStatus = "active";
+    if (!bizRaw.subscriptionEndsAt) {
+      const d = new Date();
+      d.setDate(d.getDate() + 30);
+      bizRaw.subscriptionEndsAt = d;
+    }
+  }
+
   // Normalize 3-day free trial (repair inflated remaining days from bad data)
-  const trialNorm = await normalizeStandardTrial(bizRaw);
+  // Skip when already on a paid active plan (even if isTrial was stale — healed above)
+  const trialNorm =
+    looksPaidPlan && !bizRaw.isTrial
+      ? {
+          trialDays: bizRaw.trialDays,
+          trialEndsAt: bizRaw.trialEndsAt,
+          trialStartDate: bizRaw.trialStartDate,
+        }
+      : await normalizeStandardTrial(bizRaw);
   const biz = {
     ...bizRaw,
     trialDays: trialNorm.trialDays,
@@ -277,8 +335,15 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
     };
   }
 
-  // Trial path
-  if (biz.isTrial || biz.planStatus === "trial" || biz.plan === "trial") {
+  // Trial path — only when truly on trial (do not use plan name alone if planStatus is active paid)
+  const onTrial =
+    (biz.isTrial || biz.planStatus === "trial" || biz.plan === "trial") &&
+    !(
+      !biz.isTrial &&
+      biz.plan !== "trial" &&
+      (biz.planStatus === "active" || biz.planStatus === "past_due")
+    );
+  if (onTrial) {
     const trialEnd = biz.trialEndsAt;
     if (trialEnd && new Date(trialEnd).getTime() > now) {
       return {

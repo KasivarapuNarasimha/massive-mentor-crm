@@ -410,6 +410,9 @@ export default function BillingPage() {
           setBusyCode(null);
           void load();
           void refreshPlan();
+          void import("@/lib/data-events").then(({ emitDataChanged }) => {
+            emitDataChanged({ module: "billing", action: "update" });
+          });
         };
 
         if (verify.data?.activated) {

@@ -220,22 +220,50 @@ export async function changePlan(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const schema = z.object({
-      action: z.enum(["activate", "upgrade", "downgrade", "renew"]),
-      plan: z.string(),
+      action: z.enum([
+        "activate",
+        "upgrade",
+        "downgrade",
+        "renew",
+        "extend_trial",
+        "cancel",
+        "activate_license",
+        "suspend_license",
+      ]),
+      plan: z.string().optional(),
       days: z.number().int().positive().optional(),
+      reason: z.string().max(500).optional(),
+      paymentId: z.string().optional(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ success: false, error: parsed.error.errors[0]?.message || "Invalid input" });
     }
+    const needsPlan = ["activate", "upgrade", "downgrade", "renew"].includes(parsed.data.action);
+    if (needsPlan && !parsed.data.plan) {
+      return res.status(400).json({ success: false, error: "plan is required for this action" });
+    }
     const data = await platform.changePlan(
       req.user.id,
       String(req.params.id),
       parsed.data.action,
-      parsed.data.plan,
-      parsed.data.days
+      parsed.data.plan || "trial",
+      parsed.data.days,
+      { reason: parsed.data.reason, paymentId: parsed.data.paymentId }
     );
     res.json({ success: true, data });
+  } catch (error: unknown) {
+    res.status(400).json({ success: false, error: error instanceof Error ? error.message : "Failed" });
+  }
+}
+
+/** GET /api/platform/businesses/:id/subscription-history */
+export async function subscriptionHistory(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+    const data = await platform.getSubscriptionHistory(String(req.params.id), limit);
+    res.json({ success: true, data: { history: data } });
   } catch (error: unknown) {
     res.status(400).json({ success: false, error: error instanceof Error ? error.message : "Failed" });
   }

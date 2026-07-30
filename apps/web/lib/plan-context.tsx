@@ -20,11 +20,13 @@ import {
   requiredPlanName,
 } from "@/lib/plan-entitlements";
 import { FeatureLockModal } from "@/components/billing/FeatureLockModal";
+import { subscribeDataChanged } from "@/lib/data-events";
 
 type PlanContextValue = {
   tier: PlanTier;
   plan: string | null;
   isTrial: boolean;
+  planStatus: string | null;
   loading: boolean;
   can: (feature: FeatureKey) => boolean;
   requireFeature: (feature: FeatureKey) => boolean;
@@ -40,6 +42,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
   const [tier, setTier] = useState<PlanTier>("trial");
   const [plan, setPlan] = useState<string | null>(null);
   const [isTrial, setIsTrial] = useState(true);
+  const [planStatus, setPlanStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lockFeature, setLockFeature] = useState<FeatureKey | null>(null);
 
@@ -48,26 +51,52 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    const res = await api.get<{
-      access: {
-        isTrial: boolean;
-        plan?: string | null;
-        planStatus?: string;
-      };
-    }>("/billing/access", token);
-    if (res.success && res.data?.access) {
-      const a = res.data.access;
-      const p = a.plan || null;
-      setPlan(p);
-      setIsTrial(!!a.isTrial);
-      setTier(resolvePlanTier(p, !!a.isTrial));
+    try {
+      const res = await api.get<{
+        access: {
+          isTrial: boolean;
+          plan?: string | null;
+          planStatus?: string;
+        };
+      }>("/billing/access", token);
+      if (res.success && res.data?.access) {
+        const a = res.data.access;
+        const p = a.plan || null;
+        setPlan(p);
+        setIsTrial(!!a.isTrial);
+        setPlanStatus(a.planStatus || null);
+        setTier(resolvePlanTier(p, !!a.isTrial));
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [token, isAuthenticated]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Live sync: Super Admin plan changes must appear without re-login
+  useEffect(() => {
+    if (!token || !isAuthenticated) return;
+    const unsub = subscribeDataChanged((ev) => {
+      if (ev.module === "billing" || ev.module === "all") void refresh();
+    });
+    const onFocus = () => void refresh();
+    const onVis = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    // Poll modestly so admin-side plan updates propagate without hard refresh
+    const poll = window.setInterval(() => void refresh(), 45_000);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      unsub();
+      window.clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [token, isAuthenticated, refresh]);
 
   const can = useCallback(
     (feature: FeatureKey) => canAccessFeature(tier, feature),
@@ -95,6 +124,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       tier,
       plan,
       isTrial,
+      planStatus,
       loading,
       can,
       requireFeature,
@@ -102,7 +132,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       closeLock,
       refresh,
     }),
-    [tier, plan, isTrial, loading, can, requireFeature, openLock, closeLock, refresh]
+    [tier, plan, isTrial, planStatus, loading, can, requireFeature, openLock, closeLock, refresh]
   );
 
   return (
@@ -127,6 +157,7 @@ export function usePlan(): PlanContextValue {
       tier: "enterprise",
       plan: null,
       isTrial: false,
+      planStatus: "active",
       loading: false,
       can: () => true,
       requireFeature: () => true,

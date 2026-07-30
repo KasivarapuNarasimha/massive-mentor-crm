@@ -16,6 +16,7 @@ export type DataChangeEvent = {
     | "document"
     | "finance"
     | "notification"
+    | "billing"
     | "all";
   action?: "create" | "update" | "delete" | "import" | "refresh";
 };
