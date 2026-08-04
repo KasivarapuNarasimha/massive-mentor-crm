@@ -18,7 +18,18 @@ type Member = {
   name: string | null;
   role: string;
   isDisabled: boolean;
+  modules?: string[];
+  permissionTemplate?: string;
+  permissionsCustomized?: boolean;
 };
+
+type CatalogModule = {
+  key: string;
+  label: string;
+  category?: string | null;
+  alwaysOn?: boolean;
+};
+type CatalogTemplate = { roleKey: string; label: string; modules: string[] };
 
 type BizDetail = {
   id: string;
@@ -88,17 +99,35 @@ export default function AdminBusinessManagePage() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [supportReason, setSupportReason] = useState("");
   const [confirm, setConfirm] = useState<"suspend" | "activate" | "delete" | null>(null);
-  const [addUser, setAddUser] = useState({ email: "", password: "", name: "", role: "sales_executive" });
+  const [addUser, setAddUser] = useState({
+    email: "",
+    password: "",
+    name: "",
+    role: "sales_executive",
+  });
+  const [addModules, setAddModules] = useState<string[]>([]);
+  const [catalogModules, setCatalogModules] = useState<CatalogModule[]>([]);
+  const [catalogTemplates, setCatalogTemplates] = useState<CatalogTemplate[]>([]);
+  const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [editModules, setEditModules] = useState<string[]>([]);
+  const [editRole, setEditRole] = useState("sales_executive");
   const [busy, setBusy] = useState(false);
   const [wl, setWl] = useState({ companyName: "", logoUrl: "", theme: "dark", customDomain: "" });
 
   const token = () => localStorage.getItem(PORTAL_TOKENS.admin) || "";
 
+  const applyTemplateModules = (roleKey: string) => {
+    const t = catalogTemplates.find((x) => x.roleKey === roleKey);
+    if (t?.modules?.length) return [...t.modules];
+    return catalogModules.filter((m) => m.alwaysOn).map((m) => m.key);
+  };
+
   const load = useCallback(async () => {
     if (!id) return;
-    const [res, hist] = await Promise.all([
+    const [res, hist, cat] = await Promise.all([
       api.platformGetBusiness(id, token()),
       api.platformSubscriptionHistory(id, token(), 50),
+      api.platformPermissionCatalog(token()),
     ]);
     if (res.success && res.data) {
       const d = res.data as unknown as BizDetail;
@@ -114,6 +143,13 @@ export default function AdminBusinessManagePage() {
     } else toast.error(res.error || "Not found");
     if (hist.success && hist.data?.history) {
       setHistory(hist.data.history);
+    }
+    if (cat.success && cat.data) {
+      setCatalogModules(cat.data.modules || []);
+      setCatalogTemplates(cat.data.templates || []);
+      // Seed add-user modules from sales_executive template once
+      const se = (cat.data.templates || []).find((t) => t.roleKey === "sales_executive");
+      if (se?.modules?.length) setAddModules(se.modules);
     }
   }, [id]);
 
@@ -214,13 +250,93 @@ export default function AdminBusinessManagePage() {
 
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await api.platformAddUser(id, addUser, token());
+    const res = await api.platformAddUser(
+      id,
+      {
+        ...addUser,
+        modules: addModules,
+        customized: true,
+      },
+      token()
+    );
     if (res.success) {
-      toast.success("User added");
+      toast.success("User added with module permissions");
       setAddUser({ email: "", password: "", name: "", role: "sales_executive" });
+      setAddModules(applyTemplateModules("sales_executive"));
       load();
     } else toast.error(res.error || "Failed");
   };
+
+  const openEditPermissions = (m: Member) => {
+    setEditUserId(m.userId);
+    setEditRole(m.role || "sales_executive");
+    setEditModules(
+      m.modules && m.modules.length
+        ? [...m.modules]
+        : applyTemplateModules(m.role || "sales_executive")
+    );
+  };
+
+  const saveEditPermissions = async () => {
+    if (!editUserId) return;
+    setBusy(true);
+    const res = await api.platformSetUserPermissions(
+      id,
+      editUserId,
+      {
+        modules: editModules,
+        role: editRole,
+        template: editRole,
+        customized: true,
+      },
+      token()
+    );
+    setBusy(false);
+    if (res.success) {
+      toast.success("Permissions updated — user portal updates on next load");
+      setEditUserId(null);
+      load();
+    } else toast.error(res.error || "Failed");
+  };
+
+  const toggleModule = (list: string[], key: string, alwaysOn?: boolean) => {
+    if (alwaysOn) return list;
+    return list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
+  };
+
+  const ModuleCheckboxes = ({
+    selected,
+    onChange,
+  }: {
+    selected: string[];
+    onChange: (next: string[]) => void;
+  }) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto p-2 rounded-xl border border-border bg-background/50">
+      {catalogModules.map((m) => {
+        const checked = selected.includes(m.key) || !!m.alwaysOn;
+        return (
+          <label
+            key={m.key}
+            className={`flex items-center gap-2 text-xs rounded-lg px-2 py-1.5 cursor-pointer ${
+              checked ? "bg-violet-500/10 text-foreground" : "text-muted-foreground"
+            } ${m.alwaysOn ? "opacity-70" : ""}`}
+          >
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={!!m.alwaysOn}
+              onChange={() => onChange(toggleModule(selected, m.key, m.alwaysOn))}
+              className="rounded border-border"
+            />
+            <span>{m.label}</span>
+          </label>
+        );
+      })}
+      {!catalogModules.length && (
+        <p className="col-span-full text-xs text-muted-foreground">Loading catalog…</p>
+      )}
+    </div>
+  );
 
   const toggleUser = async (userId: string, disabled: boolean) => {
     const res = await api.platformDisableUser(id, userId, !disabled, token());
@@ -526,44 +642,112 @@ export default function AdminBusinessManagePage() {
         </div>
       </section>
 
-      {/* Users */}
+      {/* Users + module permissions */}
       <section className="bg-card border border-border rounded-2xl p-5 space-y-4">
-        <h2 className="font-semibold">Users</h2>
+        <div>
+          <h2 className="font-semibold">Users &amp; Module Permissions</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Assign a portal role template, then customize module checkboxes. Users only see granted
+            modules in the CRM sidebar and APIs.
+          </p>
+        </div>
         <div className="space-y-2">
           {(biz.members || []).map((m) => (
             <div
               key={m.userId}
-              className="flex flex-wrap items-center justify-between gap-2 bg-background border border-border rounded-xl p-3 text-sm"
+              className="bg-background border border-border rounded-xl p-3 text-sm space-y-2"
             >
-              <div>
-                <div className="font-medium">{m.name || m.email}</div>
-                <div className="text-xs text-muted-foreground">
-                  {m.email} · {m.role} {m.isDisabled ? "· disabled" : ""}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="font-medium">{m.name || m.email}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {m.email} · {m.role} {m.isDisabled ? "· disabled" : ""}
+                    {m.modules?.length ? ` · ${m.modules.length} modules` : " · template defaults"}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => openEditPermissions(m)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-violet-500/20 text-violet-200 border border-violet-500/30"
+                  >
+                    Permissions
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleUser(m.userId, m.isDisabled)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-white/10"
+                  >
+                    {m.isDisabled ? "Enable" : "Disable"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resetPw(m.userId)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-white/10"
+                  >
+                    Reset Password
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggleUser(m.userId, m.isDisabled)}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-white/10"
-                >
-                  {m.isDisabled ? "Enable" : "Disable"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => resetPw(m.userId)}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-white/10"
-                >
-                  Reset Password
-                </button>
-              </div>
+              {editUserId === m.userId && (
+                <div className="border-t border-border pt-3 space-y-2">
+                  <label className="block text-xs text-muted-foreground">
+                    Portal / role template
+                    <select
+                      value={editRole}
+                      onChange={(e) => {
+                        const r = e.target.value;
+                        setEditRole(r);
+                        setEditModules(applyTemplateModules(r));
+                      }}
+                      className="mt-1 w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-foreground"
+                    >
+                      {(catalogTemplates.length
+                        ? catalogTemplates
+                        : [
+                            { roleKey: "ceo", label: "CEO" },
+                            { roleKey: "business_admin", label: "Business Admin" },
+                            { roleKey: "sales_manager", label: "Sales Manager" },
+                            { roleKey: "sales_executive", label: "Sales Executive" },
+                            { roleKey: "marketing", label: "Marketing" },
+                            { roleKey: "finance", label: "Finance" },
+                            { roleKey: "support", label: "Support" },
+                          ]
+                      ).map((t) => (
+                        <option key={t.roleKey} value={t.roleKey}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <p className="text-[11px] text-muted-foreground">Modules (customize after template)</p>
+                  <ModuleCheckboxes selected={editModules} onChange={setEditModules} />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void saveEditPermissions()}
+                      className="min-h-10 px-4 rounded-xl bg-primary text-primary-foreground text-xs font-medium disabled:opacity-50"
+                    >
+                      Save permissions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditUserId(null)}
+                      className="min-h-10 px-4 rounded-xl bg-white/10 text-xs"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
           {!biz.members?.length && <p className="text-sm text-muted-foreground">No members.</p>}
         </div>
 
-        <form onSubmit={createUser} className="grid sm:grid-cols-2 gap-2 pt-2 border-t border-border">
-          <h3 className="sm:col-span-2 text-sm font-medium text-muted-foreground">Add User</h3>
+        <form onSubmit={createUser} className="grid sm:grid-cols-2 gap-2 pt-3 border-t border-border">
+          <h3 className="sm:col-span-2 text-sm font-medium text-foreground">Add User</h3>
           <input
             required
             type="email"
@@ -589,15 +773,39 @@ export default function AdminBusinessManagePage() {
           />
           <select
             value={addUser.role}
-            onChange={(e) => setAddUser({ ...addUser, role: e.target.value })}
+            onChange={(e) => {
+              const role = e.target.value;
+              setAddUser({ ...addUser, role });
+              setAddModules(applyTemplateModules(role));
+            }}
             className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground"
           >
-            <option value="sales_executive">Sales Executive</option>
-            <option value="sales_manager">Sales Manager</option>
-            <option value="business_admin">Business Admin</option>
+            {(catalogTemplates.length
+              ? catalogTemplates
+              : [
+                  { roleKey: "ceo", label: "CEO" },
+                  { roleKey: "business_admin", label: "Business Admin" },
+                  { roleKey: "sales_manager", label: "Sales Manager" },
+                  { roleKey: "sales_executive", label: "Sales Executive" },
+                  { roleKey: "marketing", label: "Marketing" },
+                  { roleKey: "finance", label: "Finance" },
+                  { roleKey: "support", label: "Support" },
+                ]
+            ).map((t) => (
+              <option key={t.roleKey} value={t.roleKey}>
+                {t.label} (portal template)
+              </option>
+            ))}
           </select>
-          <button type="submit" className="sm:col-span-2 min-h-11 bg-primary text-primary-foreground rounded-xl text-sm font-medium">
-            Add User
+          <div className="sm:col-span-2 space-y-1">
+            <p className="text-xs text-muted-foreground">Module access</p>
+            <ModuleCheckboxes selected={addModules} onChange={setAddModules} />
+          </div>
+          <button
+            type="submit"
+            className="sm:col-span-2 min-h-11 bg-primary text-primary-foreground rounded-xl text-sm font-medium"
+          >
+            Add User with permissions
           </button>
         </form>
       </section>

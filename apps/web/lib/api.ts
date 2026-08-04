@@ -889,6 +889,43 @@ class ApiClient {
     }>("/templates/install", body, token);
   }
 
+  async platformPermissionCatalog(token: string) {
+    return this.get<{
+      modules: Array<{
+        key: string;
+        label: string;
+        description?: string | null;
+        category?: string | null;
+        alwaysOn?: boolean;
+        sortOrder?: number;
+      }>;
+      templates: Array<{
+        roleKey: string;
+        label: string;
+        modules: string[];
+        sortOrder?: number;
+      }>;
+    }>("/platform/permission-catalog", token);
+  }
+
+  async platformSetUserPermissions(
+    businessId: string,
+    userId: string,
+    body: {
+      modules: string[];
+      role?: string;
+      template?: string;
+      customized?: boolean;
+    },
+    token: string
+  ) {
+    return this.request(`/platform/businesses/${businessId}/users/${userId}/permissions`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      token,
+    });
+  }
+
   /** Role portal: menus, actions, home, permissions (config-driven).
    * Optional previewRole: Business Admin workspace role switch (not user switch).
    */
@@ -902,6 +939,7 @@ class ApiClient {
       actualRole: string;
       platformRole: string;
       permissions: string[];
+      modules: string[];
       businessId: string;
       businessName: string;
       homeRoute: string;

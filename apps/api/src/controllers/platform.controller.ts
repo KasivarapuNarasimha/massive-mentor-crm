@@ -514,6 +514,8 @@ export async function addUser(req: AuthenticatedRequest, res: Response) {
       password: z.string().min(8),
       name: z.string().optional(),
       role: z.string().optional(),
+      modules: z.array(z.string()).optional(),
+      customized: z.boolean().optional(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
@@ -527,6 +529,59 @@ export async function addUser(req: AuthenticatedRequest, res: Response) {
     res.status(201).json({ success: true, data });
   } catch (error: unknown) {
     res.status(400).json({ success: false, error: error instanceof Error ? error.message : "Failed" });
+  }
+}
+
+/** GET /api/platform/permission-catalog */
+export async function permissionCatalog(_req: AuthenticatedRequest, res: Response) {
+  try {
+    const { listPermissionCatalog, ensurePermissionCatalogSeeded } = await import(
+      "../services/permissions.service.js"
+    );
+    await ensurePermissionCatalogSeeded();
+    const data = await listPermissionCatalog();
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Failed",
+    });
+  }
+}
+
+/** PATCH /api/platform/businesses/:id/users/:userId/permissions */
+export async function setUserPermissions(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const schema = z.object({
+      modules: z.array(z.string()).min(0),
+      role: z.string().optional(),
+      template: z.string().optional(),
+      customized: z.boolean().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: parsed.error.errors[0]?.message || "Invalid input",
+      });
+    }
+    const { setMemberModules } = await import("../services/permissions.service.js");
+    const data = await setMemberModules({
+      actorUserId: req.user.id,
+      businessId: String(req.params.id),
+      userId: String(req.params.userId),
+      modules: parsed.data.modules,
+      role: parsed.data.role,
+      template: parsed.data.template,
+      customized: parsed.data.customized,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Failed",
+    });
   }
 }
 

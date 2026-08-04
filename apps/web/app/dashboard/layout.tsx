@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PortalProvider } from "@/lib/portal-context";
 import { PlanProvider } from "@/lib/plan-context";
+import { ModuleGate } from "@/components/permissions/ModuleGate";
 import { api } from "@/lib/api";
 
 export default function DashboardLayout({
@@ -106,7 +107,9 @@ export default function DashboardLayout({
   return (
     <PortalProvider>
       <PlanProvider>
-        <DashboardShell>{children}</DashboardShell>
+        <DashboardShell>
+          <ModuleGate>{children}</ModuleGate>
+        </DashboardShell>
       </PlanProvider>
     </PortalProvider>
   );

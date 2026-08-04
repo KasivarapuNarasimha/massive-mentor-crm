@@ -20,6 +20,7 @@ import {
 } from "@/lib/plan-entitlements";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { filterNavByModules } from "@/lib/module-permissions";
 
 /** Layout chrome heights — keep FieldStatusBar at h-12 (3rem) */
 const NAV_H = "3.5rem"; // h-14
@@ -569,14 +570,22 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     return items;
   })();
 
-  const primaryNav = (portalNav || resolveNav(navItems)).filter(
-    (item) => item.href !== APPEARANCE_HREF
+  const moduleKeys = portal?.modules || null;
+
+  const primaryNav = filterNavByModules(
+    (portalNav || resolveNav(navItems)).filter((item) => item.href !== APPEARANCE_HREF),
+    moduleKeys
   );
   // When portal menus replace CRM nav, keep Security out of the flat CRM list if present —
   // Settings section owns Appearance (+ Security for discovery).
-  const crmNav = (portalNav ? [] : resolveNav(crmNavItems)).filter(
-    (item) => item.href !== APPEARANCE_HREF && item.href !== "/dashboard/security"
+  const crmNav = filterNavByModules(
+    (portalNav ? [] : resolveNav(crmNavItems)).filter(
+      (item) => item.href !== APPEARANCE_HREF && item.href !== "/dashboard/security"
+    ),
+    moduleKeys
   );
+
+  const settingsNavFiltered = filterNavByModules(SETTINGS_NAV, moduleKeys);
 
   // Body scroll lock when mobile sidebar is open (prevents background scroll)
   useEffect(() => {
@@ -1177,9 +1186,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </nav>
 
               {/*
-                Settings — always visible for every role (Business Admin included).
-                Not plan-gated. Shown even when portal menus replace CRM nav.
+                Settings — filtered by Super Admin module grants (settings / appearance).
               */}
+              {settingsNavFiltered.length > 0 && (
+              <>
               <div
                 className={`text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2 mt-6 ${
                   sidebarCollapsed ? "lg:hidden" : ""
@@ -1188,7 +1198,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 Settings
               </div>
               <nav className="space-y-0.5" aria-label="Settings navigation" data-testid="settings-nav">
-                {SETTINGS_NAV.map((item) => (
+                {settingsNavFiltered.map((item) => (
                   <Link
                     key={item.key || `settings:${item.href}`}
                     href={item.href}
@@ -1211,6 +1221,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 ))}
               </nav>
+              </>
+              )}
             </div>
 
             <div

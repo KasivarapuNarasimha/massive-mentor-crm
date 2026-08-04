@@ -294,32 +294,38 @@ app.use("/api", requireBillingAccess);
 app.use("/api/platform", platformRoutes);
 app.use("/api/demo", demoRoutes);
 
-// Mount API routes
+// Module permission gate — path → CrmModule; Super Admin catalog is DB-seeded
+import { requireModuleFromPath } from "./middleware/requireModule.js";
+import { requireAuth as requireAuthMw } from "./middleware/auth.js";
+
+// Mount API routes (auth + module gate on tenant CRM surfaces)
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
-app.use("/api/health-score", healthRoutes);
 app.use("/api/ai", aiRoutes);
-app.use("/api/swot", swotRoutes);
-app.use("/api/mentor", mentorRoutes);
-app.use("/api/roadmap", roadmapRoutes);
-app.use("/api/marketing", marketingRoutes);
-app.use("/api/crm", crmRoutes);
-app.use("/api/leads", leadsRoutes);
-app.use("/api/automations", automationRoutes);
-app.use("/api/integrations", integrationRoutes);
-app.use("/api/teams", teamRoutes);
-app.use("/api/reports", reportRoutes);
+app.use("/api/health-score", requireAuthMw, requireModuleFromPath, healthRoutes);
+app.use("/api/swot", requireAuthMw, requireModuleFromPath, swotRoutes);
+app.use("/api/mentor", requireAuthMw, requireModuleFromPath, mentorRoutes);
+app.use("/api/roadmap", requireAuthMw, requireModuleFromPath, roadmapRoutes);
+app.use("/api/marketing", requireAuthMw, requireModuleFromPath, marketingRoutes);
+app.use("/api/crm", requireAuthMw, requireModuleFromPath, crmRoutes);
+app.use("/api/leads", requireAuthMw, requireModuleFromPath, leadsRoutes);
+app.use("/api/automations", requireAuthMw, requireModuleFromPath, automationRoutes);
+// Public WhatsApp webhook is registered earlier; authenticated integration routes below
+app.use("/api/integrations", requireAuthMw, requireModuleFromPath, integrationRoutes);
+app.use("/api/teams", requireAuthMw, requireModuleFromPath, teamRoutes);
+app.use("/api/reports", requireAuthMw, requireModuleFromPath, reportRoutes);
 app.use("/api/businesses", businessRoutes);
 app.use("/api/templates", templateRoutes);
-app.use("/api/dashboards", dashboardRoutes);
+app.use("/api/dashboards", requireAuthMw, requireModuleFromPath, dashboardRoutes);
 app.use("/api/portal", portalRoutes);
-app.use("/api/business-users", userAdminRoutes);
-app.use("/api/finance", financeRoutes);
-app.use("/api/location", locationRoutes);
-app.use("/api/backups", backupRoutes);
-app.use("/api/approvals", approvalRoutes);
-app.use("/api/billing", billingRoutes);
-app.use("/api/security", securityRoutes);
+app.use("/api/business-users", requireAuthMw, requireModuleFromPath, userAdminRoutes);
+app.use("/api/finance", requireAuthMw, requireModuleFromPath, financeRoutes);
+app.use("/api/location", requireAuthMw, requireModuleFromPath, locationRoutes);
+app.use("/api/backups", requireAuthMw, requireModuleFromPath, backupRoutes);
+app.use("/api/approvals", requireAuthMw, requireModuleFromPath, approvalRoutes);
+// billing/access + stream exempt inside requireModuleFromPath
+app.use("/api/billing", requireAuthMw, requireModuleFromPath, billingRoutes);
+app.use("/api/security", requireAuthMw, requireModuleFromPath, securityRoutes);
 
 app.get("/api", (_req, res) => {
   res.json({
@@ -389,6 +395,11 @@ server = app.listen(PORT, () => {
   ensureSubscriptionPlans().catch((err) => {
     console.error("[plans] seed failed:", err instanceof Error ? err.message : err);
   });
+  import("./services/permissions.service.js")
+    .then((m) => m.ensurePermissionCatalogSeeded())
+    .catch((err) => {
+      console.error("[permissions] seed failed:", err instanceof Error ? err.message : err);
+    });
 
   startBackupScheduler();
 

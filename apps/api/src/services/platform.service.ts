@@ -153,15 +153,25 @@ export async function getBusinessDetail(businessId: string) {
     owner: b.owner,
     industry: profile?.industry || b.templateSlug || "—",
     phone: (profile as { location?: string } | null)?.location || null,
-    members: b.members.map((m) => ({
-      membershipId: m.id,
-      role: m.role,
-      userId: m.user.id,
-      email: m.user.email,
-      name: m.user.name,
-      isDisabled: m.user.isDisabled,
-      createdAt: m.user.createdAt,
-    })),
+    members: b.members.map((m) => {
+      const perms = (m.permissions || {}) as {
+        modules?: string[];
+        template?: string;
+        customized?: boolean;
+      };
+      return {
+        membershipId: m.id,
+        role: m.role,
+        userId: m.user.id,
+        email: m.user.email,
+        name: m.user.name,
+        isDisabled: m.user.isDisabled,
+        createdAt: m.user.createdAt,
+        modules: Array.isArray(perms.modules) ? perms.modules : [],
+        permissionTemplate: perms.template || m.role,
+        permissionsCustomized: !!perms.customized,
+      };
+    }),
     stats: {
       leads,
       clients,
@@ -1487,12 +1497,17 @@ export async function addBusinessUser(input: {
   password: string;
   name?: string;
   role?: string;
+  /** Module keys; if omitted, role template defaults apply */
+  modules?: string[];
+  /** When true, modules are treated as custom (not pure template) */
+  customized?: boolean;
 }) {
   const b = await prisma.business.findFirst({
     where: { id: input.businessId, isDemo: false, portalKind: "customer" },
   });
   if (!b) throw new Error("Business not found");
 
+  const role = input.role || "sales_executive";
   const email = input.email.toLowerCase().trim();
   let user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
@@ -1501,20 +1516,43 @@ export async function addBusinessUser(input: {
         email,
         passwordHash: await bcrypt.hash(input.password, 12),
         name: input.name?.trim() || null,
-        role: input.role || "sales_executive",
+        role,
         platformRole: "user",
       },
     });
+  } else {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { role },
+    });
   }
+
+  const { modulesForTemplate, alwaysOnModules } = await import(
+    "./permissions.service.js"
+  );
+  const modules = Array.from(
+    new Set([
+      ...(Array.isArray(input.modules) && input.modules.length
+        ? input.modules
+        : modulesForTemplate(role)),
+      ...alwaysOnModules(),
+    ])
+  );
+  const permissions = {
+    modules,
+    template: role,
+    customized: !!input.customized || !!(input.modules && input.modules.length),
+  };
 
   await prisma.businessMember.upsert({
     where: { businessId_userId: { businessId: b.id, userId: user.id } },
     create: {
       businessId: b.id,
       userId: user.id,
-      role: input.role || "sales_executive",
+      role,
+      permissions,
     },
-    update: { role: input.role || "sales_executive" },
+    update: { role, permissions },
   });
 
   await recordAudit({
@@ -1523,10 +1561,10 @@ export async function addBusinessUser(input: {
     action: "platform_add_user",
     entityType: "user",
     entityId: user.id,
-    metadata: { email },
+    metadata: { email, role, modules },
   });
 
-  return { id: user.id, email: user.email, name: user.name };
+  return { id: user.id, email: user.email, name: user.name, role, modules };
 }
 
 export async function setBusinessUserDisabled(

@@ -477,14 +477,50 @@ model BusinessMember {
   business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// Business role key (config-driven later). owner | admin | manager | sales_executive
+  /// Business role key: ceo | business_admin | sales_manager | sales_executive | marketing | finance | support | …
   role        String   @default("owner")
+  /// Module access: { modules: string[], template?: string, customized?: boolean }
   permissions Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@unique([businessId, userId])
   @@index([userId])
+}
+
+/// Catalog of CRM modules Super Admin can grant (future modules = new rows, no code change required for catalog UI)
+model CrmModule {
+  id          String   @id @default(cuid())
+  /// Stable key: dashboard, leads, finance, billing, …
+  key         String   @unique
+  label       String
+  description String?
+  /// Frontend route prefix, e.g. /dashboard/finance
+  routePrefix String?
+  /// API path prefixes JSON string[], e.g. ["/api/finance"]
+  apiPrefixes Json     @default("[]")
+  category    String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  /// If true, always granted (profile, appearance) — still listed for transparency
+  alwaysOn    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+/// Default module sets per portal/role template (CEO, Sales Executive, …)
+model RolePermissionTemplate {
+  id        String   @id @default(cuid())
+  roleKey   String   @unique
+  label     String
+  /// JSON string[] of CrmModule.key values
+  modules   Json     @default("[]")
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /// Append-only audit trail (Phase 1: login + tenancy events; expanded later)

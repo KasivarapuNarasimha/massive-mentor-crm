@@ -29,6 +29,8 @@ export type PortalState = {
   actualRole: string;
   platformRole: string;
   permissions: string[];
+  /** CRM module keys granted by Super Admin (sidebar + route gate) */
+  modules: string[];
   businessId: string;
   businessName: string;
   homeRoute: string;

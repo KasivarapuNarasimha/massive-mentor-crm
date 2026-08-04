@@ -51,6 +51,12 @@ router.get("/businesses/:id/export", requirePlatformAdmin, ctrl.exportBusiness);
 router.post("/businesses/:id/users", requirePlatformAdmin, ctrl.addUser);
 router.post("/businesses/:id/users/:userId/disable", requirePlatformAdmin, ctrl.disableUser);
 router.post("/businesses/:id/users/:userId/reset-password", requirePlatformAdmin, ctrl.resetPassword);
+router.patch(
+  "/businesses/:id/users/:userId/permissions",
+  requirePlatformAdmin,
+  ctrl.setUserPermissions
+);
+router.get("/permission-catalog", requirePlatformAdmin, ctrl.permissionCatalog);
 
 router.get("/invoices", requirePlatformAdmin, ctrl.listInvoices);
 router.post("/invoices", requirePlatformAdmin, ctrl.createInvoice);

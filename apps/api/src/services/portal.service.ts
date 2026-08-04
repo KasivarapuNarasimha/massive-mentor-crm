@@ -44,6 +44,8 @@ export type ResolvedPortal = {
   actualRole: string;
   platformRole: string;
   permissions: string[];
+  /** Module keys granted to this member (DB-driven Super Admin control) */
+  modules: string[];
   businessId: string;
   businessName: string;
   menus: PortalMenu[];
@@ -258,8 +260,24 @@ export async function resolveUserPortal(
     permissions.push("config.edit", "members.manage", "audit.read", "reports.export");
   }
 
+  // Module permissions (Super Admin grants) — use actual member modules unless previewing another role's template
+  const {
+    getMemberModuleKeys,
+    modulesForTemplate,
+    filterMenusByModules,
+  } = await import("./permissions.service.js");
+
+  let modules: string[];
+  if (isWorkspacePreview) {
+    // Preview: show target role template modules (not the admin's own grants)
+    modules = modulesForTemplate(role);
+  } else {
+    modules = await getMemberModuleKeys(userId, business.id);
+  }
+
   // Unique routes only (avoids React duplicate keys when same path had multiple labels)
-  const rawMenus = filterMenusByPermission(portal.menus || [], permissions);
+  let rawMenus = filterMenusByPermission(portal.menus || [], permissions);
+  rawMenus = filterMenusByModules(rawMenus, modules);
   const seenRoutes = new Set<string>();
   const menus = rawMenus.filter((m) => {
     if (!m.route || seenRoutes.has(m.route)) return false;
@@ -281,6 +299,7 @@ export async function resolveUserPortal(
     actualRole,
     platformRole,
     permissions: Array.from(new Set(permissions)),
+    modules,
     businessId: business.id,
     businessName: business.name,
     menus,

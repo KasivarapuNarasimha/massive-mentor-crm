@@ -20,6 +20,7 @@ export async function getCurrentPortal(req: AuthenticatedRequest, res: Response)
         actualRole: resolved.actualRole,
         platformRole: resolved.platformRole,
         permissions: resolved.permissions,
+        modules: resolved.modules,
         businessId: resolved.businessId,
         businessName: resolved.businessName,
         homeRoute: resolved.homeRoute,
