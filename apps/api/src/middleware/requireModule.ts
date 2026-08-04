@@ -68,6 +68,23 @@ export async function requireModuleFromPath(
         required: ["leads", "clients"],
       });
     }
+    if (mod === "__ai_any__") {
+      if (
+        keys.includes("mentor") ||
+        keys.includes("ai_sales") ||
+        keys.includes("marketing") ||
+        keys.includes("swot") ||
+        keys.includes("roadmap")
+      ) {
+        return next();
+      }
+      return res.status(403).json({
+        success: false,
+        error: "You do not have permission to access this resource.",
+        code: "MODULE_FORBIDDEN",
+        required: ["mentor", "ai_sales"],
+      });
+    }
     if (!keys.includes(mod)) {
       return res.status(403).json({
         success: false,

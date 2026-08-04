@@ -23,7 +23,18 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
 
   // Authentication
-  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters long for security'),
+  JWT_SECRET: z
+    .string()
+    .min(32, 'JWT_SECRET must be at least 32 characters long for security')
+    .refine(
+      (v) =>
+        process.env.NODE_ENV !== 'production' ||
+        !/changeme|your.?jwt|secret_key_here|placeholder|example_secret|test_secret/i.test(v),
+      {
+        message:
+          'Production JWT_SECRET must not use a placeholder value — generate a long random secret',
+      }
+    ),
 
   // AI Configuration
   AI_PROVIDER: z.enum(['groq', 'openai']).default('groq'),

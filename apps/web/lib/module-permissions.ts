@@ -47,12 +47,27 @@ export function moduleKeyForPath(pathname: string): string | null {
   return best?.key || null;
 }
 
-export function canAccessPath(pathname: string, modules: string[] | null | undefined): boolean {
-  if (!modules || modules.length === 0) return true; // until loaded
+/**
+ * @param modules - null/undefined = portal not loaded yet
+ * @param opts.loaded - when true, empty modules fail closed (except profile/appearance)
+ */
+export function canAccessPath(
+  pathname: string,
+  modules: string[] | null | undefined,
+  opts?: { loaded?: boolean }
+): boolean {
+  const loaded = opts?.loaded === true;
+  // Not loaded yet — allow render shell; ModuleGate should wait
+  if (modules === null || modules === undefined) {
+    return !loaded;
+  }
   const key = moduleKeyForPath(pathname);
-  if (!key) return true;
-  // personal always if missing from list (safety)
+  // Personal surfaces always allowed once authenticated
   if (key === "profile" || key === "appearance") return true;
+  // Unknown CRM path after load → deny (prevents accidental exposure)
+  if (!key) return !loaded;
+  // Explicit empty grant list (should still include always-on from API)
+  if (modules.length === 0) return false;
   return modules.includes(key);
 }
 
@@ -60,6 +75,12 @@ export function filterNavByModules<T extends { href: string }>(
   items: T[],
   modules: string[] | null | undefined
 ): T[] {
-  if (!modules || modules.length === 0) return items;
-  return items.filter((item) => canAccessPath(item.href, modules));
+  // Until portal loads, hide non-personal nav (fail closed for UX security)
+  if (modules === null || modules === undefined) {
+    return items.filter((item) => {
+      const k = moduleKeyForPath(item.href);
+      return k === "profile" || k === "appearance" || item.href === "/dashboard";
+    });
+  }
+  return items.filter((item) => canAccessPath(item.href, modules, { loaded: true }));
 }

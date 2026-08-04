@@ -1,250 +1,277 @@
 # Massive Mentor CRM — Production Readiness Report
 
-**Date:** 2026-07-19  
-**Release:** **v1.0.0-RC1** (see `docs/RELEASE_RC1.md`)  
-**Scope:** Full monorepo audit (API + Web) — Authentication through Super Admin, Customer Portal, Billing  
-**High Priority remediation:** Complete (Decimal, invoice sequences, distributed locks, secret encryption, AI quotas)  
-**E2E suites:**  
-- RC1 regression: **33/33 PASS** (`scripts/rc1-regression.mjs`)  
-- High Priority + audit smoke: **33/33 PASS** (`scripts/prod-readiness-e2e.mjs`)  
-- Pre-launch full module: **58/58 PASS** (`scripts/prelaunch-e2e.mjs`)  
+**Date:** 2026-07-24  
+**Reviewer role:** Senior SaaS architect / production QA  
+**Branch tip at review:** `07a456b` + readiness hardening (permission fail-closed, CORS, AI gate, JWT placeholder guard)  
+**Scope:** Full monorepo (`apps/api`, `apps/web`, deploy) — no new product features; findings + critical fixes only.
 
 ---
 
-## Overall Score: **88 / 100**
+## Executive summary
+
+Massive Mentor CRM is a **broad, multi-tenant SaaS product** with Super Admin, customer portals, billing (Razorpay), CRM modules, AI surfaces, and multi-host nginx deployment. Core product flows are largely implemented and recently hardened (themes, SSE subscription sync, module permissions, bulk delete, password-reset email).
+
+**It is not yet “set and forget” for unattended paid launch.** Several **ops and multi-instance** risks remain, plus residual permission/tenant edge cases and configuration dependencies (SMTP, Razorpay webhook secret, JWT strength, single-process SSE, in-memory rate limits).
+
+| Score | Value | Meaning |
+|-------|------:|---------|
+| **Security** | **78 / 100** | Strong foundations; fix residual config + multi-node assumptions |
+| **Performance** | **72 / 100** | Acceptable for SMB; large-tenant scale needs work |
+| **Production readiness** | **76 / 100** | Soft launch / paid pilot OK after High Priority checklist |
+| **Recommendation** | **Conditional GO** | Launch to early paying customers only after High Priority items below |
+
+---
+
+## Completed features (inventory)
+
+| Area | Status | Notes |
+|------|--------|--------|
+| Authentication (login/logout/JWT/session) | Done | Sessions, tokenVersion, portal isolation |
+| Password reset + SMTP | Done | Failures surface 503; needs prod SMTP |
+| Super Admin platform | Done | Businesses, licenses, support login-as |
+| Business provisioning | Done | Admin create customer + template |
+| Role & module permissions | Done | DB catalog + templates + UI + API gate |
+| Portal menus by role | Done | Config-driven + module filter |
+| Dashboard / KPIs | Done | Config + portal dashboards |
+| Leads / Clients / Deals / Tasks / Meetings | Done | Tenant-scoped CRM |
+| Notes / Documents | Done | Present |
+| Reports + import/export | Done | Timeouts/nginx import snippet |
+| Bulk edit / bulk delete (all filtered) | Done | Scope all_filtered |
+| Bulk email (SMTP compose) | Done | Not mailto-only |
+| AI Mentor / AI Sales / Market AI | Done | Quota + provider env |
+| SWOT / Health / Roadmap | Done | |
+| Finance | Done | Module-gated |
+| Billing + Razorpay checkout | Done | Webhook activation path |
+| Trial + subscription lock | Done | Access evaluation + heal isTrial |
+| Real-time subscription SSE | Done | Needs nginx stream + single API process |
+| WhatsApp Cloud multi-tenant | Done | Webhooks, signature, self-serve |
+| Notifications | Done | Polling |
+| Theme light/dark/system | Done | next-themes + tokens |
+| Email brand templates | Done | |
+| Backups | Done | Tenant + platform |
+| Approvals | Done | |
+| Mobile adaptive layout | Mostly | PageShell / safe areas; not every page pixel-perfect |
+
+---
+
+## Critical fixes applied in this review
+
+1. **Permission fail-open loophole** — Client previously treated missing/empty modules as “allow all”. Now fail-closed after portal load; nav hides restricted modules while loading.  
+2. **CORS raw IP in production** — `http://200.141.0.25:*` no longer allowed when `NODE_ENV=production`.  
+3. **`/api/ai` ungated** — Now behind auth + module path gate (`__ai_any__` = any AI module).  
+4. **JWT placeholder guard** — Production rejects obvious placeholder `JWT_SECRET` values.
+
+---
+
+## High priority issues (fix / verify before paid launch)
+
+| ID | Area | Issue | Risk | Action |
+|----|------|--------|------|--------|
+| H1 | Ops | **SSE pub/sub is in-process** — multi-PM2 instances miss events | Wrong plan shown until 5m fallback | Run **one** API instance for SSE, or add Redis bus |
+| H2 | Ops | **Rate limits are in-memory** — reset on restart; weak under multi-node | Brute-force / AI abuse | Redis rate-limit store or edge WAF |
+| H3 | Config | **SMTP must be configured** or password reset fails for real users | Support load / lockouts | Verify Hostinger SMTP + test reset |
+| H4 | Config | **Razorpay `RAZORPAY_WEBHOOK_SECRET` required in prod** | Failed activations | Configure Meta/Razorpay webhook + secret |
+| H5 | Deploy | **`prisma db push` for CrmModule / RolePermissionTemplate / themePreference** | 500s on permissions/theme | Run schema push + seed on every env |
+| H6 | Nginx | **SSE location must exist on API host** | No real-time plan updates | Confirm `location = /api/billing/stream` |
+| H7 | Security | **Support login-as** issues customer tokens — ensure audit + short TTL always enforced | Privilege abuse | Review support JWT TTL + audit log access |
+| H8 | Permissions | **Business Admin workspace role preview** can view other portals’ menus | Info disclosure | Restrict preview or log; document as intentional |
+| H9 | Security | Ensure production **JWT_SECRET ≥ 32** and not reused across envs | Account takeover | Rotate if ever leaked |
+| H10 | Billing | Client activation relies on webhook **or** poll; delayed webhook confuses UX | Charge without access | Monitor webhook logs; verify payment status poll |
+
+---
+
+## Medium priority issues
+
+| ID | Area | Issue | Action |
+|----|------|--------|--------|
+| M1 | Security | General API rate limit 300/min/IP may be tight for power users behind NAT | Tune or per-user limits |
+| M2 | CRM | Leads client meta-filters only apply to **current page** of server results | Document or server-side filters |
+| M3 | Import | Large imports depend on nginx timeouts + client CSV parse | Keep import timeout snippet live |
+| M4 | Performance | Dashboard/notification **polling** (e.g. 8s notifs) adds load | Increase intervals or use SSE for notifs later |
+| M5 | UX | Some pages still mix residual zinc/`white/10` classes | Gradual token cleanup |
+| M6 | Mobile | Dense CRM tables need horizontal scroll; not all have card lists | Audit leads/deals/finance mobile |
+| M7 | AI | Provider keys fail-fast on boot — good; document failover | Ops runbook |
+| M8 | Backups | Restore is powerful — ensure only business_admin+ and platform admin | Role review |
+| M9 | WhatsApp | Multi-tenant webhook routing depends on phone_number_id config | Per-tenant test matrix |
+| M10 | Theme | Chart libraries may use hardcoded colors | Theme-aware chart colors |
+| M11 | Validation | Some CRM free-text fields lack length/sanitize caps on API | Align with sanitize utils |
+| M12 | Audit | Not every bulk action surfaces in customer-facing history | Expand export for compliance |
+| M13 | Demo portal | Ensure demo data cannot write into customer tenants | Periodic isolation test |
+| M14 | CORS | Broad `*.massivementor.in` HTTPS allow | Prefer explicit host list long-term |
+
+---
+
+## Low priority issues
+
+| ID | Area | Issue |
+|----|------|--------|
+| L1 | DX | `apps/web/package-lock.json` untracked noise if monorepo uses pnpm |
+| L2 | UI | Inconsistent button styles (primary vs white/10) across modules |
+| L3 | Docs | Some deploy docs still say `app.` vs `crm.` primary host |
+| L4 | SEO | Customer CRM noindex not always set (usually fine for app) |
+| L5 | A11y | Not all modals trap focus / announce titles |
+| L6 | i18n | English-only |
+| L7 | Tests | Limited automated E2E coverage for billing + permissions |
+
+---
+
+## Module-by-module QA notes
+
+### Authentication
+- **Good:** bcrypt, JWT portal claim, session table, password complexity on reset, rate limits.  
+- **Watch:** Login limiter 5/15min/IP — shared office NAT.  
+- **Fixed earlier:** Reset email errors no longer silent success on SMTP failure.
+
+### User management / Super Admin
+- **Good:** Platform-only admin JWT; support mode audited.  
+- **Watch:** Password reset for business users by admin increments tokenVersion (good).  
+- **New:** Module permission UI on business manage page.
+
+### Role & permission system
+- **Good:** Catalog + templates + API gate + ModuleGate.  
+- **Fixed this review:** Fail-open while modules empty.  
+- **Watch:** Members without `permissions.modules` get role template defaults (expected).
+
+### Dashboard
+- Tenant + portal dashboards; feature gates via plan tier + modules.
+
+### Leads / Clients / Deals / Tasks / Meetings
+- Tenant scope via `buildCrmScope`. Soft delete on contacts.  
+- Bulk delete all_filtered efficient for soft-delete.  
+- **Watch:** Permanent delete of 20k is chunked/slow.
+
+### Reports / Import / Export
+- Import timeouts documented; verify live nginx merge.  
+- Export CSV client-side for some reports — large datasets may freeze UI.
+
+### AI Mentor / AI Sales / SWOT / Health / Roadmap
+- Quota middleware present.  
+- **Fixed:** `/api/ai` module gate.
+
+### Finance
+- Module + plan professional tier.  
+- **Watch:** Money as Decimal — verify display rounding.
+
+### Billing / Razorpay / Trial / Subscription / SSE
+- Activation sets `isTrial: false`.  
+- Admin changePlan clears trial flags + SSE publish.  
+- Self-heal stuck `isTrial` on access.  
+- **Watch:** Multi-instance SSE; webhook secret; invoice PDF disk path.
+
+### Email
+- Nodemailer + raw SMTP fallback; verify() on send.  
+- Lead compose uses platform SMTP.
+
+### WhatsApp
+- Signature verification; multi-tenant; plaintext verifyToken (intentional).  
+- **Watch:** App Secret + phone_number_id routing in prod.
+
+### Notifications
+- Polling; not real-time. Acceptable for v1.
+
+### Theme
+- Design tokens; next-themes; SSR suppressHydrationWarning.  
+- **Watch:** residual hardcoded colors.
+
+### Mobile
+- Adaptive patterns exist; full visual QA on real devices still required.
+
+---
+
+## Security score breakdown (78/100)
+
+| Control | Score | Notes |
+|---------|------:|-------|
+| Auth & sessions | 16/20 | Solid; NAT rate limits |
+| Authorization / tenancy | 14/20 | Modules + scope; preview & empty-module fixed |
+| Secrets & crypto | 12/15 | JWT/webhook/SMTP depend on ops |
+| Input validation | 12/15 | Zod widespread; not universal |
+| Transport / headers | 12/15 | Helmet + HTTPS nginx |
+| Abuse protection | 7/10 | In-memory RL only |
+| Audit logging | 5/5 | Present on critical admin actions |
+
+---
+
+## Performance score breakdown (72/100)
 
 | Area | Score | Notes |
 |------|------:|-------|
-| Security | 86 | Core gates strong; tokens encrypted at rest; residual JWT lifetime |
-| Multi-tenant isolation | 78 | CRM core good; dual-scope legacy remains (Medium) |
-| Billing / Razorpay | 90 | Webhook-first, IDOR fixed, atomic SaaS invoices, job locks |
-| CRM modules | 84 | Soft-delete, pipeline sync, roles, Decimal deal values |
-| Performance / scale | 78 | Distributed billing locks; finance aggregates still Medium |
-| Ops / deploy | 84 | Backups + multi-instance-safe billing job |
-| UX / product completeness | 82 | Trial/billing UX solid; some admin polish left |
+| API design | 15/20 | Pagination exists; some N+1 risk |
+| DB access | 14/20 | Indexes present; large bulk OK soft-delete |
+| Frontend | 14/20 | Next 15; large pages (leads) heavy |
+| Real-time | 12/20 | SSE good; multi-instance weak |
+| Caching | 8/10 | Little CDN for API; static Next OK |
+| Background jobs | 9/10 | Billing job + lock |
 
 ---
 
-## Recommendation: **GO (Production Ready)**
+## Production readiness score: **76 / 100**
 
-All **user-specified High Priority** items required for Production Ready are **resolved and verified**.
-
-Safe to deploy to production after the **ops checklist** (secrets rotation, webhook registration, SMTP, HTTPS). Residual items below are **Medium/Low** and do not block GO.
-
-### High Priority gate (required for GO) — ALL CLOSED
-
-| # | Requirement | Status | Evidence |
-|---|-------------|--------|----------|
-| HP1 | Convert all financial values from Float to Decimal | **Done** | Schema `@db.Decimal(18,2)`; 0 float money columns in DB; 19 numeric money columns; GST 1000×18% = **1180** exact |
-| HP2 | Invoice number generation atomic & globally unique | **Done** | `InvoiceSequence` + `pg_advisory_xact_lock`; concurrent 5 invoices unique; SaaS `MM-INV-YYYY-######` |
-| HP3 | Distributed locking for scheduled billing jobs | **Done** | `withDistributedLock("saas-billing-daily")` via `pg_try_advisory_lock` in `index.ts` |
-| HP4 | Encrypt integration tokens/secrets at rest | **Done** | AES-256-GCM `enc:v1:…` via `secret-crypto`; upsert encrypts; list masks secrets |
-| HP5 | AI usage quotas, rate limits, cost controls per business | **Done** | `AiUsageEvent` + `requireAiQuota`; 429 `AI_QUOTA_EXCEEDED` when daily limit hit; plan-tier multipliers |
+| Category | Weight | Score | Weighted |
+|----------|-------:|------:|---------:|
+| Security | 30% | 78 | 23.4 |
+| Reliability / ops | 25% | 70 | 17.5 |
+| Feature completeness | 20% | 88 | 17.6 |
+| Data integrity | 15% | 75 | 11.3 |
+| UX polish | 10% | 65 | 6.5 |
+| **Total** | | | **~76** |
 
 ---
 
-## Critical Issues (addressed)
+## Remaining bugs (known residual)
 
-| # | Issue | Status |
-|---|--------|--------|
-| C1 | Reports/exports used `userId` only | **Fixed** |
-| C2 | Invoice PDF download IDOR | **Fixed** |
-| C3 | Billing gate failed open on errors | **Fixed** — 503 fail closed |
-| C4 | `getUserBusinessId` demo/deleted membership | **Fixed** |
-| C5 | Super Admin login not rate-limited | **Fixed** |
-| C6 | Platform password reset tokenVersion | **Fixed** |
-| C7 | Coupon redeemed at order create | **Fixed** — redeem on activation |
-| C8 | Live Razorpay secrets in developer `.env` | **Ops** — rotate keys |
-| C9 | Webhook secret fallback in prod | **Hardened** |
-
----
-
-## High Priority Issues (full audit list)
-
-| # | Issue | Status |
-|---|--------|--------|
-| H1 | Deal `contactId` not validated on create | **Fixed** |
-| H2 | Payment status query with null businessId | **Fixed** |
-| H3 | Fuzzy orphan deal title-matching in pipeline sync | **Disabled in production** |
-| H4 | Money fields as `Float` (GST/paise drift) | **Fixed** — Decimal + `lib/money.ts` |
-| H5 | Finance dashboard loads all rows into memory | **Open (Medium)** — SQL aggregates recommended |
-| H6 | Invoice number race under concurrency | **Fixed** — `invoice-sequence.service` |
-| H7 | Multi-business users: first membership wins | **Open (Medium)** — active-business header |
-| H8 | JWT 7-day lifetime in localStorage | **Open (Medium)** — shorten / refresh |
-| H9 | In-memory rate limits (multi-instance weak) | **Open (Medium)** — Redis store |
-| H10 | Billing daily job multi-instance duplicates | **Fixed** — Postgres advisory lock |
-| H11 | Integration tokens plaintext in DB | **Fixed** — AES-256-GCM at rest |
-| H12 | Notes/documents lack businessId | **Partial** — indexes; still user-scoped |
-| H13 | AI routes limited rate limiting | **Fixed** — per-business AI quota middleware |
-| H14 | `requireRole` ORs stale `User.role` | **Open (Medium)** |
-| H15 | Support JWT `supportBusinessId` not pinned | **Open (Medium)** |
-
-> **Note:** H5/H7/H8/H9/H12/H14/H15 remain as scale/UX hardening (treated as Medium for GO). The five **explicit Production Ready blockers** from the remediation brief are HP1–HP5 above — all closed.
+1. SSE does not cross API process boundaries without shared pub/sub.  
+2. In-memory rate limits not shared across instances.  
+3. Client-side table filters on leads only apply to current server page.  
+4. Some UI still uses non-token colors (inconsistent light theme on edge pages).  
+5. Chart colors not fully theme-aware.  
+6. Limited automated regression suite for billing + permissions.  
+7. Workspace role preview can over-expose menu structure to admins (by design).  
+8. Import path still sensitive to nginx body/timeout if snippet not applied.  
+9. WhatsApp/App Secret misconfiguration yields hard-to-debug 403s (ops).  
+10. Demo vs customer isolation must be re-verified after each major seed change.
 
 ---
 
-## Medium Priority Issues
+## Pre-launch checklist (must-do)
 
-| # | Issue | Notes |
-|---|--------|------|
-| M1 | Dual-scope `OR userId + businessId null` widens queries | Finish backfill then remove |
-| M2 | Finance “outstanding” mixes all statuses | Improve AR formula |
-| M3 | Currency rewrite side-effect on finance dashboard GET | Move to migration/job |
-| M4 | Email no durable queue / PDF attach incomplete | Nodemailer + queue |
-| M5 | WhatsApp history user-scoped only | Add businessId |
-| M6 | Dashboard engine up to 20k rows for charts | SQL groupBy |
-| M7 | Approval step without approver role can be soft | Default deny |
-| M8 | Public `/health` SMTP metadata | Strip in prod |
-| M9 | Duplicate export helpers vs `fetchExportRows` | Consolidate |
-| M10 | Coupon maxUses race without row lock | Conditional update |
-| M11 | Partial refund locks entire tenant | Soften refund logic |
-| M12 | Demo login not rate-limited | Add limiter |
-| M13 | Finance dashboard full-table load (was H5) | SQL aggregates |
-| M14 | Multi-business context (was H7) | `X-Business-Id` / JWT claim |
-| M15 | JWT lifetime / refresh (was H8) | 1h access + refresh |
-| M16 | Redis rate-limit store (was H9) | Shared limiter |
+- [ ] `git pull` latest; rebuild **API + web**; `prisma db push` / migrate  
+- [ ] Confirm env: `JWT_SECRET`, `DATABASE_URL`, `SMTP_*`, `RAZORPAY_*` (+ webhook secret), `APP_URL=https://crm.massigmentor.in`  
+- [ ] Nginx: API stream location + import timeouts; `nginx -t` + reload  
+- [ ] Smoke: login customer + admin; password reset email; Razorpay test payment  
+- [ ] Smoke: Super Admin plan change → CRM SSE update &lt; 3s  
+- [ ] Smoke: Sales Executive without finance → 403 UI + 403 API  
+- [ ] Smoke: bulk delete all filtered on &gt;1 page of leads  
+- [ ] Smoke: lead email send via SMTP  
+- [ ] Smoke: light/dark theme on login + dashboard  
+- [ ] PM2: single API process **or** accept SSE delay / add Redis  
+- [ ] Backups: take DB dump before launch  
+- [ ] Support WhatsApp/email monitored  
 
 ---
 
-## Low Priority Issues
+## Final recommendation
 
-| # | Issue |
-|---|--------|
-| L1 | Viewer is business-wide for CRM — document product intent |
-| L2 | Team role names diverge from BusinessMember roles |
-| L3 | Register service still exists behind ALLOW_PUBLIC_REGISTER |
-| L4 | Template pipeline keys vs hardcoded sync maps |
-| L5 | Admin bulk delete lacks typed confirmation phrase |
-| L6 | CSV formula injection on older export helpers |
+**Conditional GO for paid pilot / early customers (≤ tens of businesses).**  
 
----
+**Not recommended** for unattended large-scale launch until High Priority **H1–H6** are closed (SMTP, Razorpay webhook, schema seed, SSE ops model, rate-limit strategy).
 
-## Implementation Summary (this remediation)
+After the pilot (2–4 weeks of production traffic, zero P0 incidents on billing/auth/tenancy), raise readiness target to **≥ 85** with automated E2E for:
 
-| Component | Path |
-|-----------|------|
-| Money helpers | `apps/api/src/lib/money.ts` |
-| Secret crypto | `apps/api/src/lib/secret-crypto.ts` |
-| Distributed lock | `apps/api/src/lib/distributed-lock.ts` |
-| Invoice sequences | `apps/api/src/services/invoice-sequence.service.ts` |
-| AI quota service | `apps/api/src/services/ai-quota.service.ts` |
-| AI quota middleware | `apps/api/src/middleware/aiQuota.ts` |
-| Schema | `InvoiceSequence`, `AiUsageEvent`, Decimal money fields |
-| Env | `TOKEN_ENCRYPTION_KEY` (optional; falls back to backup key / JWT) |
+1. Auth + session limit  
+2. Subscription activate / admin plan change / SSE  
+3. Module permission deny matrix  
+4. Lead import + bulk delete  
 
 ---
 
-## Security Review
+## Sign-off
 
-| Control | Assessment |
-|---------|------------|
-| Public registration | Disabled (API 403 + service guard) |
-| Portal JWT isolation | Strong (admin cannot hit CRM) |
-| Session revocation | Good on self-reset + platform reset |
-| Super Admin brute force | Mitigated (rate limit) |
-| Multi-tenant CRM lists | Good via `buildCrmScope` |
-| Billing isolation | Good after PDF/status fixes |
-| Integration secrets | **Encrypted at rest (AES-256-GCM)** |
-| AI cost abuse | **Per-business quotas + 429** |
-| Razorpay | Webhook-first; rotate live keys in secrets manager |
-| CORS / Helmet / soft delete | Present |
+| Role | Status |
+|------|--------|
+| Engineering review | Completed (codebase audit + critical fixes) |
+| Security review | Partial (architecture + spot fixes; no external pen-test) |
+| Load test | **Not done** — schedule before scale-up |
+| Legal / DPDP / ToS | **Owner responsibility** |
 
----
-
-## Performance Review
-
-| Topic | Assessment |
-|-------|------------|
-| CRM list pagination | Good |
-| Finance dashboard | Medium — still benefits from SQL aggregates |
-| Money correctness | **Decimal — production safe** |
-| Billing jobs | **Multi-instance safe (advisory lock)** |
-| Invoice numbers | **Atomic under concurrency** |
-| Rate limit store | In-memory (scale: add Redis) |
-| AI | Dedicated budget + request limits |
-
----
-
-## Database Review
-
-| Topic | Assessment |
-|-------|------------|
-| Money types | **Decimal(18,2) / Decimal(12,6) for AI cost** |
-| Invoice sequences | `InvoiceSequence` unique keys |
-| Soft delete | Contacts good; notes lack businessId |
-| Indexes | Improved |
-| Backups | Scheduler + AES path exists |
-
----
-
-## Deployment Readiness
-
-### Ready
-- Sales-led onboarding + trial  
-- Webhook subscription activation  
-- Invoice PDF generation  
-- Atomic finance + SaaS invoice numbers  
-- Multi-instance-safe billing job  
-- Encrypted integration secrets  
-- AI quotas / cost controls  
-- CRM core + pipeline sync  
-- Super Admin customers + revenue  
-- Automated backups  
-- E2E green (33 + 58)  
-
-### Before first paid customer (ops — not code blockers)
-- [ ] `RAZORPAY_WEBHOOK_SECRET` set + dashboard webhook URL  
-- [ ] Rotate any exposed live Razorpay keys  
-- [ ] Set dedicated `TOKEN_ENCRYPTION_KEY` (32+ random bytes) in secrets manager  
-- [ ] `NODE_ENV=production`, secrets manager  
-- [ ] SMTP production verification  
-- [ ] Postgres backups verified restore  
-- [ ] HTTPS + reverse proxy  
-
-### After GO (scale hardening)
-- [ ] Finance dashboard SQL aggregates  
-- [ ] Active-business context for multi-membership  
-- [ ] Shorter JWT + refresh tokens  
-- [ ] Redis rate-limit store  
-
----
-
-## End-to-End Verification (executed 2026-07-18)
-
-### High Priority + audit (`scripts/prod-readiness-e2e.mjs`)
-
-```
-health up · DB Decimal money (0 float cols, 19 numeric)
-register 403 · admin login · admin JWT ≠ CRM
-provision customer · customer login
-GST 1000@18% = 1180 · sequential INV numbers · concurrent unique
-advisory lock wired · pg_try_advisory_lock OK
-integration token enc:v1 · plaintext absent · list masks
-AI 429 when quota exhausted · AI allowed under quota
-billing access trial · lead+deal · finance KPIs · revenue
-SaaS MM-INV atomic · code audit (money/crypto/AI/lock)
-=== RESULT pass=33 fail=0 warn=0 ===
-```
-
-### Pre-launch full module (`scripts/prelaunch-e2e.mjs`)
-
-```
-=== SUMMARY ===
-pass=58 fail=0 warn=0 total=58
-```
-
-Artifacts: `docs/PROD_READINESS_E2E_RESULTS.json`
-
----
-
-## Final Verdict
-
-| | |
-|--|--|
-| **Score** | **88 / 100** |
-| **Recommendation** | **GO — Production Ready** |
-| **Meaning** | High Priority production blockers closed and verified. Suitable for production launch after ops checklist (webhook secret, key rotation, HTTPS, SMTP). Continue Medium items for multi-region / high concurrency scale. |
-
----
-
-*Generated after High Priority remediation + full production audit re-run + automated E2E verification.*
+*This report does not replace a formal penetration test or load test.*

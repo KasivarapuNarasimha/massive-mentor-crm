@@ -19,8 +19,10 @@ export function ModuleGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const modules = portal?.modules;
-  if (!canAccessPath(pathname, modules)) {
+  // Portal resolved but modules missing → treat as loaded empty (deny restricted pages)
+  const modules = portal ? portal.modules || [] : null;
+  const loaded = !!portal;
+  if (!canAccessPath(pathname, modules, { loaded })) {
     return (
       <div
         className="max-w-lg mx-auto m-6 sm:m-10 rounded-2xl border border-red-500/30 bg-red-500/5 p-6 sm:p-8 text-center"

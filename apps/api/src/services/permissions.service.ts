@@ -31,8 +31,8 @@ export const MODULE_CATALOG: Array<{
   { key: "notes", label: "Notes", routePrefix: "/dashboard/notes", apiPrefixes: ["/api/crm/notes"], category: "crm", sortOrder: 7 },
   { key: "documents", label: "Documents", routePrefix: "/dashboard/documents", apiPrefixes: ["/api/crm/documents"], category: "crm", sortOrder: 8 },
   { key: "reports", label: "Reports", routePrefix: "/dashboard/reports", apiPrefixes: ["/api/reports"], category: "insights", sortOrder: 10 },
-  { key: "ai_sales", label: "AI Sales", routePrefix: "/dashboard/ai-sales", apiPrefixes: ["/api/crm/ai"], category: "ai", sortOrder: 11 },
-  { key: "mentor", label: "AI Mentor", routePrefix: "/dashboard/mentor", apiPrefixes: ["/api/mentor"], category: "ai", sortOrder: 12 },
+  { key: "ai_sales", label: "AI Sales", routePrefix: "/dashboard/ai-sales", apiPrefixes: ["/api/crm/ai", "/api/ai"], category: "ai", sortOrder: 11 },
+  { key: "mentor", label: "AI Mentor", routePrefix: "/dashboard/mentor", apiPrefixes: ["/api/mentor", "/api/ai"], category: "ai", sortOrder: 12 },
   { key: "marketing", label: "Market AI", routePrefix: "/dashboard/marketing", apiPrefixes: ["/api/marketing"], category: "ai", sortOrder: 13 },
   { key: "swot", label: "SWOT Analysis", routePrefix: "/dashboard/swot", apiPrefixes: ["/api/swot"], category: "strategy", sortOrder: 14 },
   { key: "roadmap", label: "Growth Roadmap", routePrefix: "/dashboard/roadmap", apiPrefixes: ["/api/roadmap"], category: "strategy", sortOrder: 15 },
@@ -308,6 +308,10 @@ export function moduleKeyForApiPath(apiPath: string): string | null {
   // contacts type leads vs clients — same API; gated by leads/clients on frontend, API allows if either
   if (p.startsWith("/api/crm/contacts")) {
     return "__crm_contacts__"; // special: need leads OR clients
+  }
+  // Generic AI helper — allow if user has any AI module
+  if (p.startsWith("/api/ai")) {
+    return "__ai_any__";
   }
   return best?.key || null;
 }

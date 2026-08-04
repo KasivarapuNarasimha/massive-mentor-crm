@@ -570,7 +570,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     return items;
   })();
 
-  const moduleKeys = portal?.modules || null;
+  // null until portal loads; then use explicit array (may be empty) for fail-closed nav
+  const moduleKeys = portal ? portal.modules || [] : null;
 
   const primaryNav = filterNavByModules(
     (portalNav || resolveNav(navItems)).filter((item) => item.href !== APPEARANCE_HREF),

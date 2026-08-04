@@ -78,9 +78,11 @@ function collectAllowedOrigins(): Set<string> {
   add("https://api.massivementor.in");
   add("https://massivementor.in");
 
-  // Legacy direct-IP UI (pre-domain)
-  add("http://200.141.0.25:3000");
-  add("http://200.141.0.25:3001");
+  // Legacy direct-IP UI — development / migration only (never in production allowlist)
+  if (!isProd) {
+    add("http://200.141.0.25:3000");
+    add("http://200.141.0.25:3001");
+  }
 
   return set;
 }
@@ -94,8 +96,10 @@ function isOriginAllowed(origin: string | undefined): boolean {
 
   try {
     const u = new URL(origin);
-    // Any port on the known public host when UI is re-bound
-    if (u.hostname === "200.141.0.25" && u.protocol === "http:") return true;
+    // Legacy raw-IP UI — block in production (force HTTPS domain)
+    if (u.hostname === "200.141.0.25" && u.protocol === "http:") {
+      return !isProd;
+    }
 
     // All first-party HTTPS portals: https://*.massivementor.in
     if (
@@ -301,7 +305,8 @@ import { requireAuth as requireAuthMw } from "./middleware/auth.js";
 // Mount API routes (auth + module gate on tenant CRM surfaces)
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
-app.use("/api/ai", aiRoutes);
+// AI test endpoint — require auth + any AI-related module
+app.use("/api/ai", requireAuthMw, requireModuleFromPath, aiRoutes);
 app.use("/api/health-score", requireAuthMw, requireModuleFromPath, healthRoutes);
 app.use("/api/swot", requireAuthMw, requireModuleFromPath, swotRoutes);
 app.use("/api/mentor", requireAuthMw, requireModuleFromPath, mentorRoutes);
