@@ -282,6 +282,41 @@ export async function bulkDeleteLeadsHandler(req: AuthenticatedRequest, res: Res
   }
 }
 
+/** POST /api/leads/bulk-assign — selected | first_n | all_filtered */
+export async function bulkAssignLeadsHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const rawScope = String(req.body?.scope || req.body?.mode || "ids").toLowerCase();
+    const scope =
+      rawScope === "first_n" || rawScope === "firstn" || rawScope === "first"
+        ? "first_n"
+        : rawScope === "all_filtered" || rawScope === "all"
+          ? "all_filtered"
+          : "ids";
+    const assignedTo = String(req.body?.assignedTo || req.body?.userId || "").trim();
+    const limitRaw = req.body?.limit ?? req.body?.count ?? req.body?.firstN;
+    const limit =
+      limitRaw === undefined || limitRaw === null || limitRaw === ""
+        ? undefined
+        : Number(limitRaw);
+
+    const { bulkAssignLeads } = await import("../services/crm.service.js");
+    const data = await bulkAssignLeads(req.user.id, {
+      assignedTo,
+      scope,
+      ids: Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : undefined,
+      limit,
+      search: typeof req.body?.search === "string" ? req.body.search : undefined,
+      status: typeof req.body?.status === "string" ? req.body.status : undefined,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Bulk assign failed";
+    const status = message.includes("permission") ? 403 : 400;
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
 /** POST /api/crm/leads/send-email — compose & send via SMTP */
 export async function sendLeadEmailHandler(req: AuthenticatedRequest, res: Response) {
   try {

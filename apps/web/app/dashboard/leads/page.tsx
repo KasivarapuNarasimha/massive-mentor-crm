@@ -155,6 +155,12 @@ export default function LeadsPage() {
   } | null>(null);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [assignValue, setAssignValue] = useState("");
+  /** Assign scope: selected IDs, first N filtered, or all filtered (≤50k) */
+  const [assignScope, setAssignScope] = useState<"ids" | "first_n" | "all_filtered">("ids");
+  const [assignFirstPreset, setAssignFirstPreset] = useState<
+    "100" | "250" | "500" | "1000" | "5000" | "custom"
+  >("100");
+  const [assignCustomCount, setAssignCustomCount] = useState("");
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
   const [followUpTitle, setFollowUpTitle] = useState("Follow up");
   const [followUpDays, setFollowUpDays] = useState("1");
@@ -854,38 +860,134 @@ export default function LeadsPage() {
 
   // ——— Bulk actions (UI orchestration over existing endpoints) ———
 
+  const BULK_ASSIGN_MAX = 50_000;
+
+  const resolvedAssignLimit = useMemo(() => {
+    if (assignScope !== "first_n") return null;
+    if (assignFirstPreset === "custom") {
+      const n = Number.parseInt(assignCustomCount, 10);
+      return Number.isFinite(n) ? n : NaN;
+    }
+    return Number.parseInt(assignFirstPreset, 10);
+  }, [assignScope, assignFirstPreset, assignCustomCount]);
+
+  const assignCustomValidation = useMemo(() => {
+    if (assignScope !== "first_n" || assignFirstPreset !== "custom") return null;
+    if (!assignCustomCount.trim()) return "Enter a number between 1 and 50,000.";
+    const n = Number.parseInt(assignCustomCount, 10);
+    if (!Number.isFinite(n) || String(n) !== assignCustomCount.trim()) {
+      return "Enter a whole number between 1 and 50,000.";
+    }
+    if (n < 1) return "Count must be at least 1.";
+    if (n > BULK_ASSIGN_MAX) return "Count cannot exceed 50,000.";
+    if (n > serverTotal) {
+      return `Count cannot exceed filtered results (${serverTotal.toLocaleString()}).`;
+    }
+    return null;
+  }, [assignScope, assignFirstPreset, assignCustomCount, serverTotal]);
+
   const runBulkAssign = async () => {
-    if (!token || !assignValue.trim() || selectedLeads.length === 0) return;
-    // assignValue must be a workspace user id
+    if (!token || !assignValue.trim()) return;
     const member = teamMembers.find((t) => t.id === assignValue.trim());
     if (!member) {
       toast.error("Select a team member from the list");
       return;
     }
-    setBulkBusy(true);
-    let ok = 0;
-    let fail = 0;
-    for (const lead of selectedLeads) {
-      const res = await api.updateCrmContact(
-        lead.id,
-        { name: lead.name, assignedTo: member.id },
-        token
-      );
-      if (res.success) {
-        ok++;
-        setLeads((prev) =>
-          prev.map((l) => (l.id === lead.id ? { ...l, assignedTo: member.id } : l))
-        );
-      } else fail++;
+
+    if (assignScope === "ids" && selectedIds.size === 0) {
+      toast.error("Select at least one lead");
+      return;
     }
+    if (assignScope === "all_filtered" && serverTotal === 0) {
+      toast.error("No leads match the current filters");
+      return;
+    }
+    if (assignScope === "first_n") {
+      if (assignFirstPreset === "custom" && assignCustomValidation) {
+        toast.error(assignCustomValidation);
+        return;
+      }
+      const lim = resolvedAssignLimit;
+      if (!lim || !Number.isFinite(lim) || lim < 1) {
+        toast.error("Enter a valid count between 1 and 50,000");
+        return;
+      }
+      if (lim > BULK_ASSIGN_MAX) {
+        toast.error("Count cannot exceed 50,000");
+        return;
+      }
+      if (serverTotal === 0) {
+        toast.error("No leads match the current filters");
+        return;
+      }
+    }
+
+    const label = member.name?.trim() || member.email;
+    const progressHint =
+      assignScope === "ids"
+        ? `Assigning ${selectedIds.size.toLocaleString()} selected lead(s)…`
+        : assignScope === "all_filtered"
+          ? `Assigning all ${serverTotal.toLocaleString()} filtered lead(s)…`
+          : `Assigning first ${Math.min(resolvedAssignLimit || 0, serverTotal).toLocaleString()} filtered lead(s)…`;
+
+    setBulkBusy(true);
+    setBulkProgress(progressHint);
+
+    const body =
+      assignScope === "ids"
+        ? {
+            assignedTo: member.id,
+            scope: "ids" as const,
+            ids: [...selectedIds],
+          }
+        : assignScope === "all_filtered"
+          ? {
+              assignedTo: member.id,
+              scope: "all_filtered" as const,
+              search: search.trim() || undefined,
+              status: statusFilter || undefined,
+            }
+          : {
+              assignedTo: member.id,
+              scope: "first_n" as const,
+              limit: Math.min(
+                resolvedAssignLimit || 0,
+                serverTotal,
+                BULK_ASSIGN_MAX
+              ),
+              search: search.trim() || undefined,
+              status: statusFilter || undefined,
+            };
+
+    const res = await api.bulkAssignLeads(body, token);
     setBulkBusy(false);
+    setBulkProgress(null);
     setAssignModalOpen(false);
     setAssignValue("");
     setTeamSearch("");
-    const label = member.name?.trim() || member.email;
-    if (ok) toast.success(`Assigned ${ok} lead(s) to ${label}`);
-    if (fail) toast.error(`${fail} assignment(s) failed`);
-    clearSelection();
+    setAssignCustomCount("");
+
+    if (res.success && res.data) {
+      const n = res.data.assigned;
+      const who = res.data.assigneeName || label;
+      let msg = `Successfully assigned ${n.toLocaleString()} leads.`;
+      if (res.data.scope === "first_n") {
+        msg = `Successfully assigned first ${n.toLocaleString()} filtered leads.`;
+      } else if (res.data.scope === "all_filtered") {
+        msg = `Successfully assigned all ${n.toLocaleString()} filtered leads.`;
+      } else {
+        msg = `Successfully assigned ${n.toLocaleString()} leads.`;
+      }
+      toast.success(msg, {
+        description: `Assigned to ${who}${res.data.failed ? ` · ${res.data.failed} failed` : ""}`,
+      });
+      clearSelection();
+      await loadLeads();
+      const { emitDataChanged } = await import("@/lib/data-events");
+      emitDataChanged({ module: "contact", action: "update" });
+    } else {
+      toast.error(res.error || "Bulk assign failed");
+    }
   };
 
   const runBulkAiScore = async () => {
@@ -1519,7 +1621,7 @@ export default function LeadsPage() {
               </button>
               {serverTotal > pageLeads.length && (
                 <span className="text-xs text-amber-300/90">
-                  {serverTotal.toLocaleString()} match filters — use Delete → &quot;All filtered&quot; for full set
+                  {serverTotal.toLocaleString()} match filters — use Assign / Delete → filtered scopes (up to 50,000)
                 </span>
               )}
               <button
@@ -1544,6 +1646,9 @@ export default function LeadsPage() {
               onClick={() => {
                 setAssignValue("");
                 setTeamSearch("");
+                setAssignScope(selectedIds.size > 0 ? "ids" : "first_n");
+                setAssignFirstPreset("100");
+                setAssignCustomCount("");
                 void loadTeam();
                 setAssignModalOpen(true);
               }}
@@ -2047,21 +2152,179 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Assign User modal — workspace user ids only */}
+      {/* Assign User modal — selected | first N filtered | all filtered (≤50k) */}
       {assignModalOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto p-5 sm:p-6">
             <h3 className="text-lg font-semibold mb-1">Assign User</h3>
             <p className="text-xs text-muted-foreground mb-4">
-              Assign {selectedIds.size} selected lead(s) to an active workspace member.
+              Assign leads to an active workspace member. Filtered scopes use current search/status
+              (all pages, up to 50,000). Processed in batches of 1,000.
             </p>
+
+            <div className="space-y-2 mb-4">
+              <label
+                className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                  assignScope === "ids"
+                    ? "border-primary/50 bg-primary/10"
+                    : "border-border hover:bg-muted/40"
+                } ${selectedIds.size === 0 ? "opacity-60" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="bulk-assign-scope"
+                  className="mt-1"
+                  checked={assignScope === "ids"}
+                  disabled={selectedIds.size === 0}
+                  onChange={() => setAssignScope("ids")}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-foreground">
+                    Assign selected ({selectedIds.size.toLocaleString()})
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    Only the leads currently checked.
+                  </span>
+                </span>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                  assignScope === "first_n"
+                    ? "border-primary/50 bg-primary/10"
+                    : "border-border hover:bg-muted/40"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="bulk-assign-scope"
+                  className="mt-1"
+                  checked={assignScope === "first_n"}
+                  onChange={() => setAssignScope("first_n")}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-foreground">
+                    Assign first N filtered leads
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-0.5 mb-2">
+                    First N matching current filters ({serverTotal.toLocaleString()} total).
+                  </span>
+                  {assignScope === "first_n" && (
+                    <div className="space-y-2" onClick={(e) => e.preventDefault()}>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(
+                          [
+                            ["100", "100"],
+                            ["250", "250"],
+                            ["500", "500"],
+                            ["1000", "1,000"],
+                            ["5000", "5,000"],
+                            ["custom", "Custom"],
+                          ] as const
+                        ).map(([val, label]) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setAssignFirstPreset(val);
+                            }}
+                            className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
+                              assignFirstPreset === val
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-white/5 border-border hover:bg-white/10"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      {assignFirstPreset === "custom" && (
+                        <div>
+                          <input
+                            type="number"
+                            min={1}
+                            max={BULK_ASSIGN_MAX}
+                            value={assignCustomCount}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setAssignCustomCount(e.target.value)}
+                            placeholder="Enter count (1–50,000)"
+                            className={`${inputClass} tabular-nums`}
+                          />
+                          {assignCustomValidation ? (
+                            <p className="text-xs text-red-400 mt-1">{assignCustomValidation}</p>
+                          ) : assignCustomCount.trim() ? (
+                            <p className="text-xs text-emerald-400/90 mt-1">
+                              Assign first{" "}
+                              {Math.min(
+                                Number.parseInt(assignCustomCount, 10) || 0,
+                                serverTotal,
+                                BULK_ASSIGN_MAX
+                              ).toLocaleString()}{" "}
+                              matching leads.
+                            </p>
+                          ) : null}
+                        </div>
+                      )}
+                      {assignFirstPreset !== "custom" && (
+                        <p className="text-xs text-sky-300/90">
+                          Assign first{" "}
+                          {Math.min(
+                            Number.parseInt(assignFirstPreset, 10),
+                            serverTotal || Number.parseInt(assignFirstPreset, 10)
+                          ).toLocaleString()}{" "}
+                          matching leads.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </span>
+              </label>
+
+              <label
+                className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                  assignScope === "all_filtered"
+                    ? "border-primary/50 bg-primary/10"
+                    : "border-border hover:bg-muted/40"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="bulk-assign-scope"
+                  className="mt-1"
+                  checked={assignScope === "all_filtered"}
+                  onChange={() => setAssignScope("all_filtered")}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-foreground">
+                    Assign all filtered results ({serverTotal.toLocaleString()})
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    Every lead matching current search/status — all pages (up to 50,000).
+                    {search || statusFilter ? (
+                      <span className="block mt-1 text-amber-200/90">
+                        Filters: {statusFilter ? `status=${statusFilter}` : ""}
+                        {statusFilter && search ? " · " : ""}
+                        {search ? `search="${search}"` : ""}
+                      </span>
+                    ) : (
+                      <span className="block mt-1 text-amber-200/90">
+                        No filters — this assigns ALL leads in CRM.
+                      </span>
+                    )}
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <label className="block text-xs text-muted-foreground mb-1">Assign to</label>
             <input
               type="search"
               value={teamSearch}
               onChange={(e) => setTeamSearch(e.target.value)}
               placeholder="Search by name or email…"
               className={`${inputClass} mb-2`}
-              autoFocus
             />
             <select
               value={assignValue}
@@ -2075,6 +2338,14 @@ export default function LeadsPage() {
                 </option>
               ))}
             </select>
+
+            {bulkProgress && (
+              <div className="flex items-center gap-2 text-xs text-sky-300 mb-3">
+                <span className="inline-block w-3.5 h-3.5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+                {bulkProgress}
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 type="button"
@@ -2082,18 +2353,39 @@ export default function LeadsPage() {
                   setAssignModalOpen(false);
                   setAssignValue("");
                   setTeamSearch("");
+                  setAssignCustomCount("");
                 }}
-                className="flex-1 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
+                className="flex-1 min-h-11 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={bulkBusy || !assignValue.trim()}
-                onClick={runBulkAssign}
-                className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium disabled:opacity-50"
+                disabled={
+                  bulkBusy ||
+                  !assignValue.trim() ||
+                  (assignScope === "ids" && selectedIds.size === 0) ||
+                  (assignScope === "all_filtered" && serverTotal === 0) ||
+                  (assignScope === "first_n" &&
+                    (serverTotal === 0 ||
+                      (assignFirstPreset === "custom" && !!assignCustomValidation) ||
+                      (assignFirstPreset === "custom" && !assignCustomCount.trim()) ||
+                      !resolvedAssignLimit ||
+                      resolvedAssignLimit < 1))
+                }
+                onClick={() => void runBulkAssign()}
+                className="flex-1 min-h-11 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium disabled:opacity-50"
               >
-                {bulkBusy ? "Assigning…" : "Assign"}
+                {bulkBusy
+                  ? "Assigning…"
+                  : assignScope === "all_filtered"
+                    ? `Assign ${serverTotal.toLocaleString()} filtered`
+                    : assignScope === "first_n"
+                      ? `Assign first ${Math.min(
+                          resolvedAssignLimit || 0,
+                          serverTotal || resolvedAssignLimit || 0
+                        ).toLocaleString()}`
+                      : `Assign ${selectedIds.size.toLocaleString()} selected`}
               </button>
             </div>
           </div>
@@ -2287,7 +2579,7 @@ export default function LeadsPage() {
                         Delete all filtered results ({serverTotal.toLocaleString()})
                       </span>
                       <span className="block text-xs text-muted-foreground mt-0.5">
-                        Every lead matching current search/status — all pages (up to 25,000).
+                        Every lead matching current search/status — all pages (up to 50,000).
                         {search || statusFilter ? (
                           <span className="block mt-1 text-amber-200/90">
                             Filters: {statusFilter ? `status=${statusFilter}` : ""}

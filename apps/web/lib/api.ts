@@ -517,7 +517,7 @@ class ApiClient {
   /**
    * Soft-delete (trash) or permanent purge — POST /api/leads/bulk-delete
    * scope: "ids" (default) uses body.ids
-   * scope: "all_filtered" deletes every lead matching search/status (all pages)
+   * scope: "all_filtered" deletes every lead matching search/status (all pages, up to 50k)
    */
   async bulkDeleteLeads(
     body: {
@@ -537,6 +537,34 @@ class ApiClient {
       scope?: string;
       matched?: number;
     }>("/leads/bulk-delete", body, token);
+  }
+
+  /**
+   * Bulk assign leads — POST /api/leads/bulk-assign
+   * scope: "ids" | "first_n" | "all_filtered"
+   */
+  async bulkAssignLeads(
+    body: {
+      assignedTo: string;
+      scope: "ids" | "first_n" | "all_filtered";
+      ids?: string[];
+      limit?: number;
+      search?: string;
+      status?: string;
+    },
+    token?: string | null
+  ) {
+    return this.post<{
+      assigned: number;
+      failed: number;
+      matched: number;
+      requested: number;
+      scope: string;
+      limit: number | null;
+      assignedTo: string;
+      assigneeName: string | null;
+      ids: string[];
+    }>("/leads/bulk-assign", body, token);
   }
 
   /** Compose + send email to lead(s) via platform SMTP — POST /api/leads/send-email */

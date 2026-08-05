@@ -777,13 +777,19 @@ export async function bulkEditLeads(
 
 /**
  * Soft-delete selected leads (trash). Undo via bulkRestoreLeads within retention window.
+ * Shared caps used by bulk delete + bulk assign.
  */
-const BULK_DELETE_MAX_IDS = 25_000;
-const BULK_DELETE_CHUNK = 500;
+export const BULK_LEAD_MAX_ROWS = 50_000;
+export const BULK_LEAD_CHUNK = 1_000;
+
+/** @deprecated use BULK_LEAD_MAX_ROWS */
+const BULK_DELETE_MAX_IDS = BULK_LEAD_MAX_ROWS;
+/** @deprecated use BULK_LEAD_CHUNK */
+const BULK_DELETE_CHUNK = BULK_LEAD_CHUNK;
 
 /**
  * Soft-delete or permanently purge leads by explicit IDs (chunked).
- * Supports large selections (up to 25k) via batched updates.
+ * Supports large selections (up to 50k) via batched updates of 1,000.
  */
 export async function bulkSoftDeleteLeads(
   userId: string,
@@ -863,6 +869,7 @@ export async function bulkSoftDeleteLeads(
       failed: unique.length - deleted,
       permanent,
       scope: "ids",
+      batchSize: BULK_DELETE_CHUNK,
       ids: okIds.slice(0, 100),
     },
   });
@@ -879,7 +886,7 @@ export async function bulkSoftDeleteLeads(
 
 /**
  * Soft-delete ALL leads matching list filters (search/status) — not just the current page.
- * Uses a single updateMany for soft delete so 20k+ rows are efficient.
+ * Soft-delete runs in batches of 1,000 to avoid long-running single statements / timeouts.
  */
 export async function bulkSoftDeleteLeadsByFilter(
   userId: string,
@@ -925,47 +932,53 @@ export async function bulkSoftDeleteLeadsByFilter(
     );
   }
 
-  // Sample IDs for undo (first 200) — full undo of 20k would require storing all IDs
+  // Sample IDs for undo (first 200) — full undo of 50k would require storing all IDs
   const sample = await prisma.contact.findMany({
     where: where as never,
     select: { id: true },
     take: 200,
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
   });
   const sampleIds = sample.map((c) => c.id);
 
   let deleted = 0;
-  if (permanent) {
-    // Permanent: delete in chunks
-    let cursor: string | undefined;
-    for (;;) {
-      const batch = await prisma.contact.findMany({
-        where: where as never,
-        select: { id: true },
-        take: BULK_DELETE_CHUNK,
-        ...(cursor
-          ? { cursor: { id: cursor }, skip: 1 }
-          : {}),
-        orderBy: { id: "asc" },
-      });
-      if (!batch.length) break;
-      for (const c of batch) {
+  // Always process in chunks of 1,000 (soft or permanent) for timeout safety
+  let cursor: string | undefined;
+  for (;;) {
+    const batch = await prisma.contact.findMany({
+      where: where as never,
+      select: { id: true },
+      take: BULK_DELETE_CHUNK,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      orderBy: { id: "asc" },
+    });
+    if (!batch.length) break;
+    const batchIds = batch.map((c) => c.id);
+
+    if (permanent) {
+      for (const id of batchIds) {
         try {
-          await prisma.contact.delete({ where: { id: c.id } });
+          await prisma.contact.delete({ where: { id } });
           deleted++;
         } catch {
           /* skip */
         }
       }
-      cursor = batch[batch.length - 1]?.id;
-      if (batch.length < BULK_DELETE_CHUNK) break;
+    } else {
+      // Re-apply list filters + batch ids so we never soft-delete outside the filtered set
+      const result = await prisma.contact.updateMany({
+        where: {
+          AND: [where, { id: { in: batchIds }, deletedAt: null }],
+        } as never,
+        data: { deletedAt: new Date(), deletedByUserId: userId },
+      });
+      deleted += result.count;
     }
-  } else {
-    const result = await prisma.contact.updateMany({
-      where: where as never,
-      data: { deletedAt: new Date(), deletedByUserId: userId },
-    });
-    deleted = result.count;
+
+    cursor = batch[batch.length - 1]?.id;
+    if (batch.length < BULK_DELETE_CHUNK) break;
+    // Cap safety: never exceed max rows even if count drifted
+    if (deleted >= BULK_DELETE_MAX_IDS) break;
   }
 
   const businessId = await getUserBusinessId(userId);
@@ -981,6 +994,7 @@ export async function bulkSoftDeleteLeadsByFilter(
       deleted,
       permanent,
       scope: "all_filtered",
+      batchSize: BULK_DELETE_CHUNK,
       filters: {
         search: filters.search || null,
         status: filters.status || null,
@@ -997,6 +1011,242 @@ export async function bulkSoftDeleteLeadsByFilter(
     permanent,
     scope: "all_filtered",
     matched,
+  };
+}
+
+export type BulkAssignScope = "ids" | "first_n" | "all_filtered";
+
+export type BulkAssignInput = {
+  assignedTo: string;
+  scope: BulkAssignScope;
+  /** Required when scope === "ids" */
+  ids?: string[];
+  /** Required when scope === "first_n" — how many filtered leads to assign */
+  limit?: number;
+  search?: string;
+  status?: string;
+};
+
+/**
+ * Enterprise bulk assign: selected IDs, first N filtered, or all filtered (≤50k).
+ * Updates in batches of 1,000. Audited with actor, target, filters, and counts.
+ */
+export async function bulkAssignLeads(
+  userId: string,
+  input: BulkAssignInput
+): Promise<{
+  assigned: number;
+  failed: number;
+  matched: number;
+  requested: number;
+  scope: BulkAssignScope;
+  limit: number | null;
+  assignedTo: string;
+  assigneeName: string | null;
+  ids: string[];
+}> {
+  if (!(await canBulkEditLeads(userId))) {
+    throw new Error("You do not have permission to bulk-assign leads");
+  }
+
+  const assignedTo = String(input.assignedTo || "").trim();
+  if (!assignedTo) throw new Error("Select a team member to assign");
+
+  const scopeMode: BulkAssignScope =
+    input.scope === "first_n" || input.scope === "all_filtered" || input.scope === "ids"
+      ? input.scope
+      : "ids";
+
+  // Resolve assignee in same business (or platform user for super_admin edge cases)
+  const businessId = await getUserBusinessId(userId);
+  let assigneeName: string | null = null;
+  if (businessId) {
+    const member = await prisma.businessMember.findFirst({
+      where: { businessId, userId: assignedTo },
+      include: { user: { select: { id: true, name: true, email: true, isDisabled: true } } },
+    });
+    if (!member?.user) {
+      throw new Error("Assignee is not an active member of this workspace");
+    }
+    if (member.user.isDisabled) {
+      throw new Error("Cannot assign leads to a disabled user");
+    }
+    assigneeName = member.user.name?.trim() || member.user.email;
+  } else {
+    const user = await prisma.user.findUnique({
+      where: { id: assignedTo },
+      select: { id: true, name: true, email: true, isDisabled: true },
+    });
+    if (!user) throw new Error("Assignee user not found");
+    if (user.isDisabled) throw new Error("Cannot assign leads to a disabled user");
+    assigneeName = user.name?.trim() || user.email;
+  }
+
+  const filters = {
+    search: input.search?.trim() || undefined,
+    status: input.status?.trim() || undefined,
+  };
+
+  let targetIds: string[] = [];
+  let matched = 0;
+  let requested = 0;
+
+  if (scopeMode === "ids") {
+    const unique = [...new Set((input.ids || []).filter(Boolean))];
+    if (!unique.length) throw new Error("Select at least one lead");
+    if (unique.length > BULK_LEAD_MAX_ROWS) {
+      throw new Error(`Maximum ${BULK_LEAD_MAX_ROWS.toLocaleString()} leads per bulk assign`);
+    }
+    const crmScope = await buildCrmScope(userId);
+    // Validate tenant ownership in batches; only assign scoped leads
+    const valid: string[] = [];
+    for (let i = 0; i < unique.length; i += BULK_LEAD_CHUNK) {
+      const chunk = unique.slice(i, i + BULK_LEAD_CHUNK);
+      const found = await prisma.contact.findMany({
+        where: andTenant(crmScope.where, {
+          id: { in: chunk },
+          type: "lead",
+          deletedAt: null,
+        }) as never,
+        select: { id: true },
+      });
+      valid.push(...found.map((c) => c.id));
+    }
+    targetIds = valid;
+    matched = unique.length;
+    requested = unique.length;
+  } else {
+    const where = await buildContactListWhere(userId, {
+      type: "lead",
+      search: filters.search,
+      status: filters.status,
+      trashOnly: false,
+      includeDeleted: false,
+    });
+    matched = await prisma.contact.count({ where: where as never });
+    if (matched === 0) {
+      throw new Error("No leads match the current filters");
+    }
+    if (matched > BULK_LEAD_MAX_ROWS && scopeMode === "all_filtered") {
+      throw new Error(
+        `Too many matching leads (${matched.toLocaleString()}). Refine filters (max ${BULK_LEAD_MAX_ROWS.toLocaleString()}).`
+      );
+    }
+
+    let limit =
+      scopeMode === "all_filtered"
+        ? Math.min(matched, BULK_LEAD_MAX_ROWS)
+        : Math.floor(Number(input.limit));
+
+    if (scopeMode === "first_n") {
+      if (!Number.isFinite(limit) || limit < 1) {
+        throw new Error("Enter a count between 1 and 50,000");
+      }
+      if (limit > BULK_LEAD_MAX_ROWS) {
+        throw new Error(`Maximum ${BULK_LEAD_MAX_ROWS.toLocaleString()} leads per bulk assign`);
+      }
+      if (limit > matched) {
+        // Cap to matched — do not error (UX: "first 1500 of 800" → assign all 800)
+        limit = matched;
+      }
+    }
+
+    requested = limit;
+
+    // Fetch first N (or all) in stable list order: updatedAt desc, id asc
+    // Keyset pagination avoids deep OFFSET for 10k–50k rows
+    const collected: string[] = [];
+    let cursorUpdatedAt: Date | null = null;
+    let cursorId: string | null = null;
+    while (collected.length < limit) {
+      const take = Math.min(BULK_LEAD_CHUNK, limit - collected.length);
+      const keyset: Record<string, unknown> | null =
+        cursorUpdatedAt && cursorId
+          ? {
+              OR: [
+                { updatedAt: { lt: cursorUpdatedAt } },
+                {
+                  AND: [{ updatedAt: cursorUpdatedAt }, { id: { gt: cursorId } }],
+                },
+              ],
+            }
+          : null;
+      const pageWhere = (keyset ? { AND: [where, keyset] } : where) as never;
+      const batch: Array<{ id: string; updatedAt: Date }> = await prisma.contact.findMany({
+        where: pageWhere,
+        select: { id: true, updatedAt: true },
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        take,
+      });
+      if (!batch.length) break;
+      collected.push(...batch.map((c: { id: string }) => c.id));
+      const last: { id: string; updatedAt: Date } = batch[batch.length - 1]!;
+      cursorUpdatedAt = last.updatedAt;
+      cursorId = last.id;
+      if (batch.length < take) break;
+    }
+    targetIds = collected;
+  }
+
+  // Apply assignment in batches of 1,000
+  let assigned = 0;
+  const sampleIds: string[] = [];
+  for (let i = 0; i < targetIds.length; i += BULK_LEAD_CHUNK) {
+    const chunk = targetIds.slice(i, i + BULK_LEAD_CHUNK);
+    const result = await prisma.contact.updateMany({
+      where: {
+        id: { in: chunk },
+        type: "lead",
+        deletedAt: null,
+      },
+      data: {
+        assignedTo,
+        lastContactedAt: new Date(),
+      },
+    });
+    assigned += result.count;
+    if (sampleIds.length < 100) {
+      sampleIds.push(...chunk.slice(0, 100 - sampleIds.length));
+    }
+  }
+
+  const failed = Math.max(0, targetIds.length - assigned);
+
+  await recordAudit({
+    businessId,
+    actorUserId: userId,
+    action: "lead_bulk_assign",
+    entityType: "contact",
+    metadata: {
+      scope: scopeMode,
+      assignedTo,
+      assigneeName,
+      filters: {
+        search: filters.search || null,
+        status: filters.status || null,
+      },
+      matched,
+      requested,
+      assigned,
+      failed,
+      limit: scopeMode === "first_n" ? requested : null,
+      batchSize: BULK_LEAD_CHUNK,
+      sampleIds,
+      timestamp: new Date().toISOString(),
+    },
+  });
+
+  scheduleFollowupRefresh(userId);
+  return {
+    assigned,
+    failed,
+    matched,
+    requested,
+    scope: scopeMode,
+    limit: scopeMode === "first_n" ? requested : null,
+    assignedTo,
+    assigneeName,
+    ids: sampleIds,
   };
 }
 

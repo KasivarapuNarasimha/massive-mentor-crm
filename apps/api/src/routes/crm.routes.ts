@@ -43,6 +43,7 @@ import {
   aiFollowupEngineMap,
   bulkEditLeadsHandler,
   bulkDeleteLeadsHandler,
+  bulkAssignLeadsHandler,
   bulkRestoreLeadsHandler,
   sendLeadEmailHandler,
 } from "../controllers/crm.controller.js";
@@ -54,6 +55,7 @@ const router: Router = Router();
 // Enterprise lead bulk actions (also mounted at /api/leads/*)
 router.post("/leads/bulk-edit", requireAuth, bulkEditLeadsHandler);
 router.post("/leads/bulk-delete", requireAuth, bulkDeleteLeadsHandler);
+router.post("/leads/bulk-assign", requireAuth, bulkAssignLeadsHandler);
 router.post("/leads/bulk-restore", requireAuth, bulkRestoreLeadsHandler);
 router.post("/leads/send-email", requireAuth, sendLeadEmailHandler);
 
