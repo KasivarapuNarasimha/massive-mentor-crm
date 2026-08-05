@@ -3,14 +3,17 @@
  * Pipeline stages consistent after status/stage changes.
  *
  * Used by: updateContact, bulkEditLeads, updateDeal.
- * Avoids circular updates via `source` flag.
+ * Lead → Deal path runs inside a Prisma interactive transaction:
+ *   check existing deal by contactId → create OR update (never duplicate).
  */
 import { prisma } from "../lib/prisma.js";
+import type { Prisma } from "@prisma/client";
 import { notifyUser } from "./notification.service.js";
 import { logActivity } from "./activity.service.js";
 import { recordAudit } from "./audit.service.js";
 import { scheduleFollowupRefresh } from "./followup-engine.service.js";
 import { getUserBusinessId } from "./field-engine.service.js";
+import { tenantWhereClause } from "./tenant-scope.service.js";
 
 export type PipelineSyncResult = {
   dealsUpdated: number;
@@ -23,7 +26,7 @@ export type PipelineSyncResult = {
 };
 
 export type PipelineSyncSettings = {
-  /** Auto-create a deal when lead reaches qualified/proposal/won and none exists */
+  /** Auto-create a deal when lead reaches qualified/proposal (won/lost always create) */
   autoCreateDeal: boolean;
   /** Convert lead → client when status becomes won (or deal closed_won) */
   convertLeadToClientOnWon: boolean;
@@ -78,16 +81,6 @@ const STAGE_ORDER = [
   "closed_lost",
 ];
 
-const STATUS_ORDER = [
-  "new",
-  "contacted",
-  "qualified",
-  "proposal",
-  "negotiation",
-  "won",
-  "lost",
-];
-
 function norm(s: string | null | undefined): string {
   return (s || "").trim().toLowerCase().replace(/\s+/g, "_");
 }
@@ -96,7 +89,6 @@ export function mapLeadStatusToDealStage(status: string): string | null {
   const s = norm(status);
   if (!s) return null;
   if (LEAD_STATUS_TO_DEAL_STAGE[s]) return LEAD_STATUS_TO_DEAL_STAGE[s];
-  // Template isWon keys
   if (/^won$|closed_won|converted|customer|enrolled/.test(s)) return "closed_won";
   if (/^lost$|closed_lost|dead|rejected|churned/.test(s)) return "closed_lost";
   if (/qualified|hot|warm/.test(s)) return "qualified";
@@ -140,6 +132,15 @@ function stageRank(stage: string): number {
   return i >= 0 ? i : 0;
 }
 
+function probabilityForStage(targetStage: string): number {
+  if (targetStage === "closed_won") return 100;
+  if (targetStage === "closed_lost") return 0;
+  if (targetStage === "negotiation") return 70;
+  if (targetStage === "proposal") return 50;
+  if (targetStage === "qualified") return 30;
+  return 10;
+}
+
 async function loadSettings(businessId: string | null | undefined): Promise<PipelineSyncSettings> {
   if (!businessId) return { ...DEFAULT_SETTINGS };
   const biz = await prisma.business.findUnique({
@@ -179,8 +180,37 @@ function emptyResult(): PipelineSyncResult {
 }
 
 /**
+ * Resolve a non-null businessId for deal writes whenever the workspace exists.
+ * Prefer lead.businessId → actor membership → contact owner membership.
+ */
+async function resolveBusinessIdForContact(
+  contact: { businessId?: string | null; userId?: string | null },
+  actorUserId: string
+): Promise<string | null> {
+  if (contact.businessId) return contact.businessId;
+  const fromActor = await getUserBusinessId(actorUserId);
+  if (fromActor) return fromActor;
+  if (contact.userId && contact.userId !== actorUserId) {
+    return getUserBusinessId(contact.userId);
+  }
+  return null;
+}
+
+/** Deal list filter for a contact — never uses assignedTo (Deal has no such field). */
+function dealsForContactWhere(
+  contactId: string,
+  businessId: string | null,
+  ownerUserId: string
+): Prisma.DealWhereInput {
+  const tenant = tenantWhereClause(ownerUserId, businessId);
+  return {
+    AND: [{ contactId }, tenant],
+  };
+}
+
+/**
  * After a Lead/Contact status change: update linked deals, optionally auto-create,
- * convert to client on won.
+ * convert to client on won — all inside one Prisma transaction.
  */
 export async function syncFromLeadStatusChange(
   userId: string,
@@ -205,23 +235,218 @@ export async function syncFromLeadStatusChange(
   const targetStage = mapLeadStatusToDealStage(contact.status);
   if (!targetStage) return result;
 
-  const businessId =
-    contact.businessId || (await getUserBusinessId(userId)) || null;
+  const businessId = await resolveBusinessIdForContact(contact, userId);
   const settings = await loadSettings(businessId);
+  const ownerUserId = contact.userId || userId;
+  const probability = probabilityForStage(targetStage);
+  const terminal = isWonStatus(contact.status) || isLostStatus(contact.status);
 
-  // Convert lead → client on won
-  if (
-    settings.convertLeadToClientOnWon &&
-    isWonStatus(contact.status) &&
-    contact.type === "lead"
-  ) {
-    // Client lifecycle uses "active"; deal carries closed_won
-    await prisma.contact.update({
-      where: { id: contact.id },
-      data: { type: "client", status: "active" },
-    });
-    result.contactConvertedToClient = true;
-    result.messages.push(`Lead "${contact.name}" converted to Client (active)`);
+  // Won/lost ALWAYS create-or-update a deal (production requirement).
+  // Earlier pipeline stages respect autoCreateDeal setting.
+  const stageCreatesDeal =
+    terminal ||
+    targetStage === "proposal" ||
+    targetStage === "negotiation" ||
+    targetStage === "qualified" ||
+    ["proposal", "proposal_sent", "negotiation", "qualified", "won", "lost"].includes(next);
+
+  const shouldCreateIfMissing =
+    terminal || (settings.autoCreateDeal && stageCreatesDeal);
+
+  await prisma.$transaction(
+    async (tx) => {
+      // Backfill contact.businessId when missing so future queries stay tenant-safe
+      if (businessId && !contact.businessId) {
+        await tx.contact.update({
+          where: { id: contact.id },
+          data: { businessId },
+        });
+        contact = { ...contact, businessId };
+      }
+
+      // Convert lead → client on won (same transaction)
+      if (
+        settings.convertLeadToClientOnWon &&
+        isWonStatus(contact.status) &&
+        contact.type === "lead"
+      ) {
+        await tx.contact.update({
+          where: { id: contact.id },
+          data: { type: "client", status: "active" },
+        });
+        result.contactConvertedToClient = true;
+        result.messages.push(`Lead "${contact.name}" converted to Client (active)`);
+      }
+
+      // Find existing deals for this contact (tenant-scoped; NO assignedTo)
+      let deals = await tx.deal.findMany({
+        where: dealsForContactWhere(contact.id, businessId, ownerUserId),
+        orderBy: { updatedAt: "desc" },
+      });
+
+      // If none by contactId, try same-tenant orphan match only when won/lost (title contains name)
+      if (deals.length === 0 && terminal) {
+        const namePart = (contact.name || "").trim().toLowerCase();
+        if (namePart.length >= 3) {
+          const tenant = tenantWhereClause(ownerUserId, businessId);
+          const orphans = await tx.deal.findMany({
+            where: {
+              AND: [{ contactId: null }, tenant],
+            },
+            orderBy: { updatedAt: "desc" },
+            take: 15,
+          });
+          const matched = orphans.filter((d) =>
+            (d.title || "").toLowerCase().includes(namePart)
+          );
+          for (const o of matched) {
+            await tx.deal.update({
+              where: { id: o.id },
+              data: {
+                contactId: contact.id,
+                ...(businessId ? { businessId } : {}),
+              },
+            });
+          }
+          if (matched.length) {
+            deals = await tx.deal.findMany({
+              where: dealsForContactWhere(contact.id, businessId, ownerUserId),
+              orderBy: { updatedAt: "desc" },
+            });
+            result.messages.push(`Linked ${matched.length} orphan deal(s) to contact`);
+          }
+        }
+      }
+
+      if (deals.length === 0) {
+        if (!shouldCreateIfMissing) {
+          if (
+            isWonStatus(contact.status) ||
+            ["qualified", "proposal", "negotiation"].includes(next)
+          ) {
+            result.promptCreateDeal = true;
+            result.messages.push(
+              "No linked deal — enable auto-create or create a deal manually"
+            );
+          }
+          return;
+        }
+
+        // Require businessId for new deals whenever workspace exists
+        const createBusinessId = businessId;
+        if (!createBusinessId) {
+          // Last resort: still create under userId so won is not lost; log loudly
+          console.warn(
+            `[pipeline-sync] creating deal without businessId for contact=${contact.id} actor=${userId}`
+          );
+        }
+
+        const title = contact.company?.trim()
+          ? `${contact.company} — ${contact.name}`
+          : `Deal: ${contact.name}`;
+
+        const created = await tx.deal.create({
+          data: {
+            userId: ownerUserId,
+            businessId: createBusinessId,
+            contactId: contact.id,
+            title,
+            value: contact.value ?? null,
+            stage: targetStage,
+            probability,
+            notes: `Auto-created from lead status → ${contact.status}`,
+            customFields: {
+              autoCreatedFromLead: true,
+              leadStatus: contact.status,
+            },
+          },
+        });
+        result.dealCreated = true;
+        result.dealIds.push(created.id);
+        result.messages.push(`Deal created at stage ${targetStage}`);
+        return;
+      }
+
+      // Update existing deal(s) — prefer primary (most recently updated)
+      for (const deal of deals) {
+        if (!terminal) {
+          if (settings.protectClosedDeals && isClosedDealStage(deal.stage)) {
+            const allow =
+              (isWonStatus(contact.status) && /lost|closed_lost/i.test(deal.stage)) ||
+              (isLostStatus(contact.status) && /won|closed_won/i.test(deal.stage));
+            if (!allow && norm(deal.stage) === norm(targetStage)) continue;
+            if (!allow) continue;
+          }
+          if (
+            settings.protectClosedDeals &&
+            stageRank(deal.stage) > stageRank(targetStage) &&
+            isClosedDealStage(deal.stage)
+          ) {
+            continue;
+          }
+        }
+
+        const needsStage = norm(deal.stage) !== norm(targetStage) || deal.stage !== targetStage;
+        const needsLink = deal.contactId !== contact.id;
+        const needsBiz = !!(businessId && deal.businessId !== businessId);
+        const needsValue =
+          contact.value != null && (deal.value == null || deal.value === undefined);
+
+        if (!needsStage && !needsLink && !needsBiz && !needsValue) {
+          // Still record as "synced" for primary deal so UI can refresh
+          if (result.dealIds.length === 0) result.dealIds.push(deal.id);
+          continue;
+        }
+
+        const updated = await tx.deal.update({
+          where: { id: deal.id },
+          data: {
+            contactId: contact.id,
+            stage: targetStage,
+            probability,
+            ...(businessId ? { businessId } : {}),
+            ...(needsValue ? { value: contact.value } : {}),
+          },
+        });
+        result.dealsUpdated++;
+        result.dealIds.push(updated.id);
+        result.messages.push(`Deal "${updated.title}" → ${targetStage}`);
+      }
+
+      // If protect-closed skipped all and we still need a deal for won/lost, create one
+      if (terminal && result.dealsUpdated === 0 && result.dealIds.length === 0) {
+        const title = contact.company?.trim()
+          ? `${contact.company} — ${contact.name}`
+          : `Deal: ${contact.name}`;
+        const created = await tx.deal.create({
+          data: {
+            userId: ownerUserId,
+            businessId,
+            contactId: contact.id,
+            title,
+            value: contact.value ?? null,
+            stage: targetStage,
+            probability,
+            notes: `Auto-created from lead status → ${contact.status}`,
+            customFields: {
+              autoCreatedFromLead: true,
+              leadStatus: contact.status,
+            },
+          },
+        });
+        result.dealCreated = true;
+        result.dealIds.push(created.id);
+        result.messages.push(`Deal created at stage ${targetStage}`);
+      }
+    },
+    {
+      maxWait: 10_000,
+      timeout: 30_000,
+    }
+  );
+
+  // Side-effects after commit (notifications / audit — non-fatal)
+  if (result.contactConvertedToClient) {
     await notifyUser(userId, {
       type: "activity",
       title: "Lead converted to Client",
@@ -231,202 +456,41 @@ export async function syncFromLeadStatusChange(
     }).catch(() => {});
   }
 
-  const probability =
-    targetStage === "closed_won"
-      ? 100
-      : targetStage === "closed_lost"
-        ? 0
-        : targetStage === "negotiation"
-          ? 70
-          : targetStage === "proposal"
-            ? 50
-            : targetStage === "qualified"
-              ? 30
-              : 10;
-
-  // All deals already linked to this contact (tenant-scoped)
-  let deals = await prisma.deal.findMany({
-    where: {
-      contactId: contact.id,
-      ...(businessId
-        ? { OR: [{ businessId }, { userId }] }
-        : { userId }),
-    },
-    orderBy: { updatedAt: "desc" },
-  });
-
-  // Adopt orphan open deals by title match — only in non-production (risky fuzzy match).
-  // Production requires explicit contactId linkage to avoid wrong re-links.
-  const allowOrphanMatch = process.env.NODE_ENV !== "production";
-  if (
-    allowOrphanMatch &&
-    (deals.length === 0 || isWonStatus(contact.status) || isLostStatus(contact.status))
-  ) {
-    const namePart = (contact.name || "").trim();
-    const companyPart = (contact.company || "").trim();
-    const orphanWhere: Record<string, unknown> = {
-      contactId: null,
-      ...(businessId
-        ? { OR: [{ businessId }, { userId }] }
-        : { userId }),
-    };
-    if (!isWonStatus(contact.status) && !isLostStatus(contact.status)) {
-      orphanWhere.stage = {
-        notIn: ["closed_won", "closed_lost", "won", "lost"],
-      };
-    }
-    const orphans = await prisma.deal.findMany({
-      where: orphanWhere as never,
-      orderBy: { updatedAt: "desc" },
-      take: 25,
-    });
-    const matched = orphans.filter((d) => {
-      const t = (d.title || "").toLowerCase();
-      if (companyPart && t.includes(companyPart.toLowerCase())) return true;
-      if (namePart && t.includes(namePart.toLowerCase())) return true;
-      return false;
-    });
-    for (const o of matched) {
-      await prisma.deal.update({
-        where: { id: o.id },
-        data: { contactId: contact.id },
-      });
-    }
-    if (matched.length) {
-      deals = await prisma.deal.findMany({
-        where: {
-          contactId: contact.id,
-          ...(businessId
-            ? { OR: [{ businessId }, { userId }] }
-            : { userId }),
-        },
-        orderBy: { updatedAt: "desc" },
-      });
-      result.messages.push(`Linked ${matched.length} orphan deal(s) to contact`);
-    }
-  }
-
-  if (deals.length === 0) {
-    // Auto-create from Proposal Sent onward (and won/lost) — not for early "new/contacted"
-    const stageCreatesDeal =
-      targetStage === "proposal" ||
-      targetStage === "negotiation" ||
-      targetStage === "qualified" ||
-      targetStage === "closed_won" ||
-      targetStage === "closed_lost" ||
-      ["proposal", "proposal_sent", "negotiation", "qualified", "won", "lost"].includes(next);
-
-    const shouldCreate = settings.autoCreateDeal && stageCreatesDeal;
-
-    if (shouldCreate) {
-      const title =
-        contact.company?.trim()
-          ? `${contact.company} — ${contact.name}`
-          : `Deal: ${contact.name}`;
-      const created = await prisma.deal.create({
-        data: {
-          userId: contact.userId || userId,
-          businessId,
-          contactId: contact.id,
-          title,
-          value: contact.value ?? null,
-          stage: targetStage,
-          probability,
-          notes: `Auto-created from lead status → ${contact.status}`,
-          customFields: { autoCreatedFromLead: true, leadStatus: contact.status },
-        },
-      });
-      result.dealCreated = true;
-      result.dealIds.push(created.id);
-      result.messages.push(`Deal created at stage ${targetStage}`);
-      await notifyUser(userId, {
-        type: isWonStatus(contact.status) ? "deal_won" : "activity",
-        title: isWonStatus(contact.status) ? "Deal won (auto)" : "Deal created",
-        message: `Deal "${created.title}" ${
-          isWonStatus(contact.status) ? "closed won" : `opened at ${targetStage}`
-        } from lead status`,
-        entityType: "deal",
-        entityId: created.id,
-      }).catch(() => {});
-      await logActivity({
-        userId,
-        entityType: "deal",
-        entityId: created.id,
-        action: "auto_created_from_lead",
-        details: { contactId: contact.id, stage: targetStage, leadStatus: contact.status },
-      }).catch(() => {});
-    } else if (
-      isWonStatus(contact.status) ||
-      ["qualified", "proposal", "negotiation"].includes(next)
-    ) {
-      result.promptCreateDeal = true;
-      result.messages.push("No linked deal — enable auto-create or create a deal manually");
-    }
-  } else {
-    const terminal = isWonStatus(contact.status) || isLostStatus(contact.status);
-
-    for (const deal of deals) {
-      // Terminal lead outcomes always force every linked deal into one stage
-      // (prevents "Lead" + "Closed Won" dual-column ghosts for the same contact).
-      if (!terminal) {
-        if (settings.protectClosedDeals && isClosedDealStage(deal.stage)) {
-          const allow =
-            (isWonStatus(contact.status) && /lost|closed_lost/i.test(deal.stage)) ||
-            (isLostStatus(contact.status) && /won|closed_won/i.test(deal.stage));
-          if (!allow && norm(deal.stage) === norm(targetStage)) continue;
-          if (!allow) continue;
-        }
-
-        if (
-          settings.protectClosedDeals &&
-          stageRank(deal.stage) > stageRank(targetStage) &&
-          isClosedDealStage(deal.stage)
-        ) {
-          continue;
-        }
-      }
-
-      if (norm(deal.stage) === norm(targetStage) && deal.contactId === contact.id) {
-        // Already correct stage — still normalize aliases (won → closed_won)
-        if (deal.stage !== targetStage) {
-          await prisma.deal.update({
-            where: { id: deal.id },
-            data: { stage: targetStage, probability },
-          });
-          result.dealsUpdated++;
-          result.dealIds.push(deal.id);
-        }
-        continue;
-      }
-
-      const updated = await prisma.deal.update({
-        where: { id: deal.id },
-        data: {
-          contactId: contact.id,
-          stage: targetStage,
-          probability,
-          ...(contact.value != null && deal.value == null ? { value: contact.value } : {}),
-        },
-      });
-      result.dealsUpdated++;
-      result.dealIds.push(updated.id);
-      result.messages.push(`Deal "${updated.title}" → ${targetStage}`);
-
+  if (result.dealCreated && result.dealIds[0]) {
+    const dealId = result.dealIds[0];
+    await notifyUser(userId, {
+      type: isWonStatus(contact.status) ? "deal_won" : "activity",
+      title: isWonStatus(contact.status) ? "Deal won (auto)" : "Deal created",
+      message: `Deal ${
+        isWonStatus(contact.status) ? "closed won" : `opened at ${targetStage}`
+      } from lead status`,
+      entityType: "deal",
+      entityId: dealId,
+    }).catch(() => {});
+    await logActivity({
+      userId,
+      entityType: "deal",
+      entityId: dealId,
+      action: "auto_created_from_lead",
+      details: { contactId: contact.id, stage: targetStage, leadStatus: contact.status },
+    }).catch(() => {});
+  } else if (result.dealsUpdated > 0) {
+    for (const dealId of result.dealIds.slice(0, 3)) {
       if (isWonStatus(contact.status) || /closed_won|won/i.test(targetStage)) {
         await notifyUser(userId, {
           type: "deal_won",
           title: "Deal won",
-          message: `Deal "${updated.title}" moved to ${targetStage} (lead won)`,
+          message: `Deal moved to ${targetStage} (lead won)`,
           entityType: "deal",
-          entityId: updated.id,
+          entityId: dealId,
         }).catch(() => {});
       } else if (isLostStatus(contact.status) || /closed_lost|lost/i.test(targetStage)) {
         await notifyUser(userId, {
           type: "deal_lost",
           title: "Deal lost",
-          message: `Deal "${updated.title}" moved to ${targetStage} (lead lost)`,
+          message: `Deal moved to ${targetStage} (lead lost)`,
           entityType: "deal",
-          entityId: updated.id,
+          entityId: dealId,
         }).catch(() => {});
       }
     }
@@ -440,9 +504,10 @@ export async function syncFromLeadStatusChange(
       entityType: "contact",
       entityId: contact.id,
       metadata: {
-        previousStatus: previousStatus,
+        previousStatus,
         nextStatus: contact.status,
         targetStage,
+        businessId,
         ...result,
       },
     }).catch(() => {});
@@ -473,83 +538,94 @@ export async function syncFromDealStageChange(
   const mapped = mapDealStageToLeadStatus(deal.stage);
   if (!mapped) return result;
 
-  const settings = await loadSettings(deal.businessId);
-  const contact = await prisma.contact.findFirst({
-    where: { id: deal.contactId, deletedAt: null },
-  });
-  if (!contact) return result;
+  const businessId =
+    deal.businessId || (await getUserBusinessId(userId)) || null;
+  const settings = await loadSettings(businessId);
 
-  const nextType =
-    settings.convertLeadToClientOnWon && mapped.type === "client"
-      ? "client"
-      : contact.type === "client" && !isLostStatus(mapped.status)
+  await prisma.$transaction(async (tx) => {
+    const contact = await tx.contact.findFirst({
+      where: { id: deal.contactId!, deletedAt: null },
+    });
+    if (!contact) return;
+
+    const nextType =
+      settings.convertLeadToClientOnWon && mapped.type === "client"
         ? "client"
-        : mapped.type || contact.type;
+        : contact.type === "client" && !isLostStatus(mapped.status)
+          ? "client"
+          : mapped.type || contact.type;
 
-  const nextStatus =
-    contact.type === "client" && nextType === "client" && isWonStatus(mapped.status)
-      ? "active"
-      : mapped.status;
+    const nextStatus =
+      contact.type === "client" && nextType === "client" && isWonStatus(mapped.status)
+        ? "active"
+        : mapped.status;
 
-  // Don't regress client active → early lead status unless lost
-  if (
-    contact.type === "client" &&
-    contact.status === "active" &&
-    !isLostStatus(mapped.status) &&
-    !isWonStatus(mapped.status)
-  ) {
-    return result;
-  }
+    // Don't regress client active → early lead status unless lost
+    if (
+      contact.type === "client" &&
+      contact.status === "active" &&
+      !isLostStatus(mapped.status) &&
+      !isWonStatus(mapped.status)
+    ) {
+      return;
+    }
 
-  if (norm(contact.status) === norm(nextStatus) && contact.type === nextType) {
-    return result;
-  }
+    if (norm(contact.status) === norm(nextStatus) && contact.type === nextType) {
+      return;
+    }
 
-  await prisma.contact.update({
-    where: { id: contact.id },
-    data: {
-      status: nextStatus,
-      type: nextType,
-      lastContactedAt: new Date(),
-    },
+    await tx.contact.update({
+      where: { id: contact.id },
+      data: {
+        status: nextStatus,
+        type: nextType,
+        lastContactedAt: new Date(),
+        ...(businessId && !contact.businessId ? { businessId } : {}),
+      },
+    });
+
+    // Backfill deal.businessId if missing
+    if (businessId && !deal.businessId) {
+      await tx.deal.update({
+        where: { id: deal.id },
+        data: { businessId },
+      });
+    }
+
+    result.contactStatusSynced = true;
+    result.contactConvertedToClient =
+      contact.type === "lead" && nextType === "client";
+    result.messages.push(
+      `Contact "${contact.name}" → ${nextType}/${nextStatus} (from deal ${deal.stage})`
+    );
   });
-
-  result.contactStatusSynced = true;
-  result.contactConvertedToClient =
-    contact.type === "lead" && nextType === "client";
-  result.messages.push(
-    `Contact "${contact.name}" → ${nextType}/${nextStatus} (from deal ${deal.stage})`
-  );
 
   if (result.contactConvertedToClient) {
     await notifyUser(userId, {
       type: "activity",
       title: "Lead converted to Client",
-      message: `"${contact.name}" converted because deal "${deal.title}" is ${deal.stage}`,
+      message: `"${deal.title}" closed — contact converted to client`,
       entityType: "contact",
-      entityId: contact.id,
+      entityId: deal.contactId!,
     }).catch(() => {});
   }
 
-  await recordAudit({
-    businessId: deal.businessId || contact.businessId,
-    actorUserId: userId,
-    action: "pipeline_sync_from_deal",
-    entityType: "deal",
-    entityId: deal.id,
-    metadata: {
-      previousStage,
-      nextStage: deal.stage,
-      contactId: contact.id,
-      nextStatus,
-      nextType,
-    },
-  }).catch(() => {});
+  if (result.contactStatusSynced) {
+    await recordAudit({
+      businessId,
+      actorUserId: userId,
+      action: "pipeline_sync_from_deal",
+      entityType: "deal",
+      entityId: deal.id,
+      metadata: {
+        previousStage,
+        nextStage: deal.stage,
+        contactId: deal.contactId,
+        ...result,
+      },
+    }).catch(() => {});
+    scheduleFollowupRefresh(userId);
+  }
 
-  scheduleFollowupRefresh(userId);
   return result;
 }
-
-/** Export defaults for docs / admin UI */
-export const PIPELINE_SYNC_DEFAULTS = DEFAULT_SETTINGS;
-export { STATUS_ORDER, STAGE_ORDER };

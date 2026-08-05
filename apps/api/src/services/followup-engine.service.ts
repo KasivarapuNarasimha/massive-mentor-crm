@@ -6,7 +6,11 @@
  */
 import { prisma } from "../lib/prisma.js";
 import { createNotification } from "./notification.service.js";
-import { buildTenantScope, andTenant } from "./tenant-scope.service.js";
+import {
+  buildCrmScope,
+  buildOwnedEntityScope,
+  andTenant,
+} from "./tenant-scope.service.js";
 import { toMoneyNumber, type MoneyInput } from "../lib/money.js";
 
 export type FollowupActionType =
@@ -563,18 +567,20 @@ export async function refreshFollowupEngine(
 
   const now = new Date();
   const businessId = await loadBusinessId(userId);
-  const tenant = await buildTenantScope(userId);
+  // Contact scope may include assignedTo; deal/task/meeting must NOT (no such field)
+  const contactScope = await buildCrmScope(userId);
+  const ownedScope = await buildOwnedEntityScope(userId);
 
   const [contacts, deals, tasks, meetings, aiGens] = await Promise.all([
     prisma.contact.findMany({
-      where: andTenant(tenant.where, {
+      where: andTenant(contactScope.where, {
         status: { notIn: ["won", "lost", "churned"] },
       }) as never,
       take: 300,
       orderBy: { updatedAt: "desc" },
     }),
     prisma.deal.findMany({
-      where: andTenant(tenant.where, {
+      where: andTenant(ownedScope.where, {
         stage: { notIn: ["closed_won", "closed_lost", "won", "lost"] },
       }) as never,
       include: { contact: { select: { id: true, name: true, company: true } } },
@@ -582,11 +588,11 @@ export async function refreshFollowupEngine(
       orderBy: { updatedAt: "desc" },
     }),
     prisma.task.findMany({
-      where: andTenant(tenant.where, { status: { not: "done" } }) as never,
+      where: andTenant(ownedScope.where, { status: { not: "done" } }) as never,
       take: 400,
     }),
     prisma.meeting.findMany({
-      where: andTenant(tenant.where, {}) as never,
+      where: andTenant(ownedScope.where, {}) as never,
       take: 400,
       orderBy: { scheduledAt: "desc" },
     }),

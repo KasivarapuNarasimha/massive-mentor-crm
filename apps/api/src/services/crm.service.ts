@@ -51,6 +51,7 @@ import {
   buildCrmScope,
   buildOwnedEntityScope,
   buildTenantScope,
+  buildOwnedTenantScope,
   resolveActorRole,
 } from "./tenant-scope.service.js";
 import { paginated, skipTake, type PaginatedResult } from "./pagination.js";
@@ -461,6 +462,10 @@ export async function updateContact(
   const statusChanged =
     nextStatus.trim().toLowerCase() !== String(existing.status || "").trim().toLowerCase();
 
+  // Ensure contact has a workspace businessId before deal sync
+  const resolvedBusinessId =
+    existing.businessId || (await getUserBusinessId(userId)) || null;
+
   const contact = await prisma.contact.update({
     where: { id },
     data: {
@@ -521,6 +526,10 @@ export async function updateContact(
       industry: parsed.industry !== undefined ? parsed.industry : existing.industry,
       tags: parsed.tags !== undefined ? parsed.tags ?? [] : existing.tags,
       customFields: mergedCustom as object,
+      // Never leave lead without businessId when workspace exists
+      ...(resolvedBusinessId && !existing.businessId
+        ? { businessId: resolvedBusinessId }
+        : {}),
     },
   });
 
@@ -558,19 +567,23 @@ export async function updateContact(
           status: contact.status,
           value: contact.value == null ? null : toMoneyNumber(contact.value),
           company: contact.company,
-          businessId: contact.businessId,
+          businessId: contact.businessId || resolvedBusinessId,
           userId: contact.userId,
         },
         existing.status
       );
     } catch (err) {
+      // Surface pipeline failures so they are not silent in production
       console.error("[updateContact] pipeline sync failed", err);
+      throw err instanceof Error
+        ? err
+        : new Error("Lead updated but deal pipeline sync failed");
     }
   }
 
-  // Re-fetch when sync may have flipped type/status (lead → client)
+  // Re-fetch when sync may have flipped type/status (lead → client) or backfilled businessId
   const finalContact =
-    pipelineSync?.contactConvertedToClient
+    pipelineSync?.contactConvertedToClient || pipelineSync?.dealCreated
       ? (await prisma.contact.findUnique({ where: { id: contact.id } })) || contact
       : contact;
 
@@ -1466,10 +1479,23 @@ export async function createDeal(userId: string, input: DealInput) {
     if (!contact) throw new Error("Contact not found or not accessible");
   }
 
+  // Prefer contact's businessId when linking, so deal never lands in null tenant
+  let dealBusinessId = businessId ?? null;
+  if (parsed.contactId) {
+    const linked = await prisma.contact.findFirst({
+      where: { id: parsed.contactId },
+      select: { businessId: true },
+    });
+    if (linked?.businessId) dealBusinessId = linked.businessId;
+  }
+  if (!dealBusinessId) {
+    console.warn(`[createDeal] no businessId for user=${userId} — deal will be user-scoped only`);
+  }
+
   return prisma.deal.create({
     data: {
       userId,
-      businessId: businessId ?? null,
+      businessId: dealBusinessId,
       contactId: parsed.contactId || null,
       title: parsed.title,
       value: parsed.value ?? null,
@@ -1493,7 +1519,8 @@ export async function createDeal(userId: string, input: DealInput) {
 }
 
 export async function updateDeal(userId: string, id: string, input: Partial<DealInput>) {
-  const { where: tenant } = await buildTenantScope(userId);
+  // Deal has no assignedTo — use owned-entity scope (never Contact CRM scope)
+  const { where: tenant } = await buildOwnedTenantScope(userId);
   const existing = await prisma.deal.findFirst({
     where: andTenant(tenant, { id }) as never,
   });
@@ -1575,7 +1602,7 @@ export async function updateDeal(userId: string, id: string, input: Partial<Deal
 }
 
 export async function deleteDeal(userId: string, id: string) {
-  const { where: tenant } = await buildTenantScope(userId);
+  const { where: tenant } = await buildOwnedTenantScope(userId);
   const existing = await prisma.deal.findFirst({
     where: andTenant(tenant, { id }) as never,
   });
@@ -1666,7 +1693,7 @@ export async function createTask(userId: string, input: TaskInput) {
 }
 
 export async function updateTask(userId: string, id: string, input: Partial<TaskInput>) {
-  const { where: tenant } = await buildTenantScope(userId);
+  const { where: tenant } = await buildOwnedTenantScope(userId);
   const existing = await prisma.task.findFirst({
     where: andTenant(tenant, { id }) as never,
   });
@@ -1689,7 +1716,7 @@ export async function updateTask(userId: string, id: string, input: Partial<Task
 }
 
 export async function deleteTask(userId: string, id: string) {
-  const { where: tenant } = await buildTenantScope(userId);
+  const { where: tenant } = await buildOwnedTenantScope(userId);
   const existing = await prisma.task.findFirst({
     where: andTenant(tenant, { id }) as never,
   });
@@ -1780,7 +1807,7 @@ export async function createMeeting(userId: string, input: MeetingInput) {
 }
 
 export async function updateMeeting(userId: string, id: string, input: Partial<MeetingInput>) {
-  const { where: tenant } = await buildTenantScope(userId);
+  const { where: tenant } = await buildOwnedTenantScope(userId);
   const existing = await prisma.meeting.findFirst({
     where: andTenant(tenant, { id }) as never,
   });
@@ -1803,7 +1830,7 @@ export async function updateMeeting(userId: string, id: string, input: Partial<M
 }
 
 export async function deleteMeeting(userId: string, id: string) {
-  const { where: tenant } = await buildTenantScope(userId);
+  const { where: tenant } = await buildOwnedTenantScope(userId);
   const existing = await prisma.meeting.findFirst({
     where: andTenant(tenant, { id }) as never,
   });
@@ -2093,7 +2120,10 @@ Return ONLY { "subject": "...", "body": "full email..." }
 }
 
 export async function generateProposal(userId: string, dealId: string) {
-  const deal = await prisma.deal.findFirst({ where: andTenant((await buildTenantScope(userId)).where, { id: dealId }) as never, include: { contact: true } });
+  const deal = await prisma.deal.findFirst({
+    where: andTenant((await buildOwnedTenantScope(userId)).where, { id: dealId }) as never,
+    include: { contact: true },
+  });
   if (!deal) throw new Error("Deal not found");
 
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
@@ -2146,10 +2176,15 @@ export async function generateNextBestAction(userId: string, entityType: string,
   let data: any = {};
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
 
-  if (entityType === 'contact') {
-    data = await prisma.contact.findFirst({ where: andTenant((await buildTenantScope(userId)).where, { id: entityId }) as never });
-  } else if (entityType === 'deal') {
-    data = await prisma.deal.findFirst({ where: andTenant((await buildTenantScope(userId)).where, { id: entityId }) as never, include: { contact: true } });
+  if (entityType === "contact") {
+    data = await prisma.contact.findFirst({
+      where: andTenant((await buildTenantScope(userId)).where, { id: entityId }) as never,
+    });
+  } else if (entityType === "deal") {
+    data = await prisma.deal.findFirst({
+      where: andTenant((await buildOwnedTenantScope(userId)).where, { id: entityId }) as never,
+      include: { contact: true },
+    });
   }
 
   if (!data) throw new Error("Entity not found");
@@ -2363,7 +2398,8 @@ export async function generateReminders(
   });
   if (!actor) throw new Error("User not found");
 
-  const scope = await buildCrmScope(userId);
+  const contactScope = await buildCrmScope(userId);
+  const dealScope = await buildOwnedEntityScope(userId);
   let contact: {
     id: string;
     name: string;
@@ -2417,7 +2453,7 @@ export async function generateReminders(
 
   if (opts.contactId) {
     contact = await prisma.contact.findFirst({
-      where: andTenant(scope.where, { id: opts.contactId, deletedAt: null }) as never,
+      where: andTenant(contactScope.where, { id: opts.contactId, deletedAt: null }) as never,
       select: {
         id: true,
         name: true,
@@ -2436,7 +2472,7 @@ export async function generateReminders(
 
   if (opts.dealId) {
     const dealRow = await prisma.deal.findFirst({
-      where: andTenant(scope.where, { id: opts.dealId }) as never,
+      where: andTenant(dealScope.where, { id: opts.dealId }) as never,
       select: {
         id: true,
         title: true,

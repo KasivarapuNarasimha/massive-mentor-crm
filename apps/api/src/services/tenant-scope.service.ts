@@ -53,28 +53,37 @@ export async function resolveActorRole(userId: string): Promise<string> {
 }
 
 /**
- * Multi-tenant + role data isolation.
+ * Tenant-only where clause (no role field filters).
+ * Safe for Contact, Deal, Task, Meeting, Document — does NOT include `assignedTo`.
+ */
+export function tenantWhereClause(
+  userId: string,
+  businessId: string | null
+): Record<string, unknown> {
+  if (!businessId) return { userId };
+  return {
+    OR: [{ businessId }, { userId, businessId: null }],
+  };
+}
+
+/**
+ * Multi-tenant + role data isolation for **Contact** (Lead/Client).
  *
  * - Always restrict to the actor's business (or legacy user-owned rows).
  * - Sales Executive (and similar): further restrict to userId OR assignedTo = actor.
+ *
+ * ⚠️ Do NOT use this where clause on Deal / Task / Meeting / Document —
+ * those models have no `assignedTo` field. Use `buildOwnedEntityScope` instead.
  */
 export async function buildCrmScope(userId: string): Promise<CrmScope> {
   const businessId = await getUserBusinessId(userId);
   const role = await resolveActorRole(userId);
   const ownDataOnly = OWN_DATA_ONLY_ROLES.has(role);
-
-  let tenant: Record<string, unknown>;
-  if (!businessId) {
-    tenant = { userId };
-  } else {
-    tenant = {
-      OR: [{ businessId }, { userId, businessId: null }],
-    };
-  }
+  const tenant = tenantWhereClause(userId, businessId);
 
   let where: Record<string, unknown> = tenant;
   if (ownDataOnly) {
-    // Own records: created by user OR assigned to user (contacts)
+    // Contact only: created by user OR assigned to user
     where = {
       AND: [
         tenant,
@@ -89,20 +98,25 @@ export async function buildCrmScope(userId: string): Promise<CrmScope> {
 }
 
 /**
- * Scope for entities without assignedTo (deals, tasks, meetings, documents).
+ * Scope for entities **without** Contact.assignedTo (deals, tasks, meetings, documents).
  * SE: only userId match within tenant.
+ * Never injects `assignedTo` into Prisma where (that caused Invalid prisma.deal.findFirst).
  */
 export async function buildOwnedEntityScope(userId: string): Promise<CrmScope> {
-  const base = await buildCrmScope(userId);
-  if (!base.ownDataOnly) return base;
+  const businessId = await getUserBusinessId(userId);
+  const role = await resolveActorRole(userId);
+  const ownDataOnly = OWN_DATA_ONLY_ROLES.has(role);
+  const tenant = tenantWhereClause(userId, businessId);
 
-  const tenant =
-    base.businessId != null
-      ? { OR: [{ businessId: base.businessId }, { userId, businessId: null }] }
-      : { userId };
+  if (!ownDataOnly) {
+    return { businessId, role, userId, ownDataOnly, where: tenant };
+  }
 
   return {
-    ...base,
+    businessId,
+    role,
+    userId,
+    ownDataOnly,
     where: {
       AND: [tenant, { userId }],
     },
@@ -118,9 +132,21 @@ export function andTenant(
   return { AND: [tenantWhere, extra] };
 }
 
-/** @deprecated use buildCrmScope — kept for callers still importing buildTenantScope */
+/**
+ * Contact-scoped tenant filter (may include assignedTo for SE).
+ * Prefer `buildCrmScope` for new code.
+ */
 export async function buildTenantScope(userId: string) {
   const s = await buildCrmScope(userId);
+  return { businessId: s.businessId, where: s.where };
+}
+
+/**
+ * Non-contact entity tenant filter — never uses assignedTo.
+ * Prefer `buildOwnedEntityScope` for new code.
+ */
+export async function buildOwnedTenantScope(userId: string) {
+  const s = await buildOwnedEntityScope(userId);
   return { businessId: s.businessId, where: s.where };
 }
 
