@@ -86,18 +86,73 @@ export function ExportFiltersBar({
       if (status) q.set("status", status);
       const url = `${API_BASE_URL}/reports/export/${format}?${q.toString()}`;
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept:
+            format === "csv"
+              ? "text/csv"
+              : format === "xlsx"
+                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                : "application/pdf",
+        },
       });
-      if (!res.ok) {
+      const contentType = (res.headers.get("content-type") || "").toLowerCase();
+      // Never save an error JSON body as .xlsx/.csv (causes "format not valid")
+      if (!res.ok || contentType.includes("application/json")) {
         const err = await res.json().catch(() => ({}));
-        toast.error((err as { error?: string }).error || `Export ${format} failed`);
+        toast.error((err as { error?: string }).error || `Export ${format} failed (${res.status})`);
         return;
       }
-      const blob = await res.blob();
-      const a = document.createElement("a");
+      const buf = await res.arrayBuffer();
+      if (!buf.byteLength) {
+        toast.error("Export returned an empty file");
+        return;
+      }
+      // Basic magic-byte checks
+      const u8 = new Uint8Array(buf);
+      if (format === "xlsx" && !(u8[0] === 0x50 && u8[1] === 0x4b)) {
+        toast.error("Invalid Excel file received from server");
+        return;
+      }
+      if (format === "pdf" && !(u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46)) {
+        toast.error("Invalid PDF file received from server");
+        return;
+      }
+      // CSV should start with UTF-8 BOM (EF BB BF) for Excel, or plain text
+      if (format === "csv") {
+        const hasBom = u8[0] === 0xef && u8[1] === 0xbb && u8[2] === 0xbf;
+        const looksText = u8[0] >= 0x20 || u8[0] === 0x0a || u8[0] === 0x0d || hasBom;
+        if (!looksText) {
+          toast.error("Invalid CSV file received from server");
+          return;
+        }
+      }
+      const mime =
+        format === "csv"
+          ? "text/csv;charset=utf-8"
+          : format === "xlsx"
+            ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            : "application/pdf";
+      const cd = res.headers.get("content-disposition") || "";
+      // Prefer RFC 5987 filename*=UTF-8''...
+      const star = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(cd);
+      const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(cd);
+      let filename = `${module}-export.${format}`;
+      try {
+        if (star?.[1]) filename = decodeURIComponent(star[1].trim());
+        else if (plain?.[1]) filename = plain[1].trim().replace(/^["']|["']$/g, "");
+      } catch {
+        /* keep default */
+      }
+      // Ensure extension matches format (never save .xlsx that is actually CSV, etc.)
+      if (!filename.toLowerCase().endsWith(`.${format}`)) {
+        filename = `${filename.replace(/\.[^.]+$/, "")}.${format}`;
+      }
+      const blob = new Blob([buf], { type: mime });
       const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
       a.href = href;
-      a.download = `${module}-export.${format === "xlsx" ? "xlsx" : format}`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();

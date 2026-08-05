@@ -6,15 +6,6 @@ import {
 } from "./tenant-scope.service.js";
 import { toMoneyNumber } from "../lib/money.js";
 
-let PDFDocument: any = null;
-async function getPDFDocument() {
-  if (!PDFDocument) {
-    // @ts-ignore - pdfkit has no types; runtime dynamic import is safe (used in PDF export)
-    PDFDocument = (await import("pdfkit")).default;
-  }
-  return PDFDocument;
-}
-
 /**
  * Tenant-scoped dashboard analytics — FULL dataset aggregates only.
  * Never paginate / LIMIT chart inputs (would under-count large imports).
@@ -462,53 +453,12 @@ async function aggregateLeadsByDay(
 }
 
 export async function exportContactsToCsv(userId: string, type?: "lead" | "client") {
-  const scope = await buildCrmScope(userId);
-  const where = andTenant(scope.where, {
-    deletedAt: null,
-    ...(type ? { type } : {}),
-  });
-
-  const contacts = await prisma.contact.findMany({
-    where: where as never,
-    take: 10000,
-  });
-
-  const headers = ["id", "type", "name", "email", "phone", "company", "status", "value", "source"];
-  const rows = contacts.map((c) => [
-    c.id,
-    c.type,
-    c.name,
-    c.email || "",
-    c.phone || "",
-    c.company || "",
-    c.status,
-    c.value || "",
-    c.source || "",
-  ]);
-
-  return [headers, ...rows].map((row) => row.join(",")).join("\n");
+  const module = type === "client" ? "clients" : type === "lead" ? "leads" : "contacts";
+  return exportModuleCsv(userId, module as ExportModule);
 }
 
 export async function exportDealsToCsv(userId: string) {
-  const scope = await buildOwnedEntityScope(userId);
-  const deals = await prisma.deal.findMany({
-    where: scope.where as never,
-    include: { contact: { select: { name: true } } },
-    take: 10000,
-  });
-
-  const headers = ["id", "title", "value", "stage", "probability", "contact", "expectedClose"];
-  const rows = deals.map((d) => [
-    d.id,
-    d.title,
-    d.value || "",
-    d.stage,
-    d.probability || "",
-    d.contact?.name || "",
-    d.expectedClose ? d.expectedClose.toISOString().split("T")[0] : "",
-  ]);
-
-  return [headers, ...rows].map((row) => row.join(",")).join("\n");
+  return exportModuleCsv(userId, "deals");
 }
 
 // Contact CSV/Excel import — implementation in import-contacts.service.ts
@@ -528,105 +478,23 @@ export {
   previewImportFromFile,
 } from "./import-contacts.service.js";
 
-export async function exportContactsToPdf(userId: string, type?: "lead" | "client", res?: any) {
-  const where: any = { userId };
-  if (type) where.type = type;
-
-  const contacts = await prisma.contact.findMany({ where });
-
-  const PDF = await getPDFDocument();
-  const doc = new PDF({ margin: 30, size: "A4" });
-  if (res) {
-    doc.pipe(res);
+export async function exportContactsToPdf(
+  userId: string,
+  type?: "lead" | "client",
+  res?: NodeJS.WritableStream
+) {
+  const module = type === "client" ? "clients" : type === "lead" ? "leads" : "contacts";
+  if (!res) {
+    throw new Error("PDF export requires a writable response stream");
   }
-
-  doc.fontSize(16).text(`Contacts Export${type ? ` (${type})` : ""}`, { align: "center" });
-  doc.moveDown();
-
-  const headers = ["ID", "Type", "Name", "Email", "Phone", "Company", "Status", "Value", "Source"];
-  let y = doc.y;
-  doc.fontSize(8);
-
-  // Header
-  headers.forEach((h, i) => {
-    doc.text(h, 30 + i * 60, y, { width: 55, continued: i < headers.length - 1 });
-  });
-  y += 15;
-  doc.moveTo(30, y - 5).lineTo(30 + headers.length * 60, y - 5).stroke();
-
-  contacts.forEach((c, idx) => {
-    if (y > 750) {
-      doc.addPage();
-      y = 50;
-    }
-    const row = [
-      c.id.substring(0, 8),
-      c.type,
-      c.name.substring(0, 15),
-      (c.email || "").substring(0, 15),
-      (c.phone || "").substring(0, 12),
-      (c.company || "").substring(0, 12),
-      c.status,
-      c.value ? String(c.value) : "",
-      (c.source || "").substring(0, 10),
-    ];
-    row.forEach((val, i) => {
-      doc.text(val, 30 + i * 60, y, { width: 55 });
-    });
-    y += 12;
-  });
-
-  doc.end();
+  await exportModulePdf(userId, module as ExportModule, undefined, res);
 }
 
-export async function exportDealsToPdf(userId: string, res?: any) {
-  const scope = await buildOwnedEntityScope(userId);
-  const deals = await prisma.deal.findMany({
-    where: scope.where as never,
-    include: { contact: { select: { name: true } } },
-    take: 10000,
-  });
-
-  const PDF = await getPDFDocument();
-  const doc = new PDF({ margin: 30, size: "A4" });
-  if (res) {
-    doc.pipe(res);
+export async function exportDealsToPdf(userId: string, res?: NodeJS.WritableStream) {
+  if (!res) {
+    throw new Error("PDF export requires a writable response stream");
   }
-
-  doc.fontSize(16).text("Deals Export", { align: "center" });
-  doc.moveDown();
-
-  const headers = ["ID", "Title", "Value", "Stage", "Prob", "Contact", "Close"];
-  let y = doc.y;
-  doc.fontSize(8);
-
-  headers.forEach((h, i) => {
-    doc.text(h, 30 + i * 70, y, { width: 65, continued: i < headers.length - 1 });
-  });
-  y += 15;
-  doc.moveTo(30, y - 5).lineTo(30 + headers.length * 70, y - 5).stroke();
-
-  deals.forEach((d) => {
-    if (y > 750) {
-      doc.addPage();
-      y = 50;
-    }
-    const row = [
-      d.id.substring(0, 8),
-      d.title.substring(0, 20),
-      d.value ? String(d.value) : "",
-      d.stage,
-      d.probability ? String(d.probability) : "",
-      (d.contact?.name || "").substring(0, 12),
-      d.expectedClose ? d.expectedClose.toISOString().split("T")[0] : "",
-    ];
-    row.forEach((val, i) => {
-      doc.text(val, 30 + i * 70, y, { width: 65 });
-    });
-    y += 12;
-  });
-
-  doc.end();
+  await exportModulePdf(userId, "deals", undefined, res);
 }
 
 // =====================================================
@@ -669,16 +537,28 @@ function dateRange(from?: string, to?: string) {
   return range;
 }
 
-function escapeCsv(val: unknown): string {
-  const s = val == null ? "" : String(val);
-  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
+/** Max rows for memory-bound formats; CSV streams can go higher via batches */
+export const EXPORT_MAX_ROWS = 100_000;
+const EXPORT_BATCH = 2_500;
 
-function rowsToCsv(headers: string[], rows: unknown[][]): string {
-  return [headers, ...rows]
-    .map((row) => row.map(escapeCsv).join(","))
-    .join("\n");
+/**
+ * Cursor-paginate Prisma findMany by id (stable for large exports).
+ */
+async function fetchAllBatched<T extends { id: string }>(
+  fetchPage: (cursor: string | undefined, take: number) => Promise<T[]>,
+  maxRows = EXPORT_MAX_ROWS
+): Promise<T[]> {
+  const all: T[] = [];
+  let cursor: string | undefined;
+  while (all.length < maxRows) {
+    const take = Math.min(EXPORT_BATCH, maxRows - all.length);
+    const page = await fetchPage(cursor, take);
+    if (!page.length) break;
+    all.push(...page);
+    if (page.length < take) break;
+    cursor = page[page.length - 1]!.id;
+  }
+  return all;
 }
 
 export async function fetchExportRows(
@@ -710,14 +590,36 @@ export async function fetchExportRows(
         ];
       }
       const where = andTenant(contactScope.where, extra);
-      const items = await prisma.contact.findMany({
-        where: where as never,
-        orderBy: { createdAt: filters.sortDir === "asc" ? "asc" : "desc" },
-        take: 5000,
+      const items = await fetchAllBatched(async (cursor, take) => {
+        return prisma.contact.findMany({
+          where: where as never,
+          orderBy: [{ createdAt: filters.sortDir === "asc" ? "asc" : "desc" }, { id: "asc" }],
+          take,
+          ...(cursor
+            ? {
+                skip: 1,
+                cursor: { id: cursor },
+              }
+            : {}),
+        });
       });
       return {
         title: module === "leads" ? "Leads" : module === "clients" ? "Clients" : "Contacts",
-        headers: ["id", "type", "name", "email", "phone", "company", "status", "value", "source", "createdAt"],
+        headers: [
+          "id",
+          "type",
+          "name",
+          "email",
+          "phone",
+          "company",
+          "status",
+          "value",
+          "source",
+          "priority",
+          "assignedTo",
+          "aiScore",
+          "createdAt",
+        ],
         rows: items.map((c) => [
           c.id,
           c.type,
@@ -728,6 +630,9 @@ export async function fetchExportRows(
           c.status,
           c.value ?? "",
           c.source || "",
+          c.priority || "",
+          c.assignedTo || "",
+          c.aiScore ?? "",
           c.createdAt.toISOString(),
         ]),
       };
@@ -738,15 +643,27 @@ export async function fetchExportRows(
       if (createdAt) extra.createdAt = createdAt;
       if (search) extra.title = { contains: search, mode: "insensitive" };
       const where = andTenant(ownedScope.where, extra);
-      const items = await prisma.deal.findMany({
-        where: where as never,
-        include: { contact: { select: { name: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 5000,
+      const items = await fetchAllBatched(async (cursor, take) => {
+        return prisma.deal.findMany({
+          where: where as never,
+          include: { contact: { select: { name: true } } },
+          orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+          take,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
       });
       return {
         title: "Deals",
-        headers: ["id", "title", "value", "stage", "probability", "contact", "expectedClose", "createdAt"],
+        headers: [
+          "id",
+          "title",
+          "value",
+          "stage",
+          "probability",
+          "contact",
+          "expectedClose",
+          "createdAt",
+        ],
         rows: items.map((d) => [
           d.id,
           d.title,
@@ -764,10 +681,13 @@ export async function fetchExportRows(
       if (filters.status) where.status = filters.status;
       if (createdAt) where.createdAt = createdAt;
       if (search) where.title = { contains: search, mode: "insensitive" };
-      const items = await prisma.task.findMany({
-        where: where as never,
-        orderBy: { createdAt: "desc" },
-        take: 5000,
+      const items = await fetchAllBatched(async (cursor, take) => {
+        return prisma.task.findMany({
+          where: where as never,
+          orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+          take,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
       });
       return {
         title: "Tasks",
@@ -786,10 +706,13 @@ export async function fetchExportRows(
       const where: Record<string, unknown> = { userId };
       if (createdAt) where.scheduledAt = createdAt;
       if (search) where.title = { contains: search, mode: "insensitive" };
-      const items = await prisma.meeting.findMany({
-        where: where as never,
-        orderBy: { scheduledAt: "desc" },
-        take: 5000,
+      const items = await fetchAllBatched(async (cursor, take) => {
+        return prisma.meeting.findMany({
+          where: where as never,
+          orderBy: [{ scheduledAt: "desc" }, { id: "asc" }],
+          take,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
       });
       return {
         title: "Meetings",
@@ -808,10 +731,13 @@ export async function fetchExportRows(
       const where: Record<string, unknown> = { userId };
       if (createdAt) where.createdAt = createdAt;
       if (search) where.title = { contains: search, mode: "insensitive" };
-      const items = await prisma.document.findMany({
-        where: where as never,
-        orderBy: { createdAt: "desc" },
-        take: 5000,
+      const items = await fetchAllBatched(async (cursor, take) => {
+        return prisma.document.findMany({
+          where: where as never,
+          orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+          take,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
       });
       return {
         title: "Documents",
@@ -829,9 +755,7 @@ export async function fetchExportRows(
     case "invoices": {
       const { getUserBusinessId } = await import("./field-engine.service.js");
       const businessId = await getUserBusinessId(userId);
-      const where: Record<string, unknown> = businessId
-        ? { businessId }
-        : { userId };
+      const where: Record<string, unknown> = businessId ? { businessId } : { userId };
       if (filters.status) where.status = filters.status;
       if (createdAt) where.createdAt = createdAt;
       if (search) {
@@ -840,10 +764,13 @@ export async function fetchExportRows(
           { number: { contains: search, mode: "insensitive" } },
         ];
       }
-      const items = await prisma.invoice.findMany({
-        where: where as never,
-        orderBy: { createdAt: "desc" },
-        take: 5000,
+      const items = await fetchAllBatched(async (cursor, take) => {
+        return prisma.invoice.findMany({
+          where: where as never,
+          orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+          take,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
       });
       return {
         title: "Invoices",
@@ -876,15 +803,16 @@ export async function fetchExportRows(
     case "expenses": {
       const { getUserBusinessId } = await import("./field-engine.service.js");
       const businessId = await getUserBusinessId(userId);
-      const where: Record<string, unknown> = businessId
-        ? { businessId }
-        : { userId };
+      const where: Record<string, unknown> = businessId ? { businessId } : { userId };
       if (createdAt) where.expenseDate = createdAt;
       if (search) where.title = { contains: search, mode: "insensitive" };
-      const items = await prisma.expense.findMany({
-        where: where as never,
-        orderBy: { expenseDate: "desc" },
-        take: 5000,
+      const items = await fetchAllBatched(async (cursor, take) => {
+        return prisma.expense.findMany({
+          where: where as never,
+          orderBy: [{ expenseDate: "desc" }, { id: "asc" }],
+          take,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
       });
       return {
         title: "Expenses",
@@ -904,15 +832,16 @@ export async function fetchExportRows(
     case "payments": {
       const { getUserBusinessId } = await import("./field-engine.service.js");
       const businessId = await getUserBusinessId(userId);
-      const where: Record<string, unknown> = businessId
-        ? { businessId }
-        : { userId };
+      const where: Record<string, unknown> = businessId ? { businessId } : { userId };
       if (createdAt) where.paidAt = createdAt;
-      const items = await prisma.payment.findMany({
-        where: where as never,
-        include: { invoice: { select: { number: true, clientName: true, currency: true } } },
-        orderBy: { paidAt: "desc" },
-        take: 5000,
+      const items = await fetchAllBatched(async (cursor, take) => {
+        return prisma.payment.findMany({
+          where: where as never,
+          include: { invoice: { select: { number: true, clientName: true, currency: true } } },
+          orderBy: [{ paidAt: "desc" }, { id: "asc" }],
+          take,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
       });
       return {
         title: "Payments",
@@ -931,10 +860,7 @@ export async function fetchExportRows(
     }
     case "activity":
     case "audit": {
-      // Prefer AuditLog; fall back to Activity
-      const where: Record<string, unknown> = {};
-      // Audit is business-scoped; filter by actor
-      where.actorUserId = userId;
+      const where: Record<string, unknown> = { actorUserId: userId };
       if (createdAt) where.createdAt = createdAt;
       if (search) {
         where.OR = [
@@ -942,10 +868,13 @@ export async function fetchExportRows(
           { entityType: { contains: search, mode: "insensitive" } },
         ];
       }
-      const items = await prisma.auditLog.findMany({
-        where: where as never,
-        orderBy: { createdAt: "desc" },
-        take: 5000,
+      const items = await fetchAllBatched(async (cursor, take) => {
+        return prisma.auditLog.findMany({
+          where: where as never,
+          orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+          take,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
       });
       return {
         title: "Audit Log",
@@ -969,8 +898,21 @@ export async function exportModuleCsv(
   module: ExportModule,
   filters?: ExportFilters
 ): Promise<string> {
+  const { buildCsvString } = await import("./export-format.service.js");
   const { headers, rows } = await fetchExportRows(userId, module, filters);
-  return rowsToCsv(headers, rows);
+  return buildCsvString(headers, rows, { bom: true });
+}
+
+/** Stream CSV directly to response (preferred for large datasets). */
+export async function exportModuleCsvStream(
+  userId: string,
+  module: ExportModule,
+  filters: ExportFilters | undefined,
+  res: NodeJS.WritableStream
+): Promise<void> {
+  const { streamCsvTo } = await import("./export-format.service.js");
+  const { headers, rows } = await fetchExportRows(userId, module, filters);
+  streamCsvTo(res, headers, rows, { bom: true });
 }
 
 export async function exportModulePdf(
@@ -979,32 +921,14 @@ export async function exportModulePdf(
   filters: ExportFilters | undefined,
   res: NodeJS.WritableStream
 ): Promise<void> {
+  const { streamPdfTable } = await import("./export-format.service.js");
   const { headers, rows, title } = await fetchExportRows(userId, module, filters);
-  const PDF = await getPDFDocument();
-  const doc = new PDF({ margin: 30, size: "A4", layout: headers.length > 6 ? "landscape" : "portrait" });
-  doc.pipe(res);
-  doc.fontSize(14).text(`${title} Export`, { align: "center" });
-  doc.fontSize(8).fillColor("#666").text(`Generated ${new Date().toISOString()}`, { align: "center" });
-  doc.moveDown();
-  doc.fillColor("#000").fontSize(7);
-  const colW = Math.min(90, Math.floor(750 / Math.max(headers.length, 1)));
-  let y = doc.y;
-  headers.forEach((h, i) => {
-    doc.text(String(h).slice(0, 12), 30 + i * colW, y, { width: colW - 2 });
+  await streamPdfTable(res, {
+    title,
+    headers,
+    rows,
+    maxRows: 15_000,
   });
-  y += 12;
-  doc.moveTo(30, y - 2).lineTo(30 + headers.length * colW, y - 2).stroke();
-  for (const row of rows.slice(0, 800)) {
-    if (y > 520) {
-      doc.addPage();
-      y = 40;
-    }
-    row.forEach((val, i) => {
-      doc.text(String(val ?? "").slice(0, 18), 30 + i * colW, y, { width: colW - 2 });
-    });
-    y += 10;
-  }
-  doc.end();
 }
 
 export async function exportModuleXlsx(
@@ -1012,11 +936,7 @@ export async function exportModuleXlsx(
   module: ExportModule,
   filters?: ExportFilters
 ): Promise<Buffer> {
+  const { buildXlsxBuffer } = await import("./export-format.service.js");
   const { headers, rows, title } = await fetchExportRows(userId, module, filters);
-  const XLSX = await import("xlsx");
-  const data = [headers, ...rows];
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, title.slice(0, 31));
-  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  return buildXlsxBuffer(title, headers, rows);
 }

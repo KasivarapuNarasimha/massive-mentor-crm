@@ -2,15 +2,11 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
   getReportsDashboard,
-  exportContactsToCsv,
-  exportDealsToCsv,
   importContactsFromCsv,
   importContactsFromFile,
   previewImportFromCsv,
   previewImportFromFile,
-  exportContactsToPdf,
-  exportDealsToPdf,
-  exportModuleCsv,
+  exportModuleCsvStream,
   exportModulePdf,
   exportModuleXlsx,
   type ExportModule,
@@ -70,35 +66,41 @@ function resolveExportModule(type: unknown): ExportModule {
   return map[t] || (t as ExportModule);
 }
 
+function attachmentDisposition(filename: string): string {
+  // ASCII fallback + RFC 5987 UTF-8 filename* for browsers
+  const safe = filename.replace(/[^\w.\-]+/g, "_");
+  return `attachment; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
+
 export async function exportCsv(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const type = req.query.type;
     const filters = parseExportFilters(req);
-
-    // Legacy simple paths
-    if (type === "deal" && !filters.search && !filters.from) {
-      const csv = await exportDealsToCsv(req.user.id);
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader("Content-Disposition", `attachment; filename="deals.csv"`);
-      res.send(csv);
-      return;
-    }
-    if ((type === "lead" || type === "client" || !type) && !filters.from && !filters.search && type !== "tasks") {
-      // Prefer universal path when module is explicit multi-entity
-    }
-
     const module = resolveExportModule(type || "leads");
-    const csv = await exportModuleCsv(req.user.id, module, filters);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `${module}-export-${stamp}.csv`;
+
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${module}-export.csv"`);
-    res.send(csv);
+    res.setHeader("Content-Disposition", attachmentDisposition(filename));
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // Stream body so large exports do not double-buffer the whole file
+    await exportModuleCsvStream(req.user.id, module, filters, res);
   } catch (error: unknown) {
     console.error("CSV export error:", error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to export",
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to export",
+      });
+    } else {
+      try {
+        res.end();
+      } catch {
+        /* ignore */
+      }
+    }
   }
 }
 
@@ -107,19 +109,29 @@ export async function exportXlsx(req: AuthenticatedRequest, res: Response) {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const module = resolveExportModule(req.query.type || "leads");
     const filters = parseExportFilters(req);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `${module}-export-${stamp}.xlsx`;
     const buf = await exportModuleXlsx(req.user.id, module, filters);
+    if (!Buffer.isBuffer(buf) || buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b) {
+      throw new Error("Invalid XLSX buffer generated (not a real OOXML workbook)");
+    }
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
-    res.setHeader("Content-Disposition", `attachment; filename="${module}-export.xlsx"`);
-    res.send(buf);
+    res.setHeader("Content-Disposition", attachmentDisposition(filename));
+    res.setHeader("Content-Length", String(buf.length));
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.status(200).end(buf);
   } catch (error: unknown) {
     console.error("XLSX export error:", error);
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to export Excel",
-    });
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to export Excel",
+      });
+    }
   }
 }
 
@@ -312,13 +324,26 @@ export async function exportPdf(req: AuthenticatedRequest, res: Response) {
     const type = req.query.type;
     const filters = parseExportFilters(req);
     const module = resolveExportModule(type || "leads");
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `${module}-export-${stamp}.pdf`;
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${module}-export.pdf"`);
+    res.setHeader("Content-Disposition", attachmentDisposition(filename));
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
     await exportModulePdf(req.user.id, module, filters, res);
   } catch (error: unknown) {
     console.error("PDF export error:", error);
     if (!res.headersSent) {
-      res.status(500).json({ success: false, error: "Failed to export PDF" });
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to export PDF",
+      });
+    } else {
+      try {
+        res.end();
+      } catch {
+        /* ignore */
+      }
     }
   }
 }

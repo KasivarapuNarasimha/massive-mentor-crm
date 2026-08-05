@@ -84,60 +84,80 @@ export default function ReportsPage() {
     }
   };
 
-  const exportCsv = async (type?: string) => {
+  const downloadExport = async (format: "csv" | "pdf" | "xlsx", type?: string) => {
     if (!token) return;
-    const query = type ? `?type=${type}` : "";
-    const url = `${API_BASE_URL}/reports/export/csv${query}`;
+    const q = new URLSearchParams();
+    if (type) q.set("type", type);
+    const url = `${API_BASE_URL}/reports/export/${format}${q.toString() ? `?${q}` : ""}`;
     try {
       const response = await fetch(url, {
         method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept:
+            format === "csv"
+              ? "text/csv"
+              : format === "xlsx"
+                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                : "application/pdf",
+        },
       });
-      if (!response.ok) {
-        toast.error("Export failed");
+      const contentType = (response.headers.get("content-type") || "").toLowerCase();
+      if (!response.ok || contentType.includes("application/json")) {
+        const err = await response.json().catch(() => ({}));
+        toast.error((err as { error?: string }).error || `Export ${format} failed`);
         return;
       }
-      const blob = await response.blob();
+      const buf = await response.arrayBuffer();
+      if (!buf.byteLength) {
+        toast.error("Export returned an empty file");
+        return;
+      }
+      const u8 = new Uint8Array(buf);
+      if (format === "xlsx" && !(u8[0] === 0x50 && u8[1] === 0x4b)) {
+        toast.error("Invalid Excel file received");
+        return;
+      }
+      if (format === "pdf" && !(u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46)) {
+        toast.error("Invalid PDF file received");
+        return;
+      }
+      const mime =
+        format === "csv"
+          ? "text/csv;charset=utf-8"
+          : format === "xlsx"
+            ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            : "application/pdf";
+      const cd = response.headers.get("content-disposition") || "";
+      const star = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(cd);
+      const plain = /filename\s*=\s*"?([^";]+)"?/i.exec(cd);
+      let filename = `${type || "export"}-export.${format}`;
+      try {
+        if (star?.[1]) filename = decodeURIComponent(star[1].trim());
+        else if (plain?.[1]) filename = plain[1].trim().replace(/^["']|["']$/g, "");
+      } catch {
+        /* keep default */
+      }
+      if (!filename.toLowerCase().endsWith(`.${format}`)) {
+        filename = `${filename.replace(/\.[^.]+$/, "")}.${format}`;
+      }
+      const blob = new Blob([buf], { type: mime });
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = downloadUrl;
-      a.download = `export-${type || "all"}.csv`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
+      toast.success(`${format.toUpperCase()} exported`);
     } catch {
       toast.error("Export failed");
     }
   };
 
-  const exportPdf = async (type?: string) => {
-    if (!token) return;
-    const query = type ? `?type=${type}` : "";
-    const url = `${API_BASE_URL}/reports/export/pdf${query}`;
-    try {
-      const response = await fetch(url, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        toast.error("Export failed");
-        return;
-      }
-      const blob = await response.blob();
-      const downloadUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = `export-${type || "all"}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-      toast.success("PDF exported");
-    } catch {
-      toast.error("Export failed");
-    }
-  };
+  const exportCsv = async (type?: string) => downloadExport("csv", type);
+  const exportPdf = async (type?: string) => downloadExport("pdf", type);
 
   const importCsv = async () => {
     if (!importCsvText || !token) return;

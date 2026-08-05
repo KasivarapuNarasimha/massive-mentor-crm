@@ -15,6 +15,17 @@ declare module "pdfkit" {
     info?: Record<string, string>;
   }
 
+  interface PDFTextOptions {
+    align?: string;
+    width?: number;
+    height?: number;
+    continued?: boolean;
+    underline?: boolean;
+    lineBreak?: boolean;
+    ellipsis?: boolean | string;
+    lineGap?: number;
+  }
+
   class PDFDocument extends EventEmitter {
     constructor(options?: PDFDocumentOptions);
     y: number;
@@ -23,15 +34,18 @@ declare module "pdfkit" {
     pipe<T extends NodeJS.WritableStream>(destination: T, options?: { end?: boolean }): T;
     end(): void;
     addPage(options?: PDFDocumentOptions): this;
+    switchToPage(pageNumber: number): this;
+    bufferedPageRange(): { start: number; count: number };
     fontSize(size: number): this;
     font(name: string, size?: number): this;
     fillColor(color: string, opacity?: number): this;
     strokeColor(color: string, opacity?: number): this;
+    lineWidth(w: number): this;
     text(
       text: string,
-      x?: number | { align?: string; width?: number; continued?: boolean; underline?: boolean },
-      y?: number | { align?: string; width?: number; continued?: boolean; underline?: boolean },
-      options?: { align?: string; width?: number; continued?: boolean; underline?: boolean }
+      x?: number | PDFTextOptions,
+      y?: number | PDFTextOptions,
+      options?: PDFTextOptions
     ): this;
     moveDown(lines?: number): this;
     moveTo(x: number, y: number): this;
@@ -40,6 +54,9 @@ declare module "pdfkit" {
     fill(color?: string): this;
     rect(x: number, y: number, w: number, h: number): this;
     roundedRect(x: number, y: number, w: number, h: number, r?: number): this;
+    save(): this;
+    restore(): this;
+    clip(rule?: string): this;
     image(
       src: string | Buffer,
       x?: number,

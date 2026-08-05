@@ -11,38 +11,42 @@ export function downloadBlob(filename: string, content: string, mime: string) {
 }
 
 export function toCsv(rows: Array<Record<string, unknown>>, columns?: string[]) {
-  if (!rows.length) return "";
+  if (!rows.length) return "\uFEFF\r\n";
   const cols = columns || Object.keys(rows[0]);
   const esc = (v: unknown) => {
-    const s = v == null ? "" : String(v);
+    let s = v == null ? "" : String(v);
+    s = s.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    if (/^[=+\-@\t]/.test(s)) s = `'${s}`;
     if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
-  const lines = [cols.join(",")];
+  const lines = [cols.map(esc).join(",")];
   for (const r of rows) {
     lines.push(cols.map((c) => esc(r[c])).join(","));
   }
-  return lines.join("\n");
+  // UTF-8 BOM + CRLF for Excel
+  return "\uFEFF" + lines.join("\r\n") + "\r\n";
 }
 
 export function exportCsv(filename: string, rows: Array<Record<string, unknown>>, columns?: string[]) {
-  downloadBlob(filename.endsWith(".csv") ? filename : `${filename}.csv`, toCsv(rows, columns), "text/csv;charset=utf-8");
+  const name = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  const blob = new Blob([toCsv(rows, columns)], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
-/** Simple HTML table export that Excel can open */
+/**
+ * @deprecated Prefer server /reports/export/xlsx for real OOXML.
+ * Kept for admin bulk tools — downloads as .csv to avoid fake .xls corruption.
+ */
 export function exportExcelHtml(filename: string, rows: Array<Record<string, unknown>>, columns?: string[]) {
-  if (!rows.length) return;
-  const cols = columns || Object.keys(rows[0]);
-  const th = cols.map((c) => `<th>${c}</th>`).join("");
-  const body = rows
-    .map((r) => `<tr>${cols.map((c) => `<td>${r[c] == null ? "" : String(r[c])}</td>`).join("")}</tr>`)
-    .join("");
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><table border="1"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></body></html>`;
-  downloadBlob(
-    filename.endsWith(".xls") ? filename : `${filename}.xls`,
-    html,
-    "application/vnd.ms-excel"
-  );
+  exportCsv(filename.replace(/\.xls$/i, ".csv"), rows, columns);
 }
 
 /** Lightweight printable PDF via browser print dialog */

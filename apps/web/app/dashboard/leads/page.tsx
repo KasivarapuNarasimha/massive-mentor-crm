@@ -1049,6 +1049,7 @@ export default function LeadsPage() {
 
   const runBulkExport = () => {
     if (selectedLeads.length === 0) return;
+    // RFC 4180 CSV + UTF-8 BOM for Excel compatibility
     const headers = [
       "Name",
       "Email",
@@ -1062,36 +1063,43 @@ export default function LeadsPage() {
       "AI Score",
     ];
     const esc = (v: unknown) => {
-      const s = v == null ? "" : String(v);
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      let s = v == null ? "" : String(v);
+      s = s.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+      if (/^[=+\-@\t]/.test(s)) s = `'${s}`;
+      if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
     };
-    const lines = [headers.join(",")];
+    const lines = [headers.map(esc).join(",")];
     for (const l of selectedLeads) {
-      lines.push(
-        [
-          l.name,
-          l.email,
-          l.phone,
-          l.company,
-          l.status,
-          l.source,
-          l.priority,
-          l.assignedTo,
-          Array.isArray(l.tags) ? (l.tags as string[]).join(";") : "",
-          l.aiScore,
-        ]
-          .map(esc)
-          .join(",")
-      );
+      const cells = [
+        l.name,
+        l.email,
+        l.phone,
+        l.company,
+        l.status,
+        l.source,
+        l.priority,
+        l.assignedTo,
+        Array.isArray(l.tags) ? (l.tags as string[]).join(";") : "",
+        l.aiScore,
+      ];
+      // Pad to header count
+      while (cells.length < headers.length) cells.push("");
+      lines.push(cells.slice(0, headers.length).map(esc).join(","));
     }
-    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + lines.join("\r\n") + "\r\n"], {
+      type: "text/csv;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `leads-export-${selectedLeads.length}.csv`;
+    document.body.appendChild(a);
     a.click();
+    a.remove();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${selectedLeads.length} lead(s)`);
+    toast.success(`Exported ${selectedLeads.length} lead(s) as CSV`);
   };
 
   const runBulkEdit = async () => {
