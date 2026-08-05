@@ -518,6 +518,7 @@ class ApiClient {
    * Soft-delete (trash) or permanent purge — POST /api/leads/bulk-delete
    * scope: "ids" (default) uses body.ids
    * scope: "all_filtered" deletes every lead matching search/status (all pages, up to 50k)
+   * Long timeout: 50k rows @ 1k batches can exceed the default 25s client abort.
    */
   async bulkDeleteLeads(
     body: {
@@ -536,12 +537,13 @@ class ApiClient {
       permanent: boolean;
       scope?: string;
       matched?: number;
-    }>("/leads/bulk-delete", body, token);
+    }>("/leads/bulk-delete", body, token, { timeoutMs: 600_000 });
   }
 
   /**
    * Bulk assign leads — POST /api/leads/bulk-assign
    * scope: "ids" | "first_n" | "all_filtered"
+   * Long timeout for large filtered sets (up to 50k).
    */
   async bulkAssignLeads(
     body: {
@@ -564,7 +566,7 @@ class ApiClient {
       assignedTo: string;
       assigneeName: string | null;
       ids: string[];
-    }>("/leads/bulk-assign", body, token);
+    }>("/leads/bulk-assign", body, token, { timeoutMs: 600_000 });
   }
 
   /** Compose + send email to lead(s) via platform SMTP — POST /api/leads/send-email */
@@ -707,11 +709,17 @@ class ApiClient {
     });
   }
 
-  async post<T>(endpoint: string, body: unknown, token?: string | null) {
+  async post<T>(
+    endpoint: string,
+    body: unknown,
+    token?: string | null,
+    opts?: { timeoutMs?: number }
+  ) {
     return this.request<T>(endpoint, {
       method: "POST",
       body: JSON.stringify(body),
       token: token ?? undefined,
+      timeoutMs: opts?.timeoutMs,
     });
   }
 

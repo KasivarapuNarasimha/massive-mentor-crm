@@ -852,7 +852,8 @@ export async function bulkSoftDeleteLeads(
           data: { deletedAt: new Date(), deletedByUserId: userId },
         });
         deleted += result.count;
-        okIds.push(...idsToSoft);
+        // Only track IDs we attempted that matched tenant/type (for undo sample)
+        if (result.count > 0) okIds.push(...idsToSoft);
       }
     }
   }
@@ -866,7 +867,7 @@ export async function bulkSoftDeleteLeads(
     metadata: {
       requested: unique.length,
       deleted,
-      failed: unique.length - deleted,
+      failed: Math.max(0, unique.length - deleted),
       permanent,
       scope: "ids",
       batchSize: BULK_DELETE_CHUNK,
@@ -942,28 +943,31 @@ export async function bulkSoftDeleteLeadsByFilter(
   const sampleIds = sample.map((c) => c.id);
 
   let deleted = 0;
-  // Always process in chunks of 1,000 (soft or permanent) for timeout safety
-  let cursor: string | undefined;
-  for (;;) {
+  // Process in chunks of 1,000. Re-query the head of the filtered set each time
+  // (no cursor) so soft-deleted rows drop out of the next page naturally.
+  while (deleted < BULK_DELETE_MAX_IDS) {
     const batch = await prisma.contact.findMany({
       where: where as never,
       select: { id: true },
       take: BULK_DELETE_CHUNK,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       orderBy: { id: "asc" },
     });
     if (!batch.length) break;
     const batchIds = batch.map((c) => c.id);
 
     if (permanent) {
+      let batchDeleted = 0;
       for (const id of batchIds) {
         try {
           await prisma.contact.delete({ where: { id } });
           deleted++;
+          batchDeleted++;
         } catch {
-          /* skip */
+          /* skip FK / already gone */
         }
       }
+      // Safety: nothing removed → stop to avoid infinite re-fetch of the same rows
+      if (batchDeleted === 0) break;
     } else {
       // Re-apply list filters + batch ids so we never soft-delete outside the filtered set
       const result = await prisma.contact.updateMany({
@@ -973,12 +977,12 @@ export async function bulkSoftDeleteLeadsByFilter(
         data: { deletedAt: new Date(), deletedByUserId: userId },
       });
       deleted += result.count;
+      // Safety: if nothing was updated, avoid infinite loop
+      if (result.count === 0) break;
     }
 
-    cursor = batch[batch.length - 1]?.id;
     if (batch.length < BULK_DELETE_CHUNK) break;
-    // Cap safety: never exceed max rows even if count drifted
-    if (deleted >= BULK_DELETE_MAX_IDS) break;
+    if (deleted >= matched) break;
   }
 
   const businessId = await getUserBusinessId(userId);
@@ -1188,17 +1192,26 @@ export async function bulkAssignLeads(
     targetIds = collected;
   }
 
-  // Apply assignment in batches of 1,000
+  if (!targetIds.length) {
+    throw new Error(
+      scopeMode === "ids"
+        ? "No assignable leads found for the selected IDs (wrong type, deleted, or out of scope)"
+        : "No assignable leads found for the current filters"
+    );
+  }
+
+  // Apply assignment in batches of 1,000 — re-apply tenant scope for defense-in-depth
+  const crmScopeForUpdate = await buildCrmScope(userId);
   let assigned = 0;
   const sampleIds: string[] = [];
   for (let i = 0; i < targetIds.length; i += BULK_LEAD_CHUNK) {
     const chunk = targetIds.slice(i, i + BULK_LEAD_CHUNK);
     const result = await prisma.contact.updateMany({
-      where: {
+      where: andTenant(crmScopeForUpdate.where, {
         id: { in: chunk },
         type: "lead",
         deletedAt: null,
-      },
+      }) as never,
       data: {
         assignedTo,
         lastContactedAt: new Date(),

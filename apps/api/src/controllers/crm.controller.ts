@@ -248,9 +248,24 @@ export async function bulkEditLeadsHandler(req: AuthenticatedRequest, res: Respo
   }
 }
 
+/** Allow large bulk ops (50k @ 1k batches) without socket idle timeout */
+function extendBulkRequestTimeout(req: AuthenticatedRequest, res: Response, ms = 10 * 60 * 1000) {
+  try {
+    req.setTimeout(ms);
+  } catch {
+    /* ignore */
+  }
+  try {
+    res.setTimeout(ms);
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function bulkDeleteLeadsHandler(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    extendBulkRequestTimeout(req, res);
     const permanent = !!req.body?.permanent;
     const scope =
       req.body?.scope === "all_filtered" || req.body?.mode === "all_filtered"
@@ -286,6 +301,7 @@ export async function bulkDeleteLeadsHandler(req: AuthenticatedRequest, res: Res
 export async function bulkAssignLeadsHandler(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    extendBulkRequestTimeout(req, res);
     const rawScope = String(req.body?.scope || req.body?.mode || "ids").toLowerCase();
     const scope =
       rawScope === "first_n" || rawScope === "firstn" || rawScope === "first"

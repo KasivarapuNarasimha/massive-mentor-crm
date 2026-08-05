@@ -959,34 +959,34 @@ export default function LeadsPage() {
               status: statusFilter || undefined,
             };
 
-    const res = await api.bulkAssignLeads(body, token);
-    setBulkBusy(false);
-    setBulkProgress(null);
-    setAssignModalOpen(false);
-    setAssignValue("");
-    setTeamSearch("");
-    setAssignCustomCount("");
-
-    if (res.success && res.data) {
-      const n = res.data.assigned;
-      const who = res.data.assigneeName || label;
-      let msg = `Successfully assigned ${n.toLocaleString()} leads.`;
-      if (res.data.scope === "first_n") {
-        msg = `Successfully assigned first ${n.toLocaleString()} filtered leads.`;
-      } else if (res.data.scope === "all_filtered") {
-        msg = `Successfully assigned all ${n.toLocaleString()} filtered leads.`;
+    try {
+      const res = await api.bulkAssignLeads(body, token);
+      if (res.success && res.data) {
+        const n = res.data.assigned;
+        const who = res.data.assigneeName || label;
+        let msg = `Successfully assigned ${n.toLocaleString()} leads.`;
+        if (res.data.scope === "first_n") {
+          msg = `Successfully assigned first ${n.toLocaleString()} filtered leads.`;
+        } else if (res.data.scope === "all_filtered") {
+          msg = `Successfully assigned all ${n.toLocaleString()} filtered leads.`;
+        }
+        toast.success(msg, {
+          description: `Assigned to ${who}${res.data.failed ? ` · ${res.data.failed} failed` : " · Audit logged"}`,
+        });
+        setAssignModalOpen(false);
+        setAssignValue("");
+        setTeamSearch("");
+        setAssignCustomCount("");
+        clearSelection();
+        await loadLeads();
+        const { emitDataChanged } = await import("@/lib/data-events");
+        emitDataChanged({ module: "contact", action: "update" });
       } else {
-        msg = `Successfully assigned ${n.toLocaleString()} leads.`;
+        toast.error(res.error || "Bulk assign failed");
       }
-      toast.success(msg, {
-        description: `Assigned to ${who}${res.data.failed ? ` · ${res.data.failed} failed` : ""}`,
-      });
-      clearSelection();
-      await loadLeads();
-      const { emitDataChanged } = await import("@/lib/data-events");
-      emitDataChanged({ module: "contact", action: "update" });
-    } else {
-      toast.error(res.error || "Bulk assign failed");
+    } finally {
+      setBulkBusy(false);
+      setBulkProgress(null);
     }
   };
 
