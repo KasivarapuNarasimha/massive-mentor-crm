@@ -584,6 +584,48 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       seenRoutes.add("/dashboard/field-sales");
     }
 
+    // Always surface Media Library for core CRM roles (portal seed lag safety net)
+    const mediaRoles = [
+      "ceo",
+      "owner",
+      "business_admin",
+      "admin",
+      "sales_manager",
+      "manager",
+      "sales_executive",
+      "marketing",
+      "super_admin",
+    ];
+    if (mediaRoles.includes(role) && !seenRoutes.has("/dashboard/media")) {
+      const known = crmNavItems.find((n) => n.href === "/dashboard/media");
+      const mediaItem: NavItem = {
+        key: `${rolePrefix}:media`,
+        href: "/dashboard/media",
+        label: "Media Library",
+        icon: known?.icon || DEFAULT_ICON,
+      };
+      // Insert after AI Sales / AI Assistant when present; otherwise after Deals/Reports; else append
+      const afterCandidates = [
+        "/dashboard/mentor",
+        "/dashboard/ai-sales",
+        "/dashboard/reports",
+        "/dashboard/deals",
+        "/dashboard/clients",
+        "/dashboard/leads",
+      ];
+      let insertAt = -1;
+      for (const href of afterCandidates) {
+        const idx = items.findIndex((n) => n.href === href);
+        if (idx >= 0) {
+          insertAt = idx + 1;
+          break;
+        }
+      }
+      if (insertAt >= 0) items.splice(insertAt, 0, mediaItem);
+      else items.push(mediaItem);
+      seenRoutes.add("/dashboard/media");
+    }
+
     // Do not inject Appearance into primary portal menus — it lives under Settings below.
     return items;
   })();

@@ -318,9 +318,29 @@ export default function MediaLibraryPage() {
             {loading ? (
               <p className="text-muted-foreground text-sm py-10 text-center">Loading…</p>
             ) : assets.length === 0 ? (
-              <p className="text-muted-foreground text-sm py-10 text-center">
-                No files yet. {canManage ? "Upload brochures, PDFs, or images." : ""}
-              </p>
+              <div className="rounded-2xl border border-dashed border-border bg-card/30 py-14 px-6 text-center">
+                <div className="text-4xl mb-3" aria-hidden>
+                  📁
+                </div>
+                <p className="text-base font-medium text-foreground">No media uploaded yet.</p>
+                <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                  {canManage
+                    ? "Upload brochures, PDFs, images, price lists, and videos for your sales team to share on WhatsApp."
+                    : "Ask a Business Admin to upload company brochures and catalogs. You can send them to leads once files are available."}
+                </p>
+                {canManage && (
+                  <label className="inline-flex items-center justify-center mt-5 min-h-11 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:opacity-90">
+                    {uploading ? "Uploading…" : "Upload Files"}
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.mp4,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
+                      disabled={uploading}
+                      onChange={onUpload}
+                    />
+                  </label>
+                )}
+              </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {assets.map((a) => (

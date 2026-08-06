@@ -70,7 +70,12 @@ export function canAccessPath(
   if (!key) return !loaded;
   // Explicit empty grant list (should still include always-on from API)
   if (modules.length === 0) return false;
-  return modules.includes(key);
+  if (modules.includes(key)) return true;
+  // Media Library is core CRM: allow when user has media, leads, or documents
+  if (key === "media") {
+    return modules.includes("media") || modules.includes("leads") || modules.includes("documents");
+  }
+  return false;
 }
 
 export function filterNavByModules<T extends { href: string }>(

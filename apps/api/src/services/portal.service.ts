@@ -228,6 +228,7 @@ export async function resolveUserPortal(
         { key: "overview", label: "Overview", route: "/dashboard", order: 1, enabled: true },
         { key: "leads", label: "Leads", route: "/dashboard/leads", order: 2, enabled: true },
         { key: "reports", label: "Reports", route: "/dashboard/reports", order: 3, enabled: true },
+        { key: "media", label: "Media Library", route: "/dashboard/media", order: 4, enabled: true },
       ],
       actions: [],
       dashboardKeys: ["main"],
