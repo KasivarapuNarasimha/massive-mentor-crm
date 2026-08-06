@@ -1058,6 +1058,109 @@ class ApiClient {
     return `${this.baseUrl}/media/assets/${assetId}/file`;
   }
 
+  // —— WhatsApp caption templates & messaging polish ——
+  async listCaptionTemplates(
+    token?: string | null,
+    q?: { category?: string; scope?: "all" | "global" | "personal" }
+  ) {
+    const params = new URLSearchParams();
+    if (q?.category) params.set("category", q.category);
+    if (q?.scope) params.set("scope", q.scope);
+    const qs = params.toString() ? `?${params}` : "";
+    return this.get<{
+      categories: string[];
+      templates: Array<Record<string, unknown>>;
+    }>(`/media/caption-templates${qs}`, token);
+  }
+  async createCaptionTemplate(
+    body: {
+      name: string;
+      body: string;
+      category?: string;
+      language?: string;
+      isGlobal?: boolean;
+    },
+    token?: string | null
+  ) {
+    return this.post<{ template: Record<string, unknown> }>(
+      "/media/caption-templates",
+      body,
+      token
+    );
+  }
+  async updateCaptionTemplate(
+    id: string,
+    body: { name?: string; body?: string; category?: string; language?: string },
+    token?: string | null
+  ) {
+    return this.request<{ template: Record<string, unknown> }>(
+      `/media/caption-templates/${id}`,
+      { method: "PATCH", body: JSON.stringify(body), token: token ?? undefined }
+    );
+  }
+  async deleteCaptionTemplate(id: string, token?: string | null) {
+    return this.request<{ deleted: boolean }>(`/media/caption-templates/${id}`, {
+      method: "DELETE",
+      token: token ?? undefined,
+    });
+  }
+  async useCaptionTemplate(id: string, token?: string | null) {
+    return this.post<{ template: Record<string, unknown> }>(
+      `/media/caption-templates/${id}/use`,
+      {},
+      token
+    );
+  }
+  async recentCaptionTemplates(token?: string | null) {
+    return this.get<{ templates: Array<Record<string, unknown>> }>(
+      "/media/caption-templates/recent",
+      token
+    );
+  }
+  async improveCaption(caption: string, token?: string | null) {
+    return this.post<{ text: string }>(
+      "/media/caption/improve",
+      { caption },
+      token,
+      { timeoutMs: 60_000 }
+    );
+  }
+  async translateCaption(
+    caption: string,
+    language: "en" | "te" | "hi",
+    token?: string | null
+  ) {
+    return this.post<{ text: string; language: string }>(
+      "/media/caption/translate",
+      { caption, language },
+      token,
+      { timeoutMs: 60_000 }
+    );
+  }
+  async getMessagingSettings(token?: string | null) {
+    return this.get<{
+      autoSignatureEnabled: boolean;
+      signatureEnabled: boolean;
+      signature: string;
+      defaultSignature: string;
+      canManageAutoSignature: boolean;
+    }>("/media/messaging-settings", token);
+  }
+  async updateMessagingSettings(
+    body: {
+      signature?: string;
+      signatureEnabled?: boolean;
+      autoSignatureEnabled?: boolean;
+    },
+    token?: string | null
+  ) {
+    return this.request<Record<string, unknown>>("/media/messaging-settings", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      token: token ?? undefined,
+    });
+  }
+
   /** Compose + send email to lead(s) via platform SMTP — POST /api/leads/send-email */
   async sendLeadEmail(
     body: {

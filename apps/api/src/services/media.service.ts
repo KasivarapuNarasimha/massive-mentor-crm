@@ -1068,16 +1068,15 @@ export async function sendMediaViaWhatsApp(
   });
   const salesName = actor?.name?.trim() || actor?.email || "Sales";
 
-  // Full merge context — assignee, company, service, deal value, business name
   const { buildContactTemplateVars, renderTemplate } = await import(
     "./template-vars.service.js"
   );
+  const { finalizeWhatsAppCaption } = await import("./whatsapp-caption.service.js");
   const templateVars = await buildContactTemplateVars({
     contactId: contactRow.id,
     actorUserId: userId,
     businessId,
   });
-  // Prefer assignee as SalesExecutive; fall back already handled in builder
   if (!templateVars.SalesExecutive) {
     templateVars.SalesExecutive = salesName;
     templateVars.Assignee = salesName;
@@ -1100,13 +1099,17 @@ export async function sendMediaViaWhatsApp(
     );
   }
 
-  // Preserve selection order
   const ordered = ids
     .map((id) => assets.find((a) => a.id === id))
     .filter(Boolean) as typeof assets;
 
-  const rawCaption = opts.caption || "";
-  const baseCaption = renderTemplate(rawCaption, templateVars);
+  // First-file caption: merge vars + optional signature
+  const baseCaption = await finalizeWhatsAppCaption({
+    userId,
+    contactId: contactRow.id,
+    businessId,
+    caption: opts.caption || "",
+  });
 
   const results: Array<{
     assetId: string;
@@ -1119,13 +1122,13 @@ export async function sendMediaViaWhatsApp(
 
   for (let i = 0; i < ordered.length; i++) {
     const asset = ordered[i]!;
-    // Caption only on first file if multi-send (WhatsApp UX); always fully rendered
-    const captionRaw =
-      i === 0
-        ? baseCaption || asset.captionDefault || ""
-        : asset.captionDefault || "";
+    // Caption only on first file if multi-send (WhatsApp UX)
     const caption =
-      renderTemplate(captionRaw, templateVars) || undefined;
+      i === 0
+        ? baseCaption ||
+          renderTemplate(asset.captionDefault || "", templateVars) ||
+          undefined
+        : renderTemplate(asset.captionDefault || "", templateVars) || undefined;
 
     const log = await prisma.mediaSendLog.create({
       data: {

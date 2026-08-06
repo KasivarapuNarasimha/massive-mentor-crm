@@ -2,6 +2,7 @@ import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import * as media from "../services/media.service.js";
 import * as dam from "../services/media-dam.service.js";
+import * as captions from "../services/whatsapp-caption.service.js";
 
 function errStatus(message: string): number {
   if (/permission|Only Business Admin|Not allowed/i.test(message)) return 403;
@@ -826,6 +827,154 @@ export async function publicShareMeta(req: AuthenticatedRequest, res: Response) 
         expiresAt: row.expiresAt?.toISOString() || null,
       },
     });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+// ─── WhatsApp caption templates & messaging polish ───────────────────────────
+
+export async function listCaptionTemplates(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const data = await captions.listCaptionTemplates(req.user.id, {
+      category: req.query.category ? String(req.query.category) : undefined,
+      scope: (req.query.scope as "all" | "global" | "personal") || "all",
+    });
+    res.json({ success: true, data });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function createCaptionTemplate(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const template = await captions.createCaptionTemplate(req.user.id, {
+      name: String(req.body?.name || ""),
+      body: String(req.body?.body || ""),
+      category: req.body?.category ? String(req.body.category) : undefined,
+      language: req.body?.language ? String(req.body.language) : undefined,
+      isGlobal: !!req.body?.isGlobal,
+    });
+    res.status(201).json({ success: true, data: { template } });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function updateCaptionTemplate(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const template = await captions.updateCaptionTemplate(req.user.id, id, {
+      name: req.body?.name != null ? String(req.body.name) : undefined,
+      body: req.body?.body != null ? String(req.body.body) : undefined,
+      category: req.body?.category != null ? String(req.body.category) : undefined,
+      language: req.body?.language != null ? String(req.body.language) : undefined,
+    });
+    res.json({ success: true, data: { template } });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function deleteCaptionTemplate(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const data = await captions.deleteCaptionTemplate(req.user.id, id);
+    res.json({ success: true, data });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function useCaptionTemplate(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const template = await captions.markTemplateUsed(req.user.id, id);
+    res.json({ success: true, data: { template } });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function recentCaptionTemplates(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const templates = await captions.listRecentTemplates(req.user.id, 8);
+    res.json({ success: true, data: { templates } });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function improveCaption(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const data = await captions.improveCaptionWithAI(
+      req.user.id,
+      String(req.body?.caption || req.body?.text || "")
+    );
+    res.json({ success: true, data });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function translateCaptionCtrl(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const lang = String(req.body?.language || "en") as "en" | "te" | "hi";
+    if (!["en", "te", "hi"].includes(lang)) {
+      return res.status(400).json({ success: false, error: "language must be en, te, or hi" });
+    }
+    const data = await captions.translateCaption(
+      req.user.id,
+      String(req.body?.caption || req.body?.text || ""),
+      lang
+    );
+    res.json({ success: true, data });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function messagingSettings(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const data = await captions.getMessagingSettings(req.user.id);
+    res.json({ success: true, data });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function updateMessagingSettingsCtrl(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const data = await captions.updateMessagingSettings(req.user.id, {
+      signature: req.body?.signature != null ? String(req.body.signature) : undefined,
+      signatureEnabled:
+        req.body?.signatureEnabled != null ? !!req.body.signatureEnabled : undefined,
+      autoSignatureEnabled:
+        req.body?.autoSignatureEnabled != null
+          ? !!req.body.autoSignatureEnabled
+          : undefined,
+    });
+    res.json({ success: true, data });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed";
     res.status(errStatus(message)).json({ success: false, error: message });

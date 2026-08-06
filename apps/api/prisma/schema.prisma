@@ -34,6 +34,10 @@ model User {
   mfaEnrolledAt DateTime?
   /// UI theme preference: light | dark | system (default)
   themePreference String  @default("system")
+  /// Personal WhatsApp signature (appended when enabled)
+  whatsappSignature String? @db.Text
+  /// User preference: append signature when workspace auto-signature is on
+  whatsappSignatureEnabled Boolean @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -41,6 +45,7 @@ model User {
   sessions      UserSession[]
   loginEvents   LoginEvent[]
   profile       BusinessProfile?
+  whatsappCaptionTemplates WhatsAppCaptionTemplate[]
   healthScores  HealthScore[]
   swotAnalyses  SWOTAnalysis[]
   roadmaps      Roadmap[]
@@ -340,6 +345,7 @@ model Business {
   mediaShareLinks    MediaShareLink[]
   mediaAssetEvents   MediaAssetEvent[]
   mediaAssetVersions MediaAssetVersion[]
+  whatsappCaptionTemplates WhatsAppCaptionTemplate[]
   currentPlanId      String?
   currentPlan        SubscriptionPlan? @relation(fields: [currentPlanId], references: [id], onDelete: SetNull)
 
@@ -414,6 +420,34 @@ model LeadAssignmentItem {
   @@index([batchId, userId])
   @@index([contactId])
   @@index([userId])
+}
+
+// ─── WhatsApp caption templates (global + personal) ─────────────────────────
+
+model WhatsAppCaptionTemplate {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  /// null = workspace/global template (admin-managed); set = personal (owner only)
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  body            String   @db.Text
+  /// Sales | Support | Marketing | Follow-up | Payment | General
+  category        String   @default("General")
+  /// en | te | hi
+  language        String   @default("en")
+  isGlobal        Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  useCount        Int      @default(0)
+  lastUsedAt      DateTime?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([businessId, isGlobal, category])
+  @@index([businessId, userId])
+  @@index([businessId, lastUsedAt])
 }
 
 // ─── Media Library (brochures, catalogs, WhatsApp file sharing) ─────────────

@@ -45,6 +45,16 @@ import {
   processExpiry,
   publicShareFile,
   publicShareMeta,
+  listCaptionTemplates,
+  createCaptionTemplate,
+  updateCaptionTemplate,
+  deleteCaptionTemplate,
+  useCaptionTemplate,
+  recentCaptionTemplates,
+  improveCaption,
+  translateCaptionCtrl,
+  messagingSettings,
+  updateMessagingSettingsCtrl,
 } from "../controllers/media.controller.js";
 import {
   MEDIA_MAX_BYTES,
@@ -145,6 +155,18 @@ router.get("/assets/:id/file", streamAssetFile);
 router.delete("/share-links/:linkId", revokeShareLinkCtrl);
 
 router.post("/send/whatsapp", sendWhatsAppMedia);
+
+// WhatsApp caption templates & AI messaging helpers
+router.get("/caption-templates", listCaptionTemplates);
+router.post("/caption-templates", createCaptionTemplate);
+router.get("/caption-templates/recent", recentCaptionTemplates);
+router.patch("/caption-templates/:id", updateCaptionTemplate);
+router.delete("/caption-templates/:id", deleteCaptionTemplate);
+router.post("/caption-templates/:id/use", useCaptionTemplate);
+router.post("/caption/improve", improveCaption);
+router.post("/caption/translate", translateCaptionCtrl);
+router.get("/messaging-settings", messagingSettings);
+router.patch("/messaging-settings", updateMessagingSettingsCtrl);
 
 router.get("/kits", listKits);
 router.post("/kits", createKit);

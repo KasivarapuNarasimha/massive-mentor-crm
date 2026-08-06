@@ -48,6 +48,36 @@ Please find our materials attached.
 Regards,
 {{SalesExecutive}}`;
 
+const CAPTION_MAX = 4096;
+const EMOJIS = [
+  "😊",
+  "😂",
+  "👍",
+  "🙏",
+  "📄",
+  "📞",
+  "📍",
+  "🎉",
+  "❤️",
+  "✅",
+  "🔥",
+  "💼",
+  "📈",
+  "🤝",
+  "✨",
+  "👋",
+];
+
+type CaptionTemplate = {
+  id: string;
+  name: string;
+  body: string;
+  category: string;
+  isGlobal?: boolean;
+  isPersonal?: boolean;
+  useCount?: number;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -84,17 +114,56 @@ export function SendMediaModal({
     CustomerName: contactName,
     Phone: contactPhone || "",
   });
+  const [captionTemplates, setCaptionTemplates] = useState<CaptionTemplate[]>([]);
+  const [templateCategories, setTemplateCategories] = useState<string[]>([]);
+  const [recentTemplates, setRecentTemplates] = useState<CaptionTemplate[]>([]);
+  const [templateCategory, setTemplateCategory] = useState("");
+  const [templateScope, setTemplateScope] = useState<"all" | "global" | "personal">(
+    "all"
+  );
+  const [language, setLanguage] = useState<"en" | "te" | "hi">("en");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [saveTplOpen, setSaveTplOpen] = useState(false);
+  const [saveTplName, setSaveTplName] = useState("");
+  const [saveTplGlobal, setSaveTplGlobal] = useState(false);
+  const [saveTplCategory, setSaveTplCategory] = useState("General");
+  const [messaging, setMessaging] = useState<{
+    signature: string;
+    signatureEnabled: boolean;
+    autoSignatureEnabled: boolean;
+    canManageAutoSignature: boolean;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setOfflineHint(false);
     try {
-      const [a, k, rec, contactRes] = await Promise.all([
+      const [a, k, rec, contactRes, tplRes, recentRes, msgRes] = await Promise.all([
         api.listMediaAssets(token, { pageSize: 100, shareableOnly: true }),
         api.listMediaKits(token),
         api.recommendMediaForContact(contactId, token),
         api.getCrmContact(contactId, token),
+        api.listCaptionTemplates(token),
+        api.recentCaptionTemplates(token),
+        api.getMessagingSettings(token),
       ]);
+
+      if (tplRes.success && tplRes.data) {
+        setCaptionTemplates((tplRes.data.templates || []) as CaptionTemplate[]);
+        setTemplateCategories(tplRes.data.categories || []);
+      }
+      if (recentRes.success && recentRes.data?.templates) {
+        setRecentTemplates(recentRes.data.templates as CaptionTemplate[]);
+      }
+      if (msgRes.success && msgRes.data) {
+        setMessaging({
+          signature: msgRes.data.signature || "",
+          signatureEnabled: !!msgRes.data.signatureEnabled,
+          autoSignatureEnabled: !!msgRes.data.autoSignatureEnabled,
+          canManageAutoSignature: !!msgRes.data.canManageAutoSignature,
+        });
+      }
 
       // Build merge vars from full contact + current user as fallback sales exec
       let contact: Record<string, unknown> = {
@@ -218,21 +287,20 @@ export function SendMediaModal({
 
   const unknownVars = useMemo(() => findUnknownVariables(caption), [caption]);
 
-  const insertVariable = useCallback((varName: string) => {
-    const token = `{{${varName}}}`;
+  const insertAtCursor = useCallback((token: string) => {
     const el = captionRef.current;
     if (!el) {
-      setCaption((prev) => prev + token);
+      setCaption((prev) => (prev + token).slice(0, CAPTION_MAX));
       return;
     }
     const start = el.selectionStart ?? el.value.length;
     const end = el.selectionEnd ?? el.value.length;
     const prev = el.value;
-    const next = prev.slice(0, start) + token + prev.slice(end);
+    const next = (prev.slice(0, start) + token + prev.slice(end)).slice(0, CAPTION_MAX);
     setCaption(next);
     requestAnimationFrame(() => {
       el.focus();
-      const pos = start + token.length;
+      const pos = Math.min(start + token.length, CAPTION_MAX);
       try {
         el.setSelectionRange(pos, pos);
       } catch {
@@ -240,6 +308,19 @@ export function SendMediaModal({
       }
     });
   }, []);
+
+  const insertVariable = useCallback(
+    (varName: string) => insertAtCursor(`{{${varName}}}`),
+    [insertAtCursor]
+  );
+
+  const insertEmoji = useCallback(
+    (emoji: string) => {
+      insertAtCursor(emoji);
+      setShowEmoji(false);
+    },
+    [insertAtCursor]
+  );
 
   const copyPreview = async () => {
     try {
@@ -250,17 +331,116 @@ export function SendMediaModal({
     }
   };
 
-  const saveAsTemplate = () => {
+  const saveAsTemplateLocal = () => {
     saveCaptionTemplate(caption);
-    toast.success("Template saved", {
-      description: "This caption will load next time you open Send Media.",
-    });
+    toast.success("Default caption saved on this device");
   };
 
   const resetTemplate = () => {
     setCaption(DEFAULT_CAPTION);
     toast.message("Template reset to default");
   };
+
+  const applyCaptionTemplate = async (t: CaptionTemplate) => {
+    setCaption(t.body.slice(0, CAPTION_MAX));
+    void api.useCaptionTemplate(t.id, token).then((res) => {
+      if (res.success) {
+        void api.recentCaptionTemplates(token).then((r) => {
+          if (r.success && r.data?.templates) {
+            setRecentTemplates(r.data.templates as CaptionTemplate[]);
+          }
+        });
+      }
+    });
+    toast.success(`Loaded: ${t.name}`);
+  };
+
+  const runImproveAi = async () => {
+    if (!caption.trim()) {
+      toast.error("Write a caption first");
+      return;
+    }
+    setAiBusy(true);
+    try {
+      const res = await api.improveCaption(caption, token);
+      if (res.success && res.data?.text) {
+        setCaption(res.data.text.slice(0, CAPTION_MAX));
+        toast.success("Caption improved");
+      } else toast.error(res.error || "AI improve failed");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const runTranslate = async (lang: "en" | "te" | "hi") => {
+    setLanguage(lang);
+    if (!caption.trim()) return;
+    setAiBusy(true);
+    try {
+      const res = await api.translateCaption(caption, lang, token);
+      if (res.success && res.data?.text) {
+        setCaption(res.data.text.slice(0, CAPTION_MAX));
+        toast.success(
+          lang === "te" ? "Translated to Telugu" : lang === "hi" ? "Translated to Hindi" : "Translated to English"
+        );
+      } else toast.error(res.error || "Translation failed");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const savePersonalOrGlobalTemplate = async () => {
+    if (!saveTplName.trim()) {
+      toast.error("Enter a template name");
+      return;
+    }
+    const res = await api.createCaptionTemplate(
+      {
+        name: saveTplName.trim(),
+        body: caption,
+        category: saveTplCategory,
+        isGlobal: saveTplGlobal,
+      },
+      token
+    );
+    if (res.success) {
+      toast.success(saveTplGlobal ? "Global template saved" : "Personal template saved");
+      setSaveTplOpen(false);
+      setSaveTplName("");
+      const tplRes = await api.listCaptionTemplates(token);
+      if (tplRes.success && tplRes.data) {
+        setCaptionTemplates((tplRes.data.templates || []) as CaptionTemplate[]);
+      }
+    } else toast.error(res.error || "Save failed");
+  };
+
+  const filteredTemplates = useMemo(() => {
+    return captionTemplates.filter((t) => {
+      if (templateCategory && t.category !== templateCategory) return false;
+      if (templateScope === "global" && !t.isGlobal) return false;
+      if (templateScope === "personal" && !t.isPersonal) return false;
+      return true;
+    });
+  }, [captionTemplates, templateCategory, templateScope]);
+
+  const charCount = caption.length;
+  const charWarn = charCount > CAPTION_MAX * 0.85;
+  const charOver = charCount > CAPTION_MAX;
+
+  /** Preview with signature when auto-append is on */
+  const previewWithSignature = useMemo(() => {
+    if (
+      !messaging?.autoSignatureEnabled ||
+      !messaging.signatureEnabled ||
+      !messaging.signature?.trim()
+    ) {
+      return renderedCaption;
+    }
+    const sig = messaging.signature.trim();
+    if (!renderedCaption) return sig;
+    if (renderedCaption.endsWith(sig)) return renderedCaption;
+    return `${renderedCaption}\n\n${sig}`;
+  }, [renderedCaption, messaging]);
 
   if (!open) return null;
 
@@ -444,8 +624,86 @@ export function SendMediaModal({
           )}
         </div>
 
-        {/* Template editor + Live personalized preview */}
+        {/* ── Messaging experience (templates, AI, emoji, languages) ── */}
         <div className="mt-4 space-y-3">
+          {/* Recently used templates */}
+          {recentTemplates.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                Recently Used
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {recentTemplates.slice(0, 6).map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => void applyCaptionTemplate(t)}
+                    className="text-[11px] px-2.5 py-1 rounded-full border border-border hover:border-primary/40 hover:bg-primary/10"
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Template library */}
+          <div className="rounded-xl border border-border p-3 space-y-2">
+            <div className="flex flex-wrap items-center gap-2 justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Message Templates
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                <select
+                  value={templateScope}
+                  onChange={(e) =>
+                    setTemplateScope(e.target.value as "all" | "global" | "personal")
+                  }
+                  className="mm-input text-[11px] min-h-8 py-0 w-auto"
+                >
+                  <option value="all">All</option>
+                  <option value="global">Company</option>
+                  <option value="personal">My Templates</option>
+                </select>
+                <select
+                  value={templateCategory}
+                  onChange={(e) => setTemplateCategory(e.target.value)}
+                  className="mm-input text-[11px] min-h-8 py-0 w-auto"
+                >
+                  <option value="">All categories</option>
+                  {(templateCategories.length
+                    ? templateCategories
+                    : ["Sales", "Support", "Marketing", "Follow-up", "Payment", "General"]
+                  ).map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+              {filteredTemplates.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground py-1">No templates in this filter.</p>
+              ) : (
+                filteredTemplates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => void applyCaptionTemplate(t)}
+                    className="text-[11px] px-2.5 py-1 rounded-lg border border-border bg-black/15 hover:bg-white/5 text-left"
+                    title={t.category}
+                  >
+                    <span className="font-medium">{t.name}</span>
+                    <span className="text-[9px] text-muted-foreground ml-1">
+                      {t.isPersonal ? "· mine" : t.isGlobal ? "· company" : ""}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Caption
@@ -460,23 +718,80 @@ export function SendMediaModal({
               </button>
               <button
                 type="button"
-                onClick={saveAsTemplate}
+                onClick={() => {
+                  setSaveTplOpen(true);
+                  setSaveTplName("");
+                  setSaveTplGlobal(false);
+                }}
                 className="text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-white/5"
               >
                 Save as Template
               </button>
               <button
                 type="button"
+                onClick={saveAsTemplateLocal}
+                className="text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-white/5 text-muted-foreground"
+              >
+                Save as Default
+              </button>
+              <button
+                type="button"
                 onClick={resetTemplate}
                 className="text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-white/5 text-muted-foreground"
               >
-                Reset Template
+                Reset
               </button>
             </div>
           </div>
 
+          {/* Toolbar: emoji, AI, language */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowEmoji((v) => !v)}
+                className="text-sm px-2.5 py-1.5 rounded-lg border border-border hover:bg-white/5"
+                title="Emoji"
+              >
+                😊 Emoji
+              </button>
+              {showEmoji && (
+                <div className="absolute left-0 top-full mt-1 z-20 p-2 rounded-xl border border-border bg-card shadow-xl grid grid-cols-8 gap-1 w-56">
+                  {EMOJIS.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      className="text-lg p-1 hover:bg-white/10 rounded"
+                      onClick={() => insertEmoji(e)}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              disabled={aiBusy || !caption.trim()}
+              onClick={() => void runImproveAi()}
+              className="text-[11px] px-2.5 py-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20 disabled:opacity-50"
+            >
+              {aiBusy ? "Working…" : "✨ Improve with AI"}
+            </button>
+            <select
+              value={language}
+              disabled={aiBusy}
+              onChange={(e) => void runTranslate(e.target.value as "en" | "te" | "hi")}
+              className="mm-input text-[11px] min-h-8 py-0 w-auto"
+              title="Translate caption (keeps variables)"
+            >
+              <option value="en">English</option>
+              <option value="te">Telugu</option>
+              <option value="hi">Hindi</option>
+            </select>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Template mode */}
             <div className="rounded-xl border border-border bg-card/40 p-3 flex flex-col min-h-0">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                 Template
@@ -484,15 +799,27 @@ export function SendMediaModal({
               <textarea
                 ref={captionRef}
                 value={caption}
-                onChange={(e) => setCaption(e.target.value)}
+                onChange={(e) => setCaption(e.target.value.slice(0, CAPTION_MAX))}
                 rows={8}
                 className="mm-input w-full flex-1 text-sm resize-y font-mono min-h-[140px]"
                 placeholder={"Hello {{CustomerName}},\n\n…\n\nRegards,\n{{SalesExecutive}}"}
                 spellCheck={false}
               />
+              <div
+                className={`text-[11px] mt-1.5 tabular-nums ${
+                  charOver
+                    ? "text-red-400 font-semibold"
+                    : charWarn
+                      ? "text-amber-300"
+                      : "text-muted-foreground"
+                }`}
+              >
+                Characters: {charCount.toLocaleString("en-IN")} / {CAPTION_MAX.toLocaleString("en-IN")}
+                {charWarn && !charOver ? " · Approaching limit" : ""}
+                {charOver ? " · Over limit" : ""}
+              </div>
             </div>
 
-            {/* Live Preview — what the customer receives */}
             <div className="rounded-xl border border-emerald-500/35 bg-emerald-500/5 p-3 flex flex-col min-h-0">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
@@ -502,17 +829,21 @@ export function SendMediaModal({
                   As {contactName || "customer"} will see
                 </span>
               </div>
-              {renderedCaption ? (
+              {previewWithSignature ? (
                 <pre className="text-sm whitespace-pre-wrap font-sans text-foreground leading-relaxed flex-1">
-                  {renderedCaption}
+                  {previewWithSignature}
                 </pre>
               ) : (
                 <p className="text-xs text-muted-foreground">Caption is empty.</p>
               )}
+              {messaging?.autoSignatureEnabled && messaging.signatureEnabled && (
+                <p className="text-[10px] text-muted-foreground mt-2 border-t border-emerald-500/20 pt-2">
+                  Signature will be appended automatically on send.
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Variable helper — click inserts at cursor */}
           <div className="rounded-xl border border-border/80 bg-white/[0.02] p-3">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
               Available Variables
@@ -530,12 +861,8 @@ export function SendMediaModal({
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2">
-              Click a variable to insert it at the cursor in the template.
-            </p>
           </div>
 
-          {/* Unknown variable validation */}
           {unknownVars.length > 0 && (
             <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 space-y-1.5">
               <div className="text-xs font-semibold text-amber-200">
@@ -568,20 +895,52 @@ export function SendMediaModal({
                       ?
                     </>
                   ) : (
-                    <span className="text-muted-foreground">
-                      {" "}
-                      — will be removed when sent
-                    </span>
+                    <span className="text-muted-foreground"> — will be removed when sent</span>
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Signature quick toggle */}
+          {messaging && (
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={messaging.signatureEnabled}
+                  onChange={async (e) => {
+                    const enabled = e.target.checked;
+                    setMessaging({ ...messaging, signatureEnabled: enabled });
+                    await api.updateMessagingSettings({ signatureEnabled: enabled }, token);
+                  }}
+                />
+                Append my signature
+              </label>
+              {messaging.canManageAutoSignature && (
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={messaging.autoSignatureEnabled}
+                    onChange={async (e) => {
+                      const enabled = e.target.checked;
+                      setMessaging({ ...messaging, autoSignatureEnabled: enabled });
+                      await api.updateMessagingSettings(
+                        { autoSignatureEnabled: enabled },
+                        token
+                      );
+                    }}
+                  />
+                  Workspace auto-signature (Admin)
+                </label>
+              )}
             </div>
           )}
         </div>
 
         <button
           type="button"
-          disabled={sending || selected.size === 0}
+          disabled={sending || selected.size === 0 || charOver}
           onClick={() => void send()}
           className="mt-4 w-full min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50"
         >
@@ -589,6 +948,66 @@ export function SendMediaModal({
             ? "Sending…"
             : `Send ${selected.size || ""} file(s) via WhatsApp`}
         </button>
+
+        {/* Save template modal */}
+        {saveTplOpen && (
+          <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-card border border-border rounded-2xl w-full max-w-sm p-5 space-y-3">
+              <h4 className="font-semibold">Save as Template</h4>
+              <input
+                value={saveTplName}
+                onChange={(e) => setSaveTplName(e.target.value)}
+                placeholder="Template name"
+                className="mm-input w-full text-sm min-h-10"
+              />
+              <select
+                value={saveTplCategory}
+                onChange={(e) => setSaveTplCategory(e.target.value)}
+                className="mm-input w-full text-sm min-h-10"
+              >
+                {(templateCategories.length
+                  ? templateCategories
+                  : ["Sales", "Support", "Marketing", "Follow-up", "Payment", "General"]
+                ).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              {messaging?.canManageAutoSignature && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={saveTplGlobal}
+                    onChange={(e) => setSaveTplGlobal(e.target.checked)}
+                  />
+                  Company-wide (Business Admin)
+                </label>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                {saveTplGlobal
+                  ? "Visible to all sales users in this workspace."
+                  : "Saved under My Templates — only you can see it."}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="flex-1 min-h-10 rounded-xl border border-border"
+                  onClick={() => setSaveTplOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 min-h-10 rounded-xl bg-primary text-primary-foreground font-medium"
+                  onClick={() => void savePersonalOrGlobalTemplate()}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
