@@ -651,6 +651,116 @@ class ApiClient {
     );
   }
 
+  // —— Media Library ——
+  async listMediaFolders(token?: string | null) {
+    return this.get<{ folders: Array<Record<string, unknown>> }>("/media/folders", token);
+  }
+  async createMediaFolder(body: { name: string; parentId?: string | null }, token?: string | null) {
+    return this.post<{ folder: Record<string, unknown> }>("/media/folders", body, token);
+  }
+  async listMediaAssets(
+    token?: string | null,
+    q?: { folderId?: string; search?: string; kind?: string }
+  ) {
+    const params = new URLSearchParams();
+    if (q?.folderId != null) params.set("folderId", q.folderId);
+    if (q?.search) params.set("search", q.search);
+    if (q?.kind) params.set("kind", q.kind);
+    const qs = params.toString() ? `?${params}` : "";
+    return this.get<{ assets: Array<Record<string, unknown>> }>(`/media/assets${qs}`, token);
+  }
+  async uploadMediaAsset(
+    file: File,
+    opts: { folderId?: string; name?: string; captionDefault?: string },
+    token?: string | null
+  ) {
+    const fd = new FormData();
+    fd.append("file", file);
+    if (opts.folderId) fd.append("folderId", opts.folderId);
+    if (opts.name) fd.append("name", opts.name);
+    if (opts.captionDefault) fd.append("captionDefault", opts.captionDefault);
+    return this.postFormData<{ asset: Record<string, unknown> }>(
+      "/media/assets",
+      fd,
+      token,
+      { timeoutMs: 120_000 }
+    );
+  }
+  async deleteMediaAsset(id: string, token?: string | null) {
+    return this.request<{ deleted: boolean }>(`/media/assets/${id}`, {
+      method: "DELETE",
+      token: token ?? undefined,
+    });
+  }
+  async renameMediaAsset(id: string, name: string, token?: string | null) {
+    return this.request<{ asset: Record<string, unknown> }>(`/media/assets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+      token: token ?? undefined,
+    });
+  }
+  async sendMediaWhatsApp(
+    body: { contactId: string; assetIds: string[]; caption?: string; kitId?: string },
+    token?: string | null
+  ) {
+    return this.post<{
+      sent: number;
+      failed: number;
+      results: Array<{ assetId: string; assetName: string; ok: boolean; status: string; error?: string }>;
+      contact: { id: string; name: string; phone: string };
+    }>("/media/send/whatsapp", body, token, { timeoutMs: 300_000 });
+  }
+  async listMediaKits(token?: string | null) {
+    return this.get<{ kits: Array<Record<string, unknown>> }>("/media/kits", token);
+  }
+  async createMediaKit(
+    body: {
+      name: string;
+      description?: string;
+      captionTemplate?: string;
+      assetIds: string[];
+    },
+    token?: string | null
+  ) {
+    return this.post<{ kit: Record<string, unknown> }>("/media/kits", body, token);
+  }
+  async deleteMediaKit(id: string, token?: string | null) {
+    return this.request<{ deleted: boolean }>(`/media/kits/${id}`, {
+      method: "DELETE",
+      token: token ?? undefined,
+    });
+  }
+  async sendMediaKitWhatsApp(
+    kitId: string,
+    body: { contactId: string; caption?: string },
+    token?: string | null
+  ) {
+    return this.post<Record<string, unknown>>(
+      `/media/kits/${kitId}/send/whatsapp`,
+      body,
+      token,
+      { timeoutMs: 300_000 }
+    );
+  }
+  async listMediaActivity(
+    token?: string | null,
+    q?: { page?: number; pageSize?: number; contactId?: string }
+  ) {
+    const params = new URLSearchParams();
+    if (q?.page) params.set("page", String(q.page));
+    if (q?.pageSize) params.set("pageSize", String(q.pageSize));
+    if (q?.contactId) params.set("contactId", q.contactId);
+    const qs = params.toString() ? `?${params}` : "";
+    return this.get<{
+      total: number;
+      items: Array<Record<string, unknown>>;
+    }>(`/media/activity${qs}`, token);
+  }
+
+  mediaFileUrl(assetId: string): string {
+    return `${this.baseUrl}/media/assets/${assetId}/file`;
+  }
+
   /** Compose + send email to lead(s) via platform SMTP — POST /api/leads/send-email */
   async sendLeadEmail(
     body: {

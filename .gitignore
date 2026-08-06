@@ -41,4 +41,4 @@ Thumbs.db
 .vercel
 .turbo/
 .tmp-export-verify/
-apps/api/.tmp-export-verify/
+apps/api/.tmp-export-verify/storage/media/ 

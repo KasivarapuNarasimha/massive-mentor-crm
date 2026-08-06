@@ -281,6 +281,7 @@ import backupRoutes from "./routes/backup.routes.js";
 import approvalRoutes from "./routes/approval.routes.js";
 import billingRoutes from "./routes/billing.routes.js";
 import securityRoutes from "./routes/security.routes.js";
+import mediaRoutes from "./routes/media.routes.js";
 import { seedIndustryTemplates } from "./services/template.service.js";
 import { startBackupScheduler, stopBackupScheduler } from "./services/backup.service.js";
 import { apiGeneralLimiter } from "./middleware/rateLimiter.js";
@@ -331,6 +332,7 @@ app.use("/api/approvals", requireAuthMw, requireModuleFromPath, approvalRoutes);
 // billing/access + stream exempt inside requireModuleFromPath
 app.use("/api/billing", requireAuthMw, requireModuleFromPath, billingRoutes);
 app.use("/api/security", requireAuthMw, requireModuleFromPath, securityRoutes);
+app.use("/api/media", requireAuthMw, requireModuleFromPath, mediaRoutes);
 
 app.get("/api", (_req, res) => {
   res.json({

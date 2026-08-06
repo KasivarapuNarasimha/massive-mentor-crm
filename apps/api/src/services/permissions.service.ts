@@ -30,6 +30,14 @@ export const MODULE_CATALOG: Array<{
   { key: "meetings", label: "Meetings", routePrefix: "/dashboard/meetings", apiPrefixes: ["/api/crm/meetings"], category: "crm", sortOrder: 6 },
   { key: "notes", label: "Notes", routePrefix: "/dashboard/notes", apiPrefixes: ["/api/crm/notes"], category: "crm", sortOrder: 7 },
   { key: "documents", label: "Documents", routePrefix: "/dashboard/documents", apiPrefixes: ["/api/crm/documents"], category: "crm", sortOrder: 8 },
+  {
+    key: "media",
+    label: "Media Library",
+    routePrefix: "/dashboard/media",
+    apiPrefixes: ["/api/media"],
+    category: "crm",
+    sortOrder: 9,
+  },
   { key: "reports", label: "Reports", routePrefix: "/dashboard/reports", apiPrefixes: ["/api/reports"], category: "insights", sortOrder: 10 },
   { key: "ai_sales", label: "AI Sales", routePrefix: "/dashboard/ai-sales", apiPrefixes: ["/api/crm/ai", "/api/ai"], category: "ai", sortOrder: 11 },
   { key: "mentor", label: "AI Mentor", routePrefix: "/dashboard/mentor", apiPrefixes: ["/api/mentor", "/api/ai"], category: "ai", sortOrder: 12 },
@@ -74,7 +82,7 @@ export const ROLE_TEMPLATE_DEFAULTS: Array<{
     label: "Sales Manager",
     sortOrder: 3,
     modules: [
-      "dashboard", "leads", "clients", "deals", "tasks", "meetings", "notes", "documents",
+      "dashboard", "leads", "clients", "deals", "tasks", "meetings", "notes", "documents", "media",
       "reports", "ai_sales", "mentor", "field_sales", "activity", "team", "profile", "appearance",
     ],
   },
@@ -83,7 +91,7 @@ export const ROLE_TEMPLATE_DEFAULTS: Array<{
     label: "Sales Executive",
     sortOrder: 4,
     modules: [
-      "dashboard", "leads", "clients", "deals", "tasks", "meetings", "notes",
+      "dashboard", "leads", "clients", "deals", "tasks", "meetings", "notes", "media",
       "ai_sales", "mentor", "field_sales", "activity", "profile", "appearance",
     ],
   },

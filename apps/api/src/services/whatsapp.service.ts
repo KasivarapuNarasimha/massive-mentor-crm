@@ -175,6 +175,168 @@ export async function sendWhatsAppCloudMessage(opts: {
   return record;
 }
 
+/**
+ * Upload a local file buffer to Meta Cloud API media endpoint, then send as
+ * image / document / video to the recipient.
+ */
+export async function sendWhatsAppMediaFile(opts: {
+  userId: string;
+  to: string;
+  buffer: Buffer;
+  mimeType: string;
+  fileName: string;
+  caption?: string;
+  contactId?: string;
+  /** image | video | document (pdf/docs) */
+  mediaType: "image" | "video" | "document";
+}) {
+  const businessId = await getUserBusinessId(opts.userId);
+  const { getWhatsAppIntegrationForTenant } = await import("./integration.service.js");
+  const integration =
+    (await getWhatsAppIntegrationForTenant(opts.userId)) ||
+    (await getIntegration(opts.userId, "whatsapp"));
+  const cfg = getWaConfig(integration?.config);
+
+  const accessToken = normalizeWhatsAppAccessToken(
+    cfg.accessToken ||
+      (!integration
+        ? (env as { WHATSAPP_ACCESS_TOKEN?: string }).WHATSAPP_ACCESS_TOKEN ||
+          process.env.WHATSAPP_ACCESS_TOKEN ||
+          ""
+        : "")
+  );
+  const phoneNumberId = normalizePhoneNumberId(
+    cfg.phoneNumberId ||
+      (!integration ? process.env.WHATSAPP_PHONE_NUMBER_ID || "" : "")
+  );
+  const apiVersion = (
+    cfg.apiVersion ||
+    process.env.WHATSAPP_API_VERSION ||
+    "v19.0"
+  )
+    .trim()
+    .replace(/^\//, "");
+
+  if (!accessToken || !phoneNumberId) {
+    throw new Error(
+      "WhatsApp Cloud API not configured. Set Integration config (accessToken, phoneNumberId)."
+    );
+  }
+  if (integration && !integration.isActive) {
+    throw new Error("WhatsApp integration is inactive");
+  }
+
+  const to = opts.to.replace(/[^\d+]/g, "").replace(/^\+/, "");
+  if (to.length < 8) throw new Error("Invalid recipient phone number");
+
+  // 1) Upload media to Meta
+  const form = new FormData();
+  const bytes = new Uint8Array(opts.buffer);
+  const blob = new Blob([bytes], { type: opts.mimeType || "application/octet-stream" });
+  form.append("messaging_product", "whatsapp");
+  form.append("type", opts.mimeType || "application/octet-stream");
+  form.append("file", blob, opts.fileName || "file");
+
+  const uploadUrl = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/media`;
+  const uploadRes = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+    body: form,
+  });
+  const uploadJson = (await uploadRes.json().catch(() => ({}))) as {
+    id?: string;
+    error?: { message?: string };
+  };
+  if (!uploadRes.ok || !uploadJson.id) {
+    throw new Error(
+      uploadJson.error?.message || `WhatsApp media upload failed (${uploadRes.status})`
+    );
+  }
+
+  // 2) Send message referencing media id
+  const mediaType = opts.mediaType;
+  const mediaBody: Record<string, unknown> = { id: uploadJson.id };
+  if (opts.caption?.trim()) mediaBody.caption = opts.caption.trim().slice(0, 1024);
+  if (mediaType === "document") mediaBody.filename = opts.fileName || "document.pdf";
+
+  const payload: Record<string, unknown> = {
+    messaging_product: "whatsapp",
+    to,
+    type: mediaType,
+    [mediaType]: mediaBody,
+  };
+
+  const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = (await res.json().catch(() => ({}))) as {
+    messages?: Array<{ id: string }>;
+    error?: { message?: string };
+  };
+
+  const captionOrName = opts.caption?.trim() || `[media:${opts.fileName}]`;
+
+  if (!res.ok) {
+    const errMsg = json.error?.message || `WhatsApp API error ${res.status}`;
+    const failed = await prisma.whatsAppMessage.create({
+      data: {
+        businessId,
+        userId: opts.userId,
+        contactId: opts.contactId || null,
+        to,
+        body: captionOrName,
+        direction: "outbound",
+        status: "failed",
+        error: errMsg,
+        metadata: { ...json, mediaId: uploadJson.id, fileName: opts.fileName } as object,
+      },
+    });
+    throw new Error(errMsg + ` (message ${failed.id})`);
+  }
+
+  const waMessageId = json.messages?.[0]?.id || null;
+  const record = await prisma.whatsAppMessage.create({
+    data: {
+      businessId,
+      userId: opts.userId,
+      contactId: opts.contactId || null,
+      to,
+      body: captionOrName,
+      direction: "outbound",
+      status: "sent",
+      waMessageId,
+      metadata: {
+        mediaId: uploadJson.id,
+        fileName: opts.fileName,
+        mimeType: opts.mimeType,
+        mediaType,
+      } as object,
+    },
+  });
+
+  await recordAudit({
+    businessId,
+    actorUserId: opts.userId,
+    action: "whatsapp_media_sent",
+    entityType: "whatsapp_message",
+    entityId: record.id,
+    metadata: { to, waMessageId, fileName: opts.fileName, mediaType },
+  });
+
+  return record;
+}
+
 export async function listWhatsAppHistory(
   userId: string,
   opts?: { contactId?: string; to?: string; page?: number; pageSize?: number }
@@ -227,6 +389,17 @@ export async function applyWhatsAppStatusUpdate(payload: {
       updatedAt: new Date(),
     },
   });
+  // Keep Media Library send history in sync with delivery receipts
+  await prisma.mediaSendLog
+    .updateMany({
+      where: { waMessageId: payload.id },
+      data: {
+        status,
+        error: payload.errors?.[0]?.message || null,
+        updatedAt: new Date(),
+      },
+    })
+    .catch(() => undefined);
   return updated;
 }
 

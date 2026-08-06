@@ -333,6 +333,10 @@ model Business {
   billingPayments    BillingPayment[]
   integrations       Integration[]
   leadAssignmentBatches LeadAssignmentBatch[]
+  mediaFolders       MediaFolder[]
+  mediaAssets        MediaAsset[]
+  mediaKits          MediaKit[]
+  mediaSendLogs      MediaSendLog[]
   currentPlanId      String?
   currentPlan        SubscriptionPlan? @relation(fields: [currentPlanId], references: [id], onDelete: SetNull)
 
@@ -407,6 +411,122 @@ model LeadAssignmentItem {
   @@index([batchId, userId])
   @@index([contactId])
   @@index([userId])
+}
+
+// ─── Media Library (brochures, catalogs, WhatsApp file sharing) ─────────────
+
+model MediaFolder {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name            String
+  parentId        String?
+  parent          MediaFolder?  @relation("MediaFolderTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children        MediaFolder[] @relation("MediaFolderTree")
+  sortOrder       Int      @default(0)
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  assets          MediaAsset[]
+
+  @@index([businessId, parentId])
+  @@index([businessId, name])
+}
+
+model MediaAsset {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  folderId        String?
+  folder          MediaFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  /// Display name
+  name            String
+  originalName    String
+  mimeType        String
+  /// image | pdf | video | document
+  kind            String
+  sizeBytes       Int
+  /// local | s3
+  storageProvider String   @default("local")
+  storageKey      String
+  /// Optional public CDN URL (S3/public)
+  publicUrl       String?
+  captionDefault  String?  @db.Text
+  createdByUserId String
+  deletedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  kitItems MediaKitItem[]
+  sendLogs MediaSendLog[]
+
+  @@index([businessId, folderId, deletedAt])
+  @@index([businessId, kind, deletedAt])
+  @@index([businessId, name])
+}
+
+/// Saved multi-file send packages (e.g. "CRM Introduction Kit")
+model MediaKit {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  captionTemplate String?  @db.Text
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  items           MediaKitItem[]
+  sendLogs        MediaSendLog[]
+
+  @@index([businessId, name])
+}
+
+model MediaKitItem {
+  id       String @id @default(cuid())
+  kitId    String
+  kit      MediaKit   @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  assetId  String
+  asset    MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  sortOrder Int   @default(0)
+
+  @@unique([kitId, assetId])
+  @@index([kitId])
+}
+
+/// Every media send (WhatsApp / future email/SMS) — never deleted
+model MediaSendLog {
+  id            String   @id @default(cuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  assetId       String?
+  asset         MediaAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  assetName     String
+  kitId         String?
+  kit           MediaKit? @relation(fields: [kitId], references: [id], onDelete: SetNull)
+  sentByUserId  String
+  sentByName    String?
+  contactId     String?
+  contactName   String?
+  contactType   String?  // lead | client
+  toPhone       String?
+  toEmail       String?
+  /// whatsapp | email | sms
+  channel       String   @default("whatsapp")
+  caption       String?  @db.Text
+  /// pending | sent | delivered | read | failed
+  status        String   @default("pending")
+  waMessageId   String?
+  error         String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([businessId, createdAt])
+  @@index([sentByUserId, createdAt])
+  @@index([contactId, createdAt])
+  @@index([status, createdAt])
+  @@index([waMessageId])
 }
 
 // =====================================================

@@ -19,6 +19,7 @@ import {
   AiLeadRecommendationBadge,
   type AiFollowupRec,
 } from "@/components/ai/AiFollowupCenter";
+import { SendMediaModal } from "@/components/media/SendMediaModal";
 import {
   type FieldDef,
   type BusinessConfigDTO,
@@ -39,6 +40,7 @@ interface Contact {
   name: string;
   email?: string;
   phone?: string;
+  whatsapp?: string | null;
   company?: string;
   source?: string;
   value?: number;
@@ -209,6 +211,7 @@ export default function LeadsPage() {
     mode: "single" | "all_members";
   } | null>(null);
   const [assignNotes, setAssignNotes] = useState("");
+  const [mediaSendLead, setMediaSendLead] = useState<Contact | null>(null);
 
   const loadConfig = useCallback(async () => {
     if (!token) return;
@@ -1913,6 +1916,12 @@ export default function LeadsPage() {
                         Edit
                       </button>
                       <button
+                        onClick={() => setMediaSendLead(lead)}
+                        className="px-2.5 py-1 text-xs bg-emerald-600/20 text-emerald-300 rounded-lg border border-emerald-500/40"
+                      >
+                        Send Media
+                      </button>
+                      <button
                         onClick={() => scoreLead(lead)}
                         disabled={isSubmitting || bulkBusy}
                         className="px-2.5 py-1 text-xs bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/30"
@@ -2038,6 +2047,13 @@ export default function LeadsPage() {
                         className="px-2.5 py-1 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30 disabled:opacity-50"
                       >
                         Score
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMediaSendLead(lead)}
+                        className="px-2.5 py-1 text-xs bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 rounded-lg border border-emerald-500/40"
+                      >
+                        Media
                       </button>
                       <button
                         type="button"
@@ -2490,6 +2506,17 @@ export default function LeadsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {token && mediaSendLead && (
+        <SendMediaModal
+          open={!!mediaSendLead}
+          onClose={() => setMediaSendLead(null)}
+          token={token}
+          contactId={mediaSendLead.id}
+          contactName={mediaSendLead.name}
+          contactPhone={mediaSendLead.phone || mediaSendLead.whatsapp}
+        />
       )}
 
       {/* Assignment confirmation with equal-distribution summary */}

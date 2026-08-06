@@ -15,6 +15,7 @@ export type FeatureKey =
   | "reports"
   | "notes"
   | "documents"
+  | "media"
   | "team"
   | "profile"
   | "billing"
@@ -124,6 +125,7 @@ const STARTER_FEATURES: FeatureKey[] = [
   "reports",
   "notes",
   "documents",
+  "media",
   "team",
   "security",
   "profile",
@@ -171,6 +173,7 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   reports: "Reports",
   notes: "Notes",
   documents: "Documents",
+  media: "Media Library",
   team: "Team",
   security: "Security & Sessions",
   profile: "Business Profile",
@@ -220,6 +223,7 @@ export const ROUTE_FEATURE: Record<string, FeatureKey> = {
   "/dashboard/reports": "reports",
   "/dashboard/team": "team",
   "/dashboard/assignments": "leads",
+  "/dashboard/media": "media",
   "/dashboard/security": "security",
   "/dashboard/profile": "profile",
   "/dashboard/billing": "billing",
