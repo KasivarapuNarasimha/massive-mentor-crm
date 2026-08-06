@@ -1,5 +1,6 @@
 /**
  * Media Library — folders, assets, kits, WhatsApp (and future channel) sends.
+ * Phase 3 DAM hooks: content hash, approval, archive, events, lastUsed.
  */
 import { prisma } from "../lib/prisma.js";
 import { getUserBusinessId } from "./field-engine.service.js";
@@ -16,7 +17,7 @@ import {
   saveMediaFile,
 } from "./media-storage.service.js";
 import { sendWhatsAppMediaFile } from "./whatsapp.service.js";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 const MANAGE_ROLES = new Set([
   "ceo",
@@ -164,15 +165,87 @@ export type ListAssetsOpts = {
   tag?: string;
   /** Only favorites for this user */
   favoritesOnly?: boolean;
+  /** Include archived files (admin) */
+  includeArchived?: boolean;
+  /** Filter by approval status */
+  approvalStatus?: string;
+  /** Only shareable (approved, not archived/expired) — for Send Media */
+  shareableOnly?: boolean;
   page?: number;
   pageSize?: number;
 };
+
+export async function getActorLabel(userId: string): Promise<string> {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true },
+  });
+  return u?.name?.trim() || u?.email || "User";
+}
+
+export async function recordAssetEvent(opts: {
+  businessId: string;
+  assetId: string;
+  actorUserId?: string | null;
+  actorName?: string | null;
+  action: string;
+  detail?: string | null;
+  metadata?: Record<string, unknown> | null;
+}) {
+  try {
+    await prisma.mediaAssetEvent.create({
+      data: {
+        businessId: opts.businessId,
+        assetId: opts.assetId,
+        actorUserId: opts.actorUserId || null,
+        actorName: opts.actorName || null,
+        action: opts.action,
+        detail: opts.detail || null,
+        metadata: (opts.metadata || undefined) as object | undefined,
+      },
+    });
+  } catch {
+    // Non-fatal — timeline is best-effort
+  }
+}
+
+export async function touchLastUsed(assetId: string) {
+  try {
+    await prisma.mediaAsset.update({
+      where: { id: assetId },
+      data: { lastUsedAt: new Date() },
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+function contentHashOf(buf: Buffer): string {
+  return createHash("sha256").update(buf).digest("hex");
+}
 
 export async function listAssets(userId: string, opts?: ListAssetsOpts) {
   const businessId = await requireBusiness(userId);
   const page = opts?.page && opts.page > 0 ? opts.page : 1;
   const pageSize = Math.min(100, Math.max(1, opts?.pageSize || 48));
   const where: Record<string, unknown> = { businessId, deletedAt: null };
+
+  if (!opts?.includeArchived) {
+    where.archivedAt = null;
+  }
+
+  const andClauses: Array<Record<string, unknown>> = [];
+
+  if (opts?.shareableOnly) {
+    const now = new Date();
+    where.approvalStatus = "approved";
+    where.archivedAt = null;
+    andClauses.push({
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    });
+  } else if (opts?.approvalStatus) {
+    where.approvalStatus = opts.approvalStatus;
+  }
 
   if (opts?.folderId === "null" || opts?.folderId === "") {
     where.folderId = null;
@@ -206,17 +279,23 @@ export async function listAssets(userId: string, opts?: ListAssetsOpts) {
       select: { id: true },
       take: 30,
     });
-    where.OR = [
-      { name: { contains: q, mode: "insensitive" } },
-      { originalName: { contains: q, mode: "insensitive" } },
-      { tags: { has: q } },
-      ...(folderHits.length
-        ? [{ folderId: { in: folderHits.map((f) => f.id) } }]
-        : []),
-      ...(uploaderHits.length
-        ? [{ createdByUserId: { in: uploaderHits.map((u) => u.id) } }]
-        : []),
-    ];
+    andClauses.push({
+      OR: [
+        { name: { contains: q, mode: "insensitive" } },
+        { originalName: { contains: q, mode: "insensitive" } },
+        { tags: { has: q } },
+        ...(folderHits.length
+          ? [{ folderId: { in: folderHits.map((f) => f.id) } }]
+          : []),
+        ...(uploaderHits.length
+          ? [{ createdByUserId: { in: uploaderHits.map((u) => u.id) } }]
+          : []),
+      ],
+    });
+  }
+
+  if (andClauses.length) {
+    where.AND = andClauses;
   }
 
   if (opts?.favoritesOnly) {
@@ -275,6 +354,8 @@ export async function listAssets(userId: string, opts?: ListAssetsOpts) {
   };
 }
 
+export type SerializedMediaAsset = ReturnType<typeof serializeAsset>;
+
 function serializeAsset(
   a: {
     id: string;
@@ -293,6 +374,16 @@ function serializeAsset(
     downloadCount?: number;
     whatsappSendCount?: number;
     emailSendCount?: number;
+    contentHash?: string | null;
+    versionNumber?: number;
+    versionGroupId?: string | null;
+    approvalStatus?: string;
+    expiresAt?: Date | null;
+    archivedAt?: Date | null;
+    archiveReason?: string | null;
+    lastUsedAt?: Date | null;
+    approvedAt?: Date | null;
+    rejectionReason?: string | null;
   },
   extra?: {
     isFavorite?: boolean;
@@ -318,10 +409,32 @@ function serializeAsset(
     createdByUserId: a.createdByUserId,
     uploadedByName: extra?.uploadedByName ?? null,
     isFavorite: !!extra?.isFavorite,
+    contentHash: a.contentHash ?? null,
+    versionNumber: a.versionNumber ?? 1,
+    versionGroupId: a.versionGroupId ?? a.id,
+    approvalStatus: a.approvalStatus ?? "approved",
+    expiresAt: a.expiresAt ? a.expiresAt.toISOString() : null,
+    archivedAt: a.archivedAt ? a.archivedAt.toISOString() : null,
+    archiveReason: a.archiveReason ?? null,
+    lastUsedAt: a.lastUsedAt ? a.lastUsedAt.toISOString() : null,
+    approvedAt: a.approvedAt ? a.approvedAt.toISOString() : null,
+    rejectionReason: a.rejectionReason ?? null,
+    isShareable:
+      (a.approvalStatus ?? "approved") === "approved" &&
+      !a.archivedAt &&
+      (!a.expiresAt || a.expiresAt.getTime() > Date.now()),
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
     previewUrl: `/api/media/assets/${a.id}/file`,
   };
+}
+
+/** Public alias for DAM helpers */
+export function serializeAssetPublic(
+  a: Parameters<typeof serializeAsset>[0],
+  extra?: Parameters<typeof serializeAsset>[1]
+) {
+  return serializeAsset(a, extra);
 }
 
 /** Lightweight count for sidebar badge */
@@ -474,12 +587,29 @@ export async function toggleFavorite(userId: string, assetId: string) {
   const existing = await prisma.mediaFavorite.findUnique({
     where: { userId_assetId: { userId, assetId } },
   });
+  const actorName = await getActorLabel(userId);
   if (existing) {
     await prisma.mediaFavorite.delete({ where: { id: existing.id } });
+    await recordAssetEvent({
+      businessId,
+      assetId,
+      actorUserId: userId,
+      actorName,
+      action: "unfavorited",
+      detail: "Removed from favorites",
+    });
     return { favorited: false };
   }
   await prisma.mediaFavorite.create({
     data: { businessId, userId, assetId },
+  });
+  await recordAssetEvent({
+    businessId,
+    assetId,
+    actorUserId: userId,
+    actorName,
+    action: "favorited",
+    detail: "Added to favorites",
   });
   return { favorited: true };
 }
@@ -500,6 +630,15 @@ export async function updateAssetTags(
     where: { id: assetId },
     data: { tags: clean },
   });
+  const actorName = await getActorLabel(userId);
+  await recordAssetEvent({
+    businessId,
+    assetId,
+    actorUserId: userId,
+    actorName,
+    action: "tagged",
+    detail: clean.length ? `Tags: ${clean.join(", ")}` : "Tags cleared",
+  });
   return serializeAsset(asset);
 }
 
@@ -511,9 +650,34 @@ export async function recordDownload(userId: string, assetId: string) {
   if (!existing) throw new Error("File not found");
   await prisma.mediaAsset.update({
     where: { id: assetId },
-    data: { downloadCount: { increment: 1 } },
+    data: { downloadCount: { increment: 1 }, lastUsedAt: new Date() },
+  });
+  const actorName = await getActorLabel(userId);
+  await recordAssetEvent({
+    businessId,
+    assetId,
+    actorUserId: userId,
+    actorName,
+    action: "downloaded",
+    detail: "File downloaded",
   });
   return { ok: true };
+}
+
+export type UploadDupAction = "replace" | "keep_both" | "skip";
+
+export class MediaDuplicateError extends Error {
+  code = "DUPLICATE" as const;
+  duplicates: ReturnType<typeof serializeAsset>[];
+  contentHash: string;
+  constructor(
+    duplicates: ReturnType<typeof serializeAsset>[],
+    contentHash: string
+  ) {
+    super("File already exists");
+    this.duplicates = duplicates;
+    this.contentHash = contentHash;
+  }
 }
 
 export async function uploadAsset(
@@ -525,6 +689,14 @@ export async function uploadAsset(
     folderId?: string | null;
     name?: string;
     captionDefault?: string;
+    tags?: string[];
+    /** pending | approved (default approved for admin UX; set pending for workflow) */
+    approvalStatus?: "pending" | "approved";
+    expiresAt?: string | null;
+    /** When duplicate found: replace | keep_both | skip. Omit → throw DUPLICATE */
+    duplicateAction?: UploadDupAction;
+    /** Explicit asset id to replace (version bump) */
+    replaceAssetId?: string | null;
   }
 ) {
   if (!(await canManageMedia(userId))) {
@@ -544,12 +716,153 @@ export async function uploadAsset(
     if (!f) throw new Error("Folder not found");
   }
 
-  const assetId = `m${randomBytes(12).toString("hex")}`;
+  const hash = contentHashOf(opts.buffer);
+  const originalName = opts.originalName.slice(0, 255);
+  const displayName = (opts.name || opts.originalName).trim().slice(0, 200);
   const kind = kindFromMime(opts.mimeType)!;
+  const mime = opts.mimeType.split(";")[0]!.trim();
+  const approvalStatus = opts.approvalStatus === "pending" ? "pending" : "approved";
+  const expiresAt = opts.expiresAt ? new Date(opts.expiresAt) : null;
+  if (expiresAt && Number.isNaN(expiresAt.getTime())) {
+    throw new Error("Invalid expiry date");
+  }
+  const tags = [...new Set((opts.tags || []).map((t) => t.trim()).filter(Boolean))].slice(0, 30);
+  const actorName = await getActorLabel(userId);
+
+  // Explicit replace path
+  if (opts.replaceAssetId || opts.duplicateAction === "replace") {
+    const targetId = opts.replaceAssetId;
+    let existing = targetId
+      ? await prisma.mediaAsset.findFirst({
+          where: { id: targetId, businessId, deletedAt: null },
+        })
+      : null;
+    if (!existing) {
+      existing = await prisma.mediaAsset.findFirst({
+        where: {
+          businessId,
+          deletedAt: null,
+          OR: [
+            { contentHash: hash },
+            { originalName: { equals: originalName, mode: "insensitive" } },
+          ],
+        },
+        orderBy: { createdAt: "desc" },
+      });
+    }
+    if (existing) {
+      // Snapshot current version
+      await prisma.mediaAssetVersion.create({
+        data: {
+          businessId,
+          assetId: existing.id,
+          versionNumber: existing.versionNumber,
+          name: existing.name,
+          originalName: existing.originalName,
+          mimeType: existing.mimeType,
+          kind: existing.kind,
+          sizeBytes: existing.sizeBytes,
+          storageKey: existing.storageKey,
+          storageProvider: existing.storageProvider,
+          contentHash: existing.contentHash,
+          createdByUserId: userId,
+          note: "Replaced by new upload",
+        },
+      });
+      const { storageKey, storageProvider } = await saveMediaFile({
+        businessId,
+        assetId: existing.id,
+        originalName,
+        buffer: opts.buffer,
+      });
+      const nextVer = (existing.versionNumber || 1) + 1;
+      const asset = await prisma.mediaAsset.update({
+        where: { id: existing.id },
+        data: {
+          name: displayName,
+          originalName,
+          mimeType: mime,
+          kind,
+          sizeBytes: opts.buffer.length,
+          storageProvider,
+          storageKey,
+          contentHash: hash,
+          versionNumber: nextVer,
+          isLatestVersion: true,
+          captionDefault: opts.captionDefault?.trim() || existing.captionDefault,
+          tags: tags.length ? tags : existing.tags,
+          approvalStatus,
+          approvedByUserId: approvalStatus === "approved" ? userId : null,
+          approvedAt: approvalStatus === "approved" ? new Date() : null,
+          expiresAt,
+          folderId: opts.folderId !== undefined ? opts.folderId || null : existing.folderId,
+        },
+      });
+      await recordAssetEvent({
+        businessId,
+        assetId: asset.id,
+        actorUserId: userId,
+        actorName,
+        action: "replaced",
+        detail: `Replaced with version ${nextVer}`,
+        metadata: { versionNumber: nextVer, contentHash: hash },
+      });
+      await recordAudit({
+        businessId,
+        actorUserId: userId,
+        action: "media_replace",
+        entityType: "media_asset",
+        entityId: asset.id,
+        metadata: { name: asset.name, version: nextVer },
+      });
+      return serializeAsset(asset);
+    }
+    // fall through to create if no existing for replace
+  }
+
+  if (opts.duplicateAction === "skip") {
+    const dup = await prisma.mediaAsset.findFirst({
+      where: {
+        businessId,
+        deletedAt: null,
+        OR: [
+          { contentHash: hash },
+          { originalName: { equals: originalName, mode: "insensitive" } },
+        ],
+      },
+    });
+    if (dup) {
+      return { ...serializeAsset(dup), skipped: true as const };
+    }
+  }
+
+  // Detect duplicates unless keep_both
+  if (opts.duplicateAction !== "keep_both" && opts.duplicateAction !== "replace") {
+    const dups = await prisma.mediaAsset.findMany({
+      where: {
+        businessId,
+        deletedAt: null,
+        OR: [
+          { contentHash: hash },
+          { originalName: { equals: originalName, mode: "insensitive" } },
+        ],
+      },
+      take: 5,
+      orderBy: { createdAt: "desc" },
+    });
+    if (dups.length) {
+      throw new MediaDuplicateError(
+        dups.map((d) => serializeAsset(d)),
+        hash
+      );
+    }
+  }
+
+  const assetId = `m${randomBytes(12).toString("hex")}`;
   const { storageKey, storageProvider } = await saveMediaFile({
     businessId,
     assetId,
-    originalName: opts.originalName,
+    originalName,
     buffer: opts.buffer,
   });
 
@@ -558,15 +871,39 @@ export async function uploadAsset(
       id: assetId,
       businessId,
       folderId: opts.folderId || null,
-      name: (opts.name || opts.originalName).trim().slice(0, 200),
-      originalName: opts.originalName.slice(0, 255),
-      mimeType: opts.mimeType.split(";")[0]!.trim(),
+      name: displayName,
+      originalName,
+      mimeType: mime,
       kind,
       sizeBytes: opts.buffer.length,
       storageProvider,
       storageKey,
       captionDefault: opts.captionDefault?.trim() || null,
+      tags,
       createdByUserId: userId,
+      contentHash: hash,
+      versionGroupId: assetId,
+      versionNumber: 1,
+      isLatestVersion: true,
+      approvalStatus,
+      approvedByUserId: approvalStatus === "approved" ? userId : null,
+      approvedAt: approvalStatus === "approved" ? new Date() : null,
+      expiresAt,
+      lastUsedAt: null,
+    },
+  });
+
+  await recordAssetEvent({
+    businessId,
+    assetId: asset.id,
+    actorUserId: userId,
+    actorName,
+    action: "uploaded",
+    detail: `Uploaded ${displayName} (${kind}, ${opts.buffer.length} bytes)`,
+    metadata: {
+      contentHash: hash,
+      approvalStatus,
+      sizeBytes: opts.buffer.length,
     },
   });
 
@@ -576,7 +913,7 @@ export async function uploadAsset(
     action: "media_upload",
     entityType: "media_asset",
     entityId: asset.id,
-    metadata: { name: asset.name, kind, sizeBytes: asset.sizeBytes },
+    metadata: { name: asset.name, kind, sizeBytes: asset.sizeBytes, contentHash: hash },
   });
 
   return serializeAsset(asset);
@@ -594,6 +931,15 @@ export async function renameAsset(userId: string, assetId: string, name: string)
   const asset = await prisma.mediaAsset.update({
     where: { id: assetId },
     data: { name: n },
+  });
+  const actorName = await getActorLabel(userId);
+  await recordAssetEvent({
+    businessId,
+    assetId,
+    actorUserId: userId,
+    actorName,
+    action: "renamed",
+    detail: `Renamed from "${existing.name}" to "${n}"`,
   });
   return serializeAsset(asset);
 }
@@ -613,6 +959,15 @@ export async function moveAsset(userId: string, assetId: string, folderId: strin
     where: { id: assetId },
     data: { folderId },
   });
+  const actorName = await getActorLabel(userId);
+  await recordAssetEvent({
+    businessId,
+    assetId,
+    actorUserId: userId,
+    actorName,
+    action: "moved",
+    detail: folderId ? `Moved to folder ${folderId}` : "Moved to root",
+  });
   return serializeAsset(asset);
 }
 
@@ -627,8 +982,15 @@ export async function deleteAsset(userId: string, assetId: string) {
     where: { id: assetId },
     data: { deletedAt: new Date() },
   });
-  // Keep file on disk for audit recovery for now; optional hard delete:
-  // await deleteMediaFile(existing.storageKey);
+  const actorName = await getActorLabel(userId);
+  await recordAssetEvent({
+    businessId,
+    assetId,
+    actorUserId: userId,
+    actorName,
+    action: "deleted",
+    detail: `Soft-deleted "${existing.name}"`,
+  });
   await recordAudit({
     businessId,
     actorUserId: userId,
@@ -714,10 +1076,22 @@ export async function sendMediaViaWhatsApp(
   });
   const salesName = actor?.name?.trim() || actor?.email || "Sales";
 
+  const now = new Date();
   const assets = await prisma.mediaAsset.findMany({
-    where: { id: { in: ids }, businessId, deletedAt: null },
+    where: {
+      id: { in: ids },
+      businessId,
+      deletedAt: null,
+      archivedAt: null,
+      approvalStatus: "approved",
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
   });
-  if (!assets.length) throw new Error("No valid files found");
+  if (!assets.length) {
+    throw new Error(
+      "No valid files found. Only approved, non-expired, non-archived files can be sent."
+    );
+  }
 
   // Preserve selection order
   const ordered = ids
@@ -787,7 +1161,19 @@ export async function sendMediaViaWhatsApp(
       });
       await prisma.mediaAsset.update({
         where: { id: asset.id },
-        data: { whatsappSendCount: { increment: 1 } },
+        data: {
+          whatsappSendCount: { increment: 1 },
+          lastUsedAt: new Date(),
+        },
+      });
+      await recordAssetEvent({
+        businessId,
+        assetId: asset.id,
+        actorUserId: userId,
+        actorName: salesName,
+        action: "sent",
+        detail: `Sent via WhatsApp to ${contactRow.name}`,
+        metadata: { contactId: contactRow.id, channel: "whatsapp" },
       });
       results.push({
         assetId: asset.id,

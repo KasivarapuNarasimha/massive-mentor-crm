@@ -332,6 +332,14 @@ app.use("/api/approvals", requireAuthMw, requireModuleFromPath, approvalRoutes);
 // billing/access + stream exempt inside requireModuleFromPath
 app.use("/api/billing", requireAuthMw, requireModuleFromPath, billingRoutes);
 app.use("/api/security", requireAuthMw, requireModuleFromPath, securityRoutes);
+// Public media share links (token-gated, no session) — must mount before auth-wrapped /api/media
+import {
+  publicShareFile as mediaPublicShareFile,
+  publicShareMeta as mediaPublicShareMeta,
+} from "./controllers/media.controller.js";
+app.get("/api/media/public/:token/meta", mediaPublicShareMeta);
+app.get("/api/media/public/:token", mediaPublicShareFile);
+app.post("/api/media/public/:token", mediaPublicShareFile);
 app.use("/api/media", requireAuthMw, requireModuleFromPath, mediaRoutes);
 
 app.get("/api", (_req, res) => {

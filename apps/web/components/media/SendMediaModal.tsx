@@ -3,12 +3,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import {
+  cacheMediaOffline,
+  fetchAndCacheMedia,
+  listOfflineMedia,
+} from "@/lib/media-offline-cache";
+import { API_BASE_URL } from "@/lib/api";
 
 type Asset = {
   id: string;
   name: string;
   kind: string;
   sizeBytes: number;
+  isShareable?: boolean;
+  approvalStatus?: string;
 };
 
 type Kit = {
@@ -16,6 +24,11 @@ type Kit = {
   name: string;
   captionTemplate: string | null;
   items: Array<{ assetId: string }>;
+};
+
+type Suggestion = Asset & {
+  score?: number;
+  reasons?: string[];
 };
 
 const DEFAULT_CAPTION = `Hello {{CustomerName}},
@@ -48,22 +61,66 @@ export function SendMediaModal({
 }: Props) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [kits, setKits] = useState<Kit[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [kitId, setKitId] = useState("");
   const [caption, setCaption] = useState(DEFAULT_CAPTION);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [offlineHint, setOfflineHint] = useState(false);
+  const [serviceHints, setServiceHints] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [a, k] = await Promise.all([
-      api.listMediaAssets(token, { pageSize: 100 }),
-      api.listMediaKits(token),
-    ]);
-    if (a.success && a.data?.assets) setAssets(a.data.assets as Asset[]);
-    if (k.success && k.data?.kits) setKits(k.data.kits as Kit[]);
+    setOfflineHint(false);
+    try {
+      const [a, k, rec] = await Promise.all([
+        api.listMediaAssets(token, { pageSize: 100, shareableOnly: true }),
+        api.listMediaKits(token),
+        api.recommendMediaForContact(contactId, token),
+      ]);
+      if (a.success && a.data?.assets) setAssets(a.data.assets as Asset[]);
+      if (k.success && k.data?.kits) setKits(k.data.kits as Kit[]);
+      if (rec.success && rec.data) {
+        const sug = (rec.data.suggestions || []) as Suggestion[];
+        setSuggestions(sug);
+        setServiceHints(rec.data.serviceHints || []);
+        // Auto-select top AI suggestions when no preselection
+        if (!preselectedAssetIds?.length && sug.length) {
+          setSelected(new Set(sug.slice(0, 4).map((s) => s.id)));
+        }
+        // Cache suggestions offline for field sales
+        for (const s of sug.slice(0, 6)) {
+          void fetchAndCacheMedia(API_BASE_URL, token, {
+            id: s.id,
+            name: s.name,
+            originalName: s.name,
+            mimeType: "application/octet-stream",
+            kind: s.kind,
+            sizeBytes: s.sizeBytes || 0,
+          });
+        }
+      }
+    } catch {
+      // Offline fallback
+      const cached = await listOfflineMedia();
+      if (cached.length) {
+        setAssets(
+          cached.map((c) => ({
+            id: c.id,
+            name: c.name,
+            kind: c.kind,
+            sizeBytes: c.sizeBytes,
+          }))
+        );
+        setOfflineHint(true);
+        toast.message("Showing offline-cached files", {
+          description: "Sends will queue when connectivity is restored.",
+        });
+      }
+    }
     setLoading(false);
-  }, [token]);
+  }, [token, contactId, preselectedAssetIds]);
 
   useEffect(() => {
     if (open) {
@@ -93,6 +150,10 @@ export function SendMediaModal({
     });
   };
 
+  const selectAllSuggestions = () => {
+    setSelected(new Set(suggestions.map((s) => s.id)));
+  };
+
   const send = async () => {
     if (selected.size === 0) {
       toast.error("Select at least one file");
@@ -102,14 +163,14 @@ export function SendMediaModal({
       toast.error("Lead has no valid phone for WhatsApp");
       return;
     }
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      toast.error("You are offline. Files will be sendable once connectivity is restored.");
+      return;
+    }
     setSending(true);
     try {
       const res = kitId
-        ? await api.sendMediaKitWhatsApp(
-            kitId,
-            { contactId, caption },
-            token
-          )
+        ? await api.sendMediaKitWhatsApp(kitId, { contactId, caption }, token)
         : await api.sendMediaWhatsApp(
             {
               contactId,
@@ -123,6 +184,20 @@ export function SendMediaModal({
         toast.success(`Sent ${d.sent ?? selected.size} file(s) via WhatsApp`, {
           description: d.failed ? `${d.failed} failed` : contactName,
         });
+        // Keep offline cache warm
+        for (const id of selected) {
+          const a = assets.find((x) => x.id === id) || suggestions.find((x) => x.id === id);
+          if (a) {
+            void cacheMediaOffline({
+              id: a.id,
+              name: a.name,
+              originalName: a.name,
+              mimeType: "application/octet-stream",
+              kind: a.kind,
+              sizeBytes: a.sizeBytes || 0,
+            });
+          }
+        }
         onClose();
       } else {
         toast.error((res as { error?: string }).error || "Send failed");
@@ -148,6 +223,53 @@ export function SendMediaModal({
           </button>
         </div>
 
+        {offlineHint && (
+          <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+            Offline mode — using locally cached files. Sending requires internet.
+          </div>
+        )}
+
+        {/* AI recommendations */}
+        {suggestions.length > 0 && (
+          <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+                  AI Suggested Files
+                </div>
+                {serviceHints.length > 0 && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Based on: {serviceHints.slice(0, 4).join(", ")}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={selectAllSuggestions}
+                className="text-[11px] font-medium px-2 py-1 rounded-lg bg-primary text-primary-foreground"
+              >
+                Send All
+              </button>
+            </div>
+            <ul className="space-y-1">
+              {suggestions.slice(0, 6).map((s) => (
+                <li key={s.id}>
+                  <label className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-white/5 rounded-lg">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(s.id)}
+                      onChange={() => toggle(s.id)}
+                    />
+                    <span className="text-emerald-400 text-xs">✓</span>
+                    <span className="truncate flex-1 font-medium">{s.name}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase">{s.kind}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {kits.length > 0 && (
           <div className="mt-4">
             <label className="text-[10px] uppercase text-muted-foreground">Template kit</label>
@@ -167,15 +289,17 @@ export function SendMediaModal({
         )}
 
         <div className="mt-4">
-          <label className="text-[10px] uppercase text-muted-foreground">Files</label>
+          <label className="text-[10px] uppercase text-muted-foreground">
+            All approved files
+          </label>
           {loading ? (
             <p className="text-sm text-muted-foreground py-4">Loading library…</p>
           ) : assets.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">
-              No files in Media Library. Ask an admin to upload brochures.
+              No approved files available. Ask an admin to upload and approve materials.
             </p>
           ) : (
-            <ul className="mt-1 max-h-48 overflow-y-auto rounded-xl border border-border divide-y divide-border">
+            <ul className="mt-1 max-h-40 overflow-y-auto rounded-xl border border-border divide-y divide-border">
               {assets.map((a) => (
                 <li key={a.id}>
                   <label className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-white/5">

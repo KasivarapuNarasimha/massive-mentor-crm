@@ -337,6 +337,9 @@ model Business {
   mediaAssets        MediaAsset[]
   mediaKits          MediaKit[]
   mediaSendLogs      MediaSendLog[]
+  mediaShareLinks    MediaShareLink[]
+  mediaAssetEvents   MediaAssetEvent[]
+  mediaAssetVersions MediaAssetVersion[]
   currentPlanId      String?
   currentPlan        SubscriptionPlan? @relation(fields: [currentPlanId], references: [id], onDelete: SetNull)
 
@@ -462,9 +465,30 @@ model MediaAsset {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  /// SHA-256 hex of file content (duplicate detection)
+  contentHash       String?
+  /// Groups logical file versions (defaults to asset id on create)
+  versionGroupId    String?
+  versionNumber     Int      @default(1)
+  isLatestVersion   Boolean  @default(true)
+  /// pending | approved | rejected
+  approvalStatus    String   @default("approved")
+  approvedByUserId  String?
+  approvedAt        DateTime?
+  rejectionReason   String?
+  /// Optional marketing offer / campaign expiry
+  expiresAt         DateTime?
+  archivedAt        DateTime?
+  archiveReason     String?
+  /// Last download / send / preview touch (smart collections + offline cache)
+  lastUsedAt        DateTime?
+
   kitItems  MediaKitItem[]
   sendLogs  MediaSendLog[]
   favorites MediaFavorite[]
+  events    MediaAssetEvent[]
+  shareLinks MediaShareLink[]
+  versions  MediaAssetVersion[]
 
   @@index([businessId, folderId, deletedAt])
   @@index([businessId, kind, deletedAt])
@@ -472,6 +496,80 @@ model MediaAsset {
   @@index([businessId, createdAt])
   @@index([businessId, downloadCount])
   @@index([businessId, whatsappSendCount])
+  @@index([businessId, contentHash])
+  @@index([businessId, versionGroupId])
+  @@index([businessId, approvalStatus, deletedAt])
+  @@index([businessId, expiresAt])
+  @@index([businessId, archivedAt])
+  @@index([businessId, lastUsedAt])
+}
+
+/// Immutable version snapshots when a file is replaced
+model MediaAssetVersion {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  assetId         String
+  asset           MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  versionNumber   Int
+  name            String
+  originalName    String
+  mimeType        String
+  kind            String
+  sizeBytes       Int
+  storageKey      String
+  storageProvider String   @default("local")
+  contentHash     String?
+  createdByUserId String
+  note            String?
+  createdAt       DateTime @default(now())
+
+  @@unique([assetId, versionNumber])
+  @@index([businessId, assetId])
+  @@index([assetId, versionNumber])
+}
+
+/// Secure public share links (optional password + expiry)
+model MediaShareLink {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  assetId         String
+  asset           MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  /// Public token in URL (unguessable)
+  token           String   @unique
+  passwordHash    String?
+  expiresAt       DateTime?
+  maxDownloads    Int?
+  downloadCount   Int      @default(0)
+  createdByUserId String
+  revokedAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([businessId, assetId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+/// Full per-file activity timeline
+model MediaAssetEvent {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  assetId     String
+  asset       MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  actorUserId String?
+  actorName   String?
+  /// uploaded | renamed | moved | tagged | favorited | unfavorited | sent | downloaded
+  /// | archived | unarchived | approved | rejected | restored | shared | deleted | replaced | expired
+  action      String
+  detail      String?  @db.Text
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([businessId, assetId, createdAt])
+  @@index([assetId, createdAt])
+  @@index([businessId, action, createdAt])
 }
 
 /// Per-user favorites for quick access

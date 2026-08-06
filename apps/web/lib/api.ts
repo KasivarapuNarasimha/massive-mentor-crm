@@ -702,6 +702,9 @@ class ApiClient {
       uploadedBy?: string;
       tag?: string;
       favorites?: boolean;
+      includeArchived?: boolean;
+      approvalStatus?: string;
+      shareableOnly?: boolean;
       page?: number;
       pageSize?: number;
     }
@@ -713,6 +716,9 @@ class ApiClient {
     if (q?.uploadedBy) params.set("uploadedBy", q.uploadedBy);
     if (q?.tag) params.set("tag", q.tag);
     if (q?.favorites) params.set("favorites", "1");
+    if (q?.includeArchived) params.set("includeArchived", "1");
+    if (q?.approvalStatus) params.set("approvalStatus", q.approvalStatus);
+    if (q?.shareableOnly) params.set("shareableOnly", "1");
     if (q?.page) params.set("page", String(q.page));
     if (q?.pageSize) params.set("pageSize", String(q.pageSize));
     const qs = params.toString() ? `?${params}` : "";
@@ -750,7 +756,16 @@ class ApiClient {
   }
   async uploadMediaAsset(
     file: File,
-    opts: { folderId?: string; name?: string; captionDefault?: string },
+    opts: {
+      folderId?: string;
+      name?: string;
+      captionDefault?: string;
+      tags?: string[];
+      approvalStatus?: "pending" | "approved";
+      expiresAt?: string | null;
+      duplicateAction?: "replace" | "keep_both" | "skip";
+      replaceAssetId?: string | null;
+    },
     token?: string | null
   ) {
     const fd = new FormData();
@@ -758,12 +773,215 @@ class ApiClient {
     if (opts.folderId) fd.append("folderId", opts.folderId);
     if (opts.name) fd.append("name", opts.name);
     if (opts.captionDefault) fd.append("captionDefault", opts.captionDefault);
-    return this.postFormData<{ asset: Record<string, unknown> }>(
-      "/media/assets",
-      fd,
-      token,
-      { timeoutMs: 120_000 }
+    if (opts.tags?.length) fd.append("tags", JSON.stringify(opts.tags));
+    if (opts.approvalStatus) fd.append("approvalStatus", opts.approvalStatus);
+    if (opts.expiresAt) fd.append("expiresAt", opts.expiresAt);
+    if (opts.duplicateAction) fd.append("duplicateAction", opts.duplicateAction);
+    if (opts.replaceAssetId) fd.append("replaceAssetId", opts.replaceAssetId);
+    return this.postFormData<{
+      asset: Record<string, unknown>;
+      skipped?: boolean;
+      code?: string;
+      data?: { duplicates?: Array<Record<string, unknown>>; contentHash?: string };
+    }>("/media/assets", fd, token, { timeoutMs: 120_000 });
+  }
+
+  async bulkUploadMediaAssets(
+    files: File[],
+    opts: {
+      folderId?: string;
+      duplicateAction?: "replace" | "keep_both" | "skip";
+      approvalStatus?: "pending" | "approved";
+    },
+    token?: string | null
+  ) {
+    const fd = new FormData();
+    for (const f of files) fd.append("files", f);
+    if (opts.folderId) fd.append("folderId", opts.folderId);
+    if (opts.duplicateAction) fd.append("duplicateAction", opts.duplicateAction);
+    if (opts.approvalStatus) fd.append("approvalStatus", opts.approvalStatus);
+    return this.postFormData<{
+      results: Array<{
+        fileName: string;
+        ok: boolean;
+        skipped?: boolean;
+        asset?: Record<string, unknown>;
+        error?: string;
+        code?: string;
+      }>;
+      uploaded: number;
+      skipped: number;
+      failed: number;
+      total: number;
+    }>("/media/assets/bulk", fd, token, { timeoutMs: 600_000 });
+  }
+
+  async listMediaCollections(token?: string | null) {
+    return this.get<{
+      collections: Array<{
+        key: string;
+        name: string;
+        description: string;
+        icon: string;
+        count: number;
+      }>;
+    }>("/media/collections", token);
+  }
+
+  async listMediaCollectionAssets(
+    key: string,
+    token?: string | null,
+    q?: { page?: number; pageSize?: number }
+  ) {
+    const params = new URLSearchParams();
+    if (q?.page) params.set("page", String(q.page));
+    if (q?.pageSize) params.set("pageSize", String(q.pageSize));
+    const qs = params.toString() ? `?${params}` : "";
+    return this.get<{
+      assets: Array<Record<string, unknown>>;
+      items?: Array<Record<string, unknown>>;
+      total: number;
+      collection: string;
+    }>(`/media/collections/${encodeURIComponent(key)}${qs}`, token);
+  }
+
+  async recommendMediaForContact(contactId: string, token?: string | null) {
+    return this.get<{
+      contact: Record<string, unknown>;
+      dealStages: string[];
+      serviceHints: string[];
+      suggestions: Array<Record<string, unknown> & { score?: number; reasons?: string[] }>;
+    }>(`/media/recommend/${encodeURIComponent(contactId)}`, token);
+  }
+
+  async aiSearchMedia(query: string, token?: string | null) {
+    const qs = `?q=${encodeURIComponent(query)}`;
+    return this.get<{
+      query: string;
+      tokens: string[];
+      totalMatched: number;
+      items: Array<Record<string, unknown> & { relevance?: number }>;
+    }>(`/media/ai-search${qs}`, token);
+  }
+
+  async getMediaStorageDashboard(token?: string | null) {
+    return this.get<Record<string, unknown>>("/media/storage", token);
+  }
+
+  async purgeDeletedMedia(assetIds?: string[], token?: string | null) {
+    return this.post<{ purged: number }>("/media/storage/purge", { assetIds }, token);
+  }
+
+  async processMediaExpiry(token?: string | null) {
+    return this.post<{ archived: number; checked: number }>(
+      "/media/storage/process-expiry",
+      {},
+      token
     );
+  }
+
+  async getMediaVersions(assetId: string, token?: string | null) {
+    return this.get<{
+      current: Record<string, unknown>;
+      versions: Array<Record<string, unknown>>;
+    }>(`/media/assets/${assetId}/versions`, token);
+  }
+
+  async restoreMediaVersion(
+    assetId: string,
+    versionId: string,
+    token?: string | null
+  ) {
+    return this.post<{ asset: Record<string, unknown> }>(
+      `/media/assets/${assetId}/versions/restore`,
+      { versionId },
+      token
+    );
+  }
+
+  async setMediaApproval(
+    assetId: string,
+    status: "approved" | "rejected" | "pending",
+    reason?: string,
+    token?: string | null
+  ) {
+    return this.post<{ asset: Record<string, unknown> }>(
+      `/media/assets/${assetId}/approve`,
+      { status, reason },
+      token
+    );
+  }
+
+  async setMediaExpiry(
+    assetId: string,
+    expiresAt: string | null,
+    token?: string | null
+  ) {
+    return this.post<{ asset: Record<string, unknown> }>(
+      `/media/assets/${assetId}/expiry`,
+      { expiresAt },
+      token
+    );
+  }
+
+  async archiveMediaAsset(assetId: string, reason?: string, token?: string | null) {
+    return this.post<{ asset: Record<string, unknown> }>(
+      `/media/assets/${assetId}/archive`,
+      { reason },
+      token
+    );
+  }
+
+  async unarchiveMediaAsset(assetId: string, token?: string | null) {
+    return this.post<{ asset: Record<string, unknown> }>(
+      `/media/assets/${assetId}/unarchive`,
+      {},
+      token
+    );
+  }
+
+  async createMediaShareLink(
+    assetId: string,
+    body: { expiresInDays?: number; password?: string; maxDownloads?: number },
+    token?: string | null
+  ) {
+    return this.post<{
+      link: {
+        id: string;
+        token: string;
+        path: string;
+        expiresAt: string;
+        hasPassword: boolean;
+      };
+    }>(`/media/assets/${assetId}/share-links`, body, token);
+  }
+
+  async listMediaShareLinks(assetId: string, token?: string | null) {
+    return this.get<{ links: Array<Record<string, unknown>> }>(
+      `/media/assets/${assetId}/share-links`,
+      token
+    );
+  }
+
+  async revokeMediaShareLink(linkId: string, token?: string | null) {
+    return this.request<{ revoked: boolean }>(`/media/share-links/${linkId}`, {
+      method: "DELETE",
+      token: token ?? undefined,
+    });
+  }
+
+  async getMediaTimeline(assetId: string, token?: string | null) {
+    return this.get<{
+      assetId: string;
+      items: Array<{
+        id: string;
+        at: string;
+        action: string;
+        actorName: string | null;
+        detail: string | null;
+        source: string;
+      }>;
+    }>(`/media/assets/${assetId}/timeline`, token);
   }
   async deleteMediaAsset(id: string, token?: string | null) {
     return this.request<{ deleted: boolean }>(`/media/assets/${id}`, {
@@ -1047,6 +1265,7 @@ class ApiClient {
         return {
           success: false,
           error: (data.error as string) || `Upload failed (${response.status})`,
+          code: data.code as string | undefined,
           ...(data.data !== undefined ? { data: data.data as T } : {}),
         };
       }

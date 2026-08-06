@@ -31,9 +31,23 @@ export type MediaAsset = {
   createdAt: string;
   updatedAt: string;
   previewUrl: string;
+  approvalStatus?: string;
+  expiresAt?: string | null;
+  archivedAt?: string | null;
+  versionNumber?: number;
+  contentHash?: string | null;
+  isShareable?: boolean;
+  lastUsedAt?: string | null;
 };
 
 type Folder = { id: string; name: string; assetCount: number };
+type SmartCollection = {
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  count: number;
+};
 type Stats = {
   totalFiles: number;
   storageBytes: number;
@@ -107,8 +121,27 @@ export function MediaLibraryDashboard() {
   const [detail, setDetail] = useState<MediaAsset | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [moveFolderId, setMoveFolderId] = useState("");
-  const [tab, setTab] = useState<"library" | "analytics" | "activity">("library");
+  const [tab, setTab] = useState<"library" | "analytics" | "activity" | "storage">(
+    "library"
+  );
   const [activity, setActivity] = useState<Array<Record<string, unknown>>>([]);
+  const [collections, setCollections] = useState<SmartCollection[]>([]);
+  const [collectionKey, setCollectionKey] = useState<string>("");
+  const [storageDash, setStorageDash] = useState<Record<string, unknown> | null>(null);
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiSearching, setAiSearching] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<
+    Array<{ name: string; status: "pending" | "uploading" | "done" | "error" | "skipped"; error?: string }>
+  >([]);
+  const [dupPrompt, setDupPrompt] = useState<{
+    file: File;
+    duplicates: Array<{ id: string; name: string }>;
+  } | null>(null);
+  const [timeline, setTimeline] = useState<
+    Array<{ id: string; at: string; action: string; actorName: string | null; detail: string | null }>
+  >([]);
+  const [versions, setVersions] = useState<Array<Record<string, unknown>>>([]);
+  const [shareLink, setShareLink] = useState<string | null>(null);
   const [sendContact, setSendContact] = useState<{
     id: string;
     name: string;
@@ -119,12 +152,32 @@ export function MediaLibraryDashboard() {
   const [leads, setLeads] = useState<Array<{ id: string; name: string; phone?: string }>>([]);
   const [pendingSendAssetIds, setPendingSendAssetIds] = useState<string[]>([]);
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
-  const [previewMode, setPreviewMode] = useState<"detail" | "preview">("detail");
+  const [previewMode, setPreviewMode] = useState<"detail" | "preview" | "timeline" | "versions">(
+    "detail"
+  );
 
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
-    const [f, a, s, act] = await Promise.all([
+    if (collectionKey) {
+      const [col, cols, s, act] = await Promise.all([
+        api.listMediaCollectionAssets(collectionKey, token, { page, pageSize: 48 }),
+        api.listMediaCollections(token),
+        api.getMediaStats(token),
+        api.listMediaActivity(token, { pageSize: 40 }),
+      ]);
+      if (cols.success && cols.data?.collections) setCollections(cols.data.collections);
+      if (col.success && col.data) {
+        setAssets((col.data.assets || col.data.items || []) as MediaAsset[]);
+        setTotal(col.data.total ?? 0);
+        setTotalPages(Math.max(1, Math.ceil((col.data.total ?? 0) / 48)));
+      }
+      if (s.success && s.data) setStats(s.data as Stats);
+      if (act.success && act.data?.items) setActivity(act.data.items);
+      setLoading(false);
+      return;
+    }
+    const [f, a, s, act, cols] = await Promise.all([
       api.listMediaFolders(token),
       api.listMediaAssets(token, {
         folderId: folderId || undefined,
@@ -136,6 +189,7 @@ export function MediaLibraryDashboard() {
       }),
       api.getMediaStats(token),
       api.listMediaActivity(token, { pageSize: 40 }),
+      api.listMediaCollections(token),
     ]);
     if (f.success && f.data?.folders) setFolders(f.data.folders as Folder[]);
     if (a.success && a.data) {
@@ -145,8 +199,9 @@ export function MediaLibraryDashboard() {
     }
     if (s.success && s.data) setStats(s.data as Stats);
     if (act.success && act.data?.items) setActivity(act.data.items);
+    if (cols.success && cols.data?.collections) setCollections(cols.data.collections);
     setLoading(false);
-  }, [token, folderId, search, kind, favoritesOnly, page]);
+  }, [token, folderId, search, kind, favoritesOnly, page, collectionKey]);
 
   useEffect(() => {
     void load();
@@ -154,7 +209,15 @@ export function MediaLibraryDashboard() {
 
   useEffect(() => {
     setPage(1);
-  }, [folderId, search, kind, favoritesOnly]);
+  }, [folderId, search, kind, favoritesOnly, collectionKey]);
+
+  useEffect(() => {
+    if (tab === "storage" && token && canManage) {
+      void api.getMediaStorageDashboard(token).then((res) => {
+        if (res.success && res.data) setStorageDash(res.data as Record<string, unknown>);
+      });
+    }
+  }, [tab, token, canManage]);
 
   // Preview blob when detail + preview mode
   useEffect(() => {
@@ -182,26 +245,130 @@ export function MediaLibraryDashboard() {
     };
   }, [detail, token, previewMode]);
 
-  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !token) return;
-    e.target.value = "";
-    if (file.size > MEDIA_MAX_BYTES) {
-      toast.error("File size exceeds the 25 MB limit. Please upload a smaller file.");
-      return;
+  const uploadOne = async (
+    file: File,
+    duplicateAction?: "replace" | "keep_both" | "skip"
+  ) => {
+    if (!token) {
+      return { ok: false as const, error: "Not signed in" };
     }
-    setUploading(true);
+    if (file.size > MEDIA_MAX_BYTES) {
+      return { ok: false as const, error: "File exceeds 25 MB" };
+    }
     const res = await api.uploadMediaAsset(
       file,
-      { folderId: folderId || undefined, name: file.name },
+      {
+        folderId: folderId || undefined,
+        name: file.name,
+        duplicateAction,
+        approvalStatus: "approved",
+      },
+      token
+    );
+    if (res.success) {
+      return { ok: true as const, skipped: !!(res.data as { skipped?: boolean })?.skipped };
+    }
+    if ((res as { code?: string }).code === "DUPLICATE" || res.error?.includes("already exists")) {
+      const dups =
+        ((res.data as { duplicates?: Array<{ id: string; name: string }> })?.duplicates) ||
+        [];
+      return { ok: false as const, duplicate: true as const, duplicates: dups, file };
+    }
+    return { ok: false as const, error: res.error || "Upload failed" };
+  };
+
+  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const list = e.target.files;
+    if (!list?.length || !token) return;
+    const files = Array.from(list);
+    e.target.value = "";
+    setUploading(true);
+    setUploadProgress(files.map((f) => ({ name: f.name, status: "pending" as const })));
+
+    if (files.length === 1) {
+      setUploadProgress([{ name: files[0]!.name, status: "uploading" }]);
+      const result = await uploadOne(files[0]!);
+      if (result.ok) {
+        setUploadProgress([{ name: files[0]!.name, status: result.skipped ? "skipped" : "done" }]);
+        toast.success(result.skipped ? "Skipped (already exists)" : "Uploaded");
+        emitDataChanged({ module: "all", action: "create" });
+        await load();
+      } else if ("duplicate" in result && result.duplicate) {
+        setDupPrompt({
+          file: files[0]!,
+          duplicates: result.duplicates || [],
+        });
+        setUploadProgress([{ name: files[0]!.name, status: "pending" }]);
+      } else {
+        setUploadProgress([
+          { name: files[0]!.name, status: "error", error: result.error },
+        ]);
+        toast.error(result.error || "Upload failed");
+      }
+      setUploading(false);
+      return;
+    }
+
+    // Bulk path
+    const res = await api.bulkUploadMediaAssets(
+      files,
+      { folderId: folderId || undefined, duplicateAction: "keep_both", approvalStatus: "approved" },
       token
     );
     setUploading(false);
-    if (res.success) {
-      toast.success("Uploaded");
+    if (res.success && res.data) {
+      const results = res.data.results || [];
+      setUploadProgress(
+        results.map((r) => ({
+          name: r.fileName,
+          status: r.skipped ? "skipped" : r.ok ? "done" : "error",
+          error: r.error,
+        }))
+      );
+      toast.success(
+        `Uploaded ${res.data.uploaded}, skipped ${res.data.skipped}, failed ${res.data.failed}`
+      );
       emitDataChanged({ module: "all", action: "create" });
       await load();
-    } else toast.error(res.error || "Upload failed");
+    } else {
+      toast.error(res.error || "Bulk upload failed");
+    }
+  };
+
+  const resolveDuplicate = async (action: "replace" | "keep_both" | "skip") => {
+    if (!dupPrompt || !token) return;
+    const file = dupPrompt.file;
+    setDupPrompt(null);
+    setUploading(true);
+    setUploadProgress([{ name: file.name, status: "uploading" }]);
+    const result = await uploadOne(file, action);
+    setUploading(false);
+    if (result.ok) {
+      setUploadProgress([{ name: file.name, status: result.skipped ? "skipped" : "done" }]);
+      toast.success(action === "skip" ? "Skipped" : action === "replace" ? "Replaced" : "Uploaded (kept both)");
+      emitDataChanged({ module: "all", action: "create" });
+      await load();
+    } else {
+      toast.error(("error" in result && result.error) || "Upload failed");
+    }
+  };
+
+  const runAiSearch = async () => {
+    if (!token || !aiQuery.trim()) return;
+    setAiSearching(true);
+    setCollectionKey("");
+    setFavoritesOnly(false);
+    setFolderId("");
+    const res = await api.aiSearchMedia(aiQuery.trim(), token);
+    setAiSearching(false);
+    if (res.success && res.data) {
+      setAssets(res.data.items as MediaAsset[]);
+      setTotal(res.data.totalMatched);
+      setTotalPages(1);
+      toast.success(`Found ${res.data.items.length} relevant file(s)`);
+    } else {
+      toast.error(res.error || "AI search failed");
+    }
   };
 
   const createFolder = async () => {
@@ -214,13 +381,25 @@ export function MediaLibraryDashboard() {
     } else toast.error(res.error || "Failed");
   };
 
-  const openDetail = async (id: string, mode: "detail" | "preview" = "detail") => {
+  const openDetail = async (
+    id: string,
+    mode: "detail" | "preview" | "timeline" | "versions" = "detail"
+  ) => {
     if (!token) return;
     const res = await api.getMediaAsset(id, token);
     if (res.success && res.data?.asset) {
       setDetail(res.data.asset as MediaAsset);
       setPreviewMode(mode);
       setMenuId(null);
+      setShareLink(null);
+      const [tl, ver] = await Promise.all([
+        api.getMediaTimeline(id, token),
+        api.getMediaVersions(id, token),
+      ]);
+      if (tl.success && tl.data?.items) setTimeline(tl.data.items);
+      else setTimeline([]);
+      if (ver.success && ver.data?.versions) setVersions(ver.data.versions);
+      else setVersions([]);
     } else {
       const local = assets.find((a) => a.id === id) || stats?.recent.find((r) => r.id === id);
       if (local) {
@@ -371,6 +550,7 @@ export function MediaLibraryDashboard() {
             ["library", "Library"],
             ["analytics", "Analytics"],
             ["activity", "Activity"],
+            ...(canManage ? ([["storage", "Storage"]] as const) : []),
           ] as const
         ).map(([k, label]) => (
           <button
@@ -386,17 +566,62 @@ export function MediaLibraryDashboard() {
         ))}
         {canManage && tab === "library" && (
           <label className="ml-auto inline-flex items-center justify-center min-h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-medium cursor-pointer">
-            {uploading ? "Uploading…" : "Upload file"}
+            {uploading ? "Uploading…" : "Upload files"}
             <input
               type="file"
               className="hidden"
               accept={MEDIA_ACCEPT}
+              multiple
               disabled={uploading}
               onChange={onUpload}
             />
           </label>
         )}
       </div>
+
+      {uploadProgress.length > 0 && (
+        <div className="rounded-xl border border-border bg-card/50 p-3 space-y-1.5">
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-semibold uppercase text-muted-foreground">
+              Upload progress
+            </span>
+            <button
+              type="button"
+              className="text-[11px] text-muted-foreground"
+              onClick={() => setUploadProgress([])}
+            >
+              Dismiss
+            </button>
+          </div>
+          {uploadProgress.map((u, i) => (
+            <div key={`${u.name}-${i}`} className="flex items-center gap-2 text-xs">
+              <span
+                className={
+                  u.status === "done"
+                    ? "text-emerald-400"
+                    : u.status === "error"
+                      ? "text-red-400"
+                      : u.status === "skipped"
+                        ? "text-amber-400"
+                        : "text-muted-foreground"
+                }
+              >
+                {u.status === "done"
+                  ? "✓"
+                  : u.status === "error"
+                    ? "✗"
+                    : u.status === "skipped"
+                      ? "⊘"
+                      : u.status === "uploading"
+                        ? "…"
+                        : "○"}
+              </span>
+              <span className="truncate flex-1">{u.name}</span>
+              <span className="text-muted-foreground capitalize">{u.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {tab === "library" && (
         <>
@@ -432,9 +657,10 @@ export function MediaLibraryDashboard() {
                 onClick={() => {
                   setFolderId("");
                   setFavoritesOnly(false);
+                  setCollectionKey("");
                 }}
                 className={`w-full text-left px-3 py-2 rounded-xl text-sm border ${
-                  !folderId && !favoritesOnly
+                  !folderId && !favoritesOnly && !collectionKey
                     ? "border-primary bg-primary/10"
                     : "border-border hover:bg-white/5"
                 }`}
@@ -444,20 +670,35 @@ export function MediaLibraryDashboard() {
                   <span className="text-xs text-muted-foreground ml-1">({stats.totalFiles})</span>
                 ) : null}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setFavoritesOnly(true);
-                  setFolderId("");
-                }}
-                className={`w-full text-left px-3 py-2 rounded-xl text-sm border ${
-                  favoritesOnly
-                    ? "border-amber-500/50 bg-amber-500/10"
-                    : "border-border hover:bg-white/5"
-                }`}
-              >
-                ⭐ Favorites
-              </button>
+
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground pt-2 px-1">
+                Smart collections
+              </p>
+              {collections.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => {
+                    setCollectionKey(c.key);
+                    setFolderId("");
+                    setFavoritesOnly(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-sm border ${
+                    collectionKey === c.key
+                      ? "border-violet-500/50 bg-violet-500/10"
+                      : "border-border hover:bg-white/5"
+                  }`}
+                  title={c.description}
+                >
+                  <span className="mr-1">{c.icon}</span>
+                  <span className="font-medium">{c.name}</span>
+                  <span className="text-xs text-muted-foreground ml-1">({c.count})</span>
+                </button>
+              ))}
+
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground pt-2 px-1">
+                Folders
+              </p>
               {folders.map((f) => (
                 <button
                   key={f.id}
@@ -465,6 +706,7 @@ export function MediaLibraryDashboard() {
                   onClick={() => {
                     setFolderId(f.id);
                     setFavoritesOnly(false);
+                    setCollectionKey("");
                   }}
                   className={`w-full text-left px-3 py-2 rounded-xl text-sm border ${
                     folderId === f.id
@@ -498,10 +740,28 @@ export function MediaLibraryDashboard() {
             <div className="lg:col-span-3 space-y-3">
               <div className="flex flex-wrap gap-2 items-center">
                 <input
+                  value={aiQuery}
+                  onChange={(e) => setAiQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && void runAiSearch()}
+                  placeholder='AI search: "CRM brochure", "real estate pricing"…'
+                  className="mm-input max-w-md text-sm min-h-9 flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => void runAiSearch()}
+                  disabled={aiSearching}
+                  className="px-3 min-h-9 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium disabled:opacity-50"
+                >
+                  {aiSearching ? "Searching…" : "AI Search"}
+                </button>
+                <input
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search name, folder, tags, uploader…"
-                  className="mm-input max-w-sm text-sm min-h-9 flex-1"
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setCollectionKey("");
+                  }}
+                  placeholder="Exact search…"
+                  className="mm-input max-w-xs text-sm min-h-9"
                 />
                 <select
                   value={kind}
@@ -515,7 +775,11 @@ export function MediaLibraryDashboard() {
                   <option value="document">Documents</option>
                 </select>
                 <span className="text-xs text-muted-foreground">
-                  {favoritesOnly ? "Favorites" : folderName}
+                  {collectionKey
+                    ? collections.find((c) => c.key === collectionKey)?.name || collectionKey
+                    : favoritesOnly
+                      ? "Favorites"
+                      : folderName}
                   {total ? ` · ${total}` : ""}
                 </span>
               </div>
@@ -573,6 +837,28 @@ export function MediaLibraryDashboard() {
                           {formatBytes(a.sizeBytes)}
                           {a.folderName ? ` · ${a.folderName}` : ""}
                         </div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {a.approvalStatus === "pending" && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200">
+                              Pending
+                            </span>
+                          )}
+                          {a.archivedAt && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-500/30">
+                              Archived
+                            </span>
+                          )}
+                          {a.expiresAt && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-200">
+                              Exp {new Date(a.expiresAt).toLocaleDateString()}
+                            </span>
+                          )}
+                          {(a.versionNumber || 1) > 1 && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-200">
+                              v{a.versionNumber}
+                            </span>
+                          )}
+                        </div>
                       </button>
                       {/* Quick actions */}
                       <div className="absolute top-2 right-2">
@@ -613,6 +899,30 @@ export function MediaLibraryDashboard() {
                             {canManage && (
                               <>
                                 <ActionItem label="✏ Rename" onClick={() => void renameAsset(a.id)} />
+                                {a.approvalStatus === "pending" && (
+                                  <ActionItem
+                                    label="✓ Approve"
+                                    onClick={async () => {
+                                      if (!token) return;
+                                      const r = await api.setMediaApproval(a.id, "approved", undefined, token);
+                                      if (r.success) {
+                                        toast.success("Approved");
+                                        await load();
+                                      } else toast.error(r.error || "Failed");
+                                    }}
+                                  />
+                                )}
+                                <ActionItem
+                                  label="📦 Archive"
+                                  onClick={async () => {
+                                    if (!token) return;
+                                    const r = await api.archiveMediaAsset(a.id, "manual", token);
+                                    if (r.success) {
+                                      toast.success("Archived");
+                                      await load();
+                                    } else toast.error(r.error || "Failed");
+                                  }}
+                                />
                                 <div className="px-2 py-1 border-t border-border mt-1">
                                   <select
                                     className="mm-input w-full text-[11px] min-h-8"
@@ -779,6 +1089,151 @@ export function MediaLibraryDashboard() {
         </div>
       )}
 
+      {tab === "storage" && canManage && (
+        <div className="space-y-4">
+          {!storageDash ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">Loading storage…</p>
+          ) : (
+            <>
+              {(() => {
+                const st = storageDash.storage as {
+                  usedLabel?: string;
+                  availableLabel?: string;
+                  quotaLabel?: string;
+                  percentUsed?: number;
+                  totalFiles?: number;
+                };
+                const suggestions = (storageDash.cleanupSuggestions || []) as Array<{
+                  type: string;
+                  message: string;
+                  potentialLabel: string;
+                }>;
+                const largest = (storageDash.largestFiles || []) as Array<{
+                  id: string;
+                  name: string;
+                  sizeLabel: string;
+                  kind: string;
+                }>;
+                const unused = (storageDash.unusedFiles || []) as Array<{
+                  id: string;
+                  name: string;
+                  sizeLabel: string;
+                }>;
+                return (
+                  <>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="rounded-xl border border-border p-4 bg-card/40">
+                        <div className="text-[10px] uppercase text-muted-foreground">Used</div>
+                        <div className="text-xl font-semibold">{st?.usedLabel || "—"}</div>
+                      </div>
+                      <div className="rounded-xl border border-border p-4 bg-card/40">
+                        <div className="text-[10px] uppercase text-muted-foreground">Available</div>
+                        <div className="text-xl font-semibold">{st?.availableLabel || "—"}</div>
+                      </div>
+                      <div className="rounded-xl border border-border p-4 bg-card/40">
+                        <div className="text-[10px] uppercase text-muted-foreground">Quota</div>
+                        <div className="text-xl font-semibold">{st?.quotaLabel || "—"}</div>
+                      </div>
+                      <div className="rounded-xl border border-border p-4 bg-card/40">
+                        <div className="text-[10px] uppercase text-muted-foreground">Usage</div>
+                        <div className="text-xl font-semibold">{st?.percentUsed ?? 0}%</div>
+                        <div className="mt-2 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${Math.min(100, st?.percentUsed || 0)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    {suggestions.length > 0 && (
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2">
+                        <h3 className="font-semibold text-sm">Cleanup suggestions</h3>
+                        {suggestions.map((s, i) => (
+                          <p key={i} className="text-sm text-muted-foreground">
+                            • {s.message}
+                            {s.potentialLabel !== "0 B" ? ` (up to ${s.potentialLabel})` : ""}
+                          </p>
+                        ))}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            className="text-xs px-3 py-1.5 rounded-lg border border-border"
+                            onClick={async () => {
+                              if (!token) return;
+                              const r = await api.processMediaExpiry(token);
+                              if (r.success) {
+                                toast.success(`Archived ${r.data?.archived ?? 0} expired file(s)`);
+                                const dash = await api.getMediaStorageDashboard(token);
+                                if (dash.success) setStorageDash(dash.data as Record<string, unknown>);
+                                await load();
+                              }
+                            }}
+                          >
+                            Process expired
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300"
+                            onClick={async () => {
+                              if (!token || !confirm("Permanently purge all soft-deleted files?"))
+                                return;
+                              const r = await api.purgeDeletedMedia(undefined, token);
+                              if (r.success) {
+                                toast.success(`Purged ${r.data?.purged ?? 0} file(s)`);
+                                const dash = await api.getMediaStorageDashboard(token);
+                                if (dash.success) setStorageDash(dash.data as Record<string, unknown>);
+                              }
+                            }}
+                          >
+                            Purge deleted
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="rounded-xl border border-border p-4 bg-card/40">
+                        <h3 className="font-semibold text-sm mb-2">Largest files</h3>
+                        <ul className="space-y-1 text-sm">
+                          {largest.map((f) => (
+                            <li key={f.id} className="flex justify-between gap-2">
+                              <button
+                                type="button"
+                                className="truncate text-left hover:underline"
+                                onClick={() => void openDetail(f.id)}
+                              >
+                                {kindIcon(f.kind)} {f.name}
+                              </button>
+                              <span className="text-muted-foreground shrink-0">{f.sizeLabel}</span>
+                            </li>
+                          ))}
+                          {!largest.length && (
+                            <li className="text-muted-foreground text-xs">No files</li>
+                          )}
+                        </ul>
+                      </div>
+                      <div className="rounded-xl border border-border p-4 bg-card/40">
+                        <h3 className="font-semibold text-sm mb-2">Unused files (30+ days)</h3>
+                        <ul className="space-y-1 text-sm">
+                          {unused.map((f) => (
+                            <li key={f.id} className="flex justify-between gap-2">
+                              <span className="truncate">{f.name}</span>
+                              <span className="text-muted-foreground shrink-0">{f.sizeLabel}</span>
+                            </li>
+                          ))}
+                          {!unused.length && (
+                            <li className="text-muted-foreground text-xs">None found</li>
+                          )}
+                        </ul>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </>
+          )}
+        </div>
+      )}
+
       {/* File details / preview panel */}
       {detail && (
         <div className="fixed inset-0 z-50 bg-black/75 flex items-end sm:items-center justify-center sm:p-4">
@@ -796,24 +1251,25 @@ export function MediaLibraryDashboard() {
             </div>
 
             <div className="flex gap-2 mb-4 flex-wrap">
-              <button
-                type="button"
-                className={`px-2.5 py-1 text-xs rounded-lg border ${
-                  previewMode === "detail" ? "border-primary bg-primary/10" : "border-border"
-                }`}
-                onClick={() => setPreviewMode("detail")}
-              >
-                Details
-              </button>
-              <button
-                type="button"
-                className={`px-2.5 py-1 text-xs rounded-lg border ${
-                  previewMode === "preview" ? "border-primary bg-primary/10" : "border-border"
-                }`}
-                onClick={() => setPreviewMode("preview")}
-              >
-                Preview
-              </button>
+              {(
+                [
+                  ["detail", "Details"],
+                  ["preview", "Preview"],
+                  ["timeline", "Timeline"],
+                  ["versions", "Versions"],
+                ] as const
+              ).map(([m, label]) => (
+                <button
+                  key={m}
+                  type="button"
+                  className={`px-2.5 py-1 text-xs rounded-lg border ${
+                    previewMode === m ? "border-primary bg-primary/10" : "border-border"
+                  }`}
+                  onClick={() => setPreviewMode(m)}
+                >
+                  {label}
+                </button>
+              ))}
               <button
                 type="button"
                 className="px-2.5 py-1 text-xs rounded-lg border border-border"
@@ -835,7 +1291,50 @@ export function MediaLibraryDashboard() {
               >
                 Download
               </button>
+              {canManage && (
+                <button
+                  type="button"
+                  className="px-2.5 py-1 text-xs rounded-lg border border-sky-500/40 text-sky-200"
+                  onClick={async () => {
+                    if (!token) return;
+                    const days = Number(
+                      window.prompt("Link expires in how many days?", "7") || "7"
+                    );
+                    const password =
+                      window.prompt("Optional password (leave blank for none)") || undefined;
+                    const r = await api.createMediaShareLink(
+                      detail.id,
+                      {
+                        expiresInDays: days,
+                        password: password || undefined,
+                      },
+                      token
+                    );
+                    if (r.success && r.data?.link) {
+                      const origin =
+                        typeof window !== "undefined" ? window.location.origin : "";
+                      const url = `${API_BASE_URL}${r.data.link.path}`;
+                      setShareLink(url);
+                      try {
+                        await navigator.clipboard.writeText(url);
+                        toast.success("Secure link copied");
+                      } catch {
+                        toast.success("Secure link generated");
+                      }
+                      void origin;
+                    } else toast.error(r.error || "Failed to create link");
+                  }}
+                >
+                  Share link
+                </button>
+              )}
             </div>
+
+            {shareLink && (
+              <div className="mb-3 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs break-all">
+                {shareLink}
+              </div>
+            )}
 
             {previewMode === "preview" ? (
               !previewBlobUrl ? (
@@ -860,30 +1359,223 @@ export function MediaLibraryDashboard() {
                   Preview not available — use Download.
                 </p>
               )
+            ) : previewMode === "timeline" ? (
+              <ol className="relative border-l border-border ml-2 space-y-3 py-2">
+                {timeline.length === 0 ? (
+                  <p className="text-sm text-muted-foreground pl-4">No activity yet</p>
+                ) : (
+                  timeline.map((ev) => (
+                    <li key={ev.id} className="ml-4">
+                      <div className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border border-border bg-card" />
+                      <div className="text-sm font-medium capitalize">{ev.action}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {ev.actorName || "System"}
+                        {ev.detail ? ` · ${ev.detail}` : ""}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {new Date(ev.at).toLocaleString()}
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ol>
+            ) : previewMode === "versions" ? (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Current version: v{detail.versionNumber || 1}
+                </p>
+                {versions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">
+                    No previous versions. Replacing a file creates version history.
+                  </p>
+                ) : (
+                  versions.map((v) => (
+                    <div
+                      key={String(v.id)}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <div className="font-medium">Version {String(v.versionNumber)}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {String(v.name)} · {formatBytes(Number(v.sizeBytes) || 0)} ·{" "}
+                          {v.createdAt
+                            ? new Date(String(v.createdAt)).toLocaleString()
+                            : ""}
+                        </div>
+                      </div>
+                      {canManage && (
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-white/5"
+                          onClick={async () => {
+                            if (!token || !confirm(`Restore version ${v.versionNumber}?`)) return;
+                            const r = await api.restoreMediaVersion(
+                              detail.id,
+                              String(v.id),
+                              token
+                            );
+                            if (r.success) {
+                              toast.success("Version restored");
+                              await openDetail(detail.id, "versions");
+                              await load();
+                            } else toast.error(r.error || "Failed");
+                          }}
+                        >
+                          Restore
+                        </button>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
             ) : (
-              <dl className="grid grid-cols-2 gap-3 text-sm">
-                <Field label="File name" value={detail.name} />
-                <Field label="File type" value={detail.kind} />
-                <Field label="File size" value={formatBytes(detail.sizeBytes)} />
-                <Field label="Folder" value={detail.folderName || "—"} />
-                <Field label="Uploaded by" value={detail.uploadedByName || "—"} />
-                <Field
-                  label="Upload date"
-                  value={new Date(detail.createdAt).toLocaleString()}
-                />
-                <Field
-                  label="Last modified"
-                  value={new Date(detail.updatedAt).toLocaleString()}
-                />
-                <Field label="Downloads" value={String(detail.downloadCount ?? 0)} />
-                <Field label="WhatsApp sends" value={String(detail.whatsappSendCount ?? 0)} />
-                <Field label="Email sends" value={String(detail.emailSendCount ?? 0)} />
-                <Field
-                  label="Tags"
-                  value={(detail.tags || []).join(", ") || "—"}
-                />
-              </dl>
+              <div className="space-y-4">
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <Field label="File name" value={detail.name} />
+                  <Field label="File type" value={detail.kind} />
+                  <Field label="File size" value={formatBytes(detail.sizeBytes)} />
+                  <Field label="Folder" value={detail.folderName || "—"} />
+                  <Field label="Uploaded by" value={detail.uploadedByName || "—"} />
+                  <Field
+                    label="Upload date"
+                    value={new Date(detail.createdAt).toLocaleString()}
+                  />
+                  <Field label="Approval" value={detail.approvalStatus || "approved"} />
+                  <Field
+                    label="Expires"
+                    value={
+                      detail.expiresAt
+                        ? new Date(detail.expiresAt).toLocaleDateString()
+                        : "Never"
+                    }
+                  />
+                  <Field label="Version" value={`v${detail.versionNumber || 1}`} />
+                  <Field label="Downloads" value={String(detail.downloadCount ?? 0)} />
+                  <Field label="WhatsApp sends" value={String(detail.whatsappSendCount ?? 0)} />
+                  <Field label="Tags" value={(detail.tags || []).join(", ") || "—"} />
+                </dl>
+                {canManage && (
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                    {detail.approvalStatus === "pending" && (
+                      <button
+                        type="button"
+                        className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white"
+                        onClick={async () => {
+                          if (!token) return;
+                          const r = await api.setMediaApproval(
+                            detail.id,
+                            "approved",
+                            undefined,
+                            token
+                          );
+                          if (r.success) {
+                            toast.success("Approved");
+                            await openDetail(detail.id);
+                            await load();
+                          }
+                        }}
+                      >
+                        Approve for sharing
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="text-xs px-3 py-1.5 rounded-lg border border-border"
+                      onClick={async () => {
+                        if (!token) return;
+                        const d = window.prompt(
+                          "Expiry date (YYYY-MM-DD) or blank to clear",
+                          detail.expiresAt?.slice(0, 10) || ""
+                        );
+                        if (d === null) return;
+                        const r = await api.setMediaExpiry(
+                          detail.id,
+                          d.trim() || null,
+                          token
+                        );
+                        if (r.success) {
+                          toast.success(d.trim() ? "Expiry set" : "Expiry cleared");
+                          await openDetail(detail.id);
+                          await load();
+                        } else toast.error(r.error || "Failed");
+                      }}
+                    >
+                      Set expiry
+                    </button>
+                    {!detail.archivedAt ? (
+                      <button
+                        type="button"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-border"
+                        onClick={async () => {
+                          if (!token) return;
+                          const r = await api.archiveMediaAsset(detail.id, "manual", token);
+                          if (r.success) {
+                            toast.success("Archived");
+                            setDetail(null);
+                            await load();
+                          }
+                        }}
+                      >
+                        Archive
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="text-xs px-3 py-1.5 rounded-lg border border-border"
+                        onClick={async () => {
+                          if (!token) return;
+                          const r = await api.unarchiveMediaAsset(detail.id, token);
+                          if (r.success) {
+                            toast.success("Unarchived");
+                            await openDetail(detail.id);
+                            await load();
+                          }
+                        }}
+                      >
+                        Unarchive
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate resolution */}
+      {dupPrompt && (
+        <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 space-y-3">
+            <h3 className="font-semibold text-lg">File already exists</h3>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{dupPrompt.file.name}</span> matches
+              an existing file
+              {dupPrompt.duplicates[0] ? ` (${dupPrompt.duplicates[0].name})` : ""}.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                className="min-h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium"
+                onClick={() => void resolveDuplicate("replace")}
+              >
+                Replace (new version)
+              </button>
+              <button
+                type="button"
+                className="min-h-10 rounded-xl border border-border text-sm font-medium"
+                onClick={() => void resolveDuplicate("keep_both")}
+              >
+                Keep both
+              </button>
+              <button
+                type="button"
+                className="min-h-10 rounded-xl border border-border text-sm text-muted-foreground"
+                onClick={() => void resolveDuplicate("skip")}
+              >
+                Skip
+              </button>
+            </div>
           </div>
         </div>
       )}
