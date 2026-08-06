@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, API_BASE_URL } from "@/lib/api";
 import { toast } from "sonner";
 import {
@@ -9,8 +9,11 @@ import {
   listOfflineMedia,
 } from "@/lib/media-offline-cache";
 import {
-  hasUnresolvedPlaceholders,
+  AVAILABLE_TEMPLATE_VARIABLES,
+  findUnknownVariables,
+  loadSavedCaptionTemplate,
   renderTemplate,
+  saveCaptionTemplate,
   varsFromContact,
   type TemplateVars,
 } from "@/lib/template-vars";
@@ -66,6 +69,7 @@ export function SendMediaModal({
   preselectedAssetIds,
 }: Props) {
   const { user } = useAuth();
+  const captionRef = useRef<HTMLTextAreaElement>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [kits, setKits] = useState<Kit[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -191,7 +195,7 @@ export function SendMediaModal({
   useEffect(() => {
     if (open) {
       void load();
-      setCaption(DEFAULT_CAPTION);
+      setCaption(loadSavedCaptionTemplate(DEFAULT_CAPTION));
       if (preselectedAssetIds?.length) {
         setSelected(new Set(preselectedAssetIds));
       }
@@ -206,10 +210,57 @@ export function SendMediaModal({
     if (kit.captionTemplate) setCaption(kit.captionTemplate);
   }, [kitId, kits]);
 
+  /** Live personalized preview — updates instantly on every keystroke */
   const renderedCaption = useMemo(
     () => renderTemplate(caption, templateVars),
     [caption, templateVars]
   );
+
+  const unknownVars = useMemo(() => findUnknownVariables(caption), [caption]);
+
+  const insertVariable = useCallback((varName: string) => {
+    const token = `{{${varName}}}`;
+    const el = captionRef.current;
+    if (!el) {
+      setCaption((prev) => prev + token);
+      return;
+    }
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
+    const prev = el.value;
+    const next = prev.slice(0, start) + token + prev.slice(end);
+    setCaption(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      try {
+        el.setSelectionRange(pos, pos);
+      } catch {
+        /* ignore */
+      }
+    });
+  }, []);
+
+  const copyPreview = async () => {
+    try {
+      await navigator.clipboard.writeText(renderedCaption);
+      toast.success("Preview copied");
+    } catch {
+      toast.error("Could not copy");
+    }
+  };
+
+  const saveAsTemplate = () => {
+    saveCaptionTemplate(caption);
+    toast.success("Template saved", {
+      description: "This caption will load next time you open Send Media.",
+    });
+  };
+
+  const resetTemplate = () => {
+    setCaption(DEFAULT_CAPTION);
+    toast.message("Template reset to default");
+  };
 
   if (!open) return null;
 
@@ -286,7 +337,7 @@ export function SendMediaModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center sm:p-4">
-      <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto p-5">
+      <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[92dvh] overflow-y-auto p-5">
         <div className="flex justify-between items-start gap-2">
           <div>
             <h3 className="text-lg font-semibold">Send Media</h3>
@@ -393,40 +444,138 @@ export function SendMediaModal({
           )}
         </div>
 
-        <div className="mt-4">
-          <label className="text-[10px] uppercase text-muted-foreground">
-            Caption template
-          </label>
-          <textarea
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            rows={5}
-            className="mm-input w-full text-sm mt-1 resize-y font-mono"
-            placeholder="Hello {{CustomerName}}, …"
-          />
-          <p className="text-[10px] text-muted-foreground mt-1">
-            Variables: {"{{CustomerName}}"}, {"{{SalesExecutive}}"}, {"{{Company}}"},{" "}
-            {"{{Phone}}"}, {"{{Email}}"}, {"{{Service}}"}, {"{{DealValue}}"},{" "}
-            {"{{BusinessName}}"}
-          </p>
-        </div>
-
-        {/* Final WhatsApp preview — fully rendered, no placeholders */}
-        <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-300 mb-2">
-            Message preview (as customer will see)
+        {/* Template editor + Live personalized preview */}
+        <div className="mt-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Caption
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => void copyPreview()}
+                className="text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-white/5"
+              >
+                Copy Preview
+              </button>
+              <button
+                type="button"
+                onClick={saveAsTemplate}
+                className="text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-white/5"
+              >
+                Save as Template
+              </button>
+              <button
+                type="button"
+                onClick={resetTemplate}
+                className="text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-white/5 text-muted-foreground"
+              >
+                Reset Template
+              </button>
+            </div>
           </div>
-          {renderedCaption ? (
-            <pre className="text-sm whitespace-pre-wrap font-sans text-foreground leading-relaxed">
-              {renderedCaption}
-            </pre>
-          ) : (
-            <p className="text-xs text-muted-foreground">Caption is empty.</p>
-          )}
-          {hasUnresolvedPlaceholders(renderedCaption) && (
-            <p className="text-[11px] text-amber-300 mt-2">
-              Some variables could not be filled — they will be removed on send.
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Template mode */}
+            <div className="rounded-xl border border-border bg-card/40 p-3 flex flex-col min-h-0">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                Template
+              </div>
+              <textarea
+                ref={captionRef}
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                rows={8}
+                className="mm-input w-full flex-1 text-sm resize-y font-mono min-h-[140px]"
+                placeholder={"Hello {{CustomerName}},\n\n…\n\nRegards,\n{{SalesExecutive}}"}
+                spellCheck={false}
+              />
+            </div>
+
+            {/* Live Preview — what the customer receives */}
+            <div className="rounded-xl border border-emerald-500/35 bg-emerald-500/5 p-3 flex flex-col min-h-0">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                  Live Preview
+                </div>
+                <span className="text-[10px] text-emerald-400/80">
+                  As {contactName || "customer"} will see
+                </span>
+              </div>
+              {renderedCaption ? (
+                <pre className="text-sm whitespace-pre-wrap font-sans text-foreground leading-relaxed flex-1">
+                  {renderedCaption}
+                </pre>
+              ) : (
+                <p className="text-xs text-muted-foreground">Caption is empty.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Variable helper — click inserts at cursor */}
+          <div className="rounded-xl border border-border/80 bg-white/[0.02] p-3">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+              Available Variables
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {AVAILABLE_TEMPLATE_VARIABLES.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => insertVariable(v)}
+                  className="text-[11px] font-mono px-2 py-1 rounded-lg border border-border bg-black/20 hover:border-primary/50 hover:bg-primary/10 transition-colors"
+                  title={`Insert {{${v}}}`}
+                >
+                  {`{{${v}}}`}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              Click a variable to insert it at the cursor in the template.
             </p>
+          </div>
+
+          {/* Unknown variable validation */}
+          {unknownVars.length > 0 && (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 space-y-1.5">
+              <div className="text-xs font-semibold text-amber-200">
+                Unknown variable{unknownVars.length > 1 ? "s" : ""}
+              </div>
+              {unknownVars.map((u) => (
+                <div key={u.raw} className="text-xs text-amber-100/90">
+                  <span className="font-mono text-amber-200">{u.raw}</span>
+                  {u.suggestion ? (
+                    <>
+                      {" "}
+                      — Did you mean{" "}
+                      <button
+                        type="button"
+                        className="font-mono text-emerald-300 underline underline-offset-2"
+                        onClick={() => {
+                          setCaption((prev) =>
+                            prev.replace(
+                              new RegExp(
+                                `\\{\\{\\s*${u.key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\}\\}`,
+                                "g"
+                              ),
+                              `{{${u.suggestion}}}`
+                            )
+                          );
+                        }}
+                      >
+                        {`{{${u.suggestion}}}`}
+                      </button>
+                      ?
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      — will be removed when sent
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
