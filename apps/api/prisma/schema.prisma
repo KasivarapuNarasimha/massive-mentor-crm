@@ -346,6 +346,7 @@ model Business {
   mediaAssetEvents   MediaAssetEvent[]
   mediaAssetVersions MediaAssetVersion[]
   whatsappCaptionTemplates WhatsAppCaptionTemplate[]
+  whatsappConversations WhatsAppConversation[]
   currentPlanId      String?
   currentPlan        SubscriptionPlan? @relation(fields: [currentPlanId], references: [id], onDelete: SetNull)
 
@@ -1479,18 +1480,61 @@ model Payment {
   @@index([userId])
 }
 
-/// WhatsApp Cloud API conversation history (real send + inbound)
+/// WhatsApp Conversation Center — one thread per phone within a business
+model WhatsAppConversation {
+  id                   String   @id @default(cuid())
+  businessId           String
+  business             Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  contactId            String?
+  /// Digits-only E.164 without + (e.g. 919876543210)
+  phone                String
+  contactName          String?
+  company              String?
+  assignedToUserId     String?
+  /// open | pending | follow_up | won | lost | closed
+  status               String   @default("open")
+  unreadCount          Int      @default(0)
+  lastMessageAt        DateTime?
+  lastMessagePreview   String?  @db.Text
+  lastMessageDirection String?
+  lastInboundAt        DateTime?
+  lastOutboundAt       DateTime?
+  /// AI summary JSON: requirement, budget, objections, nextAction, probability
+  aiSummary            Json?
+  aiSummaryAt          DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  messages             WhatsAppMessage[]
+
+  @@unique([businessId, phone])
+  @@index([businessId, lastMessageAt])
+  @@index([businessId, assignedToUserId, lastMessageAt])
+  @@index([businessId, status, lastMessageAt])
+  @@index([businessId, unreadCount])
+  @@index([contactId])
+}
+
+/// WhatsApp Cloud API conversation history (real send + inbound + internal notes)
 model WhatsAppMessage {
   id            String   @id @default(cuid())
   businessId    String?
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   contactId     String?
+  conversationId String?
+  conversation  WhatsAppConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   to            String
   from          String?
   body          String   @db.Text
-  direction     String   // outbound | inbound
+  direction     String   // outbound | inbound | internal
   status        String   @default("queued") // queued | sent | delivered | read | failed
+  /// text | image | video | document | audio | note | system
+  messageType   String   @default("text")
+  mediaUrl      String?
+  mediaMime     String?
+  mediaName     String?
+  /// Private note — never sent to customer
+  isInternal    Boolean  @default(false)
   waMessageId   String?
   templateName  String?
   error         String?
@@ -1502,6 +1546,8 @@ model WhatsAppMessage {
   @@index([contactId, createdAt])
   @@index([waMessageId])
   @@index([businessId, createdAt])
+  @@index([conversationId, createdAt])
+  @@index([businessId, isInternal, createdAt])
 }
 
 // =====================================================

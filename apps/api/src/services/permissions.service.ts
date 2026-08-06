@@ -38,6 +38,14 @@ export const MODULE_CATALOG: Array<{
     category: "crm",
     sortOrder: 9,
   },
+  {
+    key: "whatsapp",
+    label: "WhatsApp",
+    routePrefix: "/dashboard/whatsapp",
+    apiPrefixes: ["/api/whatsapp"],
+    category: "crm",
+    sortOrder: 10,
+  },
   { key: "reports", label: "Reports", routePrefix: "/dashboard/reports", apiPrefixes: ["/api/reports"], category: "insights", sortOrder: 10 },
   { key: "ai_sales", label: "AI Sales", routePrefix: "/dashboard/ai-sales", apiPrefixes: ["/api/crm/ai", "/api/ai"], category: "ai", sortOrder: 11 },
   { key: "mentor", label: "AI Mentor", routePrefix: "/dashboard/mentor", apiPrefixes: ["/api/mentor", "/api/ai"], category: "ai", sortOrder: 12 },
@@ -82,7 +90,7 @@ export const ROLE_TEMPLATE_DEFAULTS: Array<{
     label: "Sales Manager",
     sortOrder: 3,
     modules: [
-      "dashboard", "leads", "clients", "deals", "tasks", "meetings", "notes", "documents", "media",
+      "dashboard", "leads", "clients", "deals", "tasks", "meetings", "notes", "documents", "media", "whatsapp",
       "reports", "ai_sales", "mentor", "field_sales", "activity", "team", "profile", "appearance",
     ],
   },
@@ -91,7 +99,7 @@ export const ROLE_TEMPLATE_DEFAULTS: Array<{
     label: "Sales Executive",
     sortOrder: 4,
     modules: [
-      "dashboard", "leads", "clients", "deals", "tasks", "meetings", "notes", "media",
+      "dashboard", "leads", "clients", "deals", "tasks", "meetings", "notes", "media", "whatsapp",
       "ai_sales", "mentor", "field_sales", "activity", "profile", "appearance",
     ],
   },
@@ -256,13 +264,18 @@ export async function getMemberModuleKeys(
     keys = modulesForTemplate(role);
   }
 
-  // Sales CRM users with leads always receive Media Library access for Send Media
-  // (approved business assets are workspace-shared, not uploader-private).
+  // Sales CRM users with leads always receive Media Library + WhatsApp Inbox
   if (
     (keys.includes("leads") || keys.includes("clients")) &&
     !keys.includes("media")
   ) {
     keys.push("media");
+  }
+  if (
+    (keys.includes("leads") || keys.includes("clients") || keys.includes("media")) &&
+    !keys.includes("whatsapp")
+  ) {
+    keys.push("whatsapp");
   }
 
   return keys;

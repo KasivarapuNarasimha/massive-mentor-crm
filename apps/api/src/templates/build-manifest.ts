@@ -1,4 +1,4 @@
-import type { IndustryTemplateManifest } from "../types/template-manifest.js";
+﻿import type { IndustryTemplateManifest } from "../types/template-manifest.js";
 
 const DEFAULT_PERMISSIONS = [
   "contacts.read",
@@ -33,7 +33,7 @@ const DEFAULT_MODULES: IndustryTemplateManifest["modules"] = [
 /** Full permission set for executive / admin roles */
 const ALL_PERMS = [...DEFAULT_PERMISSIONS];
 
-/** Standard business roles — dashboards filter by these keys (config-driven, not industry). */
+/** Standard business roles â€” dashboards filter by these keys (config-driven, not industry). */
 const DEFAULT_ROLES: IndustryTemplateManifest["roles"] = [
   { key: "ceo", label: "CEO", permissions: [...ALL_PERMS] },
   { key: "owner", label: "Owner", permissions: [...ALL_PERMS] },
@@ -381,7 +381,7 @@ function chart(
 
 /**
  * Role-based default dashboards with chart widgets (config data only).
- * Engines never switch on industry — only widget.type / chartType.
+ * Engines never switch on industry â€” only widget.type / chartType.
  */
 function defaultDashboards(extraWidgets: Widget[] = []): IndustryTemplateManifest["dashboards"] {
   const leadFilter = [{ field: "type", op: "eq" as const, value: "lead" }];
@@ -749,7 +749,7 @@ function uniqueByRoute(menus: MenuItem[]): MenuItem[] {
 }
 
 /**
- * Dedicated portals per role — menus/dashboard/actions from config.
+ * Dedicated portals per role â€” menus/dashboard/actions from config.
  * Super Admin is platform-level (platformRole); others use business membership role.
  */
 function defaultPortals(): PortalDef[] {
@@ -795,6 +795,7 @@ function defaultPortals(): PortalDef[] {
         menu("finance", "Finance", "/dashboard/finance", 11, ["reports.read"]),
         menu("ai_sales", "Sales Forecast & AI", "/dashboard/ai-sales", 12, ["ai.use"]),
         menu("media", "Media Library", "/dashboard/media", 13),
+        menu("whatsapp", "WhatsApp", "/dashboard/whatsapp", 13),
         menu("team", "Team & Roles", "/dashboard/team", 14, ["members.manage"]),
         menu("field_sales", "Field Sales Map", "/dashboard/field-sales", 15),
         menu("integrations", "Integrations", "/dashboard/integrations", 16, ["config.edit"]),
@@ -830,6 +831,7 @@ function defaultPortals(): PortalDef[] {
         menu("ai_sales", "AI Sales", "/dashboard/ai-sales", 8, ["ai.use"]),
         menu("mentor", "AI Assistant", "/dashboard/mentor", 9, ["ai.use"]),
         menu("media", "Media Library", "/dashboard/media", 10),
+        menu("whatsapp", "WhatsApp", "/dashboard/whatsapp", 10),
         menu("team", "Team & Roles", "/dashboard/team", 11, ["members.manage"]),
         menu("field_sales", "Field Sales Map", "/dashboard/field-sales", 12),
         menu("integrations", "Integrations", "/dashboard/integrations", 13, ["config.edit"]),
@@ -851,7 +853,7 @@ function defaultPortals(): PortalDef[] {
     {
       key: "sales_manager",
       label: "Sales Manager Portal",
-      description: "Sales team, pipeline, and forecast — no CEO-only modules",
+      description: "Sales team, pipeline, and forecast â€” no CEO-only modules",
       roles: ["sales_manager", "manager"],
       homeRoute: "/dashboard",
       defaultDashboardKey: "sales_manager",
@@ -865,6 +867,7 @@ function defaultPortals(): PortalDef[] {
         menu("reports", "Reports", "/dashboard/reports", 7, ["reports.read"]),
         menu("ai_sales", "AI Sales & Forecast", "/dashboard/ai-sales", 8, ["ai.use"]),
         menu("media", "Media Library", "/dashboard/media", 9),
+        menu("whatsapp", "WhatsApp", "/dashboard/whatsapp", 9),
         menu("field_sales", "Team Locations", "/dashboard/field-sales", 10),
       ]),
       actions: [
@@ -894,6 +897,7 @@ function defaultPortals(): PortalDef[] {
         menu("ai_sales", "WhatsApp AI & Sales Tools", "/dashboard/ai-sales", 7, ["ai.use"]),
         menu("mentor", "AI Assistant", "/dashboard/mentor", 8, ["ai.use"]),
         menu("media", "Media Library", "/dashboard/media", 9),
+        menu("whatsapp", "WhatsApp", "/dashboard/whatsapp", 9),
       ]),
       actions: [
         { key: "new_lead", label: "Add Lead", type: "create", route: "/dashboard/leads", permission: "contacts.write", order: 1 },
@@ -917,6 +921,7 @@ function defaultPortals(): PortalDef[] {
         menu("marketing_ai", "Market AI & Campaigns", "/dashboard/marketing", 2, ["ai.use"]),
         menu("leads", "Leads", "/dashboard/leads", 3, ["contacts.read"]),
         menu("media", "Media Library", "/dashboard/media", 4),
+        menu("whatsapp", "WhatsApp", "/dashboard/whatsapp", 4),
         menu("reports", "Reports", "/dashboard/reports", 5, ["reports.read"]),
       ]),
       actions: [
@@ -1064,3 +1069,4 @@ export function buildManifest(meta: SeedTemplateMeta): IndustryTemplateManifest 
     },
   };
 }
+

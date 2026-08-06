@@ -157,11 +157,30 @@ export async function sendWhatsAppCloudMessage(opts: {
       body: opts.body || `[template:${opts.templateName}]`,
       direction: "outbound",
       status: "sent",
+      messageType: "text",
       waMessageId,
       templateName: opts.templateName || null,
       metadata: json as object,
     },
   });
+
+  // Link to Conversation Center thread
+  try {
+    const { upsertConversationForMessage } = await import(
+      "./whatsapp-inbox.service.js"
+    );
+    await upsertConversationForMessage({
+      businessId,
+      userId: opts.userId,
+      phone: to,
+      contactId: opts.contactId,
+      direction: "outbound",
+      body: record.body,
+      messageId: record.id,
+    });
+  } catch (e) {
+    console.warn("[whatsapp] conversation link failed", e);
+  }
 
   await recordAudit({
     businessId,
@@ -315,6 +334,9 @@ export async function sendWhatsAppMediaFile(opts: {
       body: captionOrName,
       direction: "outbound",
       status: "sent",
+      messageType: mediaType,
+      mediaName: opts.fileName,
+      mediaMime: opts.mimeType,
       waMessageId,
       metadata: {
         mediaId: uploadJson.id,
@@ -324,6 +346,23 @@ export async function sendWhatsAppMediaFile(opts: {
       } as object,
     },
   });
+
+  try {
+    const { upsertConversationForMessage } = await import(
+      "./whatsapp-inbox.service.js"
+    );
+    await upsertConversationForMessage({
+      businessId,
+      userId: opts.userId,
+      phone: to,
+      contactId: opts.contactId,
+      direction: "outbound",
+      body: captionOrName,
+      messageId: record.id,
+    });
+  } catch (e) {
+    console.warn("[whatsapp] conversation link failed", e);
+  }
 
   await recordAudit({
     businessId,
@@ -409,8 +448,14 @@ export async function recordInboundWhatsApp(opts: {
   body: string;
   waMessageId?: string;
   contactId?: string;
+  messageType?: string;
+  mediaUrl?: string;
+  mediaMime?: string;
+  mediaName?: string;
+  businessId?: string | null;
 }) {
-  const businessId = await getUserBusinessId(opts.userId);
+  const businessId =
+    opts.businessId || (await getUserBusinessId(opts.userId));
   const msg = await prisma.whatsAppMessage.create({
     data: {
       businessId,
@@ -421,15 +466,49 @@ export async function recordInboundWhatsApp(opts: {
       body: opts.body,
       direction: "inbound",
       status: "delivered",
+      messageType: opts.messageType || "text",
+      mediaUrl: opts.mediaUrl || null,
+      mediaMime: opts.mediaMime || null,
+      mediaName: opts.mediaName || null,
       waMessageId: opts.waMessageId || null,
     },
   });
-  await notifyUser(opts.userId, {
+
+  let conversationId = "";
+  try {
+    const { upsertConversationForMessage } = await import(
+      "./whatsapp-inbox.service.js"
+    );
+    const linked = await upsertConversationForMessage({
+      businessId,
+      userId: opts.userId,
+      phone: opts.from,
+      contactId: opts.contactId,
+      direction: "inbound",
+      body: opts.body,
+      messageId: msg.id,
+    });
+    conversationId = linked.conversationId;
+  } catch (e) {
+    console.warn("[whatsapp] inbound conversation link failed", e);
+  }
+
+  // Notify assigned agent when known
+  let notifyTarget = opts.userId;
+  if (conversationId) {
+    const conv = await prisma.whatsAppConversation.findUnique({
+      where: { id: conversationId },
+      select: { assignedToUserId: true },
+    });
+    if (conv?.assignedToUserId) notifyTarget = conv.assignedToUserId;
+  }
+
+  await notifyUser(notifyTarget, {
     type: "integration",
     title: "WhatsApp message received",
     message: opts.body.slice(0, 120),
-    entityType: "whatsapp_message",
-    entityId: msg.id,
+    entityType: "whatsapp_conversation",
+    entityId: conversationId || msg.id,
   });
   return msg;
 }

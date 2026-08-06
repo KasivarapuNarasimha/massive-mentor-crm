@@ -392,6 +392,7 @@ export async function processWhatsAppWebhookPayload(body: unknown): Promise<void
           continue;
         }
         let text = "";
+        let messageType = msg.type || "text";
         if (msg.type === "text") text = msg.text?.body || "";
         else if (msg.type === "button") text = msg.button?.text || "[button]";
         else if (msg.type === "interactive") {
@@ -399,6 +400,18 @@ export async function processWhatsAppWebhookPayload(body: unknown): Promise<void
             msg.interactive?.button_reply?.title ||
             msg.interactive?.list_reply?.title ||
             "[interactive]";
+        } else if (msg.type === "image") {
+          text = "[image]";
+          messageType = "image";
+        } else if (msg.type === "document") {
+          text = "[document]";
+          messageType = "document";
+        } else if (msg.type === "video") {
+          text = "[video]";
+          messageType = "video";
+        } else if (msg.type === "audio") {
+          text = "[voice note]";
+          messageType = "audio";
         } else {
           text = `[${msg.type || "message"}]`;
         }
@@ -407,6 +420,8 @@ export async function processWhatsAppWebhookPayload(body: unknown): Promise<void
           from: msg.from,
           body: text,
           waMessageId: msg.id,
+          messageType,
+          businessId: tenant?.businessId,
         });
       }
     }

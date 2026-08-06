@@ -229,6 +229,7 @@ export async function resolveUserPortal(
         { key: "leads", label: "Leads", route: "/dashboard/leads", order: 2, enabled: true },
         { key: "reports", label: "Reports", route: "/dashboard/reports", order: 3, enabled: true },
         { key: "media", label: "Media Library", route: "/dashboard/media", order: 4, enabled: true },
+        { key: "whatsapp", label: "WhatsApp", route: "/dashboard/whatsapp", order: 5, enabled: true },
       ],
       actions: [],
       dashboardKeys: ["main"],

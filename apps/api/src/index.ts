@@ -282,6 +282,7 @@ import approvalRoutes from "./routes/approval.routes.js";
 import billingRoutes from "./routes/billing.routes.js";
 import securityRoutes from "./routes/security.routes.js";
 import mediaRoutes from "./routes/media.routes.js";
+import whatsappInboxRoutes from "./routes/whatsapp-inbox.routes.js";
 import { seedIndustryTemplates } from "./services/template.service.js";
 import { startBackupScheduler, stopBackupScheduler } from "./services/backup.service.js";
 import { apiGeneralLimiter } from "./middleware/rateLimiter.js";
@@ -341,6 +342,7 @@ app.get("/api/media/public/:token/meta", mediaPublicShareMeta);
 app.get("/api/media/public/:token", mediaPublicShareFile);
 app.post("/api/media/public/:token", mediaPublicShareFile);
 app.use("/api/media", requireAuthMw, requireModuleFromPath, mediaRoutes);
+app.use("/api/whatsapp", requireAuthMw, requireModuleFromPath, whatsappInboxRoutes);
 
 app.get("/api", (_req, res) => {
   res.json({

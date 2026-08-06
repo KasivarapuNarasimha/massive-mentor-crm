@@ -1161,6 +1161,111 @@ class ApiClient {
     });
   }
 
+  // —— WhatsApp Conversation Center ——
+  async listWaConversations(
+    token?: string | null,
+    q?: {
+      search?: string;
+      status?: string;
+      assignedTo?: string;
+      unreadOnly?: boolean;
+      page?: number;
+      pageSize?: number;
+    }
+  ) {
+    const params = new URLSearchParams();
+    if (q?.search) params.set("search", q.search);
+    if (q?.status) params.set("status", q.status);
+    if (q?.assignedTo) params.set("assignedTo", q.assignedTo);
+    if (q?.unreadOnly) params.set("unreadOnly", "1");
+    if (q?.page) params.set("page", String(q.page));
+    if (q?.pageSize) params.set("pageSize", String(q.pageSize));
+    const qs = params.toString() ? `?${params}` : "";
+    return this.get<Record<string, unknown>>(`/whatsapp/conversations${qs}`, token);
+  }
+  async getWaConversation(id: string, token?: string | null) {
+    return this.get<Record<string, unknown>>(`/whatsapp/conversations/${id}`, token);
+  }
+  async listWaMessages(id: string, token?: string | null, page = 1) {
+    return this.get<{
+      items: Array<Record<string, unknown>>;
+      total: number;
+      page: number;
+      totalPages: number;
+    }>(`/whatsapp/conversations/${id}/messages?page=${page}&pageSize=80`, token);
+  }
+  async sendWaMessage(id: string, body: string, token?: string | null) {
+    return this.post<Record<string, unknown>>(
+      `/whatsapp/conversations/${id}/messages`,
+      { body },
+      token
+    );
+  }
+  async addWaNote(id: string, body: string, token?: string | null) {
+    return this.post<Record<string, unknown>>(
+      `/whatsapp/conversations/${id}/notes`,
+      { body },
+      token
+    );
+  }
+  async assignWaConversation(id: string, assignedToUserId: string, token?: string | null) {
+    return this.post<Record<string, unknown>>(
+      `/whatsapp/conversations/${id}/assign`,
+      { assignedToUserId },
+      token
+    );
+  }
+  async setWaConversationStatus(id: string, status: string, token?: string | null) {
+    return this.post<Record<string, unknown>>(
+      `/whatsapp/conversations/${id}/status`,
+      { status },
+      token
+    );
+  }
+  async waFollowUp(id: string, dueAt: string, title?: string, token?: string | null) {
+    return this.post<Record<string, unknown>>(
+      `/whatsapp/conversations/${id}/follow-up`,
+      { dueAt, title },
+      token
+    );
+  }
+  async waAiReplies(id: string, token?: string | null) {
+    return this.get<{ suggestions: string[] }>(
+      `/whatsapp/conversations/${id}/ai-replies`,
+      token
+    );
+  }
+  async waSummarize(id: string, token?: string | null) {
+    return this.post<Record<string, unknown>>(
+      `/whatsapp/conversations/${id}/summarize`,
+      {},
+      token,
+      { timeoutMs: 60_000 }
+    );
+  }
+  async waMedia(id: string, token?: string | null) {
+    return this.get<Record<string, unknown>>(`/whatsapp/conversations/${id}/media`, token);
+  }
+  async waTimeline(id: string, token?: string | null) {
+    return this.get<{ items: Array<Record<string, unknown>> }>(
+      `/whatsapp/conversations/${id}/timeline`,
+      token
+    );
+  }
+  async waDashboard(token?: string | null) {
+    return this.get<Record<string, unknown>>("/whatsapp/dashboard", token);
+  }
+  async waAgents(token?: string | null) {
+    return this.get<{ agents: Array<Record<string, unknown>> }>("/whatsapp/agents", token);
+  }
+  async openWaForContact(contactId: string, token?: string | null) {
+    return this.post<{ conversationId: string; phone: string }>(
+      "/whatsapp/conversations/open",
+      { contactId },
+      token
+    );
+  }
+
   /** Compose + send email to lead(s) via platform SMTP — POST /api/leads/send-email */
   async sendLeadEmail(
     body: {

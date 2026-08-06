@@ -8,6 +8,7 @@ export const ROUTE_MODULE: Record<string, string> = {
   "/dashboard/leads": "leads",
   "/dashboard/assignments": "leads",
   "/dashboard/media": "media",
+  "/dashboard/whatsapp": "whatsapp",
   "/dashboard/clients": "clients",
   "/dashboard/deals": "deals",
   "/dashboard/tasks": "tasks",
@@ -74,6 +75,15 @@ export function canAccessPath(
   // Media Library is core CRM: allow when user has media, leads, or documents
   if (key === "media") {
     return modules.includes("media") || modules.includes("leads") || modules.includes("documents");
+  }
+  // WhatsApp Conversation Center — same sales access
+  if (key === "whatsapp") {
+    return (
+      modules.includes("whatsapp") ||
+      modules.includes("media") ||
+      modules.includes("leads") ||
+      modules.includes("clients")
+    );
   }
   return false;
 }
