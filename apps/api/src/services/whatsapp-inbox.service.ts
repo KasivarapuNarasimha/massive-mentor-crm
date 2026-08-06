@@ -169,8 +169,19 @@ export async function upsertConversationForMessage(opts: {
       data.lastInboundAt = now;
       data.unreadCount = { increment: 1 };
       if (existing.status === "closed") data.status = "open";
-    } else if (opts.direction === "outbound") {
+      // reset SLA flags when customer messages again after agent replied
+      if (
+        existing.lastAgentReplyAt &&
+        existing.lastAgentReplyAt.getTime() >=
+          (existing.lastInboundAt?.getTime() || 0)
+      ) {
+        data.slaBreachedL1 = false;
+        data.slaBreachedL2 = false;
+      }
+    } else if (opts.direction === "outbound" && !opts.isInternal) {
       data.lastOutboundAt = now;
+      data.lastAgentReplyAt = now;
+      if (!existing.firstResponseAt) data.firstResponseAt = now;
     }
     // Prefer existing assignment; else use contact assignee; else inbound → integration user
     if (!existing.assignedToUserId) {
@@ -193,6 +204,37 @@ export async function upsertConversationForMessage(opts: {
         })
         .catch(() => undefined);
     }
+
+    // CSAT capture from inbound rating + light spam signals
+    if (isInbound && opts.body) {
+      try {
+        const ent = await import("./whatsapp-enterprise.service.js");
+        await ent.tryCaptureCsat(existing.id, opts.body);
+        const spam = ent.detectSpamSignals(opts.body);
+        if (spam.suspicious && !existing.isSpam) {
+          const labels = [
+            ...new Set([...(existing.labels || []), "🚫 Spam"]),
+          ];
+          await prisma.whatsAppConversation.update({
+            where: { id: existing.id },
+            data: { labels },
+          });
+          if (existing.assignedToUserId) {
+            const { notifyUser } = await import("./notification.service.js");
+            await notifyUser(existing.assignedToUserId, {
+              type: "system",
+              title: "Possible spam on WhatsApp",
+              message: `${existing.contactName || existing.phone}: ${spam.reasons.join(", ")}`,
+              entityType: "whatsapp_conversation",
+              entityId: existing.id,
+            }).catch(() => undefined);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     return { conversationId: existing.id };
   }
 
@@ -211,8 +253,20 @@ export async function upsertConversationForMessage(opts: {
       lastMessageDirection: opts.direction,
       lastInboundAt: isInbound ? now : null,
       lastOutboundAt: opts.direction === "outbound" ? now : null,
+      lastAgentReplyAt:
+        opts.direction === "outbound" && !opts.isInternal ? now : null,
+      firstResponseAt:
+        opts.direction === "outbound" && !opts.isInternal ? now : null,
     },
   });
+
+  // Auto-assignment rules for new threads
+  try {
+    const ent = await import("./whatsapp-enterprise.service.js");
+    await ent.applyAutoAssignRules(businessId, created.id, contactId);
+  } catch {
+    /* ignore */
+  }
 
   if (opts.messageId) {
     await prisma.whatsAppMessage
@@ -232,21 +286,40 @@ export async function listConversations(
     status?: string;
     assignedTo?: string;
     unreadOnly?: boolean;
+    label?: string;
+    includeSnoozed?: boolean;
+    includeSpam?: boolean;
     page?: number;
     pageSize?: number;
   }
 ) {
   const businessId = await requireBusiness(userId);
+  // Process snooze/SLA jobs opportunistically
+  try {
+    const ent = await import("./whatsapp-enterprise.service.js");
+    await ent.processWhatsAppEnterpriseJobs(businessId);
+  } catch {
+    /* non-fatal */
+  }
+
   const scope = await conversationScopeWhere(userId, businessId);
   const page = opts?.page && opts.page > 0 ? opts.page : 1;
   const pageSize = Math.min(100, Math.max(1, opts?.pageSize || 30));
+  const now = new Date();
 
   const and: Record<string, unknown>[] = [scope];
+  if (!opts?.includeSpam) and.push({ isSpam: false });
+  if (!opts?.includeSnoozed) {
+    and.push({
+      OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }],
+    });
+  }
   if (opts?.status && CONVERSATION_STATUSES.includes(opts.status as never)) {
     and.push({ status: opts.status });
   }
   if (opts?.assignedTo) and.push({ assignedToUserId: opts.assignedTo });
   if (opts?.unreadOnly) and.push({ unreadCount: { gt: 0 } });
+  if (opts?.label?.trim()) and.push({ labels: { has: opts.label.trim() } });
   if (opts?.search?.trim()) {
     const q = opts.search.trim();
     and.push({
@@ -260,7 +333,7 @@ export async function listConversations(
   }
 
   const where = { AND: and };
-  const [total, rows, unreadTotal] = await Promise.all([
+  const [total, rows, unreadTotal, pinnedIds] = await Promise.all([
     prisma.whatsAppConversation.count({ where: where as never }),
     prisma.whatsAppConversation.findMany({
       where: where as never,
@@ -269,14 +342,31 @@ export async function listConversations(
       take: pageSize,
     }),
     prisma.whatsAppConversation.aggregate({
-      where: { ...(scope as object), unreadCount: { gt: 0 } } as never,
+      where: {
+        ...(scope as object),
+        unreadCount: { gt: 0 },
+        isSpam: false,
+      } as never,
       _sum: { unreadCount: true },
       _count: { _all: true },
     }),
+    import("./whatsapp-enterprise.service.js").then((m) =>
+      m.listPinnedIds(userId)
+    ),
   ]);
 
+  const pinSet = new Set(pinnedIds);
+  const sorted = [...rows].sort((a, b) => {
+    const ap = pinSet.has(a.id) ? 1 : 0;
+    const bp = pinSet.has(b.id) ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+    return (
+      (b.lastMessageAt?.getTime() || 0) - (a.lastMessageAt?.getTime() || 0)
+    );
+  });
+
   const assigneeIds = [
-    ...new Set(rows.map((r) => r.assignedToUserId).filter(Boolean) as string[]),
+    ...new Set(sorted.map((r) => r.assignedToUserId).filter(Boolean) as string[]),
   ];
   const assignees = assigneeIds.length
     ? await prisma.user.findMany({
@@ -293,7 +383,10 @@ export async function listConversations(
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
     unreadConversations: unreadTotal._count._all,
     unreadMessages: unreadTotal._sum.unreadCount || 0,
-    items: rows.map((r) => ({
+    presetLabels: (
+      await import("./whatsapp-enterprise.service.js")
+    ).getPresetLabels(),
+    items: sorted.map((r) => ({
       id: r.id,
       phone: r.phone,
       contactId: r.contactId,
@@ -301,6 +394,12 @@ export async function listConversations(
       company: r.company,
       status: r.status,
       unreadCount: r.unreadCount,
+      labels: r.labels || [],
+      pinned: pinSet.has(r.id),
+      snoozedUntil: r.snoozedUntil?.toISOString() || null,
+      isSpam: r.isSpam,
+      isBlocked: r.isBlocked,
+      csatScore: r.csatScore,
       lastMessageAt: r.lastMessageAt?.toISOString() || null,
       lastMessagePreview: r.lastMessagePreview,
       lastMessageDirection: r.lastMessageDirection,
@@ -392,6 +491,11 @@ export async function getConversation(userId: string, conversationId: string) {
       company: conv.company || contact?.company || null,
       status: conv.status,
       unreadCount: 0,
+      labels: conv.labels || [],
+      snoozedUntil: conv.snoozedUntil?.toISOString() || null,
+      isSpam: conv.isSpam,
+      isBlocked: conv.isBlocked,
+      csatScore: conv.csatScore,
       assignedToUserId: conv.assignedToUserId,
       assignedToName: convAssignee?.name || convAssignee?.email || null,
       lastMessageAt: conv.lastMessageAt?.toISOString() || null,
@@ -445,6 +549,15 @@ export async function listMessages(
     : [];
   const uMap = new Map(users.map((u) => [u.id, u]));
 
+  let reactionMap: Record<string, Array<{ emoji: string; userId: string }>> =
+    {};
+  try {
+    const ent = await import("./whatsapp-enterprise.service.js");
+    reactionMap = await ent.getReactionsForMessages(rows.map((r) => r.id));
+  } catch {
+    /* ignore */
+  }
+
   return {
     total: totalCount,
     page: effectivePage,
@@ -459,6 +572,7 @@ export async function listMessages(
       mediaUrl: m.mediaUrl,
       mediaMime: m.mediaMime,
       mediaName: m.mediaName,
+      transcript: m.transcript,
       isInternal: m.isInternal,
       waMessageId: m.waMessageId,
       error: m.error,
@@ -466,6 +580,7 @@ export async function listMessages(
       senderName:
         uMap.get(m.userId)?.name || uMap.get(m.userId)?.email || null,
       userId: m.userId,
+      reactions: reactionMap[m.id] || [],
     })),
   };
 }
@@ -648,10 +763,26 @@ export async function setConversationStatus(
   });
   if (!conv) throw new Error("Conversation not found");
 
+  const data: Record<string, unknown> = { status };
+  if (status === "closed" || status === "won" || status === "lost") {
+    data.closedAt = new Date();
+    data.resolvedAt = new Date();
+  }
   const updated = await prisma.whatsAppConversation.update({
     where: { id: conversationId },
-    data: { status },
+    data: data as never,
   });
+
+  // CSAT prompt on close
+  if (status === "closed" || status === "won") {
+    try {
+      const ent = await import("./whatsapp-enterprise.service.js");
+      await ent.sendCsatRequest(userId, conversationId);
+    } catch {
+      /* non-fatal */
+    }
+  }
+
   return { id: updated.id, status: updated.status };
 }
 
@@ -1038,90 +1169,34 @@ export async function getConversationTimeline(
 }
 
 export async function getInboxDashboard(userId: string) {
+  try {
+    const ent = await import("./whatsapp-enterprise.service.js");
+    return ent.getEnterpriseAnalytics(userId);
+  } catch {
+    /* fall through basic */
+  }
   const businessId = await requireBusiness(userId);
   const role = await resolveActorRole(userId);
   const scope = await conversationScopeWhere(userId, businessId);
-
   const start = new Date();
   start.setHours(0, 0, 0, 0);
-
-  const [
-    openCount,
-    unreadAgg,
-    todayNew,
-    todayOutbound,
-    resolved,
-    byAssignee,
-  ] = await Promise.all([
-    prisma.whatsAppConversation.count({
-      where: {
-        ...(scope as object),
-        status: { in: ["open", "pending", "follow_up"] },
-      } as never,
-    }),
-    prisma.whatsAppConversation.aggregate({
-      where: scope as never,
-      _sum: { unreadCount: true },
-    }),
-    prisma.whatsAppConversation.count({
-      where: {
-        ...(scope as object),
-        createdAt: { gte: start },
-      } as never,
-    }),
-    prisma.whatsAppMessage.count({
-      where: {
-        businessId,
-        direction: "outbound",
-        isInternal: false,
-        createdAt: { gte: start },
-        ...(isAdmin(role) ? {} : { userId }),
-      },
-    }),
-    prisma.whatsAppConversation.count({
-      where: {
-        ...(scope as object),
-        status: { in: ["won", "closed"] },
-        updatedAt: { gte: start },
-      } as never,
-    }),
-    isAdmin(role)
-      ? prisma.whatsAppConversation.groupBy({
-          by: ["assignedToUserId"],
-          where: { businessId, assignedToUserId: { not: null } },
-          _count: { _all: true },
-          orderBy: { _count: { assignedToUserId: "desc" } },
-          take: 8,
-        })
-      : Promise.resolve([]),
-  ]);
-
-  const assigneeIds = byAssignee
-    .map((r) => r.assignedToUserId)
-    .filter(Boolean) as string[];
-  const users = assigneeIds.length
-    ? await prisma.user.findMany({
-        where: { id: { in: assigneeIds } },
-        select: { id: true, name: true, email: true },
-      })
-    : [];
-  const uMap = new Map(users.map((u) => [u.id, u]));
-
+  const openCount = await prisma.whatsAppConversation.count({
+    where: {
+      ...(scope as object),
+      status: { in: ["open", "pending", "follow_up"] },
+    } as never,
+  });
   return {
     openConversations: openCount,
-    unreadMessages: unreadAgg._sum.unreadCount || 0,
-    todayNewChats: todayNew,
-    todayReplies: todayOutbound,
-    resolvedToday: resolved,
-    averageResponseTimeMinutes: null as number | null, // computed offline later
-    topExecutives: byAssignee.map((r) => ({
-      userId: r.assignedToUserId,
-      name:
-        uMap.get(r.assignedToUserId || "")?.name ||
-        uMap.get(r.assignedToUserId || "")?.email ||
-        "Unassigned",
-      conversations: r._count._all,
-    })),
+    closedConversations: 0,
+    unreadConversations: 0,
+    messagesSentToday: 0,
+    messagesReceivedToday: 0,
+    averageResponseTimeMinutes: null,
+    averageResolutionTimeMinutes: null,
+    topExecutives: [],
+    labels: [],
+    role,
   };
 }
 

@@ -1169,6 +1169,7 @@ class ApiClient {
       status?: string;
       assignedTo?: string;
       unreadOnly?: boolean;
+      label?: string;
       page?: number;
       pageSize?: number;
     }
@@ -1178,10 +1179,78 @@ class ApiClient {
     if (q?.status) params.set("status", q.status);
     if (q?.assignedTo) params.set("assignedTo", q.assignedTo);
     if (q?.unreadOnly) params.set("unreadOnly", "1");
+    if (q?.label) params.set("label", q.label);
     if (q?.page) params.set("page", String(q.page));
     if (q?.pageSize) params.set("pageSize", String(q.pageSize));
     const qs = params.toString() ? `?${params}` : "";
     return this.get<Record<string, unknown>>(`/whatsapp/conversations${qs}`, token);
+  }
+
+  async waSetLabels(id: string, labels: string[], token?: string | null) {
+    return this.post(`/whatsapp/conversations/${id}/labels`, { labels }, token);
+  }
+  async waTogglePin(id: string, token?: string | null) {
+    return this.post(`/whatsapp/conversations/${id}/pin`, {}, token);
+  }
+  async waSnooze(
+    id: string,
+    body: { preset?: string; until?: string },
+    token?: string | null
+  ) {
+    return this.post(`/whatsapp/conversations/${id}/snooze`, body, token);
+  }
+  async waReact(messageId: string, emoji: string, token?: string | null) {
+    return this.post(`/whatsapp/messages/${messageId}/react`, { emoji }, token);
+  }
+  async waSetTyping(id: string, isTyping: boolean, token?: string | null) {
+    return this.post(`/whatsapp/conversations/${id}/typing`, { isTyping }, token);
+  }
+  async waGetTyping(id: string, token?: string | null) {
+    return this.get<{ agents: Array<{ userId: string; name: string }> }>(
+      `/whatsapp/conversations/${id}/typing`,
+      token
+    );
+  }
+  async waMerge(primaryId: string, secondaryId: string, token?: string | null) {
+    return this.post(
+      `/whatsapp/conversations/${primaryId}/merge`,
+      { secondaryId },
+      token
+    );
+  }
+  waExportUrl(id: string, format: string): string {
+    return `${this.base}/whatsapp/conversations/${id}/export?format=${format}`;
+  }
+  async waMarkSpam(id: string, block: boolean, token?: string | null) {
+    return this.post(`/whatsapp/conversations/${id}/spam`, { block }, token);
+  }
+  async waTranscribe(messageId: string, token?: string | null) {
+    return this.post(`/whatsapp/messages/${messageId}/transcribe`, {}, token);
+  }
+  async waListRules(token?: string | null) {
+    return this.get<{ rules: Array<Record<string, unknown>> }>("/whatsapp/rules", token);
+  }
+  async waSaveRule(body: Record<string, unknown>, token?: string | null) {
+    return this.post("/whatsapp/rules", body, token);
+  }
+  async waGetSla(token?: string | null) {
+    return this.get<Record<string, unknown>>("/whatsapp/sla", token);
+  }
+  async waUpdateSla(body: Record<string, unknown>, token?: string | null) {
+    return this.request("/whatsapp/sla", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      token: token ?? undefined,
+    });
+  }
+  async waListBroadcasts(token?: string | null) {
+    return this.get<{ broadcasts: Array<Record<string, unknown>> }>(
+      "/whatsapp/broadcasts",
+      token
+    );
+  }
+  async waCreateBroadcast(body: Record<string, unknown>, token?: string | null) {
+    return this.post("/whatsapp/broadcasts", body, token, { timeoutMs: 300_000 });
   }
   async getWaConversation(id: string, token?: string | null) {
     return this.get<Record<string, unknown>>(`/whatsapp/conversations/${id}`, token);

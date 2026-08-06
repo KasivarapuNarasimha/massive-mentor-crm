@@ -18,6 +18,10 @@ type Conv = {
   company?: string | null;
   status: string;
   unreadCount: number;
+  labels?: string[];
+  pinned?: boolean;
+  snoozedUntil?: string | null;
+  isSpam?: boolean;
   lastMessageAt?: string | null;
   lastMessagePreview?: string | null;
   lastMessageDirection?: string | null;
@@ -32,10 +36,23 @@ type Msg = {
   status: string;
   messageType?: string;
   isInternal?: boolean;
+  transcript?: string | null;
+  reactions?: Array<{ emoji: string; userId: string }>;
   createdAt: string;
   senderName?: string | null;
   error?: string | null;
 };
+
+const REACTION_EMOJIS = ["👍", "❤️", "👀", "✅"];
+const DEFAULT_LABELS = [
+  "🔥 Hot Lead",
+  "🟡 Warm Lead",
+  "❄ Cold Lead",
+  "💰 High Value",
+  "📞 Follow-up",
+  "⚠ Payment Pending",
+  "⭐ VIP Customer",
+];
 
 const STATUSES = [
   { key: "open", label: "Open" },
@@ -73,9 +90,22 @@ export function WhatsAppConversationCenter() {
   );
 
   const [conversations, setConversations] = useState<Conv[]>([]);
+  const [presetLabels, setPresetLabels] = useState<string[]>(DEFAULT_LABELS);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [labelFilter, setLabelFilter] = useState("");
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [typingAgents, setTypingAgents] = useState<string[]>([]);
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastBody, setBroadcastBody] = useState("");
+  const [broadcastName, setBroadcastName] = useState("Festival Wishes");
+  const [automationOpen, setAutomationOpen] = useState(false);
+  const [slaManagerMin, setSlaManagerMin] = useState(15);
+  const [slaAdminMin, setSlaAdminMin] = useState(30);
+  const [ruleName, setRuleName] = useState("Real Estate Team");
+  const [ruleIndustry, setRuleIndustry] = useState("");
+  const [ruleLocation, setRuleLocation] = useState("");
+  const [ruleAssignee, setRuleAssignee] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [detail, setDetail] = useState<{
@@ -103,14 +133,18 @@ export function WhatsAppConversationCenter() {
     const res = await api.listWaConversations(token, {
       search: search.trim() || undefined,
       status: statusFilter || undefined,
+      label: labelFilter || undefined,
       unreadOnly: unreadOnly || undefined,
       pageSize: 50,
     });
     if (res.success && res.data) {
       setConversations((res.data.items || []) as Conv[]);
+      if (Array.isArray(res.data.presetLabels)) {
+        setPresetLabels(res.data.presetLabels as string[]);
+      }
     }
     setLoadingList(false);
-  }, [token, search, statusFilter, unreadOnly]);
+  }, [token, search, statusFilter, labelFilter, unreadOnly]);
 
   const loadThread = useCallback(
     async (id: string) => {
@@ -136,9 +170,32 @@ export function WhatsAppConversationCenter() {
       void api.waAiReplies(id, token).then((r) => {
         if (r.success && r.data?.suggestions) setAiSuggestions(r.data.suggestions);
       });
+      void api.waSetTyping(id, false, token);
     },
     [token]
   );
+
+  // Typing heartbeat while composing
+  useEffect(() => {
+    if (!token || !selectedId || !composer.trim() || noteMode) return;
+    void api.waSetTyping(selectedId, true, token);
+    const t = setTimeout(() => {
+      void api.waSetTyping(selectedId, false, token);
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [composer, selectedId, token, noteMode]);
+
+  useEffect(() => {
+    if (!token || !selectedId) return;
+    const t = setInterval(() => {
+      void api.waGetTyping(selectedId, token).then((r) => {
+        if (r.success && r.data?.agents) {
+          setTypingAgents(r.data.agents.map((a) => a.name));
+        }
+      });
+    }, 3000);
+    return () => clearInterval(t);
+  }, [token, selectedId]);
 
   useEffect(() => {
     void loadList();
@@ -233,10 +290,56 @@ export function WhatsAppConversationCenter() {
           {showDash && (
             <div className="flex flex-wrap gap-3 text-xs w-full sm:w-auto">
               <Stat label="Open" value={String(dash.openConversations ?? 0)} />
-              <Stat label="Unread" value={String(dash.unreadMessages ?? 0)} />
-              <Stat label="New today" value={String(dash.todayNewChats ?? 0)} />
-              <Stat label="Replies today" value={String(dash.todayReplies ?? 0)} />
-              <Stat label="Resolved today" value={String(dash.resolvedToday ?? 0)} />
+              <Stat
+                label="Closed"
+                value={String(dash.closedConversations ?? 0)}
+              />
+              <Stat
+                label="Unread"
+                value={String(
+                  dash.unreadConversations ?? dash.unreadMessages ?? 0
+                )}
+              />
+              <Stat
+                label="Sent today"
+                value={String(dash.messagesSentToday ?? dash.todayReplies ?? 0)}
+              />
+              <Stat
+                label="Received today"
+                value={String(dash.messagesReceivedToday ?? 0)}
+              />
+              <Stat
+                label="Avg response"
+                value={
+                  dash.averageResponseTimeMinutes != null
+                    ? `${dash.averageResponseTimeMinutes}m`
+                    : "—"
+                }
+              />
+              <Stat
+                label="Avg resolution"
+                value={
+                  dash.averageResolutionTimeMinutes != null
+                    ? `${dash.averageResolutionTimeMinutes}m`
+                    : "—"
+                }
+              />
+              <Stat
+                label="CSAT"
+                value={
+                  dash.averageCsat != null ? String(dash.averageCsat) : "—"
+                }
+              />
+              {Array.isArray(dash.topExecutives) &&
+                (dash.topExecutives as Array<{ name?: string; conversations?: number }>)
+                  .slice(0, 3)
+                  .map((ex, i) => (
+                    <Stat
+                      key={i}
+                      label={`Top SE${i + 1}`}
+                      value={`${ex.name || "—"} (${ex.conversations ?? 0})`}
+                    />
+                  ))}
             </div>
           )}
         </div>
@@ -266,6 +369,18 @@ export function WhatsAppConversationCenter() {
                   </option>
                 ))}
               </select>
+              <select
+                value={labelFilter}
+                onChange={(e) => setLabelFilter(e.target.value)}
+                className="mm-input text-[11px] min-h-8 py-0 flex-1"
+              >
+                <option value="">All labels</option>
+                {presetLabels.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
               <label className="inline-flex items-center gap-1 text-[11px] text-muted-foreground px-1">
                 <input
                   type="checkbox"
@@ -281,6 +396,36 @@ export function WhatsAppConversationCenter() {
               >
                 Go
               </button>
+              {canAssign && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setBroadcastOpen(true)}
+                    className="text-[11px] px-2 rounded-lg border border-violet-500/40 text-violet-200"
+                  >
+                    Broadcast
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setAutomationOpen(true);
+                      if (!token) return;
+                      const res = await api.waGetSla(token);
+                      if (res.success && res.data) {
+                        setSlaManagerMin(
+                          Number(res.data.escalateManagerMinutes ?? 15)
+                        );
+                        setSlaAdminMin(
+                          Number(res.data.escalateAdminMinutes ?? 30)
+                        );
+                      }
+                    }}
+                    className="text-[11px] px-2 rounded-lg border border-border"
+                  >
+                    SLA & Rules
+                  </button>
+                </>
+              )}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -301,7 +446,10 @@ export function WhatsAppConversationCenter() {
                   }`}
                 >
                   <div className="flex justify-between gap-2">
-                    <span className="font-medium text-sm truncate">{c.contactName}</span>
+                    <span className="font-medium text-sm truncate">
+                      {c.pinned ? "📌 " : ""}
+                      {c.contactName}
+                    </span>
                     {c.unreadCount > 0 && (
                       <span className="shrink-0 text-[10px] font-semibold bg-emerald-600 text-white rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
                         {c.unreadCount}
@@ -311,6 +459,18 @@ export function WhatsAppConversationCenter() {
                   <div className="text-[11px] text-muted-foreground truncate mt-0.5">
                     {c.lastMessagePreview || c.phone}
                   </div>
+                  {(c.labels || []).length > 0 && (
+                    <div className="flex flex-wrap gap-0.5 mt-1">
+                      {(c.labels || []).slice(0, 3).map((l) => (
+                        <span
+                          key={l}
+                          className="text-[9px] px-1 rounded bg-white/5 border border-border"
+                        >
+                          {l}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex justify-between mt-1">
                     <span className={`text-[9px] px-1.5 py-0.5 rounded border ${statusBadge(c.status)}`}>
                       {c.status}
@@ -391,6 +551,172 @@ export function WhatsAppConversationCenter() {
                     ))}
                   </select>
                 )}
+                <button
+                  type="button"
+                  title="Pin (max 10)"
+                  className="text-xs px-2 py-1 rounded-lg border border-border"
+                  onClick={async () => {
+                    if (!token || !selectedId) return;
+                    const res = await api.waTogglePin(selectedId, token);
+                    if (res.success) {
+                      toast.success(
+                        (res.data as { pinned?: boolean })?.pinned
+                          ? "Pinned"
+                          : "Unpinned"
+                      );
+                      await loadList();
+                    } else toast.error(res.error || "Pin failed");
+                  }}
+                >
+                  📌
+                </button>
+                <select
+                  className="mm-input text-[11px] min-h-8 py-0 w-auto"
+                  defaultValue=""
+                  onChange={async (e) => {
+                    if (!token || !selectedId || !e.target.value) return;
+                    const preset = e.target.value;
+                    e.target.value = "";
+                    if (preset === "custom") {
+                      const raw = window.prompt(
+                        "Snooze until (YYYY-MM-DD HH:mm or ISO)",
+                        ""
+                      );
+                      if (!raw?.trim()) return;
+                      const until = new Date(raw.trim());
+                      if (Number.isNaN(until.getTime())) {
+                        toast.error("Invalid date/time");
+                        return;
+                      }
+                      const res = await api.waSnooze(
+                        selectedId,
+                        { until: until.toISOString() },
+                        token
+                      );
+                      if (res.success) {
+                        toast.success("Conversation snoozed");
+                        setSelectedId(null);
+                        await loadList();
+                      } else toast.error(res.error || "Snooze failed");
+                      return;
+                    }
+                    const res = await api.waSnooze(
+                      selectedId,
+                      { preset },
+                      token
+                    );
+                    if (res.success) {
+                      toast.success("Conversation snoozed");
+                      setSelectedId(null);
+                      await loadList();
+                    } else toast.error(res.error || "Snooze failed");
+                  }}
+                >
+                  <option value="">Snooze…</option>
+                  <option value="1h">1 Hour</option>
+                  <option value="tomorrow">Tomorrow Morning</option>
+                  <option value="next_week">Next Week</option>
+                  <option value="custom">Custom Date & Time</option>
+                </select>
+                <select
+                  className="mm-input text-[11px] min-h-8 py-0 w-auto max-w-[130px]"
+                  defaultValue=""
+                  onChange={async (e) => {
+                    if (!token || !selectedId || !e.target.value) return;
+                    const cur = conversations.find((x) => x.id === selectedId);
+                    const labels = [...new Set([...(cur?.labels || []), e.target.value])];
+                    const res = await api.waSetLabels(selectedId, labels, token);
+                    e.target.value = "";
+                    if (res.success) {
+                      toast.success("Label added");
+                      await loadList();
+                    } else toast.error(res.error || "Failed");
+                  }}
+                >
+                  <option value="">Label…</option>
+                  {presetLabels.map((l) => (
+                    <option key={l} value={l}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="mm-input text-[11px] min-h-8 py-0 w-auto"
+                  defaultValue=""
+                  onChange={async (e) => {
+                    if (!token || !selectedId || !e.target.value) return;
+                    const format = e.target.value;
+                    e.target.value = "";
+                    const url = api.waExportUrl(selectedId, format);
+                    try {
+                      const res = await fetch(url, {
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      if (!res.ok) throw new Error("Export failed");
+                      const blob = await res.blob();
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `whatsapp-export.${format === "xlsx" ? "csv" : format}`;
+                      a.click();
+                      toast.success("Export downloaded");
+                    } catch {
+                      toast.error("Export failed");
+                    }
+                  }}
+                >
+                  <option value="">Export…</option>
+                  <option value="txt">Text</option>
+                  <option value="csv">Excel/CSV</option>
+                  <option value="pdf">PDF (text)</option>
+                </select>
+                <button
+                  type="button"
+                  className="text-[11px] px-2 py-1 rounded-lg border border-red-500/30 text-red-300"
+                  onClick={async () => {
+                    if (!token || !selectedId) return;
+                    if (!confirm("Mark as spam and close?")) return;
+                    const res = await api.waMarkSpam(selectedId, true, token);
+                    if (res.success) {
+                      toast.success("Marked spam & blocked");
+                      setSelectedId(null);
+                      await loadList();
+                    } else toast.error(res.error || "Failed");
+                  }}
+                >
+                  Spam
+                </button>
+                {canAssign && (
+                  <button
+                    type="button"
+                    className="text-[11px] px-2 py-1 rounded-lg border border-border"
+                    title="Merge another conversation into this one"
+                    onClick={async () => {
+                      if (!token || !selectedId) return;
+                      const secondaryId = window.prompt(
+                        "Merge into this chat — enter the other conversation ID (messages, labels, pins move here; other thread is deleted):"
+                      );
+                      if (!secondaryId?.trim()) return;
+                      if (
+                        !confirm(
+                          "Merge conversations? This cannot be undone."
+                        )
+                      )
+                        return;
+                      const res = await api.waMerge(
+                        selectedId,
+                        secondaryId.trim(),
+                        token
+                      );
+                      if (res.success) {
+                        toast.success("Conversations merged");
+                        await loadThread(selectedId);
+                        await loadList();
+                      } else toast.error(res.error || "Merge failed");
+                    }}
+                  >
+                    Merge
+                  </button>
+                )}
               </div>
 
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -420,7 +746,47 @@ export function WhatsAppConversationCenter() {
                             </div>
                           )}
                           <div className="whitespace-pre-wrap break-words">{m.body}</div>
-                          <div className="flex justify-end gap-2 mt-1 text-[10px] text-muted-foreground">
+                          {m.transcript && (
+                            <div className="mt-1 text-[11px] text-muted-foreground border-t border-white/10 pt-1">
+                              🎙 {m.transcript}
+                            </div>
+                          )}
+                          {m.messageType === "audio" && !m.transcript && token && (
+                            <button
+                              type="button"
+                              className="text-[10px] text-violet-300 mt-1 underline"
+                              onClick={async () => {
+                                const res = await api.waTranscribe(m.id, token);
+                                if (res.success) {
+                                  toast.success("Transcript ready");
+                                  if (selectedId) await loadThread(selectedId);
+                                } else toast.error(res.error || "Transcribe failed");
+                              }}
+                            >
+                              Transcribe voice note
+                            </button>
+                          )}
+                          <div className="flex flex-wrap items-center justify-end gap-1.5 mt-1 text-[10px] text-muted-foreground">
+                            {(m.reactions || []).length > 0 && (
+                              <span className="mr-auto">
+                                {(m.reactions || []).map((r) => r.emoji).join(" ")}
+                              </span>
+                            )}
+                            {REACTION_EMOJIS.map((em) => (
+                              <button
+                                key={em}
+                                type="button"
+                                className="opacity-60 hover:opacity-100"
+                                title="Internal reaction"
+                                onClick={async () => {
+                                  if (!token) return;
+                                  await api.waReact(m.id, em, token);
+                                  if (selectedId) await loadThread(selectedId);
+                                }}
+                              >
+                                {em}
+                              </button>
+                            ))}
                             <span>
                               {new Date(m.createdAt).toLocaleString("en-IN", {
                                 hour: "2-digit",
@@ -448,6 +814,11 @@ export function WhatsAppConversationCenter() {
                       </div>
                     );
                   })
+                )}
+                {typingAgents.length > 0 && (
+                  <p className="text-xs text-muted-foreground italic px-1">
+                    {typingAgents.join(", ")} is replying…
+                  </p>
                 )}
                 <div ref={bottomRef} />
               </div>
@@ -712,6 +1083,185 @@ export function WhatsAppConversationCenter() {
           </div>
         </aside>
       </div>
+
+      {automationOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 space-y-3 max-h-[90vh] overflow-y-auto">
+            <h3 className="font-semibold">SLA & auto-assignment</h3>
+            <p className="text-xs text-muted-foreground">
+              Escalate unanswered chats automatically. New WhatsApp threads match rules by industry/location.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-xs space-y-1">
+                <span className="text-muted-foreground">Notify manager (min)</span>
+                <input
+                  type="number"
+                  min={1}
+                  className="mm-input w-full text-sm min-h-9"
+                  value={slaManagerMin}
+                  onChange={(e) => setSlaManagerMin(Number(e.target.value) || 15)}
+                />
+              </label>
+              <label className="text-xs space-y-1">
+                <span className="text-muted-foreground">Notify admin (min)</span>
+                <input
+                  type="number"
+                  min={1}
+                  className="mm-input w-full text-sm min-h-9"
+                  value={slaAdminMin}
+                  onChange={(e) => setSlaAdminMin(Number(e.target.value) || 30)}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="w-full min-h-9 rounded-xl border border-border text-sm"
+              onClick={async () => {
+                if (!token) return;
+                const res = await api.waUpdateSla(
+                  {
+                    isActive: true,
+                    escalateManagerMinutes: slaManagerMin,
+                    escalateAdminMinutes: slaAdminMin,
+                  },
+                  token
+                );
+                if (res.success) toast.success("SLA policy saved");
+                else toast.error(res.error || "Failed");
+              }}
+            >
+              Save SLA policy
+            </button>
+            <hr className="border-border" />
+            <h4 className="text-sm font-medium">New auto-assign rule</h4>
+            <input
+              className="mm-input w-full text-sm min-h-9"
+              value={ruleName}
+              onChange={(e) => setRuleName(e.target.value)}
+              placeholder="Rule name e.g. Hyderabad Sales"
+            />
+            <input
+              className="mm-input w-full text-sm min-h-9"
+              value={ruleIndustry}
+              onChange={(e) => setRuleIndustry(e.target.value)}
+              placeholder="Industry contains (e.g. Real Estate)"
+            />
+            <input
+              className="mm-input w-full text-sm min-h-9"
+              value={ruleLocation}
+              onChange={(e) => setRuleLocation(e.target.value)}
+              placeholder="Location contains (e.g. Hyderabad)"
+            />
+            <select
+              className="mm-input w-full text-sm min-h-9"
+              value={ruleAssignee}
+              onChange={(e) => setRuleAssignee(e.target.value)}
+            >
+              <option value="">Assign to…</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name || a.email}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="flex-1 min-h-10 rounded-xl border border-border"
+                onClick={() => setAutomationOpen(false)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="flex-1 min-h-10 rounded-xl bg-emerald-600 text-white font-medium text-sm"
+                onClick={async () => {
+                  if (!token) return;
+                  if (!ruleName.trim() || !ruleAssignee) {
+                    toast.error("Name and assignee required");
+                    return;
+                  }
+                  const conditions: Record<string, string> = {};
+                  if (ruleIndustry.trim()) conditions.industry = ruleIndustry.trim();
+                  if (ruleLocation.trim())
+                    conditions.locationContains = ruleLocation.trim();
+                  const res = await api.waSaveRule(
+                    {
+                      name: ruleName.trim(),
+                      priority: 50,
+                      isActive: true,
+                      conditions,
+                      assignToUserId: ruleAssignee,
+                    },
+                    token
+                  );
+                  if (res.success) {
+                    toast.success("Auto-assign rule saved");
+                    setRuleIndustry("");
+                    setRuleLocation("");
+                  } else toast.error(res.error || "Failed");
+                }}
+              >
+                Save rule
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {broadcastOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 space-y-3">
+            <h3 className="font-semibold">Broadcast campaign</h3>
+            <p className="text-xs text-muted-foreground">
+              Sends approved free-text (or Meta template name) to filtered leads. Track delivery in history.
+            </p>
+            <input
+              className="mm-input w-full text-sm min-h-10"
+              value={broadcastName}
+              onChange={(e) => setBroadcastName(e.target.value)}
+              placeholder="Campaign name"
+            />
+            <textarea
+              className="mm-input w-full text-sm min-h-[100px]"
+              value={broadcastBody}
+              onChange={(e) => setBroadcastBody(e.target.value)}
+              placeholder="Message body or leave blank if using template only"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="flex-1 min-h-10 rounded-xl border border-border"
+                onClick={() => setBroadcastOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="flex-1 min-h-10 rounded-xl bg-violet-600 text-white font-medium"
+                onClick={async () => {
+                  if (!token) return;
+                  const res = await api.waCreateBroadcast(
+                    {
+                      name: broadcastName,
+                      body: broadcastBody || "Hello from Massive Mentor!",
+                      audienceFilter: { type: "lead" },
+                      sendNow: true,
+                    },
+                    token
+                  );
+                  if (res.success) {
+                    toast.success("Broadcast started");
+                    setBroadcastOpen(false);
+                  } else toast.error(res.error || "Broadcast failed");
+                }}
+              >
+                Send to Leads
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -733,3 +1283,6 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+// Broadcast modal is rendered by parent via state — keep helpers colocated
+// (broadcast UI appended in main return)

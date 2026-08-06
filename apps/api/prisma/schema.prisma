@@ -347,6 +347,9 @@ model Business {
   mediaAssetVersions MediaAssetVersion[]
   whatsappCaptionTemplates WhatsAppCaptionTemplate[]
   whatsappConversations WhatsAppConversation[]
+  whatsappAssignRules   WhatsAppAssignRule[]
+  whatsappSlaPolicies   WhatsAppSlaPolicy[]
+  whatsappBroadcasts    WhatsAppBroadcast[]
   currentPlanId      String?
   currentPlan        SubscriptionPlan? @relation(fields: [currentPlanId], references: [id], onDelete: SetNull)
 
@@ -1499,19 +1502,161 @@ model WhatsAppConversation {
   lastMessageDirection String?
   lastInboundAt        DateTime?
   lastOutboundAt       DateTime?
+  /// Conversation labels e.g. Hot Lead, VIP, Payment Pending
+  labels               String[] @default([])
+  /// Hide from active inbox until this time
+  snoozedUntil         DateTime?
+  isSpam               Boolean  @default(false)
+  isBlocked            Boolean  @default(false)
+  /// Customer satisfaction 1-5 after close
+  csatScore            Int?
+  csatComment          String?
+  csatSentAt           DateTime?
+  csatRespondedAt      DateTime?
+  closedAt             DateTime?
+  firstResponseAt      DateTime?
+  resolvedAt           DateTime?
+  lastAgentReplyAt     DateTime?
+  /// SLA breach flags
+  slaBreachedL1        Boolean  @default(false)
+  slaBreachedL2        Boolean  @default(false)
   /// AI summary JSON: requirement, budget, objections, nextAction, probability
   aiSummary            Json?
   aiSummaryAt          DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   messages             WhatsAppMessage[]
+  pins                 WhatsAppConversationPin[]
+  typing               WhatsAppTypingState[]
 
   @@unique([businessId, phone])
   @@index([businessId, lastMessageAt])
   @@index([businessId, assignedToUserId, lastMessageAt])
   @@index([businessId, status, lastMessageAt])
   @@index([businessId, unreadCount])
+  @@index([businessId, snoozedUntil])
+  @@index([businessId, isSpam])
   @@index([contactId])
+}
+
+/// Per-user pinned conversations (max 10 enforced in service)
+model WhatsAppConversationPin {
+  id             String   @id @default(cuid())
+  businessId     String
+  userId         String
+  conversationId String
+  conversation   WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, conversationId])
+  @@index([userId, createdAt])
+  @@index([businessId, userId])
+}
+
+/// Internal-only message reactions (never sent to customer)
+model WhatsAppMessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   WhatsAppMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+/// Soft typing indicators for team collab (+ optional customer flag)
+model WhatsAppTypingState {
+  id             String   @id @default(cuid())
+  conversationId String
+  conversation   WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  /// agent | customer
+  actorType      String   @default("agent")
+  isTyping       Boolean  @default(true)
+  updatedAt      DateTime @updatedAt
+
+  @@unique([conversationId, userId])
+  @@index([conversationId, updatedAt])
+}
+
+/// Auto-assignment rules for new WhatsApp conversations
+model WhatsAppAssignRule {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name            String
+  priority        Int      @default(100)
+  isActive        Boolean  @default(true)
+  /// { industry?, locationContains?, source?, tagsAny?, label? }
+  conditions      Json     @default("{}")
+  assignToUserId  String?
+  /// Round-robin pool of user ids
+  assignToUserIds String[] @default([])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([businessId, isActive, priority])
+}
+
+/// SLA policy for first-response escalation
+model WhatsAppSlaPolicy {
+  id                       String   @id @default(cuid())
+  businessId               String
+  business                 Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  isActive                 Boolean  @default(true)
+  /// Minutes without agent reply after inbound → notify manager
+  escalateManagerMinutes   Int      @default(15)
+  /// Minutes without agent reply → notify business admin
+  escalateAdminMinutes     Int      @default(30)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([businessId])
+}
+
+/// Broadcast campaigns (template-based bulk WhatsApp)
+model WhatsAppBroadcast {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name            String
+  /// Free-text body or template name
+  body            String   @db.Text
+  templateName    String?
+  /// draft | sending | completed | failed | cancelled
+  status          String   @default("draft")
+  /// { type: lead|client|all, status?, tags?, industry?, location? }
+  audienceFilter  Json     @default("{}")
+  createdByUserId String
+  totalRecipients Int      @default(0)
+  sentCount       Int      @default(0)
+  failedCount     Int      @default(0)
+  deliveredCount  Int      @default(0)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  items           WhatsAppBroadcastItem[]
+
+  @@index([businessId, createdAt])
+  @@index([businessId, status])
+}
+
+model WhatsAppBroadcastItem {
+  id           String   @id @default(cuid())
+  broadcastId  String
+  broadcast    WhatsAppBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  contactId    String?
+  phone        String
+  status       String   @default("pending") // pending | sent | delivered | failed
+  error        String?
+  waMessageId  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([broadcastId, status])
 }
 
 /// WhatsApp Cloud API conversation history (real send + inbound + internal notes)
@@ -1533,6 +1678,8 @@ model WhatsAppMessage {
   mediaUrl      String?
   mediaMime     String?
   mediaName     String?
+  /// Speech-to-text for voice notes
+  transcript    String?  @db.Text
   /// Private note — never sent to customer
   isInternal    Boolean  @default(false)
   waMessageId   String?
@@ -1541,6 +1688,7 @@ model WhatsAppMessage {
   metadata      Json?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  reactions     WhatsAppMessageReaction[]
 
   @@index([userId, createdAt])
   @@index([contactId, createdAt])

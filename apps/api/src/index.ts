@@ -440,6 +440,21 @@ server = app.listen(PORT, () => {
   };
   setTimeout(runBilling, 60_000);
   setInterval(runBilling, 6 * 60 * 60 * 1000);
+
+  // WhatsApp enterprise: expired snoozes + SLA escalations (multi-instance safe)
+  const runWaEnterprise = async () => {
+    try {
+      const { withDistributedLock } = await import("./lib/distributed-lock.js");
+      const ent = await import("./services/whatsapp-enterprise.service.js");
+      await withDistributedLock("whatsapp-enterprise-jobs", () =>
+        ent.processWhatsAppEnterpriseJobs()
+      );
+    } catch (err) {
+      console.error("[whatsapp-enterprise-jobs]", err);
+    }
+  };
+  setTimeout(runWaEnterprise, 90_000);
+  setInterval(runWaEnterprise, 2 * 60 * 1000);
 });
 
 // Graceful shutdown (PM2 / zero-downtime reload)
