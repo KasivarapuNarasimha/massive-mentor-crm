@@ -1017,23 +1017,13 @@ export async function getAssetForDownload(userId: string, assetId: string) {
   };
 }
 
-/** Caption template vars: {{CustomerName}} {{SalesExecutive}} {{Company}} {{Phone}} */
-export function renderCaption(
-  template: string,
-  vars: {
-    customerName?: string;
-    salesExecutive?: string;
-    company?: string;
-    phone?: string;
-  }
-): string {
-  return (template || "")
-    .replace(/\{\{\s*CustomerName\s*\}\}/gi, vars.customerName || "")
-    .replace(/\{\{\s*SalesExecutive\s*\}\}/gi, vars.salesExecutive || "")
-    .replace(/\{\{\s*Company\s*\}\}/gi, vars.company || "")
-    .replace(/\{\{\s*Phone\s*\}\}/gi, vars.phone || "")
-    .trim();
-}
+/** Caption template vars — shared engine (WhatsApp / email / SMS). */
+export {
+  renderCaption,
+  renderTemplate,
+  buildContactTemplateVars,
+  renderForContact,
+} from "./template-vars.service.js";
 
 function waMediaType(kind: string, mime: string): "image" | "video" | "document" {
   if (kind === "image" || mime.startsWith("image/")) return "image";
@@ -1078,6 +1068,21 @@ export async function sendMediaViaWhatsApp(
   });
   const salesName = actor?.name?.trim() || actor?.email || "Sales";
 
+  // Full merge context — assignee, company, service, deal value, business name
+  const { buildContactTemplateVars, renderTemplate } = await import(
+    "./template-vars.service.js"
+  );
+  const templateVars = await buildContactTemplateVars({
+    contactId: contactRow.id,
+    actorUserId: userId,
+    businessId,
+  });
+  // Prefer assignee as SalesExecutive; fall back already handled in builder
+  if (!templateVars.SalesExecutive) {
+    templateVars.SalesExecutive = salesName;
+    templateVars.Assignee = salesName;
+  }
+
   const now = new Date();
   const assets = await prisma.mediaAsset.findMany({
     where: {
@@ -1100,12 +1105,8 @@ export async function sendMediaViaWhatsApp(
     .map((id) => assets.find((a) => a.id === id))
     .filter(Boolean) as typeof assets;
 
-  const baseCaption = renderCaption(opts.caption || "", {
-    customerName: contactRow.name,
-    salesExecutive: salesName,
-    company: contactRow.company || "",
-    phone: contactRow.phone || "",
-  });
+  const rawCaption = opts.caption || "";
+  const baseCaption = renderTemplate(rawCaption, templateVars);
 
   const results: Array<{
     assetId: string;
@@ -1118,11 +1119,13 @@ export async function sendMediaViaWhatsApp(
 
   for (let i = 0; i < ordered.length; i++) {
     const asset = ordered[i]!;
-    // Caption only on first file if multi-send (WhatsApp UX)
-    const caption =
+    // Caption only on first file if multi-send (WhatsApp UX); always fully rendered
+    const captionRaw =
       i === 0
-        ? baseCaption || asset.captionDefault || undefined
-        : asset.captionDefault || undefined;
+        ? baseCaption || asset.captionDefault || ""
+        : asset.captionDefault || "";
+    const caption =
+      renderTemplate(captionRaw, templateVars) || undefined;
 
     const log = await prisma.mediaSendLog.create({
       data: {

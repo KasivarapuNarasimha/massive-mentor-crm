@@ -1318,6 +1318,9 @@ export async function sendLeadEmails(
   if (!contacts.length) throw new Error("No matching leads found");
 
   const { sendEmail } = await import("./email.service.js");
+  const { buildContactTemplateVars, renderTemplate } = await import(
+    "./template-vars.service.js"
+  );
   const results: Array<{ id: string; ok: boolean; error?: string }> = [];
   let sent = 0;
   let failed = 0;
@@ -1330,11 +1333,19 @@ export async function sendLeadEmails(
       continue;
     }
     try {
+      // Personalize subject + body per lead (never leave {{placeholders}})
+      const vars = await buildContactTemplateVars({
+        contactId: c.id,
+        actorUserId: userId,
+        businessId: scope.businessId,
+      });
+      const finalSubject = renderTemplate(subject, vars) || subject;
+      const finalBody = renderTemplate(body, vars) || body;
       const delivery = await sendEmail({
         to,
-        subject,
-        text: body,
-        html: body.replace(/\n/g, "<br/>\n"),
+        subject: finalSubject,
+        text: finalBody,
+        html: finalBody.replace(/\n/g, "<br/>\n"),
       });
       if (!delivery.delivered && delivery.mode === "console") {
         // Dev: still count as sent for UX
@@ -1345,7 +1356,7 @@ export async function sendLeadEmails(
         entityType: "contact",
         entityId: c.id,
         action: "email_sent",
-        details: { subject, to, mode: delivery.mode },
+        details: { subject: finalSubject, to, mode: delivery.mode },
       }).catch(() => undefined);
       sent++;
       results.push({ id: c.id, ok: true });

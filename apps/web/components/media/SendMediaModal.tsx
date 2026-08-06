@@ -1,14 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { api, API_BASE_URL } from "@/lib/api";
 import { toast } from "sonner";
 import {
   cacheMediaOffline,
   fetchAndCacheMedia,
   listOfflineMedia,
 } from "@/lib/media-offline-cache";
-import { API_BASE_URL } from "@/lib/api";
+import {
+  hasUnresolvedPlaceholders,
+  renderTemplate,
+  varsFromContact,
+  type TemplateVars,
+} from "@/lib/template-vars";
+import { useAuth } from "@/lib/auth-context";
 
 type Asset = {
   id: string;
@@ -59,6 +65,7 @@ export function SendMediaModal({
   contactPhone,
   preselectedAssetIds,
 }: Props) {
+  const { user } = useAuth();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [kits, setKits] = useState<Kit[]>([]);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -69,21 +76,73 @@ export function SendMediaModal({
   const [loading, setLoading] = useState(true);
   const [offlineHint, setOfflineHint] = useState(false);
   const [serviceHints, setServiceHints] = useState<string[]>([]);
+  const [templateVars, setTemplateVars] = useState<TemplateVars>({
+    CustomerName: contactName,
+    Phone: contactPhone || "",
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
     setOfflineHint(false);
     try {
-      const [a, k, rec] = await Promise.all([
+      const [a, k, rec, contactRes] = await Promise.all([
         api.listMediaAssets(token, { pageSize: 100, shareableOnly: true }),
         api.listMediaKits(token),
         api.recommendMediaForContact(contactId, token),
+        api.getCrmContact(contactId, token),
       ]);
+
+      // Build merge vars from full contact + current user as fallback sales exec
+      let contact: Record<string, unknown> = {
+        name: contactName,
+        phone: contactPhone,
+      };
+      if (contactRes.success && contactRes.data) {
+        const raw = contactRes.data as Record<string, unknown>;
+        // API may return contact at root or under .contact
+        contact =
+          (raw.contact as Record<string, unknown>) ||
+          (raw as Record<string, unknown>);
+      }
+
+      const assignedTo = contact.assignedTo as string | undefined;
+      let assignedToName: string | null = null;
+      // Prefer assignee name if embedded; otherwise current actor name
+      if (contact.assignedToName && typeof contact.assignedToName === "string") {
+        assignedToName = contact.assignedToName;
+      }
+
+      const actorName =
+        (user as { name?: string | null } | null)?.name ||
+        (user as { email?: string | null } | null)?.email ||
+        "Sales";
+
+      const vars = varsFromContact(
+        {
+          name: String(contact.name || contactName || ""),
+          company: contact.company as string | null,
+          phone: (contact.phone as string) || contactPhone || null,
+          whatsapp: contact.whatsapp as string | null,
+          email: contact.email as string | null,
+          industry: contact.industry as string | null,
+          status: contact.status as string | null,
+          source: contact.source as string | null,
+          value: contact.value as number | null,
+          customFields: (contact.customFields || {}) as Record<string, unknown>,
+          assignedToName,
+        },
+        {
+          salesExecutive: assignedToName || actorName,
+          businessName: undefined,
+        }
+      );
+      setTemplateVars(vars);
+      void assignedTo;
+
       if (a.success && a.data) {
         const list = (a.data.assets || a.data.items || []) as Asset[];
         setAssets(list);
       } else if (!a.success) {
-        // Surface permission/API errors instead of a false "no files" state
         const err = (a as { error?: string }).error || "Could not load media library";
         if (/permission|forbidden|MODULE/i.test(err)) {
           toast.error("Media access denied — contact your admin to enable Media Library");
@@ -95,11 +154,9 @@ export function SendMediaModal({
         const sug = (rec.data.suggestions || []) as Suggestion[];
         setSuggestions(sug);
         setServiceHints(rec.data.serviceHints || []);
-        // Auto-select top AI suggestions when no preselection
         if (!preselectedAssetIds?.length && sug.length) {
           setSelected(new Set(sug.slice(0, 4).map((s) => s.id)));
         }
-        // Cache suggestions offline for field sales
         for (const s of sug.slice(0, 6)) {
           void fetchAndCacheMedia(API_BASE_URL, token, {
             id: s.id,
@@ -112,7 +169,6 @@ export function SendMediaModal({
         }
       }
     } catch {
-      // Offline fallback
       const cached = await listOfflineMedia();
       if (cached.length) {
         setAssets(
@@ -130,11 +186,12 @@ export function SendMediaModal({
       }
     }
     setLoading(false);
-  }, [token, contactId, preselectedAssetIds]);
+  }, [token, contactId, contactName, contactPhone, preselectedAssetIds, user]);
 
   useEffect(() => {
     if (open) {
       void load();
+      setCaption(DEFAULT_CAPTION);
       if (preselectedAssetIds?.length) {
         setSelected(new Set(preselectedAssetIds));
       }
@@ -148,6 +205,11 @@ export function SendMediaModal({
     setSelected(new Set(kit.items.map((i) => i.assetId)));
     if (kit.captionTemplate) setCaption(kit.captionTemplate);
   }, [kitId, kits]);
+
+  const renderedCaption = useMemo(
+    () => renderTemplate(caption, templateVars),
+    [caption, templateVars]
+  );
 
   if (!open) return null;
 
@@ -177,10 +239,16 @@ export function SendMediaModal({
       toast.error("You are offline. Files will be sendable once connectivity is restored.");
       return;
     }
+    // Always send the template form — server re-renders with full context (assignee, deal, etc.)
+    // Also send if user edited already-rendered text
     setSending(true);
     try {
       const res = kitId
-        ? await api.sendMediaKitWhatsApp(kitId, { contactId, caption }, token)
+        ? await api.sendMediaKitWhatsApp(
+            kitId,
+            { contactId, caption },
+            token
+          )
         : await api.sendMediaWhatsApp(
             {
               contactId,
@@ -194,7 +262,6 @@ export function SendMediaModal({
         toast.success(`Sent ${d.sent ?? selected.size} file(s) via WhatsApp`, {
           description: d.failed ? `${d.failed} failed` : contactName,
         });
-        // Keep offline cache warm
         for (const id of selected) {
           const a = assets.find((x) => x.id === id) || suggestions.find((x) => x.id === id);
           if (a) {
@@ -239,7 +306,6 @@ export function SendMediaModal({
           </div>
         )}
 
-        {/* AI recommendations */}
         {suggestions.length > 0 && (
           <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-3">
             <div className="flex items-center justify-between gap-2 mb-2">
@@ -329,14 +395,39 @@ export function SendMediaModal({
 
         <div className="mt-4">
           <label className="text-[10px] uppercase text-muted-foreground">
-            Caption (supports {"{{CustomerName}}"}, {"{{SalesExecutive}}"})
+            Caption template
           </label>
           <textarea
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
             rows={5}
-            className="mm-input w-full text-sm mt-1 resize-y"
+            className="mm-input w-full text-sm mt-1 resize-y font-mono"
+            placeholder="Hello {{CustomerName}}, …"
           />
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Variables: {"{{CustomerName}}"}, {"{{SalesExecutive}}"}, {"{{Company}}"},{" "}
+            {"{{Phone}}"}, {"{{Email}}"}, {"{{Service}}"}, {"{{DealValue}}"},{" "}
+            {"{{BusinessName}}"}
+          </p>
+        </div>
+
+        {/* Final WhatsApp preview — fully rendered, no placeholders */}
+        <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-300 mb-2">
+            Message preview (as customer will see)
+          </div>
+          {renderedCaption ? (
+            <pre className="text-sm whitespace-pre-wrap font-sans text-foreground leading-relaxed">
+              {renderedCaption}
+            </pre>
+          ) : (
+            <p className="text-xs text-muted-foreground">Caption is empty.</p>
+          )}
+          {hasUnresolvedPlaceholders(renderedCaption) && (
+            <p className="text-[11px] text-amber-300 mt-2">
+              Some variables could not be filled — they will be removed on send.
+            </p>
+          )}
         </div>
 
         <button
