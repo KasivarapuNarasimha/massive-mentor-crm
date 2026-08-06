@@ -79,7 +79,17 @@ export function SendMediaModal({
         api.listMediaKits(token),
         api.recommendMediaForContact(contactId, token),
       ]);
-      if (a.success && a.data?.assets) setAssets(a.data.assets as Asset[]);
+      if (a.success && a.data) {
+        const list = (a.data.assets || a.data.items || []) as Asset[];
+        setAssets(list);
+      } else if (!a.success) {
+        // Surface permission/API errors instead of a false "no files" state
+        const err = (a as { error?: string }).error || "Could not load media library";
+        if (/permission|forbidden|MODULE/i.test(err)) {
+          toast.error("Media access denied — contact your admin to enable Media Library");
+        }
+        setAssets([]);
+      }
       if (k.success && k.data?.kits) setKits(k.data.kits as Kit[]);
       if (rec.success && rec.data) {
         const sug = (rec.data.suggestions || []) as Suggestion[];

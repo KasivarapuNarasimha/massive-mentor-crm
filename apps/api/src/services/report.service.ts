@@ -417,19 +417,23 @@ async function aggregateLeadsByDay(
     return map;
   }
   if (contactScope.businessId && contactScope.ownDataOnly) {
+    const ids =
+      contactScope.visibleUserIds && contactScope.visibleUserIds.length
+        ? contactScope.visibleUserIds
+        : [userId];
     const rows = await prisma.$queryRawUnsafe<Array<{ d: string; n: number }>>(
       `SELECT to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') AS d,
               COUNT(*)::int AS n
        FROM "Contact"
        WHERE "businessId" = $1
-         AND ("userId" = $2 OR "assignedTo" = $2)
+         AND ("userId" = ANY($2::text[]) OR "assignedTo" = ANY($2::text[]))
          AND type = 'lead'
          AND "deletedAt" IS NULL
          AND "createdAt" >= $3
        GROUP BY 1
        ORDER BY 1`,
       contactScope.businessId,
-      userId,
+      ids,
       from
     );
     for (const r of rows) map.set(String(r.d), Number(r.n) || 0);

@@ -85,6 +85,25 @@ export async function requireModuleFromPath(
         required: ["mentor", "ai_sales"],
       });
     }
+    // Media Library is core CRM sharing: allow with media OR leads OR clients OR documents
+    // (matches frontend canAccessPath). Prevents SM/SE with leads but legacy module grants
+    // missing "media" from seeing empty Send Media after admin upload.
+    if (mod === "media") {
+      if (
+        keys.includes("media") ||
+        keys.includes("leads") ||
+        keys.includes("clients") ||
+        keys.includes("documents")
+      ) {
+        return next();
+      }
+      return res.status(403).json({
+        success: false,
+        error: "You do not have permission to access this resource.",
+        code: "MODULE_FORBIDDEN",
+        required: ["media", "leads"],
+      });
+    }
     if (!keys.includes(mod)) {
       return res.status(403).json({
         success: false,

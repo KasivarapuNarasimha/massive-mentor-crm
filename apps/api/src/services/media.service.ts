@@ -237,9 +237,11 @@ export async function listAssets(userId: string, opts?: ListAssetsOpts) {
   const andClauses: Array<Record<string, unknown>> = [];
 
   if (opts?.shareableOnly) {
+    // Workspace-shared assets for all CRM roles (not filtered by uploader).
+    // Anything not pending/rejected is sendable (covers approved + legacy rows).
     const now = new Date();
-    where.approvalStatus = "approved";
     where.archivedAt = null;
+    where.approvalStatus = { notIn: ["pending", "rejected"] };
     andClauses.push({
       OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
     });
@@ -1083,7 +1085,7 @@ export async function sendMediaViaWhatsApp(
       businessId,
       deletedAt: null,
       archivedAt: null,
-      approvalStatus: "approved",
+      approvalStatus: { notIn: ["pending", "rejected"] },
       OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
     },
   });

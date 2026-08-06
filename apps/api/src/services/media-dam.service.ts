@@ -71,7 +71,8 @@ export function shareableAssetWhere(businessId: string) {
     businessId,
     deletedAt: null,
     archivedAt: null,
-    approvalStatus: "approved",
+    // Workspace-level sharing — never filter by createdByUserId
+    approvalStatus: { notIn: ["pending", "rejected"] },
     OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
   };
 }

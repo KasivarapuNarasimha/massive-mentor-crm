@@ -244,16 +244,28 @@ export async function getMemberModuleKeys(
   });
   const role = member?.role || user.role || "sales_executive";
   const parsed = parseMemberPermissions(member?.permissions);
+  let keys: string[];
   if (Array.isArray(parsed.modules) && parsed.modules.length > 0) {
-    return Array.from(new Set([...parsed.modules, ...alwaysOnModules()]));
-  }
-  // Legacy: owner/admin/ceo without modules JSON → full template for role
-  if (["owner", "admin", "ceo", "business_admin"].includes(role)) {
-    return modulesForTemplate(
+    keys = Array.from(new Set([...parsed.modules, ...alwaysOnModules()]));
+  } else if (["owner", "admin", "ceo", "business_admin"].includes(role)) {
+    // Legacy: owner/admin/ceo without modules JSON → full template for role
+    keys = modulesForTemplate(
       role === "owner" || role === "admin" ? "business_admin" : role
     );
+  } else {
+    keys = modulesForTemplate(role);
   }
-  return modulesForTemplate(role);
+
+  // Sales CRM users with leads always receive Media Library access for Send Media
+  // (approved business assets are workspace-shared, not uploader-private).
+  if (
+    (keys.includes("leads") || keys.includes("clients")) &&
+    !keys.includes("media")
+  ) {
+    keys.push("media");
+  }
+
+  return keys;
 }
 
 export async function memberHasModule(
