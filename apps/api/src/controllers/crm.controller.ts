@@ -297,38 +297,135 @@ export async function bulkDeleteLeadsHandler(req: AuthenticatedRequest, res: Res
   }
 }
 
-/** POST /api/leads/bulk-assign — selected | first_n | all_filtered */
+/** POST /api/leads/bulk-assign — single | all_members + selected | first_n | all_filtered */
 export async function bulkAssignLeadsHandler(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     extendBulkRequestTimeout(req, res);
-    const rawScope = String(req.body?.scope || req.body?.mode || "ids").toLowerCase();
+    const rawScope = String(req.body?.scope || "ids").toLowerCase();
     const scope =
       rawScope === "first_n" || rawScope === "firstn" || rawScope === "first"
         ? "first_n"
         : rawScope === "all_filtered" || rawScope === "all"
           ? "all_filtered"
-          : "ids";
+          : rawScope === "reassign"
+            ? "reassign"
+            : "ids";
+    const rawMode = String(req.body?.assignMode || req.body?.mode || "single").toLowerCase();
+    const mode =
+      rawMode === "all_members" || rawMode === "all" || rawMode === "everyone"
+        ? "all_members"
+        : "single";
     const assignedTo = String(req.body?.assignedTo || req.body?.userId || "").trim();
     const limitRaw = req.body?.limit ?? req.body?.count ?? req.body?.firstN;
     const limit =
       limitRaw === undefined || limitRaw === null || limitRaw === ""
         ? undefined
         : Number(limitRaw);
+    const dryRun = req.body?.dryRun === true || req.body?.preview === true;
 
-    const { bulkAssignLeads } = await import("../services/crm.service.js");
-    const data = await bulkAssignLeads(req.user.id, {
-      assignedTo,
+    const { smartBulkAssignLeads } = await import("../services/lead-assignment.service.js");
+    const data = await smartBulkAssignLeads(req.user.id, {
+      mode,
+      assignedTo: mode === "single" ? assignedTo : undefined,
       scope,
       ids: Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : undefined,
       limit,
       search: typeof req.body?.search === "string" ? req.body.search : undefined,
       status: typeof req.body?.status === "string" ? req.body.status : undefined,
+      notes: typeof req.body?.notes === "string" ? req.body.notes : undefined,
+      dryRun,
     });
-    res.json({ success: true, data });
+
+    // Backward-compatible fields for older clients
+    const primary = data.distribution[0];
+    res.json({
+      success: true,
+      data: {
+        ...data,
+        assignedTo: primary?.userId || assignedTo || null,
+        assigneeName:
+          mode === "all_members"
+            ? `All members (${data.distribution.length})`
+            : primary?.name || primary?.email || null,
+        ids: [],
+        limit: scope === "first_n" ? data.requested : null,
+      },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Bulk assign failed";
     const status = message.includes("permission") ? 403 : 400;
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
+/** GET /api/leads/assignable-members — active members for Assign To search */
+export async function listAssignableMembersHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const { listAssignableMembers } = await import("../services/lead-assignment.service.js");
+    const members = await listAssignableMembers(req.user.id);
+    res.json({ success: true, data: { members } });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to list members";
+    const status = message.includes("permission") ? 403 : 400;
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
+/** GET /api/leads/assignments — history (admin) */
+export async function listLeadAssignmentsHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const page = req.query.page ? Number(req.query.page) : 1;
+    const pageSize = req.query.pageSize ? Number(req.query.pageSize) : 25;
+    const { listAssignmentHistory } = await import("../services/lead-assignment.service.js");
+    const data = await listAssignmentHistory(req.user.id, { page, pageSize });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to load history";
+    const status = message.includes("Only") || message.includes("permission") ? 403 : 400;
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
+/** GET /api/leads/assignments/:id */
+export async function getLeadAssignmentHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { getAssignmentDetail } = await import("../services/lead-assignment.service.js");
+    const data = await getAssignmentDetail(req.user.id, id);
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Failed to load assignment";
+    const status = message.includes("not found")
+      ? 404
+      : message.includes("Only") || message.includes("permission")
+        ? 403
+        : 400;
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
+/** POST /api/leads/assignments/:id/move — edit assignment (move N leads A→B) */
+export async function moveLeadAssignmentHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    extendBulkRequestTimeout(req, res);
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { moveAssignmentLeads } = await import("../services/lead-assignment.service.js");
+    const data = await moveAssignmentLeads(req.user.id, {
+      batchId: id,
+      fromUserId: String(req.body?.fromUserId || ""),
+      toUserId: String(req.body?.toUserId || ""),
+      count: Number(req.body?.count),
+      notes: typeof req.body?.notes === "string" ? req.body.notes : undefined,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Move failed";
+    const status = message.includes("Only") || message.includes("permission") ? 403 : 400;
     res.status(status).json({ success: false, error: message });
   }
 }

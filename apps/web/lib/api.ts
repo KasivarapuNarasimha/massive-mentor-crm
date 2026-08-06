@@ -547,12 +547,18 @@ class ApiClient {
    */
   async bulkAssignLeads(
     body: {
-      assignedTo: string;
-      scope: "ids" | "first_n" | "all_filtered";
+      assignedTo?: string;
+      /** single | all_members */
+      assignMode?: "single" | "all_members";
+      mode?: "single" | "all_members";
+      scope: "ids" | "first_n" | "all_filtered" | "reassign";
       ids?: string[];
       limit?: number;
       search?: string;
       status?: string;
+      notes?: string;
+      dryRun?: boolean;
+      preview?: boolean;
     },
     token?: string | null
   ) {
@@ -562,11 +568,87 @@ class ApiClient {
       matched: number;
       requested: number;
       scope: string;
+      mode?: string;
       limit: number | null;
-      assignedTo: string;
+      assignedTo: string | null;
       assigneeName: string | null;
       ids: string[];
+      distribution?: Array<{
+        userId: string;
+        name: string | null;
+        email: string;
+        count: number;
+      }>;
+      assignmentId?: string | null;
+      sequence?: number | null;
+      dryRun?: boolean;
     }>("/leads/bulk-assign", body, token, { timeoutMs: 600_000 });
+  }
+
+  async listAssignableMembers(token?: string | null) {
+    return this.get<{
+      members: Array<{
+        id: string;
+        name: string | null;
+        email: string;
+        phone: string | null;
+        employeeCode: string | null;
+        username: string | null;
+        role: string;
+      }>;
+    }>("/leads/assignable-members", token);
+  }
+
+  async listLeadAssignments(
+    token?: string | null,
+    q?: { page?: number; pageSize?: number }
+  ) {
+    const params = new URLSearchParams();
+    if (q?.page) params.set("page", String(q.page));
+    if (q?.pageSize) params.set("pageSize", String(q.pageSize));
+    const qs = params.toString() ? `?${params}` : "";
+    return this.get<{
+      total: number;
+      page: number;
+      pageSize: number;
+      items: Array<{
+        id: string;
+        sequence: number;
+        actorUserId: string;
+        actorName: string | null;
+        mode: string;
+        scope: string;
+        leadCount: number;
+        memberCount: number;
+        distribution: unknown;
+        status: string;
+        notes: string | null;
+        createdAt: string;
+        lines: Array<{
+          userId: string;
+          userName: string | null;
+          userEmail: string | null;
+          leadCount: number;
+        }>;
+      }>;
+    }>(`/leads/assignments${qs}`, token);
+  }
+
+  async getLeadAssignment(id: string, token?: string | null) {
+    return this.get<Record<string, unknown>>(`/leads/assignments/${id}`, token);
+  }
+
+  async moveLeadAssignment(
+    id: string,
+    body: { fromUserId: string; toUserId: string; count: number; notes?: string },
+    token?: string | null
+  ) {
+    return this.post<Record<string, unknown>>(
+      `/leads/assignments/${id}/move`,
+      body,
+      token,
+      { timeoutMs: 300_000 }
+    );
   }
 
   /** Compose + send email to lead(s) via platform SMTP — POST /api/leads/send-email */

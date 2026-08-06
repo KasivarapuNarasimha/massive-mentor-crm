@@ -219,6 +219,7 @@ export const ROUTE_FEATURE: Record<string, FeatureKey> = {
   "/dashboard/documents": "documents",
   "/dashboard/reports": "reports",
   "/dashboard/team": "team",
+  "/dashboard/assignments": "leads",
   "/dashboard/security": "security",
   "/dashboard/profile": "profile",
   "/dashboard/billing": "billing",

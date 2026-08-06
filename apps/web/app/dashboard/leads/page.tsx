@@ -187,12 +187,28 @@ export default function LeadsPage() {
     customValue: "",
   });
   /** Active workspace users for Assign To (id = assignedTo userId) */
-  const [teamMembers, setTeamMembers] = useState<
-    Array<{ id: string; name: string | null; email: string; isDisabled?: boolean }>
-  >([]);
+  type TeamMemberRow = {
+    id: string;
+    name: string | null;
+    email: string;
+    phone?: string | null;
+    employeeCode?: string | null;
+    username?: string | null;
+    isDisabled?: boolean;
+  };
+  const [teamMembers, setTeamMembers] = useState<TeamMemberRow[]>([]);
   const [teamSearch, setTeamSearch] = useState("");
   /** assignedTo on create/edit form (userId) */
   const [formAssigneeId, setFormAssigneeId] = useState("");
+  /** "__all__" = equal distribute to all active members */
+  const ALL_MEMBERS_VALUE = "__all__";
+  const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
+  const [assignPreview, setAssignPreview] = useState<{
+    total: number;
+    distribution: Array<{ userId: string; name: string | null; email: string; count: number }>;
+    mode: "single" | "all_members";
+  } | null>(null);
+  const [assignNotes, setAssignNotes] = useState("");
 
   const loadConfig = useCallback(async () => {
     if (!token) return;
@@ -205,15 +221,34 @@ export default function LeadsPage() {
 
   const loadTeam = useCallback(async () => {
     if (!token) return;
-    const res = await api.listBusinessUsers(token);
-    if (res.success && res.data?.users) {
+    // Prefer assignable-members (any bulk-editor); fall back to business-users for admins
+    const res = await api.listAssignableMembers(token);
+    if (res.success && res.data?.members) {
       setTeamMembers(
-        res.data.users
+        res.data.members.map((u) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          phone: u.phone,
+          employeeCode: u.employeeCode,
+          username: u.username,
+          isDisabled: false,
+        }))
+      );
+      return;
+    }
+    const fallback = await api.listBusinessUsers(token);
+    if (fallback.success && fallback.data?.users) {
+      setTeamMembers(
+        fallback.data.users
           .filter((u) => !u.isDisabled && u.status !== "disabled")
           .map((u) => ({
             id: u.id,
             name: u.name,
             email: u.email,
+            phone: (u as { phone?: string | null }).phone,
+            employeeCode: (u as { employeeCode?: string | null }).employeeCode,
+            username: (u as { username?: string | null }).username,
             isDisabled: u.isDisabled,
           }))
       );
@@ -232,15 +267,27 @@ export default function LeadsPage() {
     [teamMembers]
   );
 
+  /** Search by name, email, phone, employee ID, username (partial match) */
+  const memberMatchesSearch = useCallback((m: TeamMemberRow, q: string) => {
+    if (!q) return true;
+    const hay = [
+      m.name || "",
+      m.email || "",
+      m.phone || "",
+      m.employeeCode || "",
+      m.username || "",
+      m.id || "",
+    ]
+      .join(" ")
+      .toLowerCase();
+    return hay.includes(q);
+  }, []);
+
   const filteredTeam = useMemo(() => {
     const q = teamSearch.trim().toLowerCase();
     if (!q) return teamMembers;
-    return teamMembers.filter(
-      (m) =>
-        (m.name || "").toLowerCase().includes(q) ||
-        m.email.toLowerCase().includes(q)
-    );
-  }, [teamMembers, teamSearch]);
+    return teamMembers.filter((m) => memberMatchesSearch(m, q));
+  }, [teamMembers, teamSearch, memberMatchesSearch]);
 
   const loadLeads = useCallback(async (opts?: { page?: number; silent?: boolean }) => {
     if (!token) return { ok: false as const, total: 0 };
@@ -886,43 +933,101 @@ export default function LeadsPage() {
     return null;
   }, [assignScope, assignFirstPreset, assignCustomCount, serverTotal]);
 
-  const runBulkAssign = async () => {
-    if (!token || !assignValue.trim()) return;
-    const member = teamMembers.find((t) => t.id === assignValue.trim());
-    if (!member) {
-      toast.error("Select a team member from the list");
-      return;
+  const buildAssignBody = (dryRun: boolean) => {
+    const isAll = assignValue === ALL_MEMBERS_VALUE;
+    const member = isAll ? null : teamMembers.find((t) => t.id === assignValue.trim());
+    const base = {
+      assignMode: (isAll ? "all_members" : "single") as "all_members" | "single",
+      assignedTo: isAll ? undefined : member?.id,
+      notes: assignNotes.trim() || undefined,
+      dryRun,
+    };
+    if (assignScope === "ids") {
+      return { ...base, scope: "ids" as const, ids: [...selectedIds] };
     }
+    if (assignScope === "all_filtered") {
+      return {
+        ...base,
+        scope: "all_filtered" as const,
+        search: search.trim() || undefined,
+        status: statusFilter || undefined,
+      };
+    }
+    return {
+      ...base,
+      scope: "first_n" as const,
+      limit: Math.min(resolvedAssignLimit || 0, serverTotal, BULK_ASSIGN_MAX),
+      search: search.trim() || undefined,
+      status: statusFilter || undefined,
+    };
+  };
 
-    if (assignScope === "ids" && selectedIds.size === 0) {
-      toast.error("Select at least one lead");
-      return;
+  const validateAssignForm = (): string | null => {
+    if (!assignValue.trim()) return "Select a team member or All Members";
+    if (assignValue !== ALL_MEMBERS_VALUE) {
+      const member = teamMembers.find((t) => t.id === assignValue.trim());
+      if (!member) return "Select a team member from the list";
+    } else if (teamMembers.length === 0) {
+      return "No active members to distribute leads";
     }
+    if (assignScope === "ids" && selectedIds.size === 0) return "Select at least one lead";
     if (assignScope === "all_filtered" && serverTotal === 0) {
-      toast.error("No leads match the current filters");
-      return;
+      return "No leads match the current filters";
     }
     if (assignScope === "first_n") {
-      if (assignFirstPreset === "custom" && assignCustomValidation) {
-        toast.error(assignCustomValidation);
-        return;
-      }
+      if (assignFirstPreset === "custom" && assignCustomValidation) return assignCustomValidation;
       const lim = resolvedAssignLimit;
-      if (!lim || !Number.isFinite(lim) || lim < 1) {
-        toast.error("Enter a valid count between 1 and 50,000");
-        return;
+      if (!lim || !Number.isFinite(lim) || lim < 1) return "Enter a valid count between 1 and 50,000";
+      if (lim > BULK_ASSIGN_MAX) return "Count cannot exceed 50,000";
+      if (serverTotal === 0) return "No leads match the current filters";
+    }
+    return null;
+  };
+
+  /** Step 1: dry-run preview → confirmation dialog */
+  const requestAssignPreview = async () => {
+    if (!token) return;
+    const err = validateAssignForm();
+    if (err) {
+      toast.error(err);
+      return;
+    }
+    setBulkBusy(true);
+    setBulkProgress("Calculating distribution…");
+    try {
+      const res = await api.bulkAssignLeads(buildAssignBody(true), token);
+      if (res.success && res.data?.distribution) {
+        const total = res.data.distribution.reduce((s, d) => s + d.count, 0);
+        setAssignPreview({
+          total: total || res.data.requested || 0,
+          distribution: res.data.distribution,
+          mode: assignValue === ALL_MEMBERS_VALUE ? "all_members" : "single",
+        });
+        setAssignConfirmOpen(true);
+      } else {
+        toast.error(res.error || "Could not preview assignment");
       }
-      if (lim > BULK_ASSIGN_MAX) {
-        toast.error("Count cannot exceed 50,000");
-        return;
-      }
-      if (serverTotal === 0) {
-        toast.error("No leads match the current filters");
-        return;
-      }
+    } finally {
+      setBulkBusy(false);
+      setBulkProgress(null);
+    }
+  };
+
+  /** Step 2: confirmed execute */
+  const runBulkAssign = async () => {
+    if (!token) return;
+    const err = validateAssignForm();
+    if (err) {
+      toast.error(err);
+      return;
     }
 
-    const label = member.name?.trim() || member.email;
+    const isAll = assignValue === ALL_MEMBERS_VALUE;
+    const member = isAll ? null : teamMembers.find((t) => t.id === assignValue.trim());
+    const label = isAll
+      ? `All members (${teamMembers.length})`
+      : member?.name?.trim() || member?.email || "member";
+
     const progressHint =
       assignScope === "ids"
         ? `Assigning ${selectedIds.size.toLocaleString()} selected lead(s)…`
@@ -933,50 +1038,31 @@ export default function LeadsPage() {
     setBulkBusy(true);
     setBulkProgress(progressHint);
 
-    const body =
-      assignScope === "ids"
-        ? {
-            assignedTo: member.id,
-            scope: "ids" as const,
-            ids: [...selectedIds],
-          }
-        : assignScope === "all_filtered"
-          ? {
-              assignedTo: member.id,
-              scope: "all_filtered" as const,
-              search: search.trim() || undefined,
-              status: statusFilter || undefined,
-            }
-          : {
-              assignedTo: member.id,
-              scope: "first_n" as const,
-              limit: Math.min(
-                resolvedAssignLimit || 0,
-                serverTotal,
-                BULK_ASSIGN_MAX
-              ),
-              search: search.trim() || undefined,
-              status: statusFilter || undefined,
-            };
-
     try {
-      const res = await api.bulkAssignLeads(body, token);
+      const res = await api.bulkAssignLeads(buildAssignBody(false), token);
       if (res.success && res.data) {
         const n = res.data.assigned;
-        const who = res.data.assigneeName || label;
         let msg = `Successfully assigned ${n.toLocaleString()} leads.`;
         if (res.data.scope === "first_n") {
           msg = `Successfully assigned first ${n.toLocaleString()} filtered leads.`;
         } else if (res.data.scope === "all_filtered") {
           msg = `Successfully assigned all ${n.toLocaleString()} filtered leads.`;
         }
+        if (res.data.mode === "all_members" || isAll) {
+          msg = `Successfully distributed ${n.toLocaleString()} leads equally among ${res.data.distribution?.length ?? teamMembers.length} members.`;
+        }
+        const seq =
+          res.data.sequence != null ? `Assignment #${res.data.sequence}` : "Saved to history";
         toast.success(msg, {
-          description: `Assigned to ${who}${res.data.failed ? ` · ${res.data.failed} failed` : " · Audit logged"}`,
+          description: `${label} · ${seq}${res.data.failed ? ` · ${res.data.failed} failed` : ""}`,
         });
+        setAssignConfirmOpen(false);
+        setAssignPreview(null);
         setAssignModalOpen(false);
         setAssignValue("");
         setTeamSearch("");
         setAssignCustomCount("");
+        setAssignNotes("");
         clearSelection();
         await loadLeads();
         const { emitDataChanged } = await import("@/lib/data-events");
@@ -2323,21 +2409,43 @@ export default function LeadsPage() {
               type="search"
               value={teamSearch}
               onChange={(e) => setTeamSearch(e.target.value)}
-              placeholder="Search by name or email…"
+              placeholder="Search name, email, phone, employee ID, username…"
               className={`${inputClass} mb-2`}
             />
             <select
               value={assignValue}
               onChange={(e) => setAssignValue(e.target.value)}
-              className={`${inputClass} mb-4 min-h-11`}
+              className={`${inputClass} mb-2 min-h-11`}
             >
               <option value="">Select team member…</option>
+              <option value={ALL_MEMBERS_VALUE}>
+                All Members ({teamMembers.length}) — equal distribution
+              </option>
               {filteredTeam.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name?.trim() || m.email} · {m.email}
+                  {m.name?.trim() || m.email}
+                  {m.email ? ` · ${m.email}` : ""}
+                  {m.phone ? ` · ${m.phone}` : ""}
+                  {m.employeeCode ? ` · ID:${m.employeeCode}` : ""}
+                  {m.username ? ` · @${m.username}` : ""}
                 </option>
               ))}
             </select>
+            {assignValue === ALL_MEMBERS_VALUE && (
+              <p className="text-xs text-sky-300/90 mb-3">
+                Leads will be split equally among {teamMembers.length} active members (difference at most 1).
+              </p>
+            )}
+            {teamSearch.trim() && filteredTeam.length === 0 && assignValue !== ALL_MEMBERS_VALUE && (
+              <p className="text-xs text-amber-300/90 mb-2">No members match “{teamSearch.trim()}”.</p>
+            )}
+            <label className="block text-xs text-muted-foreground mb-1">Notes (optional)</label>
+            <input
+              value={assignNotes}
+              onChange={(e) => setAssignNotes(e.target.value)}
+              placeholder="e.g. Q3 campaign distribution"
+              className={`${inputClass} mb-4`}
+            />
 
             {bulkProgress && (
               <div className="flex items-center gap-2 text-xs text-sky-300 mb-3">
@@ -2354,6 +2462,7 @@ export default function LeadsPage() {
                   setAssignValue("");
                   setTeamSearch("");
                   setAssignCustomCount("");
+                  setAssignNotes("");
                 }}
                 className="flex-1 min-h-11 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
               >
@@ -2373,19 +2482,72 @@ export default function LeadsPage() {
                       !resolvedAssignLimit ||
                       resolvedAssignLimit < 1))
                 }
-                onClick={() => void runBulkAssign()}
+                onClick={() => void requestAssignPreview()}
                 className="flex-1 min-h-11 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium disabled:opacity-50"
               >
-                {bulkBusy
-                  ? "Assigning…"
-                  : assignScope === "all_filtered"
-                    ? `Assign ${serverTotal.toLocaleString()} filtered`
-                    : assignScope === "first_n"
-                      ? `Assign first ${Math.min(
-                          resolvedAssignLimit || 0,
-                          serverTotal || resolvedAssignLimit || 0
-                        ).toLocaleString()}`
-                      : `Assign ${selectedIds.size.toLocaleString()} selected`}
+                {bulkBusy ? "Preparing…" : "Review & assign"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assignment confirmation with equal-distribution summary */}
+      {assignConfirmOpen && assignPreview && (
+        <div className="fixed inset-0 bg-black/75 z-[60] flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 sm:p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-foreground">Confirm assignment</h3>
+            <p className="text-sm text-muted-foreground mt-1 mb-4">
+              You are about to assign{" "}
+              <span className="text-foreground font-semibold tabular-nums">
+                {assignPreview.total.toLocaleString()}
+              </span>{" "}
+              lead{assignPreview.total === 1 ? "" : "s"}
+              {assignPreview.mode === "all_members" ? " with equal distribution." : "."}
+            </p>
+            <div className="rounded-xl border border-border bg-muted/30 max-h-56 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground border-b border-border">
+                    <th className="px-3 py-2 font-medium">Member</th>
+                    <th className="px-3 py-2 font-medium text-right">Leads</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assignPreview.distribution.map((d) => (
+                    <tr key={d.userId} className="border-b border-border/60 last:border-0">
+                      <td className="px-3 py-2">
+                        <div className="font-medium text-foreground">{d.name?.trim() || d.email}</div>
+                        <div className="text-[11px] text-muted-foreground">{d.email}</div>
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                        {d.count.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-muted-foreground mt-3">Continue?</p>
+            <div className="flex gap-3 mt-4">
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => {
+                  setAssignConfirmOpen(false);
+                  setAssignPreview(null);
+                }}
+                className="flex-1 min-h-11 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => void runBulkAssign()}
+                className="flex-1 min-h-11 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold disabled:opacity-50"
+              >
+                {bulkBusy ? "Assigning…" : "Continue"}
               </button>
             </div>
           </div>

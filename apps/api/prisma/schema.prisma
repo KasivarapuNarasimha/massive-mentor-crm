@@ -12,6 +12,11 @@ model User {
   email         String    @unique
   passwordHash  String
   name          String?
+  /// Optional workspace identity fields (searchable for lead assignment)
+  phone         String?
+  /// Employee / staff ID shown in Assign To search
+  employeeCode  String?
+  username      String?
   role          String    @default("sales_executive") // business-facing legacy role: admin | manager | sales_executive
   /// Platform-level role (not business membership). user | super_admin
   platformRole  String    @default("user")
@@ -327,6 +332,7 @@ model Business {
   subscriptions      Subscription[]
   billingPayments    BillingPayment[]
   integrations       Integration[]
+  leadAssignmentBatches LeadAssignmentBatch[]
   currentPlanId      String?
   currentPlan        SubscriptionPlan? @relation(fields: [currentPlanId], references: [id], onDelete: SetNull)
 
@@ -337,6 +343,70 @@ model Business {
   @@index([isDemo])
   @@index([plan, planStatus])
   @@index([isLocked, trialEndsAt])
+}
+
+// ─── Enterprise Lead Assignment History ─────────────────────────────────────
+
+/// One bulk / single assignment operation (history is append-only; edits audited)
+model LeadAssignmentBatch {
+  id          String   @id @default(cuid())
+  /// Display sequence per workspace (Assignment #N)
+  sequence    Int
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  /// Admin / actor who ran the assignment
+  actorUserId String
+  actorName   String?
+  /// single | all_members
+  mode        String
+  /// ids | first_n | all_filtered | reassign | edit_move
+  scope       String
+  leadCount   Int
+  memberCount Int
+  /// Snapshot: [{ userId, name, email, count }]
+  distribution Json
+  filters     Json?
+  notes       String?  @db.Text
+  /// completed | partial
+  status      String   @default("completed")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  lines LeadAssignmentLine[]
+  items LeadAssignmentItem[]
+
+  @@unique([businessId, sequence])
+  @@index([businessId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+/// Per-member counts within a batch
+model LeadAssignmentLine {
+  id         String @id @default(cuid())
+  batchId    String
+  batch      LeadAssignmentBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  userId     String
+  userName   String?
+  userEmail  String?
+  leadCount  Int
+
+  @@index([batchId])
+  @@index([userId])
+}
+
+/// Per-lead ownership snapshot for a batch (enables edit / move without re-scanning CRM)
+model LeadAssignmentItem {
+  id        String @id @default(cuid())
+  batchId   String
+  batch     LeadAssignmentBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  contactId String
+  /// Assignee after this batch (or after edit)
+  userId    String
+
+  @@unique([batchId, contactId])
+  @@index([batchId, userId])
+  @@index([contactId])
+  @@index([userId])
 }
 
 // =====================================================

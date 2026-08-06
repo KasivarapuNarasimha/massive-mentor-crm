@@ -46,6 +46,10 @@ import {
   bulkAssignLeadsHandler,
   bulkRestoreLeadsHandler,
   sendLeadEmailHandler,
+  listAssignableMembersHandler,
+  listLeadAssignmentsHandler,
+  getLeadAssignmentHandler,
+  moveLeadAssignmentHandler,
 } from "../controllers/crm.controller.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { requireAiQuota } from "../middleware/aiQuota.js";
@@ -56,6 +60,10 @@ const router: Router = Router();
 router.post("/leads/bulk-edit", requireAuth, bulkEditLeadsHandler);
 router.post("/leads/bulk-delete", requireAuth, bulkDeleteLeadsHandler);
 router.post("/leads/bulk-assign", requireAuth, bulkAssignLeadsHandler);
+router.get("/leads/assignable-members", requireAuth, listAssignableMembersHandler);
+router.get("/leads/assignments", requireAuth, listLeadAssignmentsHandler);
+router.get("/leads/assignments/:id", requireAuth, getLeadAssignmentHandler);
+router.post("/leads/assignments/:id/move", requireAuth, moveLeadAssignmentHandler);
 router.post("/leads/bulk-restore", requireAuth, bulkRestoreLeadsHandler);
 router.post("/leads/send-email", requireAuth, sendLeadEmailHandler);
 

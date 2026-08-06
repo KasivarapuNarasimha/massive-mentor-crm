@@ -6,6 +6,7 @@
 export const ROUTE_MODULE: Record<string, string> = {
   "/dashboard": "dashboard",
   "/dashboard/leads": "leads",
+  "/dashboard/assignments": "leads",
   "/dashboard/clients": "clients",
   "/dashboard/deals": "deals",
   "/dashboard/tasks": "tasks",
