@@ -33,6 +33,8 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
+  /** Optional count badge (e.g. media file total) */
+  badge?: number | string | null;
 }
 
 const navItems: NavItem[] = [
@@ -348,6 +350,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [notifError, setNotifError] = useState<string | null>(null);
   const [notifLoading, setNotifLoading] = useState(false);
   const [configModules, setConfigModules] = useState<ModuleDef[] | null>(null);
+  /** Total media files for sidebar badge */
+  const [mediaFileCount, setMediaFileCount] = useState<number | null>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
@@ -467,6 +471,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     const unsub = subscribeDataChanged(() => {
       // Small delay so server has committed the Notification row after create
       setTimeout(() => loadNotifs(), 150);
+      // Refresh media count on library mutations
+      setTimeout(() => {
+        api.getMediaCount(token).then((r) => {
+          if (r.success && r.data && typeof r.data.total === "number") {
+            setMediaFileCount(r.data.total);
+          }
+        });
+      }, 200);
+    });
+
+    api.getMediaCount(token).then((r) => {
+      if (r.success && r.data && typeof r.data.total === "number") {
+        setMediaFileCount(r.data.total);
+      }
     });
 
     api.getBusinessConfig(token).then((res) => {
@@ -633,17 +651,28 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   // null until portal loads; then use explicit array (may be empty) for fail-closed nav
   const moduleKeys = portal ? portal.modules || [] : null;
 
-  const primaryNav = filterNavByModules(
-    (portalNav || resolveNav(navItems)).filter((item) => item.href !== APPEARANCE_HREF),
-    moduleKeys
+  const withMediaBadge = (items: NavItem[]): NavItem[] =>
+    items.map((item) =>
+      item.href === "/dashboard/media" && mediaFileCount != null && mediaFileCount > 0
+        ? { ...item, badge: mediaFileCount }
+        : item
+    );
+
+  const primaryNav = withMediaBadge(
+    filterNavByModules(
+      (portalNav || resolveNav(navItems)).filter((item) => item.href !== APPEARANCE_HREF),
+      moduleKeys
+    )
   );
   // When portal menus replace CRM nav, keep Security out of the flat CRM list if present —
   // Settings section owns Appearance (+ Security for discovery).
-  const crmNav = filterNavByModules(
-    (portalNav ? [] : resolveNav(crmNavItems)).filter(
-      (item) => item.href !== APPEARANCE_HREF && item.href !== "/dashboard/security"
-    ),
-    moduleKeys
+  const crmNav = withMediaBadge(
+    filterNavByModules(
+      (portalNav ? [] : resolveNav(crmNavItems)).filter(
+        (item) => item.href !== APPEARANCE_HREF && item.href !== "/dashboard/security"
+      ),
+      moduleKeys
+    )
   );
 
   const settingsNavFiltered = filterNavByModules(SETTINGS_NAV, moduleKeys);
@@ -1164,6 +1193,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     <span className={`flex-1 truncate ${sidebarCollapsed ? "lg:hidden" : ""}`}>
                       {item.label}
                     </span>
+                    {item.badge != null && item.badge !== "" && !sidebarCollapsed && (
+                      <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded-md bg-white/10 text-muted-foreground shrink-0">
+                        {item.badge}
+                      </span>
+                    )}
                     {locked && (
                       <svg className={`w-3.5 h-3.5 text-muted-foreground shrink-0 ${sidebarCollapsed ? "lg:hidden" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Locked">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -1236,6 +1270,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     <span className={`flex-1 truncate ${sidebarCollapsed ? "lg:hidden" : ""}`}>
                       {item.label}
                     </span>
+                    {item.badge != null && item.badge !== "" && !sidebarCollapsed && (
+                      <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded-md bg-white/10 text-muted-foreground shrink-0">
+                        {item.badge}
+                      </span>
+                    )}
                     {locked && (
                       <svg className={`w-3.5 h-3.5 text-muted-foreground shrink-0 ${sidebarCollapsed ? "lg:hidden" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Locked">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />

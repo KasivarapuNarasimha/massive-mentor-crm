@@ -74,14 +74,22 @@ export async function listFolders(userId: string) {
   const folders = await prisma.mediaFolder.findMany({
     where: { businessId },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    include: { _count: { select: { assets: true } } },
   });
+  // Count only active (non-deleted) assets per folder
+  const counts = await prisma.mediaAsset.groupBy({
+    by: ["folderId"],
+    where: { businessId, deletedAt: null },
+    _count: { _all: true },
+  });
+  const countMap = new Map(
+    counts.map((c) => [c.folderId ?? "__null__", c._count._all])
+  );
   return folders.map((f) => ({
     id: f.id,
     name: f.name,
     parentId: f.parentId,
     sortOrder: f.sortOrder,
-    assetCount: f._count.assets,
+    assetCount: countMap.get(f.id) ?? 0,
     createdAt: f.createdAt.toISOString(),
   }));
 }
@@ -146,43 +154,152 @@ export async function deleteFolder(userId: string, folderId: string) {
   return { deleted: true };
 }
 
-export async function listAssets(
-  userId: string,
-  opts?: { folderId?: string | null; search?: string; kind?: string }
-) {
+export type ListAssetsOpts = {
+  folderId?: string | null;
+  search?: string;
+  kind?: string;
+  /** Filter by uploader user id */
+  uploadedBy?: string;
+  /** Tag partial match */
+  tag?: string;
+  /** Only favorites for this user */
+  favoritesOnly?: boolean;
+  page?: number;
+  pageSize?: number;
+};
+
+export async function listAssets(userId: string, opts?: ListAssetsOpts) {
   const businessId = await requireBusiness(userId);
+  const page = opts?.page && opts.page > 0 ? opts.page : 1;
+  const pageSize = Math.min(100, Math.max(1, opts?.pageSize || 48));
   const where: Record<string, unknown> = { businessId, deletedAt: null };
+
   if (opts?.folderId === "null" || opts?.folderId === "") {
     where.folderId = null;
   } else if (opts?.folderId) {
     where.folderId = opts.folderId;
   }
   if (opts?.kind) where.kind = opts.kind;
-  if (opts?.search?.trim()) {
-    where.name = { contains: opts.search.trim(), mode: "insensitive" };
+  if (opts?.uploadedBy) where.createdByUserId = opts.uploadedBy;
+  if (opts?.tag?.trim()) {
+    where.tags = { has: opts.tag.trim() };
   }
-  const assets = await prisma.mediaAsset.findMany({
-    where: where as never,
-    orderBy: { updatedAt: "desc" },
-    take: 500,
-  });
-  return assets.map(serializeAsset);
+
+  const q = opts?.search?.trim();
+  if (q) {
+    // Advanced partial search: name, originalName, tags, folder name, uploader
+    const folderHits = await prisma.mediaFolder.findMany({
+      where: {
+        businessId,
+        name: { contains: q, mode: "insensitive" },
+      },
+      select: { id: true },
+      take: 50,
+    });
+    const uploaderHits = await prisma.user.findMany({
+      where: {
+        OR: [
+          { name: { contains: q, mode: "insensitive" } },
+          { email: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      select: { id: true },
+      take: 30,
+    });
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { originalName: { contains: q, mode: "insensitive" } },
+      { tags: { has: q } },
+      ...(folderHits.length
+        ? [{ folderId: { in: folderHits.map((f) => f.id) } }]
+        : []),
+      ...(uploaderHits.length
+        ? [{ createdByUserId: { in: uploaderHits.map((u) => u.id) } }]
+        : []),
+    ];
+  }
+
+  if (opts?.favoritesOnly) {
+    const favIds = await prisma.mediaFavorite.findMany({
+      where: { businessId, userId },
+      select: { assetId: true },
+    });
+    where.id = { in: favIds.map((f) => f.assetId) };
+    if (!favIds.length) {
+      return { items: [], total: 0, page, pageSize, totalPages: 1 };
+    }
+  }
+
+  const [total, assets, favRows] = await Promise.all([
+    prisma.mediaAsset.count({ where: where as never }),
+    prisma.mediaAsset.findMany({
+      where: where as never,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: {
+        folder: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.mediaFavorite.findMany({
+      where: { userId, businessId },
+      select: { assetId: true },
+    }),
+  ]);
+
+  const favSet = new Set(favRows.map((f) => f.assetId));
+  const uploaderIds = [...new Set(assets.map((a) => a.createdByUserId))];
+  const uploaders = uploaderIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: uploaderIds } },
+        select: { id: true, name: true, email: true },
+      })
+    : [];
+  const uploaderMap = new Map(uploaders.map((u) => [u.id, u]));
+
+  return {
+    items: assets.map((a) =>
+      serializeAsset(a, {
+        isFavorite: favSet.has(a.id),
+        folderName: a.folder?.name || null,
+        uploadedByName:
+          uploaderMap.get(a.createdByUserId)?.name ||
+          uploaderMap.get(a.createdByUserId)?.email ||
+          null,
+      })
+    ),
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
 }
 
-function serializeAsset(a: {
-  id: string;
-  name: string;
-  originalName: string;
-  mimeType: string;
-  kind: string;
-  sizeBytes: number;
-  folderId: string | null;
-  captionDefault: string | null;
-  storageProvider: string;
-  createdByUserId: string;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function serializeAsset(
+  a: {
+    id: string;
+    name: string;
+    originalName: string;
+    mimeType: string;
+    kind: string;
+    sizeBytes: number;
+    folderId: string | null;
+    captionDefault: string | null;
+    storageProvider: string;
+    createdByUserId: string;
+    createdAt: Date;
+    updatedAt: Date;
+    tags?: string[];
+    downloadCount?: number;
+    whatsappSendCount?: number;
+    emailSendCount?: number;
+  },
+  extra?: {
+    isFavorite?: boolean;
+    folderName?: string | null;
+    uploadedByName?: string | null;
+  }
+) {
   return {
     id: a.id,
     name: a.name,
@@ -191,13 +308,212 @@ function serializeAsset(a: {
     kind: a.kind,
     sizeBytes: a.sizeBytes,
     folderId: a.folderId,
+    folderName: extra?.folderName ?? null,
     captionDefault: a.captionDefault,
+    tags: a.tags || [],
+    downloadCount: a.downloadCount ?? 0,
+    whatsappSendCount: a.whatsappSendCount ?? 0,
+    emailSendCount: a.emailSendCount ?? 0,
     storageProvider: a.storageProvider,
     createdByUserId: a.createdByUserId,
+    uploadedByName: extra?.uploadedByName ?? null,
+    isFavorite: !!extra?.isFavorite,
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
     previewUrl: `/api/media/assets/${a.id}/file`,
   };
+}
+
+/** Lightweight count for sidebar badge */
+export async function getMediaTotalCount(userId: string): Promise<number> {
+  try {
+    const businessId = await getUserBusinessId(userId);
+    if (!businessId) return 0;
+    return prisma.mediaAsset.count({ where: { businessId, deletedAt: null } });
+  } catch {
+    return 0;
+  }
+}
+
+/** Dashboard widget + analytics */
+export async function getMediaStats(userId: string) {
+  const businessId = await requireBusiness(userId);
+  const base = { businessId, deletedAt: null as null };
+
+  const [
+    totalFiles,
+    storageAgg,
+    byKind,
+    recent,
+    topDownloaded,
+    topShared,
+    whatsappSends,
+    emailSends,
+  ] = await Promise.all([
+    prisma.mediaAsset.count({ where: base }),
+    prisma.mediaAsset.aggregate({
+      where: base,
+      _sum: { sizeBytes: true },
+    }),
+    prisma.mediaAsset.groupBy({
+      by: ["kind"],
+      where: base,
+      _count: { _all: true },
+    }),
+    prisma.mediaAsset.findMany({
+      where: base,
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: {
+        id: true,
+        name: true,
+        kind: true,
+        sizeBytes: true,
+        createdAt: true,
+        mimeType: true,
+      },
+    }),
+    prisma.mediaAsset.findFirst({
+      where: base,
+      orderBy: { downloadCount: "desc" },
+      select: { id: true, name: true, downloadCount: true },
+    }),
+    prisma.mediaAsset.findFirst({
+      where: base,
+      orderBy: { whatsappSendCount: "desc" },
+      select: { id: true, name: true, whatsappSendCount: true, emailSendCount: true },
+    }),
+    prisma.mediaSendLog.count({
+      where: { businessId, channel: "whatsapp", status: { not: "failed" } },
+    }),
+    prisma.mediaSendLog.count({
+      where: { businessId, channel: "email", status: { not: "failed" } },
+    }),
+  ]);
+
+  const kindMap: Record<string, number> = {};
+  for (const row of byKind) kindMap[row.kind] = row._count._all;
+
+  const storageBytes = storageAgg._sum.sizeBytes || 0;
+  return {
+    totalFiles,
+    storageBytes,
+    storageUsedLabel: formatStorage(storageBytes),
+    byKind: {
+      brochures: kindMap.pdf || 0, // PDFs often brochures; also expose pdf
+      images: kindMap.image || 0,
+      videos: kindMap.video || 0,
+      pdfs: kindMap.pdf || 0,
+      documents: kindMap.document || 0,
+    },
+    kindBreakdown: kindMap,
+    recent: recent.map((r) => ({
+      id: r.id,
+      name: r.name,
+      kind: r.kind,
+      sizeBytes: r.sizeBytes,
+      createdAt: r.createdAt.toISOString(),
+      mimeType: r.mimeType,
+    })),
+    mostDownloaded: topDownloaded
+      ? {
+          id: topDownloaded.id,
+          name: topDownloaded.name,
+          count: topDownloaded.downloadCount,
+        }
+      : null,
+    mostShared: topShared
+      ? {
+          id: topShared.id,
+          name: topShared.name,
+          whatsapp: topShared.whatsappSendCount,
+          email: topShared.emailSendCount,
+        }
+      : null,
+    totalWhatsAppShares: whatsappSends,
+    totalEmailShares: emailSends,
+  };
+}
+
+function formatStorage(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+export async function getAssetDetail(userId: string, assetId: string) {
+  const businessId = await requireBusiness(userId);
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { id: assetId, businessId, deletedAt: null },
+    include: { folder: { select: { id: true, name: true } } },
+  });
+  if (!asset) throw new Error("File not found");
+  const [uploader, fav] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: asset.createdByUserId },
+      select: { name: true, email: true },
+    }),
+    prisma.mediaFavorite.findUnique({
+      where: { userId_assetId: { userId, assetId } },
+    }),
+  ]);
+  return serializeAsset(asset, {
+    isFavorite: !!fav,
+    folderName: asset.folder?.name || null,
+    uploadedByName: uploader?.name || uploader?.email || null,
+  });
+}
+
+export async function toggleFavorite(userId: string, assetId: string) {
+  const businessId = await requireBusiness(userId);
+  const asset = await prisma.mediaAsset.findFirst({
+    where: { id: assetId, businessId, deletedAt: null },
+  });
+  if (!asset) throw new Error("File not found");
+  const existing = await prisma.mediaFavorite.findUnique({
+    where: { userId_assetId: { userId, assetId } },
+  });
+  if (existing) {
+    await prisma.mediaFavorite.delete({ where: { id: existing.id } });
+    return { favorited: false };
+  }
+  await prisma.mediaFavorite.create({
+    data: { businessId, userId, assetId },
+  });
+  return { favorited: true };
+}
+
+export async function updateAssetTags(
+  userId: string,
+  assetId: string,
+  tags: string[]
+) {
+  if (!(await canManageMedia(userId))) throw new Error("Only Business Admin can edit tags");
+  const businessId = await requireBusiness(userId);
+  const existing = await prisma.mediaAsset.findFirst({
+    where: { id: assetId, businessId, deletedAt: null },
+  });
+  if (!existing) throw new Error("File not found");
+  const clean = [...new Set(tags.map((t) => t.trim()).filter(Boolean))].slice(0, 30);
+  const asset = await prisma.mediaAsset.update({
+    where: { id: assetId },
+    data: { tags: clean },
+  });
+  return serializeAsset(asset);
+}
+
+export async function recordDownload(userId: string, assetId: string) {
+  const businessId = await requireBusiness(userId);
+  const existing = await prisma.mediaAsset.findFirst({
+    where: { id: assetId, businessId, deletedAt: null },
+  });
+  if (!existing) throw new Error("File not found");
+  await prisma.mediaAsset.update({
+    where: { id: assetId },
+    data: { downloadCount: { increment: 1 } },
+  });
+  return { ok: true };
 }
 
 export async function uploadAsset(
@@ -468,6 +784,10 @@ export async function sendMediaViaWhatsApp(
           status: "sent",
           waMessageId: record.waMessageId,
         },
+      });
+      await prisma.mediaAsset.update({
+        where: { id: asset.id },
+        data: { whatsappSendCount: { increment: 1 } },
       });
       results.push({
         assetId: asset.id,

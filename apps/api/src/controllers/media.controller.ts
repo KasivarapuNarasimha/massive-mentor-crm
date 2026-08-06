@@ -62,12 +62,92 @@ export async function deleteFolder(req: AuthenticatedRequest, res: Response) {
 export async function listAssets(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-    const assets = await media.listAssets(req.user.id, {
+    const data = await media.listAssets(req.user.id, {
       folderId: req.query.folderId != null ? String(req.query.folderId) : undefined,
       search: req.query.search ? String(req.query.search) : undefined,
       kind: req.query.kind ? String(req.query.kind) : undefined,
+      uploadedBy: req.query.uploadedBy ? String(req.query.uploadedBy) : undefined,
+      tag: req.query.tag ? String(req.query.tag) : undefined,
+      favoritesOnly:
+        req.query.favorites === "1" ||
+        req.query.favorites === "true" ||
+        req.query.favoritesOnly === "1",
+      page: req.query.page ? Number(req.query.page) : 1,
+      pageSize: req.query.pageSize ? Number(req.query.pageSize) : 48,
     });
-    res.json({ success: true, data: { assets } });
+    // Backward compat: `assets` alias for items
+    res.json({ success: true, data: { ...data, assets: data.items } });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function mediaStats(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const data = await media.getMediaStats(req.user.id);
+    res.json({ success: true, data });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function mediaCount(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const total = await media.getMediaTotalCount(req.user.id);
+    res.json({ success: true, data: { total } });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function assetDetail(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const asset = await media.getAssetDetail(req.user.id, id);
+    res.json({ success: true, data: { asset } });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function toggleFavorite(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const data = await media.toggleFavorite(req.user.id, id);
+    res.json({ success: true, data });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function updateTags(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const tags = Array.isArray(req.body?.tags) ? (req.body.tags as string[]) : [];
+    const asset = await media.updateAssetTags(req.user.id, id, tags);
+    res.json({ success: true, data: { asset } });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Failed";
+    res.status(errStatus(message)).json({ success: false, error: message });
+  }
+}
+
+export async function recordDownload(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await media.recordDownload(req.user.id, id);
+    res.json({ success: true, data: { ok: true } });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Failed";
     res.status(errStatus(message)).json({ success: false, error: message });
@@ -159,11 +239,15 @@ export async function streamAssetFile(req: AuthenticatedRequest, res: Response) 
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const download = req.query.download === "1" || req.query.download === "true";
     const { asset, stream } = await media.getAssetForDownload(req.user.id, id);
+    if (download) {
+      await media.recordDownload(req.user.id, id).catch(() => undefined);
+    }
     res.setHeader("Content-Type", asset.mimeType || "application/octet-stream");
     res.setHeader(
       "Content-Disposition",
-      `inline; filename="${encodeURIComponent(asset.originalName || asset.name)}"`
+      `${download ? "attachment" : "inline"}; filename="${encodeURIComponent(asset.originalName || asset.name)}"`
     );
     res.setHeader("Cache-Control", "private, max-age=3600");
     stream.pipe(res);

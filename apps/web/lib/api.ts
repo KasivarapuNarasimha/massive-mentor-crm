@@ -658,16 +658,95 @@ class ApiClient {
   async createMediaFolder(body: { name: string; parentId?: string | null }, token?: string | null) {
     return this.post<{ folder: Record<string, unknown> }>("/media/folders", body, token);
   }
+  async getMediaStats(token?: string | null) {
+    return this.get<{
+      totalFiles: number;
+      storageBytes: number;
+      storageUsedLabel: string;
+      byKind: {
+        brochures: number;
+        images: number;
+        videos: number;
+        pdfs: number;
+        documents: number;
+      };
+      kindBreakdown: Record<string, number>;
+      recent: Array<{
+        id: string;
+        name: string;
+        kind: string;
+        sizeBytes: number;
+        createdAt: string;
+        mimeType: string;
+      }>;
+      mostDownloaded: { id: string; name: string; count: number } | null;
+      mostShared: {
+        id: string;
+        name: string;
+        whatsapp: number;
+        email: number;
+      } | null;
+      totalWhatsAppShares: number;
+      totalEmailShares: number;
+    }>("/media/stats", token);
+  }
+  async getMediaCount(token?: string | null) {
+    return this.get<{ total: number }>("/media/count", token);
+  }
   async listMediaAssets(
     token?: string | null,
-    q?: { folderId?: string; search?: string; kind?: string }
+    q?: {
+      folderId?: string;
+      search?: string;
+      kind?: string;
+      uploadedBy?: string;
+      tag?: string;
+      favorites?: boolean;
+      page?: number;
+      pageSize?: number;
+    }
   ) {
     const params = new URLSearchParams();
     if (q?.folderId != null) params.set("folderId", q.folderId);
     if (q?.search) params.set("search", q.search);
     if (q?.kind) params.set("kind", q.kind);
+    if (q?.uploadedBy) params.set("uploadedBy", q.uploadedBy);
+    if (q?.tag) params.set("tag", q.tag);
+    if (q?.favorites) params.set("favorites", "1");
+    if (q?.page) params.set("page", String(q.page));
+    if (q?.pageSize) params.set("pageSize", String(q.pageSize));
     const qs = params.toString() ? `?${params}` : "";
-    return this.get<{ assets: Array<Record<string, unknown>> }>(`/media/assets${qs}`, token);
+    return this.get<{
+      assets: Array<Record<string, unknown>>;
+      items?: Array<Record<string, unknown>>;
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+    }>(`/media/assets${qs}`, token);
+  }
+  async getMediaAsset(id: string, token?: string | null) {
+    return this.get<{ asset: Record<string, unknown> }>(`/media/assets/${id}`, token);
+  }
+  async toggleMediaFavorite(id: string, token?: string | null) {
+    return this.post<{ favorited: boolean }>(`/media/assets/${id}/favorite`, {}, token);
+  }
+  async updateMediaTags(id: string, tags: string[], token?: string | null) {
+    return this.post<{ asset: Record<string, unknown> }>(
+      `/media/assets/${id}/tags`,
+      { tags },
+      token
+    );
+  }
+  async moveMediaAsset(id: string, folderId: string | null, token?: string | null) {
+    return this.post<{ asset: Record<string, unknown> }>(
+      `/media/assets/${id}/move`,
+      { folderId },
+      token
+    );
+  }
+  async recordMediaDownload(id: string, token?: string | null) {
+    return this.post<{ ok: boolean }>(`/media/assets/${id}/download`, {}, token);
   }
   async uploadMediaAsset(
     file: File,

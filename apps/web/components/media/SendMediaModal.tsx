@@ -33,6 +33,8 @@ type Props = {
   contactId: string;
   contactName: string;
   contactPhone?: string | null;
+  /** Pre-select assets when opening from library quick actions */
+  preselectedAssetIds?: string[];
 };
 
 export function SendMediaModal({
@@ -42,6 +44,7 @@ export function SendMediaModal({
   contactId,
   contactName,
   contactPhone,
+  preselectedAssetIds,
 }: Props) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [kits, setKits] = useState<Kit[]>([]);
@@ -54,7 +57,7 @@ export function SendMediaModal({
   const load = useCallback(async () => {
     setLoading(true);
     const [a, k] = await Promise.all([
-      api.listMediaAssets(token),
+      api.listMediaAssets(token, { pageSize: 100 }),
       api.listMediaKits(token),
     ]);
     if (a.success && a.data?.assets) setAssets(a.data.assets as Asset[]);
@@ -63,8 +66,13 @@ export function SendMediaModal({
   }, [token]);
 
   useEffect(() => {
-    if (open) void load();
-  }, [open, load]);
+    if (open) {
+      void load();
+      if (preselectedAssetIds?.length) {
+        setSelected(new Set(preselectedAssetIds));
+      }
+    }
+  }, [open, load, preselectedAssetIds]);
 
   useEffect(() => {
     if (!kitId) return;

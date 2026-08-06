@@ -224,6 +224,17 @@ export function PremiumDashboard() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [aiRecs, setAiRecs] = useState<AiRec[]>([]);
   const [finance, setFinance] = useState<FinanceKpis | null>(null);
+  const [mediaStats, setMediaStats] = useState<{
+    totalFiles: number;
+    storageUsedLabel: string;
+    byKind: {
+      images: number;
+      videos: number;
+      pdfs: number;
+      documents: number;
+      brochures: number;
+    };
+  } | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -242,7 +253,7 @@ export function PremiumDashboard() {
 
     // Analytics: ONLY /reports/dashboard (full-tenant SQL/groupBy — no pageSize samples)
     // Lists (tasks/meetings/activity/AI): small recent slices for widgets only
-    const [reportsRes, tasksRes, meetingsRes, activityRes, financeRes, aiRes] =
+    const [reportsRes, tasksRes, meetingsRes, activityRes, financeRes, aiRes, mediaRes] =
       await Promise.all([
         api.get<ReportsDash>("/reports/dashboard", token),
         api.getCrmTasks("?pageSize=50", token),
@@ -250,6 +261,7 @@ export function PremiumDashboard() {
         safeJson(`${API_BASE_URL}/automations/activity?pageSize=20`),
         api.get<{ kpis?: FinanceKpis }>("/finance/dashboard", token),
         safeJson(`${API_BASE_URL}/crm/ai/followup-engine?limit=8`),
+        api.getMediaStats(token),
       ]);
 
     if (reportsRes.success && reportsRes.data) {
@@ -306,6 +318,16 @@ export function PremiumDashboard() {
       aiRes?.data ||
       [];
     setAiRecs(Array.isArray(recs) ? recs.slice(0, 6) : []);
+
+    if (mediaRes.success && mediaRes.data) {
+      setMediaStats({
+        totalFiles: mediaRes.data.totalFiles,
+        storageUsedLabel: mediaRes.data.storageUsedLabel,
+        byKind: mediaRes.data.byKind,
+      });
+    } else {
+      setMediaStats(null);
+    }
 
     setLoading(false);
   }, [token]);
@@ -690,6 +712,75 @@ export function PremiumDashboard() {
             />
           ))}
         </div>
+      </section>
+
+      {/* Media Library widget */}
+      <section aria-labelledby="media-lib-heading" className="mt-2">
+        <Link
+          href="/dashboard/media"
+          className="block rounded-2xl border border-border bg-card/70 p-5 sm:p-6 mm-card-hover focus-ring"
+        >
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h2
+                id="media-lib-heading"
+                className="text-lg font-semibold tracking-tight text-foreground flex items-center gap-2"
+              >
+                <span aria-hidden>📁</span> Media Library
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Brochures, catalogs & WhatsApp assets
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-violet-300">Open →</span>
+          </div>
+          {loading && !mediaStats ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton key={i} className="h-12 rounded-xl" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Total Files</span>
+                <span className="font-semibold tabular-nums">
+                  {(mediaStats?.totalFiles ?? 0).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Storage Used</span>
+                <span className="font-semibold tabular-nums">
+                  {mediaStats?.storageUsedLabel ?? "0 B"}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Brochures</span>
+                <span className="font-semibold tabular-nums">
+                  {mediaStats?.byKind.pdfs ?? mediaStats?.byKind.brochures ?? 0}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Images</span>
+                <span className="font-semibold tabular-nums">
+                  {mediaStats?.byKind.images ?? 0}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">Videos</span>
+                <span className="font-semibold tabular-nums">
+                  {mediaStats?.byKind.videos ?? 0}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground">PDFs</span>
+                <span className="font-semibold tabular-nums">
+                  {mediaStats?.byKind.pdfs ?? 0}
+                </span>
+              </div>
+            </div>
+          )}
+        </Link>
       </section>
 
       {/* 3. Sales Pipeline Kanban */}

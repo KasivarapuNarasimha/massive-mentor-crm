@@ -452,17 +452,40 @@ model MediaAsset {
   /// Optional public CDN URL (S3/public)
   publicUrl       String?
   captionDefault  String?  @db.Text
+  /// Searchable tags (brochure, pricing, catalog, …)
+  tags            String[] @default([])
+  downloadCount   Int      @default(0)
+  whatsappSendCount Int    @default(0)
+  emailSendCount  Int      @default(0)
   createdByUserId String
   deletedAt       DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  kitItems MediaKitItem[]
-  sendLogs MediaSendLog[]
+  kitItems  MediaKitItem[]
+  sendLogs  MediaSendLog[]
+  favorites MediaFavorite[]
 
   @@index([businessId, folderId, deletedAt])
   @@index([businessId, kind, deletedAt])
   @@index([businessId, name])
+  @@index([businessId, createdAt])
+  @@index([businessId, downloadCount])
+  @@index([businessId, whatsappSendCount])
+}
+
+/// Per-user favorites for quick access
+model MediaFavorite {
+  id        String   @id @default(cuid())
+  businessId String
+  userId    String
+  assetId   String
+  asset     MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, assetId])
+  @@index([businessId, userId])
+  @@index([assetId])
 }
 
 /// Saved multi-file send packages (e.g. "CRM Introduction Kit")

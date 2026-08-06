@@ -18,6 +18,12 @@ import {
   deleteKit,
   sendKitWhatsApp,
   listSendLogs,
+  mediaStats,
+  mediaCount,
+  assetDetail,
+  toggleFavorite,
+  updateTags,
+  recordDownload,
 } from "../controllers/media.controller.js";
 import {
   MEDIA_MAX_BYTES,
@@ -57,10 +63,17 @@ router.post("/folders", createFolder);
 router.patch("/folders/:id", renameFolder);
 router.delete("/folders/:id", deleteFolder);
 
+router.get("/stats", mediaStats);
+router.get("/count", mediaCount);
+
 router.get("/assets", listAssets);
 router.post("/assets", mediaUpload, uploadAsset);
+router.get("/assets/:id", assetDetail);
 router.patch("/assets/:id", renameAsset);
 router.post("/assets/:id/move", moveAsset);
+router.post("/assets/:id/favorite", toggleFavorite);
+router.post("/assets/:id/tags", updateTags);
+router.post("/assets/:id/download", recordDownload);
 router.delete("/assets/:id", deleteAsset);
 router.get("/assets/:id/file", streamAssetFile);
 
