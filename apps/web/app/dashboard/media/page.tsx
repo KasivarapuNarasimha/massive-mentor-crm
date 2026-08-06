@@ -42,6 +42,16 @@ type Activity = {
   createdAt: string;
 };
 
+/** Keep in sync with apps/api media-storage MEDIA_MAX_BYTES */
+const MEDIA_MAX_BYTES = 25 * 1024 * 1024;
+const MEDIA_MAX_MB = 25;
+const MEDIA_SIZE_LIMIT_MESSAGE =
+  "File size exceeds the 25 MB limit. Please upload a smaller file.";
+const MEDIA_ACCEPT =
+  ".jpg,.jpeg,.png,.webp,.gif,.pdf,.mp4,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt";
+const MEDIA_SUPPORTED_LABEL =
+  "Supported: JPG, PNG, WebP, PDF, MP4, DOCX, PPTX, XLSX";
+
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
@@ -128,6 +138,15 @@ export default function MediaLibraryPage() {
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !token) return;
+    e.target.value = "";
+    // Client-side size guard (same 25 MB as API / multer / nginx)
+    if (file.size > MEDIA_MAX_BYTES) {
+      toast.error(MEDIA_SIZE_LIMIT_MESSAGE, {
+        description: `"${file.name}" is ${formatBytes(file.size)} (max ${MEDIA_MAX_MB} MB).`,
+        duration: 8000,
+      });
+      return;
+    }
     setUploading(true);
     const res = await api.uploadMediaAsset(
       file,
@@ -135,11 +154,20 @@ export default function MediaLibraryPage() {
       token
     );
     setUploading(false);
-    e.target.value = "";
     if (res.success) {
-      toast.success("Uploaded");
+      toast.success("Uploaded", {
+        description: `${file.name} · ${formatBytes(file.size)}`,
+      });
       await load();
-    } else toast.error(res.error || "Upload failed");
+    } else {
+      const err = res.error || "Upload failed";
+      // Normalize any backend size phrasing to the product message
+      if (/25\s*MB|file size|too large|LIMIT_FILE_SIZE/i.test(err)) {
+        toast.error(MEDIA_SIZE_LIMIT_MESSAGE, { duration: 8000 });
+      } else {
+        toast.error(err);
+      }
+    }
   };
 
   const createFolder = async () => {
@@ -213,16 +241,23 @@ export default function MediaLibraryPage() {
           </p>
         </div>
         {canManage && (
-          <label className="inline-flex items-center justify-center min-h-11 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium cursor-pointer">
-            {uploading ? "Uploading…" : "Upload file"}
-            <input
-              type="file"
-              className="hidden"
-              accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.mp4,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
-              disabled={uploading}
-              onChange={onUpload}
-            />
-          </label>
+          <div className="flex flex-col items-stretch sm:items-end gap-1.5">
+            <label className="inline-flex items-center justify-center min-h-11 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium cursor-pointer">
+              {uploading ? "Uploading…" : "Upload file"}
+              <input
+                type="file"
+                className="hidden"
+                accept={MEDIA_ACCEPT}
+                disabled={uploading}
+                onChange={onUpload}
+              />
+            </label>
+            <p className="text-[11px] text-muted-foreground text-right max-w-xs leading-snug">
+              {MEDIA_SUPPORTED_LABEL}
+              <br />
+              Maximum file size: {MEDIA_MAX_MB} MB
+            </p>
+          </div>
         )}
       </div>
 
@@ -329,16 +364,23 @@ export default function MediaLibraryPage() {
                     : "Ask a Business Admin to upload company brochures and catalogs. You can send them to leads once files are available."}
                 </p>
                 {canManage && (
-                  <label className="inline-flex items-center justify-center mt-5 min-h-11 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:opacity-90">
-                    {uploading ? "Uploading…" : "Upload Files"}
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.mp4,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt"
-                      disabled={uploading}
-                      onChange={onUpload}
-                    />
-                  </label>
+                  <div className="mt-5 flex flex-col items-center gap-2">
+                    <label className="inline-flex items-center justify-center min-h-11 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold cursor-pointer hover:opacity-90">
+                      {uploading ? "Uploading…" : "Upload Files"}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept={MEDIA_ACCEPT}
+                        disabled={uploading}
+                        onChange={onUpload}
+                      />
+                    </label>
+                    <p className="text-[11px] text-muted-foreground text-center leading-snug">
+                      {MEDIA_SUPPORTED_LABEL}
+                      <br />
+                      Maximum file size: {MEDIA_MAX_MB} MB
+                    </p>
+                  </div>
                 )}
               </div>
             ) : (

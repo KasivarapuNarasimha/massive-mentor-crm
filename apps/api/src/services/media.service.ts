@@ -10,6 +10,7 @@ import {
   isAllowedMime,
   kindFromMime,
   maxMediaBytes,
+  MEDIA_SIZE_LIMIT_MESSAGE,
   openMediaReadStream,
   readMediaBuffer,
   saveMediaFile,
@@ -218,7 +219,7 @@ export async function uploadAsset(
     throw new Error("File type not allowed. Use images, PDF, video (MP4), or Office docs.");
   }
   if (opts.buffer.length > maxMediaBytes()) {
-    throw new Error(`File too large (max ${Math.round(maxMediaBytes() / (1024 * 1024))}MB)`);
+    throw new Error(MEDIA_SIZE_LIMIT_MESSAGE);
   }
   if (opts.folderId) {
     const f = await prisma.mediaFolder.findFirst({

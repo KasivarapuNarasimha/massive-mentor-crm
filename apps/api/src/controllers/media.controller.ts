@@ -77,9 +77,16 @@ export async function listAssets(req: AuthenticatedRequest, res: Response) {
 export async function uploadAsset(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    // Multer may set LIMIT_FILE_SIZE on the request via error middleware; also guard here
     const file = req.file;
     if (!file?.buffer?.length) {
       return res.status(400).json({ success: false, error: "No file uploaded" });
+    }
+    const { MEDIA_SIZE_LIMIT_MESSAGE, maxMediaBytes } = await import(
+      "../services/media-storage.service.js"
+    );
+    if (file.size > maxMediaBytes() || file.buffer.length > maxMediaBytes()) {
+      return res.status(400).json({ success: false, error: MEDIA_SIZE_LIMIT_MESSAGE });
     }
     const asset = await media.uploadAsset(req.user.id, {
       buffer: file.buffer,
@@ -89,7 +96,17 @@ export async function uploadAsset(req: AuthenticatedRequest, res: Response) {
       name: req.body?.name ? String(req.body.name) : undefined,
       captionDefault: req.body?.captionDefault ? String(req.body.captionDefault) : undefined,
     });
-    res.status(201).json({ success: true, data: { asset } });
+    res.status(201).json({
+      success: true,
+      data: {
+        asset: {
+          ...asset,
+          // Explicit size metadata for reporting UIs
+          sizeBytes: asset.sizeBytes,
+          sizeMb: Math.round((asset.sizeBytes / (1024 * 1024)) * 100) / 100,
+        },
+      },
+    });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Upload failed";
     res.status(errStatus(message)).json({ success: false, error: message });

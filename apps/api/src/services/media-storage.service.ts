@@ -7,7 +7,12 @@ import path from "node:path";
 import { createReadStream, existsSync } from "node:fs";
 import { env } from "../config/env.js";
 
-const MAX_BYTES = 25 * 1024 * 1024; // 25 MB (WhatsApp doc limit is 100MB but keep practical)
+/** Maximum upload size per media file (enforced FE + BE + multer). */
+export const MEDIA_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
+export const MEDIA_MAX_MB = 25;
+
+export const MEDIA_SIZE_LIMIT_MESSAGE =
+  "File size exceeds the 25 MB limit. Please upload a smaller file.";
 
 export function mediaRoot(): string {
   const fromEnv = (env as { MEDIA_DIR?: string }).MEDIA_DIR || process.env.MEDIA_DIR;
@@ -16,7 +21,7 @@ export function mediaRoot(): string {
 }
 
 export function maxMediaBytes(): number {
-  return MAX_BYTES;
+  return MEDIA_MAX_BYTES;
 }
 
 const ALLOWED: Record<string, string> = {
@@ -65,8 +70,8 @@ export async function saveMediaFile(opts: {
   originalName: string;
   buffer: Buffer;
 }): Promise<{ storageKey: string; storageProvider: "local" }> {
-  if (opts.buffer.length > MAX_BYTES) {
-    throw new Error(`File too large (max ${Math.round(MAX_BYTES / (1024 * 1024))}MB)`);
+  if (opts.buffer.length > MEDIA_MAX_BYTES) {
+    throw new Error(MEDIA_SIZE_LIMIT_MESSAGE);
   }
   const dir = await ensureMediaDir(opts.businessId);
   const safe = safeFileName(opts.originalName);
