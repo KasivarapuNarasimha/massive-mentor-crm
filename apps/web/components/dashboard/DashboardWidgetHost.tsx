@@ -86,7 +86,7 @@ function buildAiInsight(widget: RuntimeWidget): string {
     if (v == null) return `AI: Not enough data yet to analyze ${title}.`;
     if (v === 0) return `AI: ${title} is at zero — add CRM activity or widen the date range to surface trends.`;
     if (typeof v === "number" && v > 0) {
-      return `AI: ${title} stands at ${v.toLocaleString()}. Focus on consistent pipeline hygiene so this stays predictable week over week.`;
+      return `AI: ${title} stands at ${v.toLocaleString("en-IN")}. Focus on consistent pipeline hygiene so this stays predictable week over week.`;
     }
   }
 
@@ -105,7 +105,7 @@ function buildAiInsight(widget: RuntimeWidget): string {
   if (sorted.length >= 2 && top.value > bottom.value * 3) {
     return `AI: Wide spread in ${title}: “${top.name}” leads while “${bottom.name}” lags. Review process differences between segments.`;
   }
-  return `AI: ${title} is relatively balanced across ${sorted.length} segments. Top driver: “${top.name}” (${top.value.toLocaleString()}). Click a segment to inspect records.`;
+  return `AI: ${title} is relatively balanced across ${sorted.length} segments. Top driver: “${top.name}” (${top.value.toLocaleString("en-IN")}). Click a segment to inspect records.`;
 }
 
 function InfoTip({ text }: { text: string }) {
@@ -271,7 +271,7 @@ export function DashboardWidgetHost({ widgets, onDrill, loading }: Props) {
                   {typeof w.value === "number"
                     ? isMoneyWidget(w)
                       ? money(w.value)
-                      : w.value.toLocaleString()
+                      : w.value.toLocaleString("en-IN")
                     : "—"}
                 </div>
               )}

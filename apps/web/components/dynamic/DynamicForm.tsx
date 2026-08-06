@@ -3,6 +3,7 @@
 import { DynamicField } from "@/components/dynamic/DynamicField";
 import type { FieldDef } from "@/lib/business-config";
 import { formFields } from "@/lib/business-config";
+import { parseAmount } from "@/lib/currency";
 
 type Props = {
   fields: FieldDef[];
@@ -70,8 +71,7 @@ export function buildContactPayload(
       } else if (field.coreMap === "value") {
         if (v === "" || v === null) payload.value = null;
         else {
-          const n = typeof v === "number" ? v : parseFloat(String(v));
-          payload.value = Number.isNaN(n) ? null : n;
+          payload.value = parseAmount(v as string | number);
         }
       } else {
         payload[field.coreMap] = v === "" ? null : v;

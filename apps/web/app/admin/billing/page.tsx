@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { AdminDataTable, type AdminColumn } from "@/components/admin/AdminDataTable";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { KpiCard } from "@/components/admin/KpiCard";
+import { CurrencyAmountInput } from "@/components/ui/CurrencyAmountInput";
+import { formatCurrency } from "@/lib/currency";
 
 type Inv = {
   id: string;
@@ -66,7 +68,7 @@ export default function AdminBillingPage() {
       {
         businessId: form.businessId,
         kind: form.kind,
-        amount: parseFloat(form.amount),
+        amount: Number(String(form.amount).replace(/,/g, "")),
         notes: form.notes || undefined,
       },
       token()
@@ -93,7 +95,9 @@ export default function AdminBillingPage() {
     {
       key: "amount",
       label: "Amount",
-      render: (r) => <span className="tabular-nums">₹{r.amount.toLocaleString()}</span>,
+      render: (r) => (
+        <span className="tabular-nums">{formatCurrency(r.amount, "INR")}</span>
+      ),
       exportValue: (r) => r.amount,
     },
     { key: "status", label: "Status", render: (r) => <StatusBadge value={r.status} /> },
@@ -135,7 +139,10 @@ export default function AdminBillingPage() {
         <KpiCard label="Paid revenue" value={`₹${paidTotal.toLocaleString()}`} tone="success" />
         <KpiCard
           label="Open amount"
-          value={`₹${unpaid.reduce((s, i) => s + i.amount, 0).toLocaleString()}`}
+          value={formatCurrency(
+            unpaid.reduce((s, i) => s + i.amount, 0),
+            "INR"
+          )}
           tone="danger"
         />
       </div>
@@ -165,13 +172,12 @@ export default function AdminBillingPage() {
           <option value="renewal">Renewal</option>
           <option value="adjustment">Adjustment</option>
         </select>
-        <input
-          type="number"
-          step="0.01"
+        <CurrencyAmountInput
           required
           placeholder="Amount"
           value={form.amount}
-          onChange={(e) => setForm({ ...form, amount: e.target.value })}
+          currency="INR"
+          onValueChange={(raw) => setForm({ ...form, amount: raw })}
           className="bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 text-foreground"
         />
         <input

@@ -7,8 +7,9 @@ import { emitDataChanged } from "@/lib/data-events";
 import { PaginationBar } from "@/components/ui/PaginationBar";
 import { toast } from "sonner";
 import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
-import { isCurrencyCode, setAppCurrency } from "@/lib/currency";
+import { isCurrencyCode, setAppCurrency, parseAmount } from "@/lib/currency";
 import { useBusinessCurrency } from "@/lib/use-business-currency";
+import { CurrencyAmountInput } from "@/components/ui/CurrencyAmountInput";
 
 type Kpis = {
   totalInvoiced: number;
@@ -195,7 +196,7 @@ export default function FinancePage() {
       "/finance/invoices",
       {
         clientName: invForm.clientName,
-        amount: Number(invForm.amount),
+        amount: parseAmount(invForm.amount) ?? 0,
         taxRate: Number(invForm.taxRate || 0),
         dueDate: invForm.dueDate || undefined,
         description: invForm.description,
@@ -219,7 +220,7 @@ export default function FinancePage() {
       "/finance/expenses",
       {
         title: expForm.title,
-        amount: Number(expForm.amount),
+        amount: parseAmount(expForm.amount) ?? 0,
         category: expForm.category,
         vendor: expForm.vendor,
       },
@@ -240,7 +241,7 @@ export default function FinancePage() {
     const res = await api.post(
       "/finance/payments",
       {
-        amount: Number(payForm.amount),
+        amount: parseAmount(payForm.amount) ?? 0,
         invoiceId: payForm.invoiceId || undefined,
         method: payForm.method,
         reference: payForm.reference,
@@ -387,7 +388,14 @@ export default function FinancePage() {
           <form onSubmit={createInvoice} className="bg-card border border-border rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <h3 className="sm:col-span-2 font-semibold">Create invoice</h3>
             <input className={inputClass} placeholder="Client name" value={invForm.clientName} onChange={(e) => setInvForm({ ...invForm, clientName: e.target.value })} />
-            <input className={inputClass} type="number" step="0.01" placeholder="Amount" required value={invForm.amount} onChange={(e) => setInvForm({ ...invForm, amount: e.target.value })} />
+            <CurrencyAmountInput
+              className={inputClass}
+              placeholder="Amount"
+              required
+              value={invForm.amount}
+              currency={currency}
+              onValueChange={(raw) => setInvForm({ ...invForm, amount: raw })}
+            />
             <input className={inputClass} type="number" step="0.01" placeholder="Tax rate %" value={invForm.taxRate} onChange={(e) => setInvForm({ ...invForm, taxRate: e.target.value })} />
             <input className={inputClass} type="date" value={invForm.dueDate} onChange={(e) => setInvForm({ ...invForm, dueDate: e.target.value })} />
             <input className={inputClass + " sm:col-span-2"} placeholder="Description" value={invForm.description} onChange={(e) => setInvForm({ ...invForm, description: e.target.value })} />
@@ -417,7 +425,14 @@ export default function FinancePage() {
           <form onSubmit={createExpense} className="bg-card border border-border rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <h3 className="sm:col-span-2 font-semibold">Record expense</h3>
             <input className={inputClass} placeholder="Title" required value={expForm.title} onChange={(e) => setExpForm({ ...expForm, title: e.target.value })} />
-            <input className={inputClass} type="number" step="0.01" placeholder="Amount" required value={expForm.amount} onChange={(e) => setExpForm({ ...expForm, amount: e.target.value })} />
+            <CurrencyAmountInput
+              className={inputClass}
+              placeholder="Amount"
+              required
+              value={expForm.amount}
+              currency={currency}
+              onValueChange={(raw) => setExpForm({ ...expForm, amount: raw })}
+            />
             <input className={inputClass} placeholder="Category" value={expForm.category} onChange={(e) => setExpForm({ ...expForm, category: e.target.value })} />
             <input className={inputClass} placeholder="Vendor" value={expForm.vendor} onChange={(e) => setExpForm({ ...expForm, vendor: e.target.value })} />
             <button type="submit" className="sm:col-span-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">Save expense</button>
@@ -441,7 +456,14 @@ export default function FinancePage() {
         <div className="space-y-4">
           <form onSubmit={createPayment} className="bg-card border border-border rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <h3 className="sm:col-span-2 font-semibold">Record payment</h3>
-            <input className={inputClass} type="number" step="0.01" placeholder="Amount" required value={payForm.amount} onChange={(e) => setPayForm({ ...payForm, amount: e.target.value })} />
+            <CurrencyAmountInput
+              className={inputClass}
+              placeholder="Amount"
+              required
+              value={payForm.amount}
+              currency={currency}
+              onValueChange={(raw) => setPayForm({ ...payForm, amount: raw })}
+            />
             <input className={inputClass} placeholder="Invoice ID (optional)" value={payForm.invoiceId} onChange={(e) => setPayForm({ ...payForm, invoiceId: e.target.value })} />
             <select className={inputClass} value={payForm.method} onChange={(e) => setPayForm({ ...payForm, method: e.target.value })}>
               <option value="upi">UPI</option>

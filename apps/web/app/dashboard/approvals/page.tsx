@@ -5,7 +5,8 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { PageShell, PageHeader } from "@/components/ui/PageShell";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, parseAmount } from "@/lib/currency";
+import { CurrencyAmountInput } from "@/components/ui/CurrencyAmountInput";
 
 type Workflow = {
   id: string;
@@ -154,7 +155,7 @@ export default function ApprovalsPage() {
         type: form.type,
         title: form.title.trim(),
         description: form.description || undefined,
-        amount: form.amount ? Number(form.amount) : undefined,
+        amount: form.amount ? parseAmount(form.amount) ?? undefined : undefined,
       },
       token
     );
@@ -541,10 +542,9 @@ export default function ApprovalsPage() {
               placeholder="Description"
               className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm h-20"
             />
-            <input
-              type="number"
+            <CurrencyAmountInput
               value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              onValueChange={(raw) => setForm({ ...form, amount: raw })}
               placeholder="Amount (optional)"
               className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm min-h-11"
             />

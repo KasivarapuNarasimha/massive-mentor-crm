@@ -32,7 +32,12 @@ export function toDecimal(value: MoneyInput | unknown, scale = 2): Prisma.Decima
   const n =
     typeof value === "number"
       ? value
-      : Number(String(value).replace(/,/g, "").trim());
+      : Number(
+          String(value)
+            .replace(/[₹$€£\s]/g, "")
+            .replace(/,/g, "")
+            .trim()
+        );
   if (!Number.isFinite(n)) return new Prisma.Decimal(0);
   return new Prisma.Decimal(n).toDecimalPlaces(scale);
 }

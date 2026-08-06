@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, parseAmount } from "@/lib/currency";
+import { CurrencyAmountInput } from "@/components/ui/CurrencyAmountInput";
 import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
 import { toIsoDateTime, toDateInputValue } from "@/lib/date-input";
 import { useDataVersion } from "@/lib/data-events";
@@ -226,10 +227,10 @@ export default function DealsPage() {
       return;
     }
 
-    // Value validation
+    // Value validation (raw numeric string — commas never stored in state)
     if (formData.value.trim()) {
-      const v = parseFloat(formData.value);
-      if (isNaN(v) || v < 0) {
+      const v = parseAmount(formData.value);
+      if (v == null || v < 0) {
         toast.error("Value must be a non-negative number");
         return;
       }
@@ -262,7 +263,10 @@ export default function DealsPage() {
       notes: formData.notes.trim() || null,
     };
 
-    if (formData.value) payload.value = parseFloat(formData.value);
+    if (formData.value) {
+      const v = parseAmount(formData.value);
+      if (v != null) payload.value = v;
+    }
     if (expectedCloseIso) payload.expectedClose = expectedCloseIso;
     if (formData.probability) payload.probability = parseInt(formData.probability);
 
@@ -688,11 +692,11 @@ export default function DealsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm text-muted-foreground mb-1">Value</label>
-                  <input
-                    type="number"
+                  <CurrencyAmountInput
                     value={formData.value}
-                    onChange={(e) => handleChange("value", e.target.value)}
+                    onValueChange={(raw) => handleChange("value", raw)}
                     className="w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+                    placeholder="e.g. 1,00,000"
                   />
                 </div>
                 <div>

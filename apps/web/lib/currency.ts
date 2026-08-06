@@ -270,24 +270,162 @@ export function onCurrencyChange(cb: (code: CurrencyCode) => void): () => void {
   };
 }
 
+/**
+ * Indian / locale-aware plain number (no currency symbol).
+ * INR → en-IN grouping: 1,00,000 · 10,00,000 · 1,00,00,000
+ */
+export function formatIndianNumber(
+  amount: number | string | null | undefined,
+  opts?: {
+    maximumFractionDigits?: number;
+    minimumFractionDigits?: number;
+    locale?: string;
+  }
+): string {
+  const n = parseAmount(amount);
+  if (n == null) return "";
+  const locale = opts?.locale || "en-IN";
+  const max =
+    opts?.maximumFractionDigits ??
+    (Number.isInteger(n) ? 0 : 2);
+  const min = opts?.minimumFractionDigits ?? (Number.isInteger(n) ? 0 : 2);
+  try {
+    return new Intl.NumberFormat(locale, {
+      maximumFractionDigits: max,
+      minimumFractionDigits: min,
+      useGrouping: true,
+    }).format(n);
+  } catch {
+    return String(n);
+  }
+}
+
+/** Parse user/API amount: strips Indian/Western grouping commas and spaces. */
+export function parseAmount(
+  value: number | string | null | undefined
+): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  const cleaned = String(value)
+    .replace(/[₹$€£\s]/g, "")
+    .replace(/,/g, "")
+    .trim();
+  if (!cleaned || cleaned === "-" || cleaned === ".") return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Live input formatter: "100000" → "1,00,000" (en-IN by default).
+ * Keeps optional decimal part; strips invalid chars.
+ * Returns { display, raw } where raw is DB-safe numeric string without commas.
+ */
+export function formatAmountInputLive(
+  input: string,
+  locale = "en-IN"
+): { display: string; raw: string } {
+  if (input == null || input === "") return { display: "", raw: "" };
+
+  // Keep only digits, one leading minus, one decimal point
+  let s = String(input).replace(/[^\d.-]/g, "");
+  const neg = s.startsWith("-");
+  s = s.replace(/-/g, "");
+  const dot = s.indexOf(".");
+  let intPart = dot >= 0 ? s.slice(0, dot) : s;
+  let fracPart = dot >= 0 ? s.slice(dot + 1).replace(/\./g, "") : "";
+  // Drop leading zeros except single zero before decimal
+  intPart = intPart.replace(/^0+(?=\d)/, "");
+  if (intPart === "" && (fracPart || dot >= 0)) intPart = "0";
+
+  if (intPart === "" && fracPart === "" && dot < 0) {
+    return { display: neg ? "-" : "", raw: neg ? "-" : "" };
+  }
+
+  // Limit fraction to 2 for money
+  if (fracPart.length > 2) fracPart = fracPart.slice(0, 2);
+
+  let formattedInt = intPart;
+  try {
+    if (intPart !== "") {
+      formattedInt = new Intl.NumberFormat(locale, {
+        maximumFractionDigits: 0,
+        useGrouping: true,
+      }).format(Number(intPart));
+    }
+  } catch {
+    /* keep intPart */
+  }
+
+  const hasDot = dot >= 0;
+  const display =
+    (neg ? "-" : "") +
+    formattedInt +
+    (hasDot ? "." + fracPart : fracPart ? "." + fracPart : "");
+  const raw =
+    (neg ? "-" : "") +
+    (intPart === "" ? "0" : intPart) +
+    (hasDot || fracPart ? "." + fracPart : "");
+
+  return { display, raw: raw === "-" ? "" : raw };
+}
+
+/**
+ * After reformatting, place caret so the same count of significant
+ * characters (digits + one decimal) remain before the cursor.
+ */
+export function restoreAmountCursor(
+  display: string,
+  significantBeforeCursor: number
+): number {
+  if (significantBeforeCursor <= 0) return 0;
+  let seen = 0;
+  for (let i = 0; i < display.length; i++) {
+    const ch = display[i]!;
+    if (/\d/.test(ch) || ch === ".") {
+      seen++;
+      if (seen >= significantBeforeCursor) return i + 1;
+    }
+  }
+  return display.length;
+}
+
+export function countSignificantBefore(value: string, cursor: number): number {
+  let n = 0;
+  const end = Math.min(cursor, value.length);
+  for (let i = 0; i < end; i++) {
+    const ch = value[i]!;
+    if (/\d/.test(ch) || ch === ".") n++;
+  }
+  return n;
+}
+
 /** Format money for display. Uses explicit code, else app preference, else INR. */
 export function formatCurrency(
   amount: number | string | null | undefined,
-  currencyCode?: string | null
+  currencyCode?: string | null,
+  opts?: { maximumFractionDigits?: number; minimumFractionDigits?: number }
 ): string {
-  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  const n = parseAmount(amount) ?? 0;
   const raw =
     (currencyCode && isCurrencyCode(currencyCode) && currencyCode) ||
     (typeof window !== "undefined" ? getAppCurrency() : "INR");
   const meta = getCurrencyMeta(raw);
-  const n = num == null || isNaN(num as number) ? 0 : (num as number);
+  const maxFd =
+    opts?.maximumFractionDigits ??
+    (meta.code === "INR" ? (Number.isInteger(n) ? 0 : 2) : 2);
+  const minFd =
+    opts?.minimumFractionDigits ??
+    (Number.isInteger(n) ? 0 : Math.min(2, maxFd));
 
   // AED / SAR: "AED 1,250" style (product requirement)
   if (meta.code === "AED" || meta.code === "SAR") {
     try {
       const body = new Intl.NumberFormat(meta.locale, {
-        maximumFractionDigits: 2,
-        minimumFractionDigits: n % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: maxFd,
+        minimumFractionDigits: minFd,
+        useGrouping: true,
       }).format(n);
       return `${meta.symbol} ${body}`;
     } catch {
@@ -299,14 +437,20 @@ export function formatCurrency(
     return new Intl.NumberFormat(meta.locale, {
       style: "currency",
       currency: meta.code,
-      maximumFractionDigits: meta.code === "INR" ? 0 : 2,
-      minimumFractionDigits: meta.code === "INR" ? 0 : undefined,
+      maximumFractionDigits: maxFd,
+      minimumFractionDigits: minFd,
+      useGrouping: true,
     }).format(n);
   } catch {
-    return `${meta.symbol}${Number(n).toLocaleString(meta.locale)}`;
+    return `${meta.symbol}${formatIndianNumber(n, { locale: meta.locale, maximumFractionDigits: maxFd, minimumFractionDigits: minFd })}`;
   }
 }
 
 export function currencySymbol(code?: string | null): string {
   return getCurrencyMeta(code || getAppCurrency()).symbol;
+}
+
+/** Locale used for number grouping of a currency (INR → en-IN). */
+export function currencyLocale(code?: string | null): string {
+  return getCurrencyMeta(code || getAppCurrency()).locale;
 }

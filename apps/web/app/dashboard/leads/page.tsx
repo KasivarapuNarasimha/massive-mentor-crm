@@ -32,6 +32,7 @@ import {
   FALLBACK_CONTACT_FIELDS,
   FALLBACK_LEAD_STATUSES,
 } from "@/lib/business-config";
+import { formatCurrency, parseAmount } from "@/lib/currency";
 
 interface Contact {
   id: string;
@@ -1979,7 +1980,21 @@ export default function LeadsPage() {
                     </td>
                     {tableFields.slice(0, 6).map((f) => {
                       const raw = getContactFieldValue(lead as Record<string, unknown>, f);
-                      const display = raw == null || raw === "" ? "—" : String(raw);
+                      const isMoney =
+                        f.type === "currency" ||
+                        f.coreMap === "value" ||
+                        /amount|budget|price|fee|revenue|value/i.test(f.key);
+                      const moneyN = isMoney
+                        ? parseAmount(raw as string | number | null | undefined)
+                        : null;
+                      const display =
+                        raw == null || raw === ""
+                          ? "—"
+                          : isMoney
+                            ? moneyN != null
+                              ? formatCurrency(moneyN)
+                              : "—"
+                            : String(raw);
                       const isStatus = f.coreMap === "status" || f.key === "status";
                       const isName = f.coreMap === "name" || f.key === "name";
                       return (
@@ -2009,7 +2024,10 @@ export default function LeadsPage() {
                               ) : null}
                             </div>
                           ) : (
-                            <div className="text-muted-foreground truncate" title={display !== "—" ? display : undefined}>
+                            <div
+                              className={`text-muted-foreground truncate ${isMoney ? "tabular-nums text-emerald-400/90" : ""}`}
+                              title={display !== "—" ? display : undefined}
+                            >
                               {display}
                             </div>
                           )}

@@ -1,6 +1,8 @@
 "use client";
 
 import type { FieldDef } from "@/lib/business-config";
+import { CurrencyAmountInput } from "@/components/ui/CurrencyAmountInput";
+import { getAppCurrency } from "@/lib/currency";
 
 type Props = {
   field: FieldDef;
@@ -11,6 +13,22 @@ type Props = {
 };
 
 const inputClass = "mm-input";
+
+/** Currency-like field keys even if type is number (legacy templates). */
+const MONEY_KEYS = new Set([
+  "value",
+  "amount",
+  "budget",
+  "fee",
+  "price",
+  "revenue",
+  "expense",
+  "campaign_budget",
+  "deal_value",
+  "quotation",
+  "quotation_amount",
+  "invoice_amount",
+]);
 
 /**
  * Renders a single field by FieldDef.type only — never by industry.
@@ -109,7 +127,29 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
       );
     case "number":
     case "rating":
-    case "nps":
+    case "nps": {
+      // Money-named number fields → Indian currency input
+      if (
+        field.type === "number" &&
+        (MONEY_KEYS.has(field.key) ||
+          field.coreMap === "value" ||
+          /amount|budget|price|fee|revenue|value/i.test(field.key))
+      ) {
+        return (
+          <div>
+            {label}
+            <CurrencyAmountInput
+              id={id}
+              value={str}
+              disabled={disabled}
+              currency={getAppCurrency()}
+              className={inputClass}
+              onValueChange={(raw) => onChange(field.key, raw === "" ? "" : raw)}
+              required={field.required}
+            />
+          </div>
+        );
+      }
       return (
         <div>
           {label}
@@ -123,38 +163,20 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
           />
         </div>
       );
+    }
     case "currency":
       return (
         <div>
           {label}
-          <div className="relative">
-            <input
-              id={id}
-              type="number"
-              value={str}
-              disabled={disabled}
-              onChange={(e) => onChange(field.key, e.target.value === "" ? "" : e.target.value)}
-              className={`${inputClass} pl-8`}
-            />
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-              {/* Symbol from app currency preference when available */}
-              {typeof window !== "undefined"
-                ? (() => {
-                    try {
-                      const c = localStorage.getItem("massive_mentor_currency") || "INR";
-                      return (
-                        { INR: "₹", USD: "$", EUR: "€", GBP: "£", AED: "AED", SAR: "SAR", SGD: "S$", AUD: "A$", CAD: "C$" } as Record<
-                          string,
-                          string
-                        >
-                      )[c] || "₹";
-                    } catch {
-                      return "₹";
-                    }
-                  })()
-                : "₹"}
-            </span>
-          </div>
+          <CurrencyAmountInput
+            id={id}
+            value={str}
+            disabled={disabled}
+            currency={getAppCurrency()}
+            className={inputClass}
+            onValueChange={(raw) => onChange(field.key, raw === "" ? "" : raw)}
+            required={field.required}
+          />
         </div>
       );
     case "date":

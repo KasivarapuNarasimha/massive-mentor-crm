@@ -333,9 +333,9 @@ export async function streamPdfTable(
     });
     y += titleFontSize + 6;
     doc.font("Helvetica").fontSize(metaFontSize).fillColor("#555555");
-    const meta = `Generated ${new Date().toISOString()}  ·  ${rows.length.toLocaleString()} row(s)${
+    const meta = `Generated ${new Date().toISOString()}  ·  ${rows.length.toLocaleString("en-IN")} row(s)${
       truncated
-        ? `  ·  Showing first ${maxRows.toLocaleString()} of ${sourceRows.length.toLocaleString()} (use CSV/XLSX for full export)`
+        ? `  ·  Showing first ${maxRows.toLocaleString("en-IN")} of ${sourceRows.length.toLocaleString("en-IN")} (use CSV/XLSX for full export)`
         : ""
     }`;
     doc.text(meta, margin, y, {

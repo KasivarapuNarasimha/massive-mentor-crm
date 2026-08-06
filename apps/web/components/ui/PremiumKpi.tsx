@@ -124,7 +124,7 @@ export function PremiumKpi({
 
   const display = formatMoney
     ? formatMoney(Math.round(animated))
-    : `${Math.round(animated).toLocaleString()}${suffix}`;
+    : `${Math.round(animated).toLocaleString("en-IN")}${suffix}`;
 
   const body = (
     <>
@@ -170,7 +170,7 @@ export function PremiumKpi({
             )}
             {previous != null && (
               <span className="text-[11px] text-muted-foreground">
-                vs {formatMoney ? formatMoney(previous) : previous.toLocaleString()} prior
+                vs {formatMoney ? formatMoney(previous) : previous.toLocaleString("en-IN")} prior
               </span>
             )}
             {previous == null && growth != null && (

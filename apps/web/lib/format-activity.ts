@@ -88,7 +88,8 @@ function formatValue(v: unknown): string {
   if (typeof v === "boolean") return v ? "Yes" : "No";
   if (typeof v === "number") {
     if (Math.abs(v) >= 1000 && Number.isFinite(v)) {
-      return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+      // Indian grouping for large figures in activity timelines
+      return v.toLocaleString("en-IN", { maximumFractionDigits: 2 });
     }
     return String(v);
   }

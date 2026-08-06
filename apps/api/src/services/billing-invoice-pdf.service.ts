@@ -6,6 +6,7 @@ import path from "node:path";
 import { prisma } from "../lib/prisma.js";
 import { env } from "../config/env.js";
 import { toMoneyNumber } from "../lib/money.js";
+import { formatCurrency, formatIndianNumber } from "../lib/currency.js";
 
 function invoicesDir(): string {
   const base = env.BACKUP_DIR || path.join(process.cwd(), "storage");
@@ -94,12 +95,12 @@ export async function generateBillingInvoicePdf(paymentId: string): Promise<{
   doc.fillColor("#3f3f46");
   doc.text(planName, 50);
   doc.text(String(cycle), 280, doc.y - 12);
-  doc.text(base.toFixed(2), 420, doc.y - 12, { width: 120, align: "right" });
+  doc.text(formatIndianNumber(base), 420, doc.y - 12, { width: 120, align: "right" });
   doc.moveDown(0.5);
 
   if (discountN > 0) {
     doc.text("Discount", 50);
-    doc.text(`- ${discountN.toFixed(2)}`, 420, doc.y - 12, {
+    doc.text(`- ${formatIndianNumber(discountN)}`, 420, doc.y - 12, {
       width: 120,
       align: "right",
     });
@@ -107,10 +108,10 @@ export async function generateBillingInvoicePdf(paymentId: string): Promise<{
   }
 
   doc.text(`GST (18%)`, 50);
-  doc.text(gstN.toFixed(2), 420, doc.y - 12, { width: 120, align: "right" });
+  doc.text(formatIndianNumber(gstN), 420, doc.y - 12, { width: 120, align: "right" });
   doc.moveDown();
   doc.fontSize(12).fillColor("#18181b").text("Total Paid", 50);
-  doc.text(amountN.toFixed(2), 420, doc.y - 14, { width: 120, align: "right" });
+  doc.text(formatCurrency(amountN, "INR"), 420, doc.y - 14, { width: 120, align: "right" });
   doc.moveDown(2);
 
   doc.fontSize(9).fillColor("#71717a");

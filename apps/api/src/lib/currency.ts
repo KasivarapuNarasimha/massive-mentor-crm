@@ -84,30 +84,61 @@ const SYMBOL_BY_CODE: Record<CurrencyCode, string> = {
   CAD: "C$",
 };
 
+/** Strip grouping commas / symbols → number (DB-safe). */
+export function parseAmount(
+  amount: number | string | null | undefined | { toNumber?: () => number }
+): number {
+  if (amount == null) return 0;
+  if (typeof amount === "number") return Number.isFinite(amount) ? amount : 0;
+  if (typeof amount === "object" && typeof amount.toNumber === "function") {
+    const n = amount.toNumber();
+    return Number.isFinite(n) ? n : 0;
+  }
+  const cleaned = String(amount)
+    .replace(/[₹$€£\s]/g, "")
+    .replace(/,/g, "")
+    .trim();
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Indian / locale plain number (1,00,000). */
+export function formatIndianNumber(
+  amount: number | string | null | undefined | { toNumber?: () => number },
+  locale = "en-IN"
+): string {
+  const n = parseAmount(amount);
+  try {
+    return new Intl.NumberFormat(locale, {
+      maximumFractionDigits: Number.isInteger(n) ? 0 : 2,
+      minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+      useGrouping: true,
+    }).format(n);
+  } catch {
+    return String(n);
+  }
+}
+
 /** Server-side money format (invoices, PDF/CSV exports, notifications). */
 export function formatCurrency(
   amount: number | string | null | undefined | { toNumber?: () => number },
   currencyCode?: string | null
 ): string {
-  let num: number | null | undefined;
-  if (amount == null) num = null;
-  else if (typeof amount === "string") num = parseFloat(amount);
-  else if (typeof amount === "number") num = amount;
-  else if (typeof amount === "object" && typeof amount.toNumber === "function") {
-    num = amount.toNumber();
-  } else num = Number(amount);
+  const n = parseAmount(amount);
   const code: CurrencyCode = isCurrencyCode(currencyCode || "")
     ? (currencyCode as CurrencyCode)
     : "INR";
   const locale = LOCALE_BY_CODE[code];
-  const n = num == null || isNaN(num as number) ? 0 : (num as number);
+  const maxFd = Number.isInteger(n) ? 0 : 2;
+  const minFd = Number.isInteger(n) ? 0 : 2;
 
   // GCC codes: prefer "AED 1,250" over native rtl symbols
   if (code === "AED" || code === "SAR") {
     try {
       const body = new Intl.NumberFormat(locale, {
-        maximumFractionDigits: 2,
-        minimumFractionDigits: n % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: maxFd,
+        minimumFractionDigits: minFd,
+        useGrouping: true,
       }).format(n);
       return `${SYMBOL_BY_CODE[code]} ${body}`;
     } catch {
@@ -119,11 +150,12 @@ export function formatCurrency(
     return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: code,
-      maximumFractionDigits: code === "INR" ? 0 : 2,
-      minimumFractionDigits: code === "INR" ? 0 : undefined,
+      maximumFractionDigits: maxFd,
+      minimumFractionDigits: minFd,
+      useGrouping: true,
     }).format(n);
   } catch {
-    return `${SYMBOL_BY_CODE[code]}${n.toLocaleString(locale)}`;
+    return `${SYMBOL_BY_CODE[code]}${formatIndianNumber(n, locale)}`;
   }
 }
 
