@@ -1,7 +1,8 @@
 import OpenAI from 'openai';
 import { AIProvider, AIResponse, GenerateOptions, AIUsage } from '../types.js';
-import { AIError, AIRateLimitError, AIInvalidResponseError } from '../errors.js';
+import { AIInvalidResponseError } from '../errors.js';
 import { logAIUsage, logAIError } from '../logger.js';
+import { rethrowProviderError } from '../../../utils/ai-error.js';
 
 export class OpenAIProvider implements AIProvider {
   private client: OpenAI;
@@ -15,7 +16,7 @@ export class OpenAIProvider implements AIProvider {
     this.defaultModel = defaultModel;
   }
 
-  async generateJSON<T = any>(
+  async generateJSON<T = unknown>(
     prompt: string,
     options: GenerateOptions = {}
   ): Promise<AIResponse<T>> {
@@ -69,23 +70,9 @@ export class OpenAIProvider implements AIProvider {
         usage,
         raw: completion,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logAIError(error, 'openai', 'generateJSON');
-
-      if (error.status === 429) {
-        throw new AIRateLimitError('openai', error);
-      }
-
-      if (error instanceof AIError) {
-        throw error;
-      }
-
-      throw new AIError(
-        error.message || 'Unknown OpenAI error',
-        'PROVIDER_ERROR',
-        'openai',
-        error
-      );
+      rethrowProviderError('openai', error, 'Unknown OpenAI error');
     }
   }
 
@@ -123,19 +110,9 @@ export class OpenAIProvider implements AIProvider {
         usage,
         raw: completion,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logAIError(error, 'openai', 'generateText');
-
-      if (error.status === 429) {
-        throw new AIRateLimitError('openai', error);
-      }
-
-      throw new AIError(
-        error.message || 'Unknown OpenAI error',
-        'PROVIDER_ERROR',
-        'openai',
-        error
-      );
+      rethrowProviderError('openai', error, 'Unknown OpenAI error');
     }
   }
 }

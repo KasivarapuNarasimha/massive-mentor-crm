@@ -1283,6 +1283,3 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-// Broadcast modal is rendered by parent via state — keep helpers colocated
-// (broadcast UI appended in main return)

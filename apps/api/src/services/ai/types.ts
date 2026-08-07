@@ -11,7 +11,7 @@ export interface AIUsage {
 export interface AIResponse<T = unknown> {
   data: T;
   usage?: AIUsage;
-  raw?: any; // For debugging
+  raw?: unknown; // provider payload for debugging
 }
 
 export interface GenerateOptions {
@@ -22,7 +22,7 @@ export interface GenerateOptions {
 }
 
 export interface AIProvider {
-  generateJSON<T = any>(
+  generateJSON<T = unknown>(
     prompt: string,
     options?: GenerateOptions
   ): Promise<AIResponse<T>>;

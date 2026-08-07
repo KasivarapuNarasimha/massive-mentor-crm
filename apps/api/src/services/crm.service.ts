@@ -2201,7 +2201,13 @@ Create a proposal outline.
 Return ONLY JSON with keys: title, executiveSummary, solution, pricing, nextSteps
 `.trim();
 
-  const res = await ai.generateJSON<any>(prompt, { temperature: 0.5, maxTokens: 800 });
+  const res = await ai.generateJSON<{
+    title?: string;
+    executiveSummary?: string;
+    solution?: string;
+    pricing?: string;
+    nextSteps?: string;
+  }>(prompt, { temperature: 0.5, maxTokens: 800 });
   return res.data;
 }
 
@@ -2240,12 +2246,24 @@ Provide sales forecast.
 Return ONLY { "forecastRevenue": number, "winRate": number, "insights": ["..."] }
 `.trim();
 
-  const res = await ai.generateJSON<any>(prompt, { temperature: 0.5 });
+  const res = await ai.generateJSON<{
+    forecastRevenue?: number;
+    winRate?: number;
+    insights?: string[];
+  }>(prompt, { temperature: 0.5 });
   return res.data;
 }
 
 export async function generateNextBestAction(userId: string, entityType: string, entityId: string) {
-  let data: any = {};
+  type EntityRow = {
+    name?: string | null;
+    title?: string | null;
+    status?: string | null;
+    stage?: string | null;
+    description?: string | null;
+    notes?: string | null;
+  };
+  let data: EntityRow | null = null;
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
 
   if (entityType === "contact") {
@@ -2275,7 +2293,12 @@ Recommend next best action.
 Return ONLY valid JSON: { "action": "short", "reason": "...", "priority": "high|medium|low", "timing": "..." }
 `.trim();
 
-  const res = await ai.generateJSON<any>(prompt, { temperature: 0.6 });
+  const res = await ai.generateJSON<{
+    action?: string;
+    reason?: string;
+    priority?: string;
+    timing?: string;
+  }>(prompt, { temperature: 0.6 });
   return res.data;
 }
 
@@ -2746,7 +2769,7 @@ export async function logAiGeneration(
     tone?: string;
     language?: string;
     content: string;
-    metadata?: any;
+    metadata?: Record<string, unknown>;
   }
 ) {
   return prisma.aiGeneration.create({
@@ -2757,7 +2780,7 @@ export async function logAiGeneration(
       tone: input.tone || null,
       language: input.language || null,
       content: input.content,
-      metadata: input.metadata || undefined,
+      metadata: (input.metadata as object | undefined) || undefined,
     },
   });
 }

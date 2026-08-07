@@ -5,7 +5,7 @@ export interface LogActivityInput {
   entityType: string;
   entityId: string;
   action: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export async function logActivity(input: LogActivityInput) {
@@ -15,13 +15,22 @@ export async function logActivity(input: LogActivityInput) {
       entityType: input.entityType,
       entityId: input.entityId,
       action: input.action,
-      details: input.details || undefined,
+      details: (input.details as object | undefined) || undefined,
     },
   });
 }
 
-export async function getActivityTimeline(userId: string, entityType?: string, entityId?: string, limit = 50) {
-  const where: any = { userId };
+export async function getActivityTimeline(
+  userId: string,
+  entityType?: string,
+  entityId?: string,
+  limit = 50
+) {
+  const where: {
+    userId: string;
+    entityType?: string;
+    entityId?: string;
+  } = { userId };
   if (entityType) where.entityType = entityType;
   if (entityId) where.entityId = entityId;
 

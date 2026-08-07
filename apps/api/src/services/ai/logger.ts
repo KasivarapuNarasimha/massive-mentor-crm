@@ -15,11 +15,12 @@ export function logAIUsage(usage: AIUsage, operation?: string) {
   console.log(`[AI] Tokens → Prompt: ${usage.promptTokens} | Completion: ${usage.completionTokens} | Total: ${usage.totalTokens}`);
 }
 
-export function logAIError(error: Error, provider: string, operation?: string) {
+export function logAIError(error: unknown, provider: string, operation?: string) {
   const timestamp = new Date().toISOString();
+  const err = error instanceof Error ? error : new Error(String(error));
   console.error(`[AI ERROR] ${timestamp} | Provider: ${provider} | Operation: ${operation || 'unknown'}`);
-  console.error(`[AI ERROR] ${error.message}`);
-  if (!isProd() && error.stack) {
-    console.error(error.stack);
+  console.error(`[AI ERROR] ${err.message}`);
+  if (!isProd() && err.stack) {
+    console.error(err.stack);
   }
 }

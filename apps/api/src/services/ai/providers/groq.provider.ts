@@ -1,7 +1,8 @@
 import Groq from 'groq-sdk';
 import { AIProvider, AIResponse, GenerateOptions, AIUsage } from '../types.js';
-import { AIError, AIRateLimitError, AIInvalidResponseError } from '../errors.js';
+import { AIInvalidResponseError } from '../errors.js';
 import { logAIUsage, logAIError } from '../logger.js';
+import { rethrowProviderError } from '../../../utils/ai-error.js';
 
 export class GroqProvider implements AIProvider {
   private client: Groq;
@@ -15,7 +16,7 @@ export class GroqProvider implements AIProvider {
     this.defaultModel = defaultModel;
   }
 
-  async generateJSON<T = any>(
+  async generateJSON<T = unknown>(
     prompt: string,
     options: GenerateOptions = {}
   ): Promise<AIResponse<T>> {
@@ -69,23 +70,9 @@ export class GroqProvider implements AIProvider {
         usage,
         raw: completion,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logAIError(error, 'groq', 'generateJSON');
-
-      if (error.status === 429) {
-        throw new AIRateLimitError('groq', error);
-      }
-
-      if (error instanceof AIError) {
-        throw error;
-      }
-
-      throw new AIError(
-        error.message || 'Unknown Groq error',
-        'PROVIDER_ERROR',
-        'groq',
-        error
-      );
+      rethrowProviderError('groq', error, 'Unknown Groq error');
     }
   }
 
@@ -123,19 +110,9 @@ export class GroqProvider implements AIProvider {
         usage,
         raw: completion,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logAIError(error, 'groq', 'generateText');
-
-      if (error.status === 429) {
-        throw new AIRateLimitError('groq', error);
-      }
-
-      throw new AIError(
-        error.message || 'Unknown Groq error',
-        'PROVIDER_ERROR',
-        'groq',
-        error
-      );
+      rethrowProviderError('groq', error, 'Unknown Groq error');
     }
   }
 }

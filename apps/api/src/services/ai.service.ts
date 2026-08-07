@@ -108,7 +108,7 @@ export class AIService {
 
       return await this.provider.generateJSON<T>(prompt, options);
     } catch (error: unknown) {
-      logAIError(error as Error, this.providerType, `generateFromTemplate:${templateName}`);
+      logAIError(error, this.providerType, `generateFromTemplate:${templateName}`);
       throw error;
     }
   }
@@ -116,14 +116,14 @@ export class AIService {
   /**
    * Low-level method for direct prompts (use sparingly).
    */
-  async generateJSON<T = any>(
+  async generateJSON<T = unknown>(
     prompt: string,
     options?: GenerateOptions
   ): Promise<AIResponse<T>> {
     try {
       return await this.provider.generateJSON<T>(prompt, options);
     } catch (error: unknown) {
-      logAIError(error as Error, this.providerType, 'generateJSON');
+      logAIError(error, this.providerType, 'generateJSON');
       throw error;
     }
   }
@@ -135,7 +135,7 @@ export class AIService {
     try {
       return await this.provider.generateText(prompt, options);
     } catch (error: unknown) {
-      logAIError(error as Error, this.providerType, 'generateText');
+      logAIError(error, this.providerType, 'generateText');
       throw error;
     }
   }
@@ -156,12 +156,22 @@ export async function getAIService(): Promise<AIService> {
       console.warn('[AI] AI Service could not be initialized. AI features will be unavailable until properly configured.');
       console.warn('[AI] Error:', (error as Error).message);
       // Return a dummy service that throws on use
-      return {
-        generateFromTemplate: async () => { throw new Error('AI Service is not properly configured. Please set a valid API key for your chosen AI_PROVIDER in apps/api/.env'); },
-        generateJSON: async () => { throw new Error('AI Service is not properly configured. Please set a valid API key for your chosen AI_PROVIDER in apps/api/.env'); },
-        generateText: async () => { throw new Error('AI Service is not properly configured. Please set a valid API key for your chosen AI_PROVIDER in apps/api/.env'); },
-        getProvider: () => 'not-configured',
-      } as any;
+      const msg =
+        "AI Service is not properly configured. Please set a valid API key for your chosen AI_PROVIDER in apps/api/.env";
+      // Typed stub — same public surface as AIService without `as any`
+      const stub = {
+        generateFromTemplate: async () => {
+          throw new Error(msg);
+        },
+        generateJSON: async () => {
+          throw new Error(msg);
+        },
+        generateText: async () => {
+          throw new Error(msg);
+        },
+        getProvider: () => "not-configured",
+      };
+      return stub as unknown as AIService;
     }
   }
   return aiServiceInstance;

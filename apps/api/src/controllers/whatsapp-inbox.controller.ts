@@ -1,12 +1,7 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import * as inbox from "../services/whatsapp-inbox.service.js";
-
-function errStatus(message: string): number {
-  if (/permission|Only managers|Only Business/i.test(message)) return 403;
-  if (/not found/i.test(message)) return 404;
-  return 400;
-}
+import { messageToHttpStatus as errStatus } from "../utils/http-status.js";
 
 export async function listConversations(req: AuthenticatedRequest, res: Response) {
   try {

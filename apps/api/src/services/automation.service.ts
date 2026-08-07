@@ -30,7 +30,13 @@ export async function checkAndSendReminders(userId: string) {
   return { remindersSent: tasksDue.length };
 }
 
-export async function logCrmActivity(userId: string, entityType: string, entityId: string, action: string, details?: any) {
+export async function logCrmActivity(
+  userId: string,
+  entityType: string,
+  entityId: string,
+  action: string,
+  details?: Record<string, unknown>
+) {
   await logActivity({
     userId,
     entityType,

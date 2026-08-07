@@ -3,12 +3,7 @@ import type { AuthenticatedRequest } from "../middleware/auth.js";
 import * as media from "../services/media.service.js";
 import * as dam from "../services/media-dam.service.js";
 import * as captions from "../services/whatsapp-caption.service.js";
-
-function errStatus(message: string): number {
-  if (/permission|Only Business Admin|Not allowed/i.test(message)) return 403;
-  if (/not found/i.test(message)) return 404;
-  return 400;
-}
+import { messageToHttpStatus as errStatus } from "../utils/http-status.js";
 
 export async function listFolders(req: AuthenticatedRequest, res: Response) {
   try {

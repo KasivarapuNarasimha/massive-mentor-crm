@@ -135,9 +135,13 @@ export async function createContactHandler(req: AuthenticatedRequest, res: Respo
     res.status(201).json({ success: true, data: { contact } });
   } catch (error: unknown) {
     console.error("Create contact error:", error);
-    const message = error instanceof Error ? error.message : "Failed to create contact";
-    const status = message.includes("required") || message.includes("must be") ? 400 : 500;
-    res.status(status).json({ success: false, error: message });
+    const { messageToHttpStatus, errorMessage } = await import("../utils/http-status.js");
+    const message = errorMessage(error, "Failed to create contact");
+    const status = messageToHttpStatus(message, { defaultStatus: 500 });
+    res.status(status).json({
+      success: false,
+      error: status === 500 ? "Failed to create contact" : message,
+    });
   }
 }
 
@@ -529,13 +533,9 @@ export async function createDealHandler(req: AuthenticatedRequest, res: Response
     res.status(201).json({ success: true, data: { deal } });
   } catch (error: unknown) {
     console.error("Create deal error:", error);
-    const message = error instanceof Error ? error.message : "Failed to create deal";
-    const status =
-      /not found|not accessible|invalid/i.test(message)
-        ? 404
-        : /required|must be|validation/i.test(message)
-          ? 400
-          : 500;
+    const { messageToHttpStatus, errorMessage } = await import("../utils/http-status.js");
+    const message = errorMessage(error, "Failed to create deal");
+    const status = messageToHttpStatus(message, { defaultStatus: 500 });
     res.status(status).json({
       success: false,
       error: status === 500 ? "Failed to create deal" : message,

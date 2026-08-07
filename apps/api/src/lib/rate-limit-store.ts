@@ -152,12 +152,30 @@ export async function tryCreateRedisStore(
   if (!url) return null;
   try {
     // Optional peer dependency — only used when present (no hard package.json dep)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let RedisCtor: any = null;
+    type RedisClient = {
+      on: (event: string, cb: (err: Error) => void) => void;
+      get: (k: string) => Promise<string | null>;
+      pttl: (k: string) => Promise<number>;
+      multi: () => {
+        incr: (k: string) => unknown;
+        pttl: (k: string) => unknown;
+        exec: () => Promise<Array<[Error | null, unknown]> | null>;
+      };
+      pexpire: (k: string, ms: number) => Promise<unknown>;
+      decr: (k: string) => Promise<number>;
+      set: (...args: unknown[]) => Promise<unknown>;
+      del: (k: string) => Promise<unknown>;
+      quit: () => Promise<unknown>;
+    };
+    type RedisCtor = new (
+      url: string,
+      opts?: Record<string, unknown>
+    ) => RedisClient;
+    let RedisCtor: RedisCtor | null = null;
     try {
       // @ts-expect-error optional dependency — may be absent
       const redisMod = await import("ioredis");
-      RedisCtor = redisMod.default;
+      RedisCtor = redisMod.default as RedisCtor;
     } catch {
       RedisCtor = null;
     }
