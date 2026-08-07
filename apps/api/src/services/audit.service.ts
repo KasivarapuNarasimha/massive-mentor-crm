@@ -12,7 +12,17 @@ export type AuditAction =
   | "ai"
   | "config_change"
   | "ensure_business"
-  | "template_install";
+  | "template_install"
+  | "lead_create"
+  | "lead_update"
+  | "lead_delete"
+  | "deal_change"
+  | "role_change"
+  | "permission_change"
+  | "media_upload"
+  | "media_delete"
+  | "whatsapp_broadcast"
+  | "assignment_change";
 
 export type AuditInput = {
   businessId?: string | null;
@@ -27,6 +37,8 @@ export type AuditInput = {
 
 /**
  * Append-only audit logger. Never throws to callers (best-effort).
+ * Critical actions expected: login/logout, lead/deal CRUD, role/permission,
+ * media upload/delete, WhatsApp broadcast, assignment changes.
  */
 export async function recordAudit(input: AuditInput): Promise<void> {
   try {
@@ -42,7 +54,17 @@ export async function recordAudit(input: AuditInput): Promise<void> {
         userAgent: input.userAgent ?? null,
       },
     });
+    // Structured ops signal (no PII beyond ids)
+    const { log } = await import("../lib/logger.js");
+    log.info("audit.write", {
+      action: input.action,
+      entityType: input.entityType,
+      entityId: input.entityId,
+      actorUserId: input.actorUserId,
+      businessId: input.businessId,
+    });
   } catch (err) {
-    console.error("[audit] failed to write audit log:", err instanceof Error ? err.message : err);
+    const { logError } = await import("../lib/logger.js");
+    logError(err, { module: "audit", function: "recordAudit" });
   }
 }

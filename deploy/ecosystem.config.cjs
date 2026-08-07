@@ -29,6 +29,9 @@ module.exports = {
       out_file: "./logs/api-out.log",
       merge_logs: true,
       time: true,
+      // Requires: pm2 install pm2-logrotate
+      // Then: pm2 set pm2-logrotate:max_size 20M ; pm2 set pm2-logrotate:retain 14
+      // ; pm2 set pm2-logrotate:compress true
     },
     {
       name: "massive-mentor-web",

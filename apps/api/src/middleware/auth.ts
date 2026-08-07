@@ -18,6 +18,9 @@ export interface AuthenticatedRequest extends Request {
   supportActorId?: string;
   /** Bound UserSession.id from JWT sid claim */
   sessionId?: string;
+  /** Correlation id from requestContext middleware */
+  requestId?: string;
+  requestStartedAt?: number;
 }
 
 async function loadAndValidateUser(

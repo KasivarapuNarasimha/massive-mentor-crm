@@ -11,6 +11,9 @@ import type { Server } from "node:http";
 
 // Validate all environment variables using Zod (fail fast)
 import { env } from "./config/env.js";
+import { requestContext } from "./middleware/requestContext.js";
+import { log, logError } from "./lib/logger.js";
+import type { AuthenticatedRequest } from "./middleware/auth.js";
 
 const app = express();
 const PORT = env.PORT;
@@ -160,20 +163,8 @@ app.use(
 // Windows and caused intermittent browser "Failed to fetch". Prefer reverse-proxy
 // compression (Nginx) or the `compression` package if needed.
 
-// Request logging (production-safe — no bodies)
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on("finish", () => {
-    const ms = Date.now() - start;
-    if (isProd || ms > 500 || res.statusCode >= 400) {
-      console.log(
-        `[http] ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms` +
-          (req.ip ? ` ip=${req.ip}` : "")
-      );
-    }
-  });
-  next();
-});
+// Structured request context + access logs (no bodies / secrets)
+app.use(requestContext);
 
 // Razorpay webhook needs raw body for HMAC verification (must be before json parser)
 app.post(
@@ -208,46 +199,28 @@ app.post(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Health check (+ safe SMTP readiness; never exposes secrets)
+// Health / ready — structured checks (DB, storage, AI, SMTP, Redis, jobs, metrics)
 app.get("/health", async (_req, res) => {
-  const smtpHost = (env.SMTP_HOST || "").trim();
-  const smtpUser = (env.SMTP_USER || "").trim();
-  const smtpPass = (env.SMTP_PASS || "").trim();
-  const smtpConfigured = !!(smtpHost && smtpUser && smtpPass);
-
-  let dbOk = false;
   try {
-    const { prisma } = await import("./lib/prisma.js");
-    await prisma.$queryRaw`SELECT 1`;
-    dbOk = true;
-  } catch {
-    dbOk = false;
+    const { buildHealthReport } = await import("./lib/health-checks.js");
+    const report = await buildHealthReport();
+    res.status(report.status === "ok" ? 200 : 503).json(report);
+  } catch (err) {
+    logError(err, { module: "health", function: "GET /health" });
+    res.status(503).json({
+      status: "degraded",
+      service: "massive-mentor-api",
+      database: "down",
+      error: "health_check_failed",
+    });
   }
-
-  const status = dbOk ? "ok" : "degraded";
-  res.status(dbOk ? 200 : 503).json({
-    status,
-    service: "massive-mentor-api",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    env: env.NODE_ENV,
-    database: dbOk ? "up" : "down",
-    smtp: {
-      configured: smtpConfigured,
-      host: smtpHost || null,
-      port: env.SMTP_PORT ?? null,
-      secure: env.SMTP_SECURE === true || Number(env.SMTP_PORT) === 465,
-      user: smtpUser ? `${smtpUser.slice(0, 2)}***@${smtpUser.split("@")[1] || ""}` : null,
-      from: (env.SMTP_FROM || "").trim() || null,
-    },
-  });
 });
 
 app.get("/ready", async (_req, res) => {
   try {
-    const { prisma } = await import("./lib/prisma.js");
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({ ready: true });
+    const { buildReadyReport } = await import("./lib/health-checks.js");
+    const report = await buildReadyReport();
+    res.status(report.ready ? 200 : 503).json(report);
   } catch {
     res.status(503).json({ ready: false });
   }
@@ -370,13 +343,27 @@ app.use((req, res) => {
   });
 });
 
-// Error handler — never leak stack in production
-app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("[API Error]", err.message);
-  if (!isProd) console.error(err.stack);
+// Error handler — structured log + request correlation; never leak stack in production
+app.use((
+  err: Error,
+  req: express.Request,
+  res: express.Response,
+  _next: express.NextFunction
+) => {
+  const areq = req as AuthenticatedRequest;
+  logError(err, {
+    module: "express",
+    function: "errorHandler",
+    requestId: areq.requestId,
+    userId: areq.user?.id,
+    businessId: areq.tenant?.businessId ?? null,
+    endpoint: req.originalUrl,
+    method: req.method,
+  });
   res.status(500).json({
     success: false,
     error: isProd ? "Internal server error" : err.message || "Internal server error",
+    requestId: areq.requestId,
   });
 });
 
@@ -422,44 +409,56 @@ server = app.listen(PORT, () => {
 
   // Daily SaaS billing job — multi-instance safe via Postgres advisory lock
   const runBilling = async () => {
-    try {
+    const { runMonitoredJob, recordJobSkipped } = await import("./lib/job-monitor.js");
+    await runMonitoredJob("saas-billing-daily", async () => {
       const { withDistributedLock } = await import("./lib/distributed-lock.js");
       const { ran, result } = await withDistributedLock("saas-billing-daily", () =>
         runDailyBillingJobs()
       );
       if (!ran) {
-        console.log("[billing-job] skipped (another instance holds the lock)");
-        return;
+        recordJobSkipped("saas-billing-daily", "lock_held_by_other_instance");
+        return { skipped: true };
       }
-      console.log(
-        `[billing-job] lockedTrials=${result?.lockedTrials} lockedSubs=${result?.lockedSubs} reminders=${result?.reminders} renewals=${result?.renewalReminders}`
-      );
-    } catch (err) {
-      console.error("[billing-job]", err);
-    }
+      log.info("billing-job.complete", {
+        job: "saas-billing-daily",
+        lockedTrials: result?.lockedTrials,
+        lockedSubs: result?.lockedSubs,
+        reminders: result?.reminders,
+        renewals: result?.renewalReminders,
+      });
+      return result;
+    });
   };
   setTimeout(runBilling, 60_000);
   setInterval(runBilling, 6 * 60 * 60 * 1000);
 
   // WhatsApp enterprise: expired snoozes + SLA escalations (multi-instance safe)
   const runWaEnterprise = async () => {
-    try {
+    const { runMonitoredJob, recordJobSkipped } = await import("./lib/job-monitor.js");
+    await runMonitoredJob("whatsapp-enterprise-jobs", async () => {
       const { withDistributedLock } = await import("./lib/distributed-lock.js");
       const ent = await import("./services/whatsapp-enterprise.service.js");
-      await withDistributedLock("whatsapp-enterprise-jobs", () =>
+      const { ran, result } = await withDistributedLock("whatsapp-enterprise-jobs", () =>
         ent.processWhatsAppEnterpriseJobs()
       );
-    } catch (err) {
-      console.error("[whatsapp-enterprise-jobs]", err);
-    }
+      if (!ran) {
+        recordJobSkipped("whatsapp-enterprise-jobs", "lock_held_by_other_instance");
+        return { skipped: true };
+      }
+      return result;
+    });
   };
   setTimeout(runWaEnterprise, 90_000);
   setInterval(runWaEnterprise, 2 * 60 * 1000);
+
+  log.info("scheduler.started", {
+    jobs: ["saas-billing-daily", "whatsapp-enterprise-jobs", "backup-scheduler"],
+  });
 });
 
 // Graceful shutdown (PM2 / zero-downtime reload)
 async function shutdown(signal: string) {
-  console.log(`[shutdown] ${signal} received — draining…`);
+  log.info("shutdown.start", { signal });
   stopBackupScheduler();
   await new Promise<void>((resolve) => {
     server.close(() => resolve());
@@ -477,9 +476,15 @@ async function shutdown(signal: string) {
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
 process.on("SIGINT", () => void shutdown("SIGINT"));
 process.on("unhandledRejection", (reason) => {
-  console.error("[fatal] unhandledRejection", reason);
+  logError(reason, {
+    module: "process",
+    function: "unhandledRejection",
+  });
 });
 process.on("uncaughtException", (err) => {
-  console.error("[fatal] uncaughtException", err);
+  logError(err, {
+    module: "process",
+    function: "uncaughtException",
+  });
   void shutdown("uncaughtException");
 });
