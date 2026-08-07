@@ -201,13 +201,30 @@ async function sumEntity(
   return 0;
 }
 
+/** Max rows for list widgets / customFields fallback — never load full tenant tables. */
+const LIST_ROW_CAP = 50;
+/** Cap for rare in-memory groupBy fallback (customFields / day buckets). */
+const GROUP_SAMPLE_CAP = 500;
+/** Max series buckets returned from DB groupBy. */
+const SERIES_BUCKET_CAP = 40;
+
+const CONTACT_GROUP_FIELDS = new Set(["status", "type", "source", "priority", "assignedTo"]);
+const DEAL_GROUP_FIELDS = new Set(["stage"]);
+const TASK_GROUP_FIELDS = new Set(["status", "priority"]);
+const MEETING_GROUP_FIELDS = new Set<string>(); // Meeting has no discrete status column
+
+/**
+ * List / detail row fetch — small page only. Charts must use groupEntityAtDb.
+ */
 async function fetchEntityRows(
   entity: string,
   where: Record<string, unknown>,
   limit?: number
 ): Promise<Array<Record<string, unknown>>> {
-  // Higher cap for chart grouping; count-only paths use countEntity
-  const take = limit && limit > 0 ? Math.min(limit, 20000) : 20000;
+  const take = Math.min(
+    Math.max(1, limit && limit > 0 ? limit : LIST_ROW_CAP),
+    LIST_ROW_CAP
+  );
   switch (entity) {
     case "contact":
       return prisma.contact.findMany({
@@ -261,6 +278,156 @@ async function fetchEntityRows(
         select: {
           id: true,
           title: true,
+          scheduledAt: true,
+          createdAt: true,
+        },
+      }) as Promise<Array<Record<string, unknown>>>;
+    default:
+      return [];
+  }
+}
+
+function canGroupAtDb(entity: string, groupBy: string | undefined): groupBy is string {
+  if (!groupBy || groupBy.includes(".") || groupBy.endsWith("_day")) return false;
+  if (entity === "contact") return CONTACT_GROUP_FIELDS.has(groupBy);
+  if (entity === "deal") return DEAL_GROUP_FIELDS.has(groupBy);
+  if (entity === "task") return TASK_GROUP_FIELDS.has(groupBy);
+  if (entity === "meeting") return MEETING_GROUP_FIELDS.has(groupBy);
+  return false;
+}
+
+/**
+ * SQL-level grouping via Prisma groupBy — O(buckets) not O(all rows).
+ */
+async function groupEntityAtDb(
+  entity: string,
+  where: Record<string, unknown>,
+  source: WidgetDef["source"]
+): Promise<Array<{ name: string; value: number }> | null> {
+  const groupBy = source.groupBy;
+  if (!canGroupAtDb(entity, groupBy)) return null;
+
+  const sumValue = source.aggregate === "sum" && source.aggregateField === "value";
+  const take = Math.min(source.limit && source.limit > 0 ? source.limit : SERIES_BUCKET_CAP, SERIES_BUCKET_CAP);
+
+  try {
+    if (entity === "contact") {
+      const rows = await prisma.contact.groupBy({
+        by: [groupBy as "status" | "type" | "source" | "priority" | "assignedTo"],
+        where: where as never,
+        _count: { _all: true },
+        ...(sumValue ? { _sum: { value: true } } : {}),
+      });
+      const { toMoneyNumber } = await import("../lib/money.js");
+      return rows
+        .map((r) => ({
+          name: String((r as Record<string, unknown>)[groupBy] ?? "unknown") || "unknown",
+          value: sumValue
+            ? toMoneyNumber((r as { _sum?: { value?: unknown } })._sum?.value)
+            : (r as { _count: { _all: number } })._count._all,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, take);
+    }
+    if (entity === "deal") {
+      // Pipeline always groups by stage (Deal has no status column)
+      const field = "stage" as const;
+      const rows = await prisma.deal.groupBy({
+        by: [field],
+        where: where as never,
+        _count: { _all: true },
+        ...(sumValue ? { _sum: { value: true } } : {}),
+      });
+      const { toMoneyNumber } = await import("../lib/money.js");
+      return rows
+        .map((r) => ({
+          name: String(r.stage ?? "unknown") || "unknown",
+          value: sumValue
+            ? toMoneyNumber((r as { _sum?: { value?: unknown } })._sum?.value)
+            : r._count._all,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, take);
+    }
+    if (entity === "task") {
+      const rows = await prisma.task.groupBy({
+        by: [groupBy as "status" | "priority"],
+        where: where as never,
+        _count: { _all: true },
+      });
+      return rows
+        .map((r) => ({
+          name: String((r as Record<string, unknown>)[groupBy] ?? "unknown") || "unknown",
+          value: (r as { _count: { _all: number } })._count._all,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, take);
+    }
+  } catch (err) {
+    console.warn(
+      "[dashboard-engine] groupBy failed, falling back to sample:",
+      err instanceof Error ? err.message : err
+    );
+    return null;
+  }
+  return null;
+}
+
+/** Bounded sample for customFields / day-bucket charts only. */
+async function fetchGroupSample(
+  entity: string,
+  where: Record<string, unknown>
+): Promise<Array<Record<string, unknown>>> {
+  const take = GROUP_SAMPLE_CAP;
+  switch (entity) {
+    case "contact":
+      return prisma.contact.findMany({
+        where: where as never,
+        take,
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          value: true,
+          createdAt: true,
+          updatedAt: true,
+          customFields: true,
+        },
+      }) as Promise<Array<Record<string, unknown>>>;
+    case "deal":
+      return prisma.deal.findMany({
+        where: where as never,
+        take,
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          stage: true,
+          value: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }) as Promise<Array<Record<string, unknown>>>;
+    case "task":
+      return prisma.task.findMany({
+        where: where as never,
+        take,
+        orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          status: true,
+          dueDate: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }) as Promise<Array<Record<string, unknown>>>;
+    case "meeting":
+      return prisma.meeting.findMany({
+        where: where as never,
+        take,
+        orderBy: { scheduledAt: "desc" },
+        select: {
+          id: true,
           scheduledAt: true,
           createdAt: true,
         },
@@ -417,9 +584,12 @@ export async function evaluateDashboard(
       continue;
     }
 
-    const rows = await fetchEntityRows(widget.source.entity, where, widget.source.limit);
-
     if (widget.type === "list" || widget.type === "tasks_due" || widget.type === "feedback_recent") {
+      const rows = await fetchEntityRows(
+        widget.source.entity,
+        where,
+        widget.source.limit || 10
+      );
       results.push({
         widgetKey: widget.key,
         type: widget.type,
@@ -438,9 +608,29 @@ export async function evaluateDashboard(
       continue;
     }
 
+    // Charts & remaining metrics: prefer DB groupBy; never load full tables
+    let series: Array<{ name: string; value: number }> = [];
+    if (widget.source.groupBy) {
+      const dbSeries = await groupEntityAtDb(widget.source.entity, where, widget.source);
+      if (dbSeries) {
+        series = dbSeries;
+      } else {
+        const sample = await fetchGroupSample(widget.source.entity, where);
+        series = aggregateSeries(sample, widget.source);
+      }
+    } else if (widget.source.aggregate === "sum" && widget.source.aggregateField) {
+      const value = await sumEntity(
+        widget.source.entity,
+        where,
+        widget.source.aggregateField
+      );
+      series = [{ name: "total", value }];
+    } else {
+      const value = await countEntity(widget.source.entity, where);
+      series = [{ name: "total", value }];
+    }
+
     if (widget.type === "chart" || widget.type === "pipeline_funnel") {
-      const series = aggregateSeries(rows, widget.source);
-      // Gauge: conversion = won / total * 100 when groupBy status
       if (widget.chartType === "gauge") {
         const won = series
           .filter((s) => /won|closed_won/i.test(s.name))
@@ -461,7 +651,7 @@ export async function evaluateDashboard(
                 filterField: widget.source.groupBy,
               }
             : undefined,
-          meta: { max: 100, unit: "%" },
+          meta: { max: 100, unit: "%", aggregation: "db_groupBy" },
         });
         continue;
       }
@@ -479,13 +669,13 @@ export async function evaluateDashboard(
               filterField: widget.source.groupBy,
             }
           : undefined,
+        meta: { aggregation: "db_groupBy" },
       });
       continue;
     }
 
     // metric_count / metric_sum / metric_kpi / tasks_due as number
-    const series = aggregateSeries(rows, widget.source);
-    let value = series[0]?.value ?? rows.length;
+    let value = series[0]?.value ?? 0;
     if (widget.key.includes("gauge") || widget.chartType === "gauge") {
       const won = series.filter((s) => /won|closed_won/i.test(s.name)).reduce((a, b) => a + b.value, 0);
       const total = series.reduce((a, b) => a + b.value, 0) || 1;
@@ -497,6 +687,7 @@ export async function evaluateDashboard(
       title: widget.title,
       value,
       series,
+      meta: { aggregation: "db_groupBy" },
     });
   }
 

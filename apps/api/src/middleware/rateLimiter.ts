@@ -1,15 +1,19 @@
-import rateLimit from 'express-rate-limit';
-import type { Request, Response } from 'express';
-import type { AuthenticatedRequest } from './auth.js';
+import rateLimit from "express-rate-limit";
+import type { Request } from "express";
+import type { AuthenticatedRequest } from "./auth.js";
+import { getSharedRateLimitStore } from "../lib/rate-limit-store.js";
 
 /**
- * Lightweight rate limiters for sensitive / costly endpoints.
- * Uses in-memory store (fine for MVP; resets on restart).
- * Production-safe windows and limits chosen to avoid impacting normal users
- * while protecting against brute force and AI abuse.
+ * Production-safe rate limiters.
+ * Shared store (Redis if REDIS_URL, else PostgreSQL) — works across PM2 cluster instances.
+ * In-memory is never used in production paths.
  */
 
 const isDev = process.env.NODE_ENV !== "production";
+
+function store(prefix: string) {
+  return getSharedRateLimitStore(prefix);
+}
 
 // Strict limiter for authentication (login + register) to prevent brute-force / spam
 // Dev: high limits so local UI/E2E testing is not blocked
@@ -18,11 +22,13 @@ export const loginLimiter = rateLimit({
   max: isDev ? 500 : 5,
   message: {
     success: false,
-    error: 'Too many login attempts from this IP. Please try again in 15 minutes.',
+    error: "Too many login attempts from this IP. Please try again in 15 minutes.",
   },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
+  store: store("login"),
+  validate: false,
 });
 
 // Even stricter for registration (prevent account spam)
@@ -31,10 +37,12 @@ export const registerLimiter = rateLimit({
   max: isDev ? 200 : 3,
   message: {
     success: false,
-    error: 'Too many accounts created from this IP. Please try again later.',
+    error: "Too many accounts created from this IP. Please try again later.",
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: store("register"),
+  validate: false,
 });
 
 // Password reset request / complete — prevent email flood & token brute force
@@ -47,27 +55,29 @@ export const passwordResetLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: store("pwreset"),
+  validate: false,
 });
 
 // AI Mentor chat limiter — applied after auth so we can key by user id
 export const mentorChatLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 25, // Generous for normal conversation (roughly 1-2 messages per minute sustained)
+  max: 25,
   message: {
     success: false,
-    error: 'You have sent too many messages to the AI Mentor. Please wait a few minutes before trying again.',
+    error:
+      "You have sent too many messages to the AI Mentor. Please wait a few minutes before trying again.",
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // Prefer per-user limiting for authenticated requests (much better UX than pure IP)
+  store: store("mentor"),
+  validate: false,
   keyGenerator: (req: Request) => {
-    // After requireAuth middleware, req.user.id is available (typed via AuthenticatedRequest)
     const authReq = req as AuthenticatedRequest;
     if (authReq.user?.id) {
       return `user:${authReq.user.id}`;
     }
-    // Fallback to IP for safety (shouldn't normally happen for /chat)
-    return req.ip || 'unknown';
+    return req.ip || "unknown";
   },
 });
 
@@ -81,6 +91,8 @@ export const apiGeneralLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: store("api"),
+  validate: false,
   skip: (req) => req.path === "/health" || req.path === "/ready",
 });
 
@@ -94,4 +106,6 @@ export const exportLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: store("export"),
+  validate: false,
 });

@@ -1855,15 +1855,64 @@ export async function deleteMeeting(userId: string, id: string) {
 // Note Operations (generic attachment)
 // =====================
 
+/** Ensure note target entity is in the caller's tenant scope (blocks cross-business IDOR). */
+async function assertNoteEntityAccess(
+  userId: string,
+  entityType: string,
+  entityId: string
+): Promise<void> {
+  const type = String(entityType || "").toLowerCase();
+  if (type === "contact" || type === "lead" || type === "client") {
+    const scope = await buildCrmScope(userId);
+    const row = await prisma.contact.findFirst({
+      where: andTenant(scope.where, { id: entityId, deletedAt: null }) as never,
+      select: { id: true },
+    });
+    if (!row) throw new Error("Contact not found or not accessible");
+    return;
+  }
+  if (type === "deal") {
+    const scope = await buildOwnedEntityScope(userId);
+    const row = await prisma.deal.findFirst({
+      where: andTenant(scope.where, { id: entityId }) as never,
+      select: { id: true },
+    });
+    if (!row) throw new Error("Deal not found or not accessible");
+    return;
+  }
+  if (type === "task") {
+    const scope = await buildOwnedEntityScope(userId);
+    const row = await prisma.task.findFirst({
+      where: andTenant(scope.where, { id: entityId }) as never,
+      select: { id: true },
+    });
+    if (!row) throw new Error("Task not found or not accessible");
+    return;
+  }
+  if (type === "meeting") {
+    const scope = await buildOwnedEntityScope(userId);
+    const row = await prisma.meeting.findFirst({
+      where: andTenant(scope.where, { id: entityId }) as never,
+      select: { id: true },
+    });
+    if (!row) throw new Error("Meeting not found or not accessible");
+    return;
+  }
+  // Unknown entity types: still require ownership of any existing notes pattern
+}
+
 export async function getNotes(userId: string, entityType: string, entityId: string) {
+  await assertNoteEntityAccess(userId, entityType, entityId);
   return prisma.note.findMany({
     where: { userId, entityType, entityId },
     orderBy: { createdAt: "desc" },
+    take: 200,
   });
 }
 
 export async function createNote(userId: string, input: NoteInput) {
   const parsed = noteSchema.parse(input);
+  await assertNoteEntityAccess(userId, parsed.entityType, parsed.entityId);
 
   return prisma.note.create({
     data: {
@@ -2157,15 +2206,27 @@ Return ONLY JSON with keys: title, executiveSummary, solution, pricing, nextStep
 }
 
 export async function generateSalesForecast(userId: string) {
-  const deals = await prisma.deal.findMany({ where: { userId }, include: { contact: true } });
+  // Tenant-scoped deals only — never userId-only (blocks cross-business leakage)
+  const scope = await buildOwnedEntityScope(userId);
+  const deals = await prisma.deal.findMany({
+    where: scope.where as never,
+    select: {
+      title: true,
+      stage: true,
+      value: true,
+      probability: true,
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 50,
+  });
   const profile = await prisma.businessProfile.findUnique({ where: { userId } });
 
-  const dealsSummary = deals.map(d => ({
+  const dealsSummary = deals.slice(0, 20).map((d) => ({
     title: d.title,
     stage: d.stage,
-    value: d.value,
+    value: d.value != null ? Number(d.value) : null,
     probability: d.probability,
-  })).slice(0, 20);
+  }));
 
   const ai = await getAIService();
 
@@ -2709,6 +2770,9 @@ export async function getAiGenerations(
     limit?: number;
   }
 ) {
+  if (filters.contactId) {
+    await assertNoteEntityAccess(userId, "contact", filters.contactId);
+  }
   return prisma.aiGeneration.findMany({
     where: {
       userId,
@@ -2716,6 +2780,6 @@ export async function getAiGenerations(
       ...(filters.feature && { feature: filters.feature }),
     },
     orderBy: { createdAt: "desc" },
-    take: filters.limit ?? 20,
+    take: Math.min(filters.limit ?? 20, 100),
   });
 }

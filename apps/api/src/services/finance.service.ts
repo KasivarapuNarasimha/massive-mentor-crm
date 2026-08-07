@@ -83,11 +83,44 @@ export async function getFinanceDashboard(userId: string) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const yearStart = new Date(now.getFullYear(), 0, 1);
 
-  const [invoices, expenses, payments, paidInvoices, overdue] = await Promise.all([
-    prisma.invoice.findMany({ where: { businessId } }),
-    prisma.expense.findMany({ where: { businessId } }),
-    prisma.payment.findMany({ where: { businessId } }),
-    prisma.invoice.findMany({ where: { businessId, status: "paid" } }),
+  // SQL aggregates only — never load entire finance tables into memory
+  const [
+    invoiceAgg,
+    paidAgg,
+    openAgg,
+    expenseAgg,
+    paymentAgg,
+    overdue,
+    monthPayAgg,
+    yearPayAgg,
+    monthExpAgg,
+  ] = await Promise.all([
+    prisma.invoice.aggregate({
+      where: { businessId },
+      _sum: { total: true, taxAmount: true },
+      _count: { _all: true },
+    }),
+    prisma.invoice.aggregate({
+      where: { businessId, status: "paid" },
+      _count: { _all: true },
+    }),
+    prisma.invoice.aggregate({
+      where: {
+        businessId,
+        status: { in: ["sent", "overdue", "draft"] },
+      },
+      _sum: { total: true },
+    }),
+    prisma.expense.aggregate({
+      where: { businessId },
+      _sum: { total: true },
+      _count: { _all: true },
+    }),
+    prisma.payment.aggregate({
+      where: { businessId },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
     prisma.invoice.count({
       where: {
         businessId,
@@ -95,60 +128,60 @@ export async function getFinanceDashboard(userId: string) {
         dueDate: { lt: now },
       },
     }),
+    prisma.payment.aggregate({
+      where: { businessId, paidAt: { gte: monthStart } },
+      _sum: { amount: true },
+    }),
+    prisma.payment.aggregate({
+      where: { businessId, paidAt: { gte: yearStart } },
+      _sum: { amount: true },
+    }),
+    prisma.expense.aggregate({
+      where: { businessId, expenseDate: { gte: monthStart } },
+      _sum: { total: true },
+    }),
   ]);
 
-  // Align legacy/mismatched row currencies to business profile so UI is consistent
-  const legacyInvoices = invoices.filter((i) => i.currency !== currency);
-  const legacyExpenses = expenses.filter((e) => e.currency !== currency);
-  if (legacyInvoices.length || legacyExpenses.length) {
-    await Promise.all([
-      legacyInvoices.length
-        ? prisma.invoice.updateMany({
-            where: { businessId, currency: { not: currency } },
-            data: { currency },
-          })
-        : Promise.resolve(),
-      legacyExpenses.length
-        ? prisma.expense.updateMany({
-            where: { businessId, currency: { not: currency } },
-            data: { currency },
-          })
-        : Promise.resolve(),
-    ]);
-  }
+  // Best-effort currency normalization without full table scan of values
+  await Promise.all([
+    prisma.invoice.updateMany({
+      where: { businessId, currency: { not: currency } },
+      data: { currency },
+    }),
+    prisma.expense.updateMany({
+      where: { businessId, currency: { not: currency } },
+      data: { currency },
+    }),
+  ]).catch(() => undefined);
 
-  const totalInvoiced = invoices.reduce((s, i) => s + toMoneyNumber(i.total), 0);
-  const totalPaid = payments.reduce((s, p) => s + toMoneyNumber(p.amount), 0);
-  const totalExpenses = expenses.reduce((s, e) => s + toMoneyNumber(e.total), 0);
-  const totalTax = invoices.reduce((s, i) => s + toMoneyNumber(i.taxAmount), 0);
-  // Outstanding: only open invoices (sent/overdue) minus payments allocated to them
-  const openInvoices = invoices.filter((i) =>
-    ["sent", "overdue", "draft"].includes(i.status)
-  );
-  const openTotal = openInvoices.reduce((s, i) => s + toMoneyNumber(i.total), 0);
-  const monthRevenue = payments
-    .filter((p) => p.paidAt >= monthStart)
-    .reduce((s, p) => s + toMoneyNumber(p.amount), 0);
-  const yearRevenue = payments
-    .filter((p) => p.paidAt >= yearStart)
-    .reduce((s, p) => s + toMoneyNumber(p.amount), 0);
-  const monthExpenses = expenses
-    .filter((e) => e.expenseDate >= monthStart)
-    .reduce((s, e) => s + toMoneyNumber(e.total), 0);
+  const totalInvoiced = toMoneyNumber(invoiceAgg._sum.total);
+  const totalPaid = toMoneyNumber(paymentAgg._sum.amount);
+  const totalExpenses = toMoneyNumber(expenseAgg._sum.total);
+  const totalTax = toMoneyNumber(invoiceAgg._sum.taxAmount);
+  const openTotal = toMoneyNumber(openAgg._sum.total);
+  const monthRevenue = toMoneyNumber(monthPayAgg._sum.amount);
+  const yearRevenue = toMoneyNumber(yearPayAgg._sum.amount);
+  const monthExpenses = toMoneyNumber(monthExpAgg._sum.total);
   const profit = totalPaid - totalExpenses;
 
-  // Monthly cash flow (last 12 months)
+  // Monthly cash flow (last 12 months) via 12×2 aggregate queries (bounded)
   const cashFlow: Array<{ month: string; inflow: number; outflow: number; net: number }> = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
     const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const inflow = payments
-      .filter((p) => p.paidAt >= d && p.paidAt <= end)
-      .reduce((s, p) => s + toMoneyNumber(p.amount), 0);
-    const outflow = expenses
-      .filter((e) => e.expenseDate >= d && e.expenseDate <= end)
-      .reduce((s, e) => s + toMoneyNumber(e.total), 0);
+    const [inflowAgg, outflowAgg] = await Promise.all([
+      prisma.payment.aggregate({
+        where: { businessId, paidAt: { gte: d, lte: end } },
+        _sum: { amount: true },
+      }),
+      prisma.expense.aggregate({
+        where: { businessId, expenseDate: { gte: d, lte: end } },
+        _sum: { total: true },
+      }),
+    ]);
+    const inflow = toMoneyNumber(inflowAgg._sum.amount);
+    const outflow = toMoneyNumber(outflowAgg._sum.total);
     cashFlow.push({ month: label, inflow, outflow, net: inflow - outflow });
   }
 
@@ -165,8 +198,8 @@ export async function getFinanceDashboard(userId: string) {
       yearRevenue,
       monthExpenses,
       overdueCount: overdue,
-      invoiceCount: invoices.length,
-      paidInvoiceCount: paidInvoices.length,
+      invoiceCount: invoiceAgg._count._all,
+      paidInvoiceCount: paidAgg._count._all,
     },
     cashFlow,
     profitAndLoss: {

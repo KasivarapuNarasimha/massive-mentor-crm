@@ -114,6 +114,9 @@ const envSchema = z.object({
   SUPPORT_EMAIL: z.string().optional().default("team@massivementor.in"),
   /// Display format OK; wa.me uses digits only
   SUPPORT_WHATSAPP: z.string().optional().default("+91 9182920047"),
+
+  /// Optional Redis for distributed rate limiting (falls back to PostgreSQL store)
+  REDIS_URL: z.string().optional(),
 });
 
 // Custom refinement for AI provider key validation

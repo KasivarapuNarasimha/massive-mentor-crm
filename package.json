@@ -18,9 +18,15 @@
     "db:reset": "pnpm --filter @massivementor/api db:reset",
     "prisma:generate": "pnpm --filter @massivementor/api prisma:generate",
     "lint": "pnpm -r lint",
+    "typecheck": "pnpm --filter @massivementor/api exec tsc --noEmit && pnpm --filter @massivementor/web exec tsc --noEmit",
+    "typecheck:api": "pnpm --filter @massivementor/api exec tsc --noEmit",
+    "typecheck:web": "pnpm --filter @massivementor/web exec tsc --noEmit",
+    "prisma:validate": "pnpm --filter @massivementor/api exec prisma validate",
     "test:rc": "node scripts/rc1-regression.mjs",
     "test:e2e": "node scripts/prelaunch-e2e.mjs",
     "test:prod-readiness": "node scripts/prod-readiness-e2e.mjs",
+    "production:verify": "node scripts/production-verify.mjs",
+    "production:verify:offline": "node scripts/production-verify.mjs --skip-tests",
     "clean": "pnpm -r clean && rm -rf node_modules"
   },
   "devDependencies": {
