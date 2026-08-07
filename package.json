@@ -27,6 +27,8 @@
     "test:prod-readiness": "node scripts/prod-readiness-e2e.mjs",
     "production:verify": "node scripts/production-verify.mjs",
     "production:verify:offline": "node scripts/production-verify.mjs --skip-tests",
+    "production:checklist": "node scripts/phase8-release-checklist.mjs",
+    "production:checklist:fast": "node scripts/phase8-release-checklist.mjs --skip-build --skip-lint",
     "clean": "pnpm -r clean && rm -rf node_modules"
   },
   "devDependencies": {
