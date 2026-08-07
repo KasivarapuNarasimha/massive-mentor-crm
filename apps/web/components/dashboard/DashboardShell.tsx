@@ -10,6 +10,7 @@ import { subscribeDataChanged } from "@/lib/data-events";
 import { formatNotificationMessage, formatNotificationTitle } from "@/lib/format-activity";
 import { FieldStatusBar } from "@/components/field/FieldStatusBar";
 import { ApiConnectivityBanner } from "@/components/dashboard/ApiConnectivityBanner";
+import { SystemStatusIndicator } from "@/components/dashboard/SystemStatusIndicator";
 import { TrialBanner } from "@/components/dashboard/TrialBanner";
 import { setAppCurrency, isCurrencyCode, detectDefaultCurrency } from "@/lib/currency";
 import { usePlan } from "@/lib/plan-context";
@@ -860,6 +861,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="relative flex items-center gap-2 sm:gap-3" ref={userMenuRef}>
+            {/* System status — reuses cached health probe (no extra requests) */}
+            <SystemStatusIndicator />
+
             {/* Business Admin: Role workspace switcher — entire portal (menu, KPIs, AI, permissions) */}
             {portal?.canSwitchWorkspace && (
               <div className="hidden md:flex items-center gap-1.5">

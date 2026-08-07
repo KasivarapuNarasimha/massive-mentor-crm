@@ -81,6 +81,8 @@ class ApiClient {
     status?: number;
     error?: string;
     body?: unknown;
+    /** Round-trip latency of the successful probe path (ms) */
+    latencyMs?: number;
     /** Class hint for UI: timeout | offline | restarting | unavailable */
     failureKind?: "timeout" | "offline" | "restarting" | "unavailable" | "unknown";
   }> {
@@ -89,6 +91,8 @@ class ApiClient {
       const url = `${origin}${path}`;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const t0 =
+        typeof performance !== "undefined" ? performance.now() : Date.now();
       try {
         const response = await fetch(url, {
           method: "GET",
@@ -102,7 +106,11 @@ class ApiClient {
         } catch {
           body = text?.slice(0, 200);
         }
-        return { url, response, body };
+        const latencyMs = Math.round(
+          (typeof performance !== "undefined" ? performance.now() : Date.now()) -
+            t0
+        );
+        return { url, response, body, latencyMs };
       } finally {
         clearTimeout(timer);
       }
@@ -121,6 +129,7 @@ class ApiClient {
             ready: true,
             status: r.response.status,
             body: r.body,
+            latencyMs: r.latencyMs,
           };
         }
         // Process up, dependencies not ready (e.g. DB restarting)
@@ -131,6 +140,7 @@ class ApiClient {
             ready: false,
             status: r.response.status,
             body: r.body,
+            latencyMs: r.latencyMs,
             error: `API not ready (HTTP ${r.response.status})`,
             failureKind: "restarting",
           };
@@ -158,7 +168,13 @@ class ApiClient {
             body?.database !== "down";
           if (healthy) {
             this.lastNetworkError = null;
-            return { ok: true, ready: true, status: h.response.status, body: h.body };
+            return {
+              ok: true,
+              ready: true,
+              status: h.response.status,
+              body: h.body,
+              latencyMs: h.latencyMs,
+            };
           }
           this.lastNetworkError = `API health returned ${h.response.status}`;
           return {
@@ -166,6 +182,7 @@ class ApiClient {
             ready: false,
             status: h.response.status,
             body: h.body,
+            latencyMs: h.latencyMs,
             error: this.lastNetworkError,
             failureKind: "restarting",
           };

@@ -16,6 +16,15 @@ const DEFAULT_OK: HealthProbeState = {
   consecutiveFailures: 0,
   lastOkAt: null,
   nextRetryInMs: null,
+  latencyMs: null,
+  lastSuccessAt: null,
+  services: {
+    api: "unknown",
+    database: "unknown",
+    ai: "unknown",
+    whatsapp: "unknown",
+    email: "unknown",
+  },
 };
 
 /**

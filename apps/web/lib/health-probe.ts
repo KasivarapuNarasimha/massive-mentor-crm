@@ -3,7 +3,7 @@
  * - Exponential backoff: 5s → 10s → 20s → max 60s
  * - Success cache ~45s
  * - Differentiated failure kinds
- * - Log identical failures once (no toast spam)
+ * - Shared cached snapshot for System Status UI (no extra requests)
  */
 
 import { api, getApiOrigin } from "@/lib/api";
@@ -18,6 +18,8 @@ export type HealthFailureKind =
 
 export type HealthUiLevel = "ok" | "soft" | "hard" | "offline";
 
+export type ServiceStatus = "up" | "down" | "degraded" | "not_configured" | "unknown";
+
 export type HealthProbeState = {
   level: HealthUiLevel;
   kind: HealthFailureKind | null;
@@ -27,7 +29,21 @@ export type HealthProbeState = {
   consecutiveFailures: number;
   lastOkAt: number | null;
   nextRetryInMs: number | null;
+  /** Last measured RTT (ms) from probe */
+  latencyMs: number | null;
+  /** Last successful check timestamp (ms epoch) */
+  lastSuccessAt: number | null;
+  /** Parsed service statuses from last response body (cached) */
+  services: {
+    api: ServiceStatus;
+    database: ServiceStatus;
+    ai: ServiceStatus;
+    whatsapp: ServiceStatus;
+    email: ServiceStatus;
+  };
 };
+
+export type HealthListener = (state: HealthProbeState) => void;
 
 const SUCCESS_CACHE_MS = 45_000;
 const BACKOFF_STEPS_MS = [5_000, 10_000, 20_000, 60_000] as const;
@@ -37,6 +53,17 @@ let lastOkAt: number | null = null;
 let consecutiveFailures = 0;
 let lastLoggedKey: string | null = null;
 let inFlight: Promise<HealthProbeState> | null = null;
+let lastLatencyMs: number | null = null;
+let lastSuccessAt: number | null = null;
+let lastServices: HealthProbeState["services"] = {
+  api: "unknown",
+  database: "unknown",
+  ai: "unknown",
+  whatsapp: "unknown",
+  email: "unknown",
+};
+let lastPublished: HealthProbeState | null = null;
+const listeners = new Set<HealthListener>();
 
 function backoffMs(failures: number): number {
   if (failures <= 0) return BACKOFF_STEPS_MS[0];
@@ -112,7 +139,6 @@ function toUiLevel(
 ): HealthUiLevel {
   if (kind === "offline") return "offline";
   if (kind === "auth_expired") return "hard";
-  // Soft: first failures, timeouts, restarts — keep CRM usable
   if (kind === "timeout" || kind === "restarting") return "soft";
   if (failures < 3) return "soft";
   if (hadSuccessBefore && failures < 5) return "soft";
@@ -126,8 +152,105 @@ function logFailureOnce(kind: HealthFailureKind, detail: string) {
   console.warn(`[health-probe] ${kind}: ${detail}`);
 }
 
+function mapCheckStatus(raw: unknown): ServiceStatus {
+  const s = String(raw || "").toLowerCase();
+  if (s === "up" || s === "ok" || s === "true") return "up";
+  if (s === "down" || s === "false") return "down";
+  if (s === "degraded" || s === "timeout") return "degraded";
+  if (s === "not_configured" || s === "not-configured") return "not_configured";
+  return "unknown";
+}
+
+/** Merge service map from /ready or /health body without inventing data. */
+function parseServicesFromBody(
+  body: unknown,
+  opts: { apiUp: boolean; ready?: boolean }
+): HealthProbeState["services"] {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const checks = (b.checks && typeof b.checks === "object"
+    ? b.checks
+    : {}) as Record<string, unknown>;
+
+  const dbFromChecks = checks.database as { status?: string } | string | undefined;
+  const dbStatus =
+    typeof dbFromChecks === "object" && dbFromChecks
+      ? mapCheckStatus(dbFromChecks.status)
+      : typeof dbFromChecks === "string"
+        ? mapCheckStatus(dbFromChecks)
+        : mapCheckStatus(b.database);
+
+  const ai = checks.ai as { status?: string } | undefined;
+  const smtp = checks.smtp as { status?: string; configured?: boolean } | undefined;
+  const wa = checks.whatsapp as { status?: string } | undefined;
+  const legacySmtp = b.smtp as { configured?: boolean } | undefined;
+
+  let email: ServiceStatus = "unknown";
+  if (smtp?.status) email = mapCheckStatus(smtp.status);
+  else if (typeof smtp?.configured === "boolean")
+    email = smtp.configured ? "up" : "not_configured";
+  else if (typeof legacySmtp?.configured === "boolean")
+    email = legacySmtp.configured ? "up" : "not_configured";
+
+  // Preserve previously known optional services when this response is /ready-only
+  const prev = lastServices;
+  return {
+    api: opts.apiUp ? (opts.ready === false ? "degraded" : "up") : "down",
+    database:
+      dbStatus !== "unknown"
+        ? dbStatus
+        : opts.ready === true
+          ? "up"
+          : opts.ready === false
+            ? "down"
+            : prev.database,
+    ai: ai?.status ? mapCheckStatus(ai.status) : prev.ai,
+    whatsapp: wa?.status ? mapCheckStatus(wa.status) : prev.whatsapp,
+    email: email !== "unknown" ? email : prev.email,
+  };
+}
+
+function publish(state: HealthProbeState): HealthProbeState {
+  lastPublished = state;
+  listeners.forEach((fn) => {
+    try {
+      fn(state);
+    } catch {
+      /* ignore subscriber errors */
+    }
+  });
+  return state;
+}
+
+function buildState(partial: Omit<HealthProbeState, "latencyMs" | "lastSuccessAt" | "services"> & {
+  latencyMs?: number | null;
+  lastSuccessAt?: number | null;
+  services?: HealthProbeState["services"];
+}): HealthProbeState {
+  return {
+    ...partial,
+    latencyMs: partial.latencyMs ?? lastLatencyMs,
+    lastSuccessAt: partial.lastSuccessAt ?? lastSuccessAt,
+    services: partial.services ?? lastServices,
+  };
+}
+
+/** Subscribe to probe updates (System Status indicator). */
+export function subscribeHealthProbe(listener: HealthListener): () => void {
+  listeners.add(listener);
+  if (lastPublished) listener(lastPublished);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** Sync read of last published state (no network). */
+export function getHealthSnapshot(): HealthProbeState | null {
+  return lastPublished;
+}
+
 /**
  * Run one health probe (success cache + single-flight).
+ * Does not perform extra requests beyond the shared probe used by the banner.
  */
 export async function runHealthProbe(opts?: {
   force?: boolean;
@@ -142,41 +265,29 @@ export async function runHealthProbe(opts?: {
     const kind: HealthFailureKind = "offline";
     const m = messagesFor(kind);
     logFailureOnce(kind, m.detail);
-    return {
-      level: "offline",
-      kind,
-      title: m.title,
-      detail: m.detail,
-      checking: false,
-      consecutiveFailures,
-      lastOkAt,
-      nextRetryInMs: null,
+    lastServices = {
+      ...lastServices,
+      api: "down",
     };
+    return publish(
+      buildState({
+        level: "offline",
+        kind,
+        title: m.title,
+        detail: m.detail,
+        checking: false,
+        consecutiveFailures,
+        lastOkAt,
+        nextRetryInMs: null,
+        services: lastServices,
+      })
+    );
   }
 
   const now = Date.now();
   if (!opts?.force && lastOkAt != null && now - lastOkAt < SUCCESS_CACHE_MS) {
-    return {
-      level: "ok",
-      kind: null,
-      title: "Connected",
-      detail: null,
-      checking: false,
-      consecutiveFailures: 0,
-      lastOkAt,
-      nextRetryInMs: SUCCESS_CACHE_MS - (now - lastOkAt),
-    };
-  }
-
-  if (inFlight && !opts?.force) return inFlight;
-
-  const work = (async (): Promise<HealthProbeState> => {
-    const res = await api.checkHealth(PROBE_TIMEOUT_MS);
-    if (res.ok) {
-      lastOkAt = Date.now();
-      consecutiveFailures = 0;
-      lastLoggedKey = null;
-      return {
+    return publish(
+      buildState({
         level: "ok",
         kind: null,
         title: "Connected",
@@ -184,8 +295,41 @@ export async function runHealthProbe(opts?: {
         checking: false,
         consecutiveFailures: 0,
         lastOkAt,
-        nextRetryInMs: SUCCESS_CACHE_MS,
-      };
+        nextRetryInMs: SUCCESS_CACHE_MS - (now - lastOkAt),
+      })
+    );
+  }
+
+  if (inFlight && !opts?.force) return inFlight;
+
+  const work = (async (): Promise<HealthProbeState> => {
+    const res = await api.checkHealth(PROBE_TIMEOUT_MS);
+    if (typeof res.latencyMs === "number") lastLatencyMs = res.latencyMs;
+
+    if (res.ok) {
+      lastOkAt = Date.now();
+      lastSuccessAt = lastOkAt;
+      consecutiveFailures = 0;
+      lastLoggedKey = null;
+      lastServices = parseServicesFromBody(res.body, {
+        apiUp: true,
+        ready: res.ready !== false,
+      });
+      return publish(
+        buildState({
+          level: "ok",
+          kind: null,
+          title: "Connected",
+          detail: null,
+          checking: false,
+          consecutiveFailures: 0,
+          lastOkAt,
+          nextRetryInMs: SUCCESS_CACHE_MS,
+          latencyMs: lastLatencyMs,
+          lastSuccessAt,
+          services: lastServices,
+        })
+      );
     }
 
     consecutiveFailures += 1;
@@ -194,23 +338,36 @@ export async function runHealthProbe(opts?: {
     const detail = res.error || m.detail;
     logFailureOnce(kind, detail);
     const level = toUiLevel(kind, consecutiveFailures, lastOkAt != null);
-    return {
-      level,
-      kind,
-      title: m.title,
-      detail,
-      checking: false,
-      consecutiveFailures,
-      lastOkAt,
-      nextRetryInMs: backoffMs(consecutiveFailures),
-    };
+
+    // Update API/DB from failure when body present; keep last-known optional services
+    lastServices = parseServicesFromBody(res.body, {
+      apiUp: kind === "restarting" || (res.status != null && res.status > 0),
+      ready: res.ready,
+    });
+    if (kind === "unavailable" || kind === "timeout" || kind === "offline") {
+      lastServices = { ...lastServices, api: "down" };
+    }
+
+    return publish(
+      buildState({
+        level,
+        kind,
+        title: m.title,
+        detail,
+        checking: false,
+        consecutiveFailures,
+        lastOkAt,
+        nextRetryInMs: backoffMs(consecutiveFailures),
+        latencyMs: lastLatencyMs,
+        services: lastServices,
+      })
+    );
   })();
 
   inFlight = work.finally(() => {
     if (inFlight === work) inFlight = null;
   }) as Promise<HealthProbeState>;
 
-  // Attach result type
   return work;
 }
 
@@ -223,4 +380,15 @@ export function resetHealthProbeForTests() {
   consecutiveFailures = 0;
   lastLoggedKey = null;
   inFlight = null;
+  lastLatencyMs = null;
+  lastSuccessAt = null;
+  lastServices = {
+    api: "unknown",
+    database: "unknown",
+    ai: "unknown",
+    whatsapp: "unknown",
+    email: "unknown",
+  };
+  lastPublished = null;
+  listeners.clear();
 }
