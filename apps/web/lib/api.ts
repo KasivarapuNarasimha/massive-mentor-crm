@@ -74,10 +74,15 @@ class ApiClient {
    * Falls back to /health. Any HTTP response means the process is reachable.
    */
   async checkHealth(timeoutMs = 10_000): Promise<{
+    /** Process reachable (any HTTP response) OR fully healthy */
     ok: boolean;
+    /** Explicit readiness when known */
+    ready?: boolean;
     status?: number;
     error?: string;
     body?: unknown;
+    /** Class hint for UI: timeout | offline | restarting | unavailable */
+    failureKind?: "timeout" | "offline" | "restarting" | "unavailable" | "unknown";
   }> {
     const origin = getApiOrigin();
     const probe = async (path: string) => {
@@ -104,43 +109,96 @@ class ApiClient {
     };
 
     try {
-      // 1) /ready first — cheaper and was responsive when /health timed out in prod incident
+      // 1) /ready first — cheaper; stayed up when /health stalled
       try {
         const r = await probe("/ready");
         const body = r.body as { ready?: boolean } | null;
-        // Process is up if we got any HTTP response
-        const processUp = true;
         const readyOk = r.response.ok && body?.ready !== false;
-        if (processUp && readyOk) {
+        if (readyOk) {
           this.lastNetworkError = null;
-          return { ok: true, status: r.response.status, body: r.body };
+          return {
+            ok: true,
+            ready: true,
+            status: r.response.status,
+            body: r.body,
+          };
         }
-        // 503 on ready = process up but DB not ready — still "reachable" for banner
+        // Process up, dependencies not ready (e.g. DB restarting)
         if (r.response.status > 0) {
-          this.lastNetworkError = r.response.ok
-            ? null
-            : `API not ready (HTTP ${r.response.status})`;
-          // Treat as OK for connectivity banner so UI can still attempt API calls
-          return { ok: true, status: r.response.status, body: r.body };
+          this.lastNetworkError = `API not ready (HTTP ${r.response.status})`;
+          return {
+            ok: false,
+            ready: false,
+            status: r.response.status,
+            body: r.body,
+            error: `API not ready (HTTP ${r.response.status})`,
+            failureKind: "restarting",
+          };
         }
-      } catch {
+      } catch (e) {
+        const name = e instanceof Error ? e.name : "";
+        if (name === "AbortError") {
+          this.lastNetworkError = `Request timed out (${origin}/ready)`;
+          return {
+            ok: false,
+            error: this.lastNetworkError,
+            failureKind: "timeout",
+          };
+        }
         // fall through to /health
       }
 
-      const h = await probe("/health");
-      // Any response = API process is reachable
-      this.lastNetworkError = h.response.ok
-        ? null
-        : `API health returned ${h.response.status}`;
+      try {
+        const h = await probe("/health");
+        const body = h.body as { status?: string; database?: string } | null;
+        if (h.response.status > 0) {
+          const healthy =
+            h.response.ok &&
+            body?.status !== "degraded" &&
+            body?.database !== "down";
+          if (healthy) {
+            this.lastNetworkError = null;
+            return { ok: true, ready: true, status: h.response.status, body: h.body };
+          }
+          this.lastNetworkError = `API health returned ${h.response.status}`;
+          return {
+            ok: false,
+            ready: false,
+            status: h.response.status,
+            body: h.body,
+            error: this.lastNetworkError,
+            failureKind: "restarting",
+          };
+        }
+      } catch (e) {
+        const name = e instanceof Error ? e.name : "";
+        if (name === "AbortError") {
+          this.lastNetworkError = `Request timed out (${origin}/health)`;
+          return {
+            ok: false,
+            error: this.lastNetworkError,
+            failureKind: "timeout",
+          };
+        }
+        throw e;
+      }
+
+      this.lastNetworkError = `Cannot reach API at ${origin}`;
       return {
-        ok: h.response.status > 0,
-        status: h.response.status,
-        body: h.body,
+        ok: false,
+        error: this.lastNetworkError,
+        failureKind: "unavailable",
       };
     } catch (err) {
       const error = networkErrorMessage(err, `${origin}/ready`);
       this.lastNetworkError = error;
-      return { ok: false, error };
+      const failureKind =
+        typeof navigator !== "undefined" && navigator.onLine === false
+          ? ("offline" as const)
+          : /timeout|aborted/i.test(error)
+            ? ("timeout" as const)
+            : ("unavailable" as const);
+      return { ok: false, error, failureKind };
     }
   }
 
