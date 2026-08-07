@@ -21,16 +21,33 @@ let tableReady: Promise<void> | null = null;
 async function ensurePgTable(): Promise<void> {
   if (!tableReady) {
     tableReady = (async () => {
-      await prisma.$executeRawUnsafe(`
+      // Bound DDL so a stuck DB cannot hang the first API request forever
+      const ddl = Promise.all([
+        prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS ${TABLE} (
           key TEXT PRIMARY KEY,
           total_hits INTEGER NOT NULL DEFAULT 0,
           reset_time TIMESTAMPTZ NOT NULL
         )
-      `);
-      await prisma.$executeRawUnsafe(
-        `CREATE INDEX IF NOT EXISTS ${TABLE}_reset_idx ON ${TABLE} (reset_time)`
-      );
+      `),
+        prisma.$executeRawUnsafe(
+          `CREATE INDEX IF NOT EXISTS ${TABLE}_reset_idx ON ${TABLE} (reset_time)`
+        ),
+      ]);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          ddl,
+          new Promise((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error("rate_limit_table_init_timeout")),
+              5_000
+            );
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
     })().catch((err) => {
       tableReady = null;
       throw err;

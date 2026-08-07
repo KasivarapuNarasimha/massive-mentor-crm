@@ -14,7 +14,8 @@ export function ApiConnectivityBanner() {
 
   const probe = useCallback(async () => {
     setChecking(true);
-    const res = await api.checkHealth(4000);
+    // 10s — prod incident: 4s was too aggressive during restarts / brief stalls
+    const res = await api.checkHealth(10_000);
     setDown(!res.ok);
     setDetail(res.error || (!res.ok ? `HTTP ${res.status}` : null));
     setChecking(false);

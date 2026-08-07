@@ -199,30 +199,35 @@ app.post(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Health / ready — structured checks (DB, storage, AI, SMTP, Redis, jobs, metrics)
+// Liveness: always 200 if the process can respond (status field may be "degraded").
+// Never hang: DB check is hard-timed-out inside buildHealthReport.
+// Connectivity banners should treat any HTTP response as "API process up".
 app.get("/health", async (_req, res) => {
   try {
     const { buildHealthReport } = await import("./lib/health-checks.js");
     const report = await buildHealthReport();
-    res.status(report.status === "ok" ? 200 : 503).json(report);
+    // HTTP 200 = process alive (PM2/nginx liveness). Use report.status for dependency health.
+    res.status(200).json(report);
   } catch (err) {
     logError(err, { module: "health", function: "GET /health" });
-    res.status(503).json({
+    res.status(200).json({
       status: "degraded",
       service: "massive-mentor-api",
       database: "down",
       error: "health_check_failed",
+      timestamp: new Date().toISOString(),
     });
   }
 });
 
+// Readiness: 503 only when DB cannot serve traffic (orchestrators / deploy gates)
 app.get("/ready", async (_req, res) => {
   try {
     const { buildReadyReport } = await import("./lib/health-checks.js");
     const report = await buildReadyReport();
     res.status(report.ready ? 200 : 503).json(report);
   } catch {
-    res.status(503).json({ ready: false });
+    res.status(503).json({ ready: false, timestamp: new Date().toISOString() });
   }
 });
 

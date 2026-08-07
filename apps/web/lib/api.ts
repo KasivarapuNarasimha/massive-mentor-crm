@@ -68,41 +68,79 @@ class ApiClient {
    * Lightweight health probe (does not require auth).
    * Never throws.
    */
-  async checkHealth(timeoutMs = 5000): Promise<{
+  /**
+   * Connectivity probe for the API process.
+   * Prefers lightweight /ready (incident evidence: /health can stall while /ready still works).
+   * Falls back to /health. Any HTTP response means the process is reachable.
+   */
+  async checkHealth(timeoutMs = 10_000): Promise<{
     ok: boolean;
     status?: number;
     error?: string;
     body?: unknown;
   }> {
-    const url = `${getApiOrigin()}/health`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await fetch(url, {
-        method: "GET",
-        signal: controller.signal,
-        cache: "no-store",
-      });
-      const text = await response.text();
-      let body: unknown = null;
+    const origin = getApiOrigin();
+    const probe = async (path: string) => {
+      const url = `${origin}${path}`;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
-        body = text ? JSON.parse(text) : null;
+        const response = await fetch(url, {
+          method: "GET",
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        const text = await response.text();
+        let body: unknown = null;
+        try {
+          body = text ? JSON.parse(text) : null;
+        } catch {
+          body = text?.slice(0, 200);
+        }
+        return { url, response, body };
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    try {
+      // 1) /ready first — cheaper and was responsive when /health timed out in prod incident
+      try {
+        const r = await probe("/ready");
+        const body = r.body as { ready?: boolean } | null;
+        // Process is up if we got any HTTP response
+        const processUp = true;
+        const readyOk = r.response.ok && body?.ready !== false;
+        if (processUp && readyOk) {
+          this.lastNetworkError = null;
+          return { ok: true, status: r.response.status, body: r.body };
+        }
+        // 503 on ready = process up but DB not ready — still "reachable" for banner
+        if (r.response.status > 0) {
+          this.lastNetworkError = r.response.ok
+            ? null
+            : `API not ready (HTTP ${r.response.status})`;
+          // Treat as OK for connectivity banner so UI can still attempt API calls
+          return { ok: true, status: r.response.status, body: r.body };
+        }
       } catch {
-        body = text?.slice(0, 200);
+        // fall through to /health
       }
-      const ok = response.ok;
-      if (!ok) {
-        this.lastNetworkError = `API health returned ${response.status}`;
-      } else {
-        this.lastNetworkError = null;
-      }
-      return { ok, status: response.status, body };
+
+      const h = await probe("/health");
+      // Any response = API process is reachable
+      this.lastNetworkError = h.response.ok
+        ? null
+        : `API health returned ${h.response.status}`;
+      return {
+        ok: h.response.status > 0,
+        status: h.response.status,
+        body: h.body,
+      };
     } catch (err) {
-      const error = networkErrorMessage(err, url);
+      const error = networkErrorMessage(err, `${origin}/ready`);
       this.lastNetworkError = error;
       return { ok: false, error };
-    } finally {
-      clearTimeout(timer);
     }
   }
 

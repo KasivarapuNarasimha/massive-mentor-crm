@@ -1,6 +1,6 @@
 /**
  * Aggregated readiness/liveness checks for /health and /ready.
- * Never exposes secrets.
+ * Never exposes secrets. Never hangs: DB checks are hard-timed out.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -8,25 +8,62 @@ import { env } from "../config/env.js";
 import { getJobMonitorSnapshot } from "./job-monitor.js";
 import { getMetricsSnapshot, recordDbLatency } from "./metrics.js";
 
-export type CheckStatus = "up" | "down" | "degraded" | "not_configured";
+export type CheckStatus = "up" | "down" | "degraded" | "not_configured" | "timeout";
 
-async function checkDatabase(): Promise<{ status: CheckStatus; latencyMs: number | null }> {
+const DB_CHECK_TIMEOUT_MS = 2_000;
+
+async function withTimeout<T>(
+  p: Promise<T>,
+  ms: number,
+  label: string
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      p,
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${label}_timeout_${ms}ms`)),
+          ms
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function checkDatabase(): Promise<{
+  status: CheckStatus;
+  latencyMs: number | null;
+}> {
   const t0 = Date.now();
   try {
-    const { prisma } = await import("./prisma.js");
-    await prisma.$queryRaw`SELECT 1`;
+    await withTimeout(
+      (async () => {
+        const { prisma } = await import("./prisma.js");
+        await prisma.$queryRaw`SELECT 1`;
+      })(),
+      DB_CHECK_TIMEOUT_MS,
+      "db"
+    );
     const latencyMs = Date.now() - t0;
     recordDbLatency(latencyMs);
     return { status: "up", latencyMs };
-  } catch {
-    return { status: "down", latencyMs: Date.now() - t0 };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const latencyMs = Date.now() - t0;
+    return {
+      status: /timeout/i.test(msg) ? "timeout" : "down",
+      latencyMs,
+    };
   }
 }
 
 function checkStorage(): { status: CheckStatus; path: string; writable: boolean } {
+  // Prefer app-local storage — do not fail readiness on misconfigured BACKUP_DIR
   const root =
     process.env.MEDIA_STORAGE_DIR ||
-    process.env.BACKUP_DIR ||
     path.resolve(process.cwd(), "storage");
   let writable = false;
   try {
@@ -47,8 +84,7 @@ function checkStorage(): { status: CheckStatus; path: string; writable: boolean 
 
 function checkAi(): { status: CheckStatus; provider: string } {
   const provider = env.AI_PROVIDER || "groq";
-  const key =
-    provider === "openai" ? env.OPENAI_API_KEY : env.GROQ_API_KEY;
+  const key = provider === "openai" ? env.OPENAI_API_KEY : env.GROQ_API_KEY;
   if (key && key.length > 20 && !/placeholder|your-key/i.test(key)) {
     return { status: "up", provider };
   }
@@ -74,17 +110,15 @@ function checkSmtp(): {
 function checkRedis(): { status: CheckStatus } {
   const url = process.env.REDIS_URL?.trim();
   if (!url) return { status: "not_configured" };
-  // Presence only — connection is optional for rate limits (PG fallback)
   return { status: "up" };
 }
 
 function checkWhatsApp(): { status: CheckStatus } {
-  // Integration is per-tenant; platform-level = routes mounted
   return { status: "up" };
 }
 
 export async function buildHealthReport() {
-  const [database] = await Promise.all([checkDatabase()]);
+  const database = await checkDatabase();
   const storage = checkStorage();
   const ai = checkAi();
   const smtp = checkSmtp();
@@ -93,7 +127,9 @@ export async function buildHealthReport() {
   const jobs = getJobMonitorSnapshot();
   const metrics = getMetricsSnapshot();
 
-  const criticalDown = database.status === "down" || storage.status === "down";
+  // Degraded if DB bad; storage is informational only (not critical for liveness)
+  const criticalDown =
+    database.status === "down" || database.status === "timeout";
   const status = criticalDown ? "degraded" : "ok";
 
   return {
@@ -116,13 +152,11 @@ export async function buildHealthReport() {
         port: env.SMTP_PORT ?? null,
         secure: env.SMTP_SECURE === true || Number(env.SMTP_PORT) === 465,
         from: (env.SMTP_FROM || "").trim() || null,
-        // Back-compat with prior /health shape
         configured: smtp.status === "up",
       },
       redis,
       whatsapp,
     },
-    // Legacy top-level fields (keep for existing monitors)
     database: database.status === "up" ? "up" : "down",
     smtp: {
       configured: smtp.status === "up",
@@ -156,13 +190,13 @@ export async function buildHealthReport() {
 
 export async function buildReadyReport() {
   const database = await checkDatabase();
-  const storage = checkStorage();
-  const ready = database.status === "up" && storage.status === "up";
+  // Readiness = DB only. Storage failure must not take the site offline.
+  const ready = database.status === "up";
   return {
     ready,
     database: database.status,
     databaseLatencyMs: database.latencyMs,
-    storage: storage.status,
+    storage: checkStorage().status,
     timestamp: new Date().toISOString(),
   };
 }
