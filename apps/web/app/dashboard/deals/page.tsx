@@ -10,6 +10,9 @@ import { CurrencyAmountInput } from "@/components/ui/CurrencyAmountInput";
 import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
 import { toIsoDateTime, toDateInputValue } from "@/lib/date-input";
 import { useDataVersion } from "@/lib/data-events";
+import { PageLoading } from "@/components/ui/PageLoading";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 
 interface Deal {
   id: string;
@@ -133,7 +136,7 @@ export default function DealsPage() {
         setDeals(normalized);
       } else {
         setDeals([]);
-        if (!opts?.silent) toast.error(apiRes.error || "Failed to load deals");
+        if (!opts?.silent) toast.error(friendlyError(apiRes.error, "Could not load deals. Please try again."));
       }
     } catch {
       setDeals([]);
@@ -286,7 +289,7 @@ export default function DealsPage() {
           } | null;
         } | undefined
       )?.pipelineSync;
-      let msg = editingDeal ? "Deal updated" : "Deal created";
+      let msg = editingDeal ? SuccessMsg.dealUpdated : SuccessMsg.dealCreated;
       if (sync?.contactConvertedToClient) msg += " · Lead → Client";
       else if (sync?.contactStatusSynced) msg += " · Lead synced";
       toast.success(msg);
@@ -298,7 +301,7 @@ export default function DealsPage() {
       emitDataChanged({ module: "notification", action: "create" });
       await loadDeals();
     } else {
-      toast.error(apiRes.error || "Operation failed");
+      toast.error(friendlyError(apiRes.error, "Could not save deal. Please try again."));
     }
 
     setIsSubmitting(false);
@@ -310,10 +313,10 @@ export default function DealsPage() {
 
     const response = await api.deleteCrmDeal(id, token);
     if (response.success) {
-      toast.success("Deal deleted");
+      toast.success(SuccessMsg.dealDeleted);
       await loadDeals();
     } else {
-      toast.error(response.error || "Failed to delete");
+      toast.error(friendlyError(response.error, "Could not delete deal. Please try again."));
     }
   };
 
@@ -426,7 +429,7 @@ export default function DealsPage() {
       />
 
       {isLoading ? (
-        <div className="bg-card border border-border rounded-2xl p-8 animate-pulse h-96" />
+        <PageLoading variant="kanban" label="Loading deals" />
       ) : view === "kanban" ? (
         <>
           {highlightStage && (
@@ -521,7 +524,9 @@ export default function DealsPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="text-center text-muted-foreground text-xs py-6">No deals</div>
+                    <div className="text-center text-muted-foreground text-xs py-6 px-2">
+                      No deals in this stage
+                    </div>
                   )}
                 </div>
               </div>
@@ -590,7 +595,9 @@ export default function DealsPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="text-center text-muted-foreground text-xs py-8">No deals</div>
+                    <div className="text-center text-muted-foreground text-xs py-8 px-2">
+                      Drop deals here
+                    </div>
                   )}
                 </div>
               </div>

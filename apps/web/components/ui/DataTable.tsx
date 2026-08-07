@@ -29,6 +29,8 @@ type Props<T> = {
   loading?: boolean;
   emptyTitle?: string;
   emptyHint?: string;
+  /** Optional CTA under empty state */
+  emptyAction?: ReactNode;
   exportFileName?: string;
   /** Extra toolbar actions */
   toolbar?: ReactNode;
@@ -51,6 +53,7 @@ export function DataTable<T>({
   loading,
   emptyTitle = "No records",
   emptyHint = "Try adjusting filters or create a new record.",
+  emptyAction,
   exportFileName = "export",
   toolbar,
   className = "",
@@ -128,10 +131,11 @@ export function DataTable<T>({
           <div className="relative">
             <button
               type="button"
-              className="mm-btn mm-btn-secondary min-h-9 px-3 text-xs"
+              className="mm-btn mm-btn-secondary min-h-9 px-3 text-xs focus-ring"
               onClick={() => setMenuOpen((o) => !o)}
               aria-expanded={menuOpen}
               aria-haspopup="true"
+              aria-label="Toggle column visibility"
             >
               Columns
             </button>
@@ -167,9 +171,10 @@ export function DataTable<T>({
           </div>
           <button
             type="button"
-            className="mm-btn mm-btn-secondary min-h-9 px-3 text-xs"
+            className="mm-btn mm-btn-secondary min-h-9 px-3 text-xs focus-ring"
             onClick={exportCsv}
             disabled={!rows.length}
+            aria-label="Export table as CSV"
           >
             Export CSV
           </button>
@@ -178,13 +183,13 @@ export function DataTable<T>({
 
       <div className="mm-table-wrap">
         {loading ? (
-          <div className="p-6 space-y-3" aria-busy="true">
+          <div className="p-6 space-y-3" aria-busy="true" aria-label="Loading table">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="mm-skeleton h-10 w-full" />
             ))}
           </div>
         ) : rows.length === 0 ? (
-          <div className="mm-empty">
+          <div className="mm-empty" role="status">
             <div className="mm-empty-icon" aria-hidden>
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -195,16 +200,18 @@ export function DataTable<T>({
                 />
               </svg>
             </div>
-            <p className="text-sm font-medium text-muted-foreground">{emptyTitle}</p>
+            <p className="text-sm font-semibold text-foreground">{emptyTitle}</p>
             <p className="text-xs text-muted-foreground max-w-sm">{emptyHint}</p>
+            {emptyAction ? <div className="mt-3">{emptyAction}</div> : null}
           </div>
         ) : (
-          <table className="mm-table min-w-full">
+          <table className="mm-table min-w-full" role="table">
             <thead>
               <tr>
                 {visible.map((c) => (
                   <th
                     key={c.id}
+                    scope="col"
                     style={{
                       width: colWidths[c.id],
                       minWidth: c.minWidth || 100,

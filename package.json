@@ -1,8 +1,8 @@
 {
   "name": "massive-mentor",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0",
   "private": true,
-  "description": "Massive Mentor CRM — AI-powered multi-tenant SaaS (Release Candidate)",
+  "description": "Massive Mentor CRM — AI-powered multi-tenant SaaS (Production v1.0)",
   "scripts": {
     "dev": "concurrently -n \"API,WEB\" -c \"cyan,green\" \"pnpm --filter @massivementor/api dev\" \"pnpm --filter @massivementor/web dev\"",
     "dev:api": "pnpm --filter @massivementor/api dev",

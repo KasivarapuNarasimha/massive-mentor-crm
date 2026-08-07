@@ -5,6 +5,9 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageLoading } from "@/components/ui/PageLoading";
+import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 
 interface Meeting {
   id: string;
@@ -102,13 +105,13 @@ export default function MeetingsPage() {
       res = await api.createCrmMeeting(payload, token);
     }
     if (res.success) {
-      toast.success(editingMeeting ? "Meeting updated" : "Meeting scheduled");
+      toast.success(editingMeeting ? SuccessMsg.meetingUpdated : SuccessMsg.meetingCreated);
       closeModal();
       const { emitDataChanged } = await import("@/lib/data-events");
       emitDataChanged({ module: "meeting", action: editingMeeting ? "update" : "create" });
       emitDataChanged({ module: "notification", action: "create" });
       load();
-    } else toast.error(res.error || "Failed");
+    } else toast.error(friendlyError(res.error, "Could not save meeting. Please try again."));
     setIsSubmitting(false);
   };
 
@@ -117,9 +120,9 @@ export default function MeetingsPage() {
     if (!confirm(`Delete meeting "${title}"?`)) return;
     const res = await api.deleteCrmMeeting(id, token);
     if (res.success) {
-      toast.success("Meeting deleted");
+      toast.success(SuccessMsg.meetingDeleted);
       load();
-    } else toast.error(res.error || "Failed");
+    } else toast.error(friendlyError(res.error, "Could not delete meeting. Please try again."));
   };
 
   const meetingCheck = async (meetingId: string, action: "check-in" | "check-out") => {
@@ -159,9 +162,21 @@ export default function MeetingsPage() {
       <ExportFiltersBar module="meetings" token={token} className="mb-4" />
 
       {isLoading ? (
-        <div className="h-40 bg-card rounded-2xl animate-pulse" />
+        <PageLoading variant="cards" rows={4} label="Loading meetings" />
       ) : meetings.length === 0 ? (
-        <div className="bg-card border border-border rounded-2xl p-12 text-center">No meetings scheduled yet.</div>
+        <EmptyState
+          title="No meetings scheduled"
+          description="Schedule your first meeting with a lead or client."
+          action={
+            <button
+              type="button"
+              onClick={openCreate}
+              className="mm-btn mm-btn-primary min-h-11 px-5 focus-ring"
+            >
+              Schedule Meeting
+            </button>
+          }
+        />
       ) : (
         <div className="space-y-3">
           {meetings.map((m) => (

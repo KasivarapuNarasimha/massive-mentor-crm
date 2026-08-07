@@ -25,7 +25,8 @@ export default function RootError({
         <h1 className="text-2xl font-semibold tracking-tight mb-3">Something went wrong</h1>
 
         <p className="text-muted-foreground mb-8 leading-relaxed">
-          An unexpected error occurred while loading the page. We&apos;ve recorded the details for investigation.
+          Something went wrong. Please try again or contact your administrator.
+          Your data is safe.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">

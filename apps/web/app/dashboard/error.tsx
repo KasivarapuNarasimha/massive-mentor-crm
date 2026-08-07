@@ -25,7 +25,8 @@ export default function DashboardError({
         <h2 className="text-xl font-semibold tracking-tight mb-3">Something went wrong in this section</h2>
 
         <p className="text-muted-foreground mb-8 leading-relaxed max-w-md mx-auto">
-          We couldn&apos;t load or process the content here. Your data is safe — you can try again or navigate elsewhere.
+          Something went wrong in this section. Please try again or contact your administrator.
+          Your data is safe.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">

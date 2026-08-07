@@ -13,13 +13,18 @@ export function ThemeAwareToaster() {
       position="top-center"
       richColors
       closeButton
+      expand={false}
+      visibleToasts={4}
+      gap={10}
+      duration={3200}
       theme={theme}
       className="toaster group"
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-card group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
+            "group toast group-[.toaster]:bg-card group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg group-[.toaster]:rounded-xl",
+          title: "group-[.toast]:font-medium group-[.toast]:text-sm",
+          description: "group-[.toast]:text-muted-foreground group-[.toast]:text-xs",
           actionButton:
             "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
           cancelButton:

@@ -7,6 +7,9 @@ import { toast } from "sonner";
 import { formatCurrency } from "@/lib/currency";
 import { DynamicForm, buildContactPayload, contactToFormValues } from "@/components/dynamic/DynamicForm";
 import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
+import { PageLoading } from "@/components/ui/PageLoading";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 import {
   type BusinessConfigDTO,
   type FieldDef,
@@ -77,7 +80,7 @@ export default function ClientsPage() {
     if (response.success && data?.contacts) {
       setClients(data.contacts);
     } else {
-      toast.error(response.error || "Failed to load clients");
+      toast.error(friendlyError(response.error, "Could not load clients. Please try again."));
     }
     setIsLoading(false);
   }, [token]);
@@ -132,7 +135,7 @@ export default function ClientsPage() {
       : await api.createCrmContact(payload, token);
 
     if (response.success) {
-      toast.success(editingClient ? "Client updated" : "Client created");
+      toast.success(editingClient ? SuccessMsg.clientUpdated : SuccessMsg.clientCreated);
       closeModal();
       const { emitDataChanged } = await import("@/lib/data-events");
       emitDataChanged({
@@ -142,7 +145,7 @@ export default function ClientsPage() {
       emitDataChanged({ module: "notification", action: "create" });
       await loadClients();
     } else {
-      toast.error(response.error || "Operation failed");
+      toast.error(friendlyError(response.error, "Could not save client. Please try again."));
     }
 
     setIsSubmitting(false);
@@ -154,10 +157,10 @@ export default function ClientsPage() {
 
     const response = await api.deleteCrmContact(id, token);
     if (response.success) {
-      toast.success("Client deleted");
+      toast.success("Client deleted successfully");
       await loadClients();
     } else {
-      toast.error(response.error || "Failed to delete");
+      toast.error(friendlyError(response.error, "Could not delete client. Please try again."));
     }
   };
 
@@ -210,27 +213,28 @@ export default function ClientsPage() {
       </div>
 
       {isLoading ? (
-        <div className="bg-card border border-border rounded-2xl p-8">
-          <div className="animate-pulse space-y-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-16 bg-muted rounded-xl" />
-            ))}
-          </div>
-        </div>
+        <PageLoading variant="table" rows={5} label="Loading clients" />
       ) : filteredClients.length === 0 ? (
-        <div className="bg-card border border-border rounded-2xl p-12 text-center">
-          <div className="mx-auto w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6">
-            <span className="text-3xl">🤝</span>
-          </div>
-          <h3 className="text-xl font-semibold mb-2">No clients found</h3>
-          <p className="text-muted-foreground mb-6">Start by adding your first client.</p>
-          <button
-            onClick={openCreate}
-            className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active"
-          >
-            Create Client
-          </button>
-        </div>
+        <EmptyState
+          title={clients.length === 0 ? "No clients yet" : "No matching clients"}
+          description={
+            clients.length === 0
+              ? "Add your first client or convert a won lead."
+              : "Try adjusting search or filters."
+          }
+          icon={<span className="text-2xl">🤝</span>}
+          action={
+            clients.length === 0 ? (
+              <button
+                type="button"
+                onClick={openCreate}
+                className="mm-btn mm-btn-primary min-h-11 px-6 focus-ring"
+              >
+                Create Client
+              </button>
+            ) : undefined
+          }
+        />
       ) : (
         <>
           {/* Mobile / tablet card list */}

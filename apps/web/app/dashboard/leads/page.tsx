@@ -33,6 +33,7 @@ import {
   FALLBACK_LEAD_STATUSES,
 } from "@/lib/business-config";
 import { formatCurrency, parseAmount } from "@/lib/currency";
+import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 
 interface Contact {
   id: string;
@@ -833,7 +834,7 @@ export default function LeadsPage() {
         } | undefined
       )?.pipelineSync;
 
-      let msg = editingLead ? "Lead updated" : "Lead created";
+      let msg: string = editingLead ? SuccessMsg.leadUpdated : SuccessMsg.leadCreated;
       if (sync?.contactConvertedToClient) msg = "Lead won — converted to Client";
       else if (sync?.dealCreated) msg = "Lead updated — deal created & pipeline synced";
       else if (sync?.dealsUpdated) msg = `Lead updated — ${sync.dealsUpdated} deal(s) synced`;
@@ -855,7 +856,7 @@ export default function LeadsPage() {
       emitDataChanged({ module: "notification", action: "create" });
       await loadLeads();
     } else {
-      toast.error(apiResponse.error || "Operation failed");
+      toast.error(friendlyError(apiResponse.error, "Could not save lead. Please try again."));
     }
     setIsSubmitting(false);
   };
@@ -1839,28 +1840,29 @@ export default function LeadsPage() {
 
       {/* List — natural height only (no forced min-h / stretch that leaves blank space) */}
       {isLoading ? (
-        <div className="bg-card border border-border rounded-2xl p-8 shrink-0">
-          <div className="animate-pulse space-y-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-12 bg-muted rounded-xl" />
-            ))}
-          </div>
+        <div className="bg-card border border-border rounded-2xl p-6 shrink-0 space-y-3" aria-busy="true" aria-label="Loading leads">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="mm-skeleton h-12 w-full rounded-xl" />
+          ))}
         </div>
       ) : filteredLeads.length === 0 ? (
-        <div className="bg-card border border-border rounded-2xl p-8 sm:p-12 text-center shrink-0">
-          <div className="mx-auto w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6">
-            <span className="text-3xl">🎯</span>
+        <div className="mm-empty bg-card border border-border rounded-2xl shrink-0" role="status">
+          <div className="mm-empty-icon" aria-hidden>
+            <span className="text-2xl">🎯</span>
           </div>
-          <h3 className="text-xl font-semibold mb-2">No leads found</h3>
-          <p className="text-muted-foreground mb-6">
+          <p className="text-base font-semibold text-foreground">
+            {leads.length === 0 ? "No leads yet" : "No matching leads"}
+          </p>
+          <p className="text-sm text-muted-foreground max-w-sm">
             {leads.length === 0
-              ? "Start by adding your first lead or importing a file."
+              ? "Create your first lead or import a spreadsheet to get started."
               : "Try adjusting search or filters."}
           </p>
           {leads.length === 0 && (
             <button
+              type="button"
               onClick={openCreate}
-              className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover"
+              className="mt-3 mm-btn mm-btn-primary min-h-11 px-6 focus-ring"
             >
               Create Lead
             </button>

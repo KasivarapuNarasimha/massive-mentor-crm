@@ -6,6 +6,9 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
 import { toIsoDateTime, toDateInputValue } from "@/lib/date-input";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageLoading } from "@/components/ui/PageLoading";
+import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 
 interface Task {
   id: string;
@@ -101,13 +104,13 @@ export default function TasksPage() {
       res = await api.createCrmTask(payload, token);
     }
     if (res.success) {
-      toast.success(editingTask ? "Task updated" : "Task created");
+      toast.success(editingTask ? SuccessMsg.taskUpdated : SuccessMsg.taskCreated);
       closeModal();
       const { emitDataChanged } = await import("@/lib/data-events");
       emitDataChanged({ module: "task", action: editingTask ? "update" : "create" });
       emitDataChanged({ module: "notification", action: "create" });
       load();
-    } else toast.error(res.error || "Failed");
+    } else toast.error(friendlyError(res.error, "Could not save task. Please try again."));
     setIsSubmitting(false);
   };
 
@@ -116,9 +119,9 @@ export default function TasksPage() {
     if (!confirm(`Delete task "${title}"?`)) return;
     const res = await api.deleteCrmTask(id, token);
     if (res.success) {
-      toast.success("Task deleted");
+      toast.success(SuccessMsg.taskDeleted);
       load();
-    } else toast.error(res.error || "Failed to delete");
+    } else toast.error(friendlyError(res.error, "Could not delete task. Please try again."));
   };
 
   return (
@@ -131,25 +134,47 @@ export default function TasksPage() {
         <button
           type="button"
           onClick={openCreate}
-          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium touch-manipulation"
+          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium touch-manipulation focus-ring mm-btn mm-btn-primary"
         >
           + New Task
         </button>
       </div>
 
       <ExportFiltersBar module="tasks" token={token} search={search} onSearchChange={setSearch} className="mb-4" />
+      <label className="sr-only" htmlFor="task-search">
+        Search tasks
+      </label>
       <input
+        id="task-search"
         type="search"
         placeholder="Search tasks..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-4 w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11"
+        className="mb-4 w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11 focus-ring"
       />
 
       {isLoading ? (
-        <div className="h-40 bg-card rounded-2xl animate-pulse" />
+        <PageLoading variant="cards" rows={5} label="Loading tasks" />
       ) : filtered.length === 0 ? (
-        <div className="text-center p-10 bg-card border border-border rounded-2xl">No tasks</div>
+        <EmptyState
+          title={tasks.length === 0 ? "No tasks yet" : "No matching tasks"}
+          description={
+            tasks.length === 0
+              ? "Create your first task to track follow-ups and action items."
+              : "Try adjusting your search."
+          }
+          action={
+            tasks.length === 0 ? (
+              <button
+                type="button"
+                onClick={openCreate}
+                className="mm-btn mm-btn-primary min-h-11 px-5 focus-ring"
+              >
+                Create Task
+              </button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="space-y-3">
           {filtered.map((task) => (
@@ -191,19 +216,26 @@ export default function TasksPage() {
           <div className="bg-card border border-border p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
             <h3 className="font-semibold mb-4 text-lg">{editingTask ? "Edit Task" : "New Task"}</h3>
             <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
-              <input
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Task title *"
-                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
-                required
-              />
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Description"
-                className="w-full bg-background border border-border rounded-xl p-3 h-24 text-base sm:text-sm"
-              />
+              <label className="block text-xs text-muted-foreground">
+                <span className="mm-required">Title</span>
+                <input
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  placeholder="e.g. Call client about proposal"
+                  className="mt-1 w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11 focus-ring"
+                  required
+                  autoFocus
+                />
+              </label>
+              <label className="block text-xs text-muted-foreground">
+                Description
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Optional notes"
+                  className="mt-1 w-full bg-background border border-border rounded-xl p-3 h-24 text-base sm:text-sm focus-ring"
+                />
+              </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="block text-xs text-muted-foreground">
                   Due date
@@ -211,12 +243,13 @@ export default function TasksPage() {
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="mt-1 w-full bg-background border border-border rounded-xl p-3 text-foreground text-base sm:text-sm min-h-11"
+                    className="mt-1 w-full bg-background border border-border rounded-xl p-3 text-foreground text-base sm:text-sm min-h-11 focus-ring"
                   />
                 </label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  aria-label="Task status"
                   className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
                 >
                   <option value="todo">todo</option>
@@ -240,9 +273,10 @@ export default function TasksPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 min-h-11 py-2.5 bg-primary text-primary-foreground rounded-xl touch-manipulation"
+                  className={`flex-1 min-h-11 py-2.5 bg-primary text-primary-foreground rounded-xl touch-manipulation focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
+                  aria-busy={isSubmitting}
                 >
-                  {isSubmitting ? "Saving..." : editingTask ? "Update" : "Create"}
+                  {isSubmitting ? "Saving…" : editingTask ? "Update" : "Create"}
                 </button>
               </div>
             </form>

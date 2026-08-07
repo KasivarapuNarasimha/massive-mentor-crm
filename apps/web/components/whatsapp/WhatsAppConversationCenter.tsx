@@ -430,11 +430,18 @@ export function WhatsAppConversationCenter() {
           </div>
           <div className="flex-1 overflow-y-auto">
             {loadingList ? (
-              <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+              <div className="p-3 space-y-2" aria-busy="true" aria-label="Loading conversations">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="mm-skeleton h-14 w-full rounded-xl" />
+                ))}
+              </div>
             ) : conversations.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">
-                No conversations yet. Send a WhatsApp message from a lead to start a thread.
-              </p>
+              <div className="p-6 text-center" role="status">
+                <p className="text-sm font-medium text-foreground mb-1">No conversations yet</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Send a WhatsApp message from a lead to start a thread.
+                </p>
+              </div>
             ) : (
               conversations.map((c) => (
                 <button
