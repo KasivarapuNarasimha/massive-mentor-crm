@@ -1,6 +1,6 @@
 {
   "version": "1.0.0-rc.1",
-  "date": "2026-07-19T07:11:06.637Z",
+  "date": "2026-08-07T04:58:27.392Z",
   "base": "http://127.0.0.1:4000",
   "pass": 33,
   "fail": 0,
@@ -93,19 +93,19 @@
       "module": "CRM",
       "check": "Create lead",
       "ok": true,
-      "detail": "cmrrgiodb003ytypwtukzwr99"
+      "detail": "cmsih59dt00bntyl0t0c2ykz3"
     },
     {
       "module": "CRM",
       "check": "Create client",
       "ok": true,
-      "detail": "cmrrgiodz0044typw52sx8579"
+      "detail": "cmsih59eu00c5tyl05an2ln5u"
     },
     {
       "module": "CRM",
       "check": "Create deal",
       "ok": true,
-      "detail": "cmrrgioex004ctypwlxphsijk"
+      "detail": "cmsih59nu00cqtyl06axgnugy"
     },
     {
       "module": "CRM",

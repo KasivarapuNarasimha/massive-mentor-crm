@@ -1,0 +1,519 @@
+{
+  "phase": 5,
+  "generatedAt": "2026-08-07T04:58:34.948Z",
+  "base": "http://127.0.0.1:4000",
+  "scaleMax": 50000,
+  "summary": {
+    "total": 72,
+    "passed": 72,
+    "failed": 0,
+    "bugs": 0
+  },
+  "results": [
+    {
+      "module": "Ops",
+      "check": "GET /health",
+      "ok": true,
+      "detail": "ok",
+      "ms": 51
+    },
+    {
+      "module": "Ops",
+      "check": "Database up",
+      "ok": true,
+      "detail": "up",
+      "ms": 51
+    },
+    {
+      "module": "Ops",
+      "check": "GET /ready",
+      "ok": true,
+      "detail": "200",
+      "ms": 5
+    },
+    {
+      "module": "Auth",
+      "check": "Public register blocked",
+      "ok": true,
+      "detail": "403",
+      "ms": 344
+    },
+    {
+      "module": "Auth",
+      "check": "Super Admin login",
+      "ok": true,
+      "detail": "200",
+      "ms": 289
+    },
+    {
+      "module": "Auth",
+      "check": "Admin JWT blocked from CRM",
+      "ok": true,
+      "detail": "403",
+      "ms": 3
+    },
+    {
+      "module": "Auth",
+      "check": "Invalid JWT → 401",
+      "ok": true,
+      "detail": "401",
+      "ms": 3
+    },
+    {
+      "module": "Auth",
+      "check": "Missing auth → 401",
+      "ok": true,
+      "detail": "401",
+      "ms": 3
+    },
+    {
+      "module": "Onboarding",
+      "check": "Provision customer",
+      "ok": true,
+      "detail": "biz=cmsih57qf0099tyl0htxe7a4w 201",
+      "ms": 628
+    },
+    {
+      "module": "Auth",
+      "check": "Business owner login",
+      "ok": true,
+      "detail": "200",
+      "ms": 558
+    },
+    {
+      "module": "Auth",
+      "check": "Reject bad password",
+      "ok": true,
+      "detail": "401",
+      "ms": 284
+    },
+    {
+      "module": "Roles",
+      "check": "Create sales_executive",
+      "ok": true,
+      "detail": "cmsih58oz00b0tyl0o0avvtsi",
+      "ms": 324
+    },
+    {
+      "module": "Roles",
+      "check": "Login sales_executive",
+      "ok": true,
+      "detail": "200",
+      "ms": 311
+    },
+    {
+      "module": "Roles",
+      "check": "Create sales_manager",
+      "ok": true,
+      "detail": "cmsih595v00bhtyl05gnu2jtj",
+      "ms": 297
+    },
+    {
+      "module": "Roles",
+      "check": "Login sales_manager",
+      "ok": true,
+      "detail": "200",
+      "ms": 313
+    },
+    {
+      "module": "Roles",
+      "check": "Create marketing",
+      "ok": true,
+      "detail": "cmsih59nj00cktyl03cn3ydyk",
+      "ms": 322
+    },
+    {
+      "module": "Roles",
+      "check": "Create finance",
+      "ok": true,
+      "detail": "cmsih59w800d1tyl01byix1pv",
+      "ms": 314
+    },
+    {
+      "module": "Errors",
+      "check": "Lead without name rejected",
+      "ok": true,
+      "detail": "400",
+      "ms": 28
+    },
+    {
+      "module": "Leads",
+      "check": "Create lead",
+      "ok": true,
+      "detail": "cmsih59xv00dftyl06kn2g15c",
+      "ms": 30
+    },
+    {
+      "module": "Clients",
+      "check": "Create client",
+      "ok": true,
+      "detail": "cmsih59z000dntyl0bwg1cld8",
+      "ms": 56
+    },
+    {
+      "module": "Workflow",
+      "check": "Lead → Deal",
+      "ok": true,
+      "detail": "cmsih5a0j00e1tyl0x76uzgcw",
+      "ms": 38
+    },
+    {
+      "module": "Security",
+      "check": "Deal with foreign contact rejected",
+      "ok": true,
+      "detail": "404",
+      "ms": 31
+    },
+    {
+      "module": "Tasks",
+      "check": "Create task",
+      "ok": true,
+      "detail": "201",
+      "ms": 21
+    },
+    {
+      "module": "Meetings",
+      "check": "Create meeting",
+      "ok": true,
+      "detail": "201",
+      "ms": 23
+    },
+    {
+      "module": "Leads",
+      "check": "List leads paginated",
+      "ok": true,
+      "detail": "status=200",
+      "ms": 26
+    },
+    {
+      "module": "Leads",
+      "check": "Search leads",
+      "ok": true,
+      "detail": "200",
+      "ms": 39
+    },
+    {
+      "module": "Deals",
+      "check": "List deals",
+      "ok": true,
+      "detail": "200",
+      "ms": 23
+    },
+    {
+      "module": "Tasks",
+      "check": "List tasks",
+      "ok": true,
+      "detail": "200",
+      "ms": 17
+    },
+    {
+      "module": "Meetings",
+      "check": "List meetings",
+      "ok": true,
+      "detail": "200",
+      "ms": 18
+    },
+    {
+      "module": "Roles",
+      "check": "SE creates own lead",
+      "ok": true,
+      "detail": "cmsih5a7600fetyl0wvglcr1j",
+      "ms": 41
+    },
+    {
+      "module": "Assignment",
+      "check": "Assign lead to SE",
+      "ok": true,
+      "detail": "cmsih59xv00dftyl06kn2g15c",
+      "ms": 323
+    },
+    {
+      "module": "Roles",
+      "check": "SE can list scoped leads",
+      "ok": true,
+      "detail": "count=2",
+      "ms": 30
+    },
+    {
+      "module": "Roles",
+      "check": "SE sees own lead",
+      "ok": true,
+      "detail": "cmsih5a7600fetyl0wvglcr1j",
+      "ms": 30
+    },
+    {
+      "module": "Roles",
+      "check": "SE finance access controlled",
+      "ok": true,
+      "detail": "403",
+      "ms": 44
+    },
+    {
+      "module": "Roles",
+      "check": "SM list leads (team scope)",
+      "ok": true,
+      "detail": "200",
+      "ms": 26
+    },
+    {
+      "module": "Dashboard",
+      "check": "Config dashboard",
+      "ok": true,
+      "detail": "200",
+      "ms": 73
+    },
+    {
+      "module": "Reports",
+      "check": "Reports KPIs",
+      "ok": true,
+      "detail": "leads=2",
+      "ms": 29
+    },
+    {
+      "module": "Notifications",
+      "check": "List notifications",
+      "ok": true,
+      "detail": "200",
+      "ms": 19
+    },
+    {
+      "module": "Team",
+      "check": "List teams",
+      "ok": true,
+      "detail": "200",
+      "ms": 22
+    },
+    {
+      "module": "Team",
+      "check": "List business users",
+      "ok": true,
+      "detail": "200",
+      "ms": 33
+    },
+    {
+      "module": "Finance",
+      "check": "Dashboard",
+      "ok": true,
+      "detail": "200",
+      "ms": 32
+    },
+    {
+      "module": "Workflow",
+      "check": "Lead → Invoice",
+      "ok": true,
+      "detail": "total=1180 num=INV-2026-00001",
+      "ms": 61
+    },
+    {
+      "module": "AI",
+      "check": "Next action not 500",
+      "ok": true,
+      "detail": "200 ",
+      "ms": 467
+    },
+    {
+      "module": "Media",
+      "check": "List assets",
+      "ok": true,
+      "detail": "200",
+      "ms": 30
+    },
+    {
+      "module": "WhatsApp",
+      "check": "Conversation analytics",
+      "ok": true,
+      "detail": "200",
+      "ms": 23
+    },
+    {
+      "module": "WhatsApp",
+      "check": "List conversations",
+      "ok": true,
+      "detail": "200",
+      "ms": 17
+    },
+    {
+      "module": "Errors",
+      "check": "Invalid WA open handled",
+      "ok": true,
+      "detail": "200",
+      "ms": 18
+    },
+    {
+      "module": "WhatsApp",
+      "check": "Create broadcast draft",
+      "ok": true,
+      "detail": "201",
+      "ms": 31
+    },
+    {
+      "module": "Errors",
+      "check": "Duplicate concurrent creates no crash",
+      "ok": true,
+      "detail": "a=201 b=201",
+      "ms": 29
+    },
+    {
+      "module": "Bulk",
+      "check": "Create 5 leads for bulk",
+      "ok": true,
+      "detail": "5",
+      "ms": null
+    },
+    {
+      "module": "Bulk",
+      "check": "Bulk assignment",
+      "ok": true,
+      "detail": "200",
+      "ms": 34
+    },
+    {
+      "module": "Scale",
+      "check": "Lead list @ ~10 rows",
+      "ok": true,
+      "detail": "count≈10 status=200",
+      "ms": 20
+    },
+    {
+      "module": "Scale",
+      "check": "Lead search @ ~10",
+      "ok": true,
+      "detail": "200",
+      "ms": 25
+    },
+    {
+      "module": "Scale",
+      "check": "Dashboard @ ~10",
+      "ok": true,
+      "detail": "200",
+      "ms": 50
+    },
+    {
+      "module": "Scale",
+      "check": "Reports @ ~10",
+      "ok": true,
+      "detail": "200",
+      "ms": 25
+    },
+    {
+      "module": "Scale",
+      "check": "Lead list @ ~100 rows",
+      "ok": true,
+      "detail": "count≈100 status=200",
+      "ms": 23
+    },
+    {
+      "module": "Scale",
+      "check": "Lead search @ ~100",
+      "ok": true,
+      "detail": "200",
+      "ms": 22
+    },
+    {
+      "module": "Scale",
+      "check": "Dashboard @ ~100",
+      "ok": true,
+      "detail": "200",
+      "ms": 48
+    },
+    {
+      "module": "Scale",
+      "check": "Reports @ ~100",
+      "ok": true,
+      "detail": "200",
+      "ms": 34
+    },
+    {
+      "module": "Scale",
+      "check": "Lead list @ ~1000 rows",
+      "ok": true,
+      "detail": "count≈1000 status=200",
+      "ms": 24
+    },
+    {
+      "module": "Scale",
+      "check": "Lead search @ ~1000",
+      "ok": true,
+      "detail": "200",
+      "ms": 31
+    },
+    {
+      "module": "Scale",
+      "check": "Dashboard @ ~1000",
+      "ok": true,
+      "detail": "200",
+      "ms": 50
+    },
+    {
+      "module": "Scale",
+      "check": "Reports @ ~1000",
+      "ok": true,
+      "detail": "200",
+      "ms": 26
+    },
+    {
+      "module": "Scale",
+      "check": "Lead list @ ~10000 rows",
+      "ok": true,
+      "detail": "count≈10000 status=200",
+      "ms": 29
+    },
+    {
+      "module": "Scale",
+      "check": "Lead search @ ~10000",
+      "ok": true,
+      "detail": "200",
+      "ms": 41
+    },
+    {
+      "module": "Scale",
+      "check": "Dashboard @ ~10000",
+      "ok": true,
+      "detail": "200",
+      "ms": 59
+    },
+    {
+      "module": "Scale",
+      "check": "Reports @ ~10000",
+      "ok": true,
+      "detail": "200",
+      "ms": 31
+    },
+    {
+      "module": "Scale",
+      "check": "Lead list @ ~50000 rows",
+      "ok": true,
+      "detail": "count≈50000 status=200",
+      "ms": 48
+    },
+    {
+      "module": "Scale",
+      "check": "Lead search @ ~50000",
+      "ok": true,
+      "detail": "200",
+      "ms": 139
+    },
+    {
+      "module": "Scale",
+      "check": "Dashboard @ ~50000",
+      "ok": true,
+      "detail": "200",
+      "ms": 107
+    },
+    {
+      "module": "Scale",
+      "check": "Reports @ ~50000",
+      "ok": true,
+      "detail": "200",
+      "ms": 72
+    },
+    {
+      "module": "Stability",
+      "check": "Probe suite no 500/crash",
+      "ok": true,
+      "detail": "crashes=0",
+      "ms": null
+    }
+  ],
+  "bugs": []
+}

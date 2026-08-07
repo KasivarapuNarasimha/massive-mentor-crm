@@ -529,7 +529,17 @@ export async function createDealHandler(req: AuthenticatedRequest, res: Response
     res.status(201).json({ success: true, data: { deal } });
   } catch (error: unknown) {
     console.error("Create deal error:", error);
-    res.status(500).json({ success: false, error: "Failed to create deal" });
+    const message = error instanceof Error ? error.message : "Failed to create deal";
+    const status =
+      /not found|not accessible|invalid/i.test(message)
+        ? 404
+        : /required|must be|validation/i.test(message)
+          ? 400
+          : 500;
+    res.status(status).json({
+      success: false,
+      error: status === 500 ? "Failed to create deal" : message,
+    });
   }
 }
 

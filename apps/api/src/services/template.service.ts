@@ -27,51 +27,76 @@ function packageHash(manifest: IndustryTemplateManifest): string {
  * Upsert system seed templates into DB (idempotent).
  * Call on API boot and before listing if empty.
  */
-export async function seedIndustryTemplates(): Promise<{ upserted: number }> {
-  const seeds = getAllSeedManifests();
-  let upserted = 0;
+/** Process-level cache — boot seeds once; avoid re-upserting 21 templates on every dashboard hit. */
+let seedIndustryTemplatesPromise: Promise<{ upserted: number }> | null = null;
+let seedIndustryTemplatesAt = 0;
+const SEED_TTL_MS = 6 * 60 * 60 * 1000; // 6h
 
-  for (const manifest of seeds) {
-    const parsed = industryTemplateManifestSchema.safeParse(manifest);
-    if (!parsed.success) {
-      console.error(`[templates] invalid seed ${manifest.slug}:`, parsed.error.flatten());
-      continue;
-    }
-    const m = parsed.data;
-    await prisma.industryTemplate.upsert({
-      where: { slug: m.slug },
-      create: {
-        slug: m.slug,
-        name: m.name,
-        description: m.description || null,
-        category: (getSeedCategory(m.slug) as string) || null,
-        version: 1,
-        schemaVersion: m.schemaVersion,
-        isPublished: true,
-        isSystem: true,
-        isMarketplace: true,
-        authorName: "Massive Mentor",
-        manifest: m as object,
-        packageHash: packageHash(m),
-      },
-      update: {
-        name: m.name,
-        description: m.description || null,
-        category: getSeedCategory(m.slug) || null,
-        schemaVersion: m.schemaVersion,
-        isPublished: true,
-        isSystem: true,
-        isMarketplace: true,
-        manifest: m as object,
-        packageHash: packageHash(m),
-        // bump version only when hash changes — handled below
-      },
-    });
-    upserted++;
+export async function seedIndustryTemplates(opts?: {
+  force?: boolean;
+}): Promise<{ upserted: number }> {
+  const force = !!opts?.force;
+  if (
+    !force &&
+    seedIndustryTemplatesPromise &&
+    Date.now() - seedIndustryTemplatesAt < SEED_TTL_MS
+  ) {
+    return seedIndustryTemplatesPromise;
   }
 
-  console.log(`[templates] seeded/updated ${upserted} industry templates`);
-  return { upserted };
+  seedIndustryTemplatesAt = Date.now();
+  seedIndustryTemplatesPromise = (async () => {
+    const seeds = getAllSeedManifests();
+    let upserted = 0;
+
+    for (const manifest of seeds) {
+      const parsed = industryTemplateManifestSchema.safeParse(manifest);
+      if (!parsed.success) {
+        console.error(`[templates] invalid seed ${manifest.slug}:`, parsed.error.flatten());
+        continue;
+      }
+      const m = parsed.data;
+      await prisma.industryTemplate.upsert({
+        where: { slug: m.slug },
+        create: {
+          slug: m.slug,
+          name: m.name,
+          description: m.description || null,
+          category: (getSeedCategory(m.slug) as string) || null,
+          version: 1,
+          schemaVersion: m.schemaVersion,
+          isPublished: true,
+          isSystem: true,
+          isMarketplace: true,
+          authorName: "Massive Mentor",
+          manifest: m as object,
+          packageHash: packageHash(m),
+        },
+        update: {
+          name: m.name,
+          description: m.description || null,
+          category: getSeedCategory(m.slug) || null,
+          schemaVersion: m.schemaVersion,
+          isPublished: true,
+          isSystem: true,
+          isMarketplace: true,
+          manifest: m as object,
+          packageHash: packageHash(m),
+          // bump version only when hash changes — handled below
+        },
+      });
+      upserted++;
+    }
+
+    console.log(`[templates] seeded/updated ${upserted} industry templates`);
+    return { upserted };
+  })().catch((err) => {
+    seedIndustryTemplatesPromise = null;
+    seedIndustryTemplatesAt = 0;
+    throw err;
+  });
+
+  return seedIndustryTemplatesPromise;
 }
 
 function getSeedCategory(slug: string): string | null {
@@ -304,19 +329,15 @@ export async function ensureBusinessConfig(
   userId?: string | null,
   preferredSlug?: string | null
 ) {
-  // Ensure seeds exist
-  await seedIndustryTemplates();
-
   const existing = await prisma.businessConfig.findUnique({ where: { businessId } });
   if (existing) {
-    // Keep role portals production-ready without replacing field customizations
-    try {
-      await syncRoleShellFromTemplate(businessId);
-    } catch (err) {
-      console.error("[templates] syncRoleShellFromTemplate failed:", err);
-    }
-    return prisma.businessConfig.findUniqueOrThrow({ where: { businessId } });
+    // Config already present — do not re-seed industry templates or rewrite portals
+    // on every dashboard request (was adding ~1s per hit).
+    return existing;
   }
+
+  // First-time provision only
+  await seedIndustryTemplates();
 
   const slug = preferredSlug && getSeedManifestBySlug(preferredSlug) ? preferredSlug : "generic";
   await provisionTemplateToBusiness({

@@ -728,8 +728,10 @@ export async function refreshFollowupEngine(
         },
       });
     } else {
-      const created = await prisma.aiRecommendation.create({
-        data: {
+      // Upsert avoids P2002 races when concurrent refreshes share a fingerprint
+      const created = await prisma.aiRecommendation.upsert({
+        where: { userId_fingerprint: { userId, fingerprint: fp } },
+        create: {
           userId,
           businessId,
           entityType: c.entityType,
@@ -749,6 +751,20 @@ export async function refreshFollowupEngine(
           metadata: c.metadata as object,
           lastSignalAt: now,
           expiresAt: new Date(now.getTime() + 14 * DAY_MS),
+        },
+        update: {
+          title: c.title,
+          reason: c.reason,
+          priority: c.priority,
+          urgency: c.urgency,
+          confidence: c.confidence,
+          rankScore: c.rankScore,
+          metadata: c.metadata as object,
+          lastSignalAt: now,
+          status: "active",
+          contactId: c.contactId ?? null,
+          dealId: c.dealId ?? null,
+          businessId,
         },
       });
 
