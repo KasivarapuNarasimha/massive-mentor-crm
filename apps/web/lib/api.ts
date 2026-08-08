@@ -519,9 +519,18 @@ class ApiClient {
     });
   }
 
-  /** Persist appearance preference (light | dark | system) */
+  /** Persist appearance preference (light | dark | system) — CRM customer token */
   async patchThemePreference(theme: string, token: string) {
     return this.request<{ themePreference: string }>("/auth/theme", {
+      method: "PATCH",
+      body: JSON.stringify({ theme }),
+      token,
+    });
+  }
+
+  /** Super Admin portal — same User.themePreference, platform JWT */
+  async platformPatchThemePreference(theme: string, token: string) {
+    return this.request<{ themePreference: string }>("/platform/auth/theme", {
       method: "PATCH",
       body: JSON.stringify({ theme }),
       token,
@@ -1978,7 +1987,13 @@ class ApiClient {
   // —— Super Admin platform APIs (portal=admin JWT only) ——
   async platformLogin(email: string, password: string) {
     return this.request<{
-      user: { id: string; email: string; name: string | null; platformRole?: string };
+      user: {
+        id: string;
+        email: string;
+        name: string | null;
+        platformRole?: string;
+        themePreference?: string;
+      };
       token: string;
       portal: "admin";
     }>("/platform/auth/login", {
@@ -1988,10 +2003,16 @@ class ApiClient {
   }
 
   async platformMe(token: string) {
-    return this.get<{ user: { id: string; email: string; platformRole?: string }; portal: string }>(
-      "/platform/auth/me",
-      token
-    );
+    return this.get<{
+      user: {
+        id: string;
+        email: string;
+        name?: string | null;
+        platformRole?: string;
+        themePreference?: string;
+      };
+      portal: string;
+    }>("/platform/auth/me", token);
   }
 
   async platformAnalytics(token: string) {

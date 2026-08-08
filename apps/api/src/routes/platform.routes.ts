@@ -21,6 +21,7 @@ router.post("/auth/reset-password", passwordResetLimiter, resetPasswordWithToken
 
 // All management routes require Super Admin JWT (portal=admin)
 router.get("/auth/me", requirePlatformAdmin, ctrl.platformMe);
+router.patch("/auth/theme", requirePlatformAdmin, ctrl.platformUpdateTheme);
 
 router.get("/analytics", requirePlatformAdmin, ctrl.analytics);
 router.get("/revenue", requirePlatformAdmin, ctrl.revenueDashboard);

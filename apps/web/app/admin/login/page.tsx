@@ -36,6 +36,15 @@ export default function SuperAdminLoginPage() {
       localStorage.setItem(PORTAL_USER_KEYS.admin, JSON.stringify(res.data.user));
       localStorage.removeItem(PORTAL_TOKENS.customer);
       localStorage.removeItem("massive_mentor_demo_mode");
+      // Seed next-themes storage; ThemeSync applies on portal load (same as CRM)
+      try {
+        const pref = (res.data.user as { themePreference?: string })?.themePreference;
+        if (pref === "light" || pref === "dark" || pref === "system") {
+          localStorage.setItem("massive_mentor_theme", pref);
+        }
+      } catch {
+        /* ignore */
+      }
       toast.success("Signed in to Super Admin");
       router.push("/admin");
     } else {

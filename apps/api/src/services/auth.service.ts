@@ -390,6 +390,9 @@ export async function loginPlatformAdmin(input: LoginInput): Promise<AuthRespons
       name: user.name,
       role: user.role,
       platformRole: user.platformRole,
+      themePreference: normalizeThemePreference(
+        (user as { themePreference?: string }).themePreference
+      ),
     },
     token,
     portal: "admin",

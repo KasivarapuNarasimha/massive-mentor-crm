@@ -4,7 +4,44 @@ import { useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { PORTAL_TOKENS, PORTAL_USER_KEYS } from "@/lib/portal-config";
 import { THEME_STORAGE_KEY, normalizeTheme, type ThemePreference } from "@/lib/theme";
+
+/** Prefer CRM token; fall back to Super Admin platform token. */
+function resolveAuthToken(crmToken: string | null | undefined): {
+  token: string | null;
+  portal: "customer" | "admin";
+} {
+  if (crmToken) return { token: crmToken, portal: "customer" };
+  if (typeof window === "undefined") return { token: null, portal: "customer" };
+  try {
+    const admin = localStorage.getItem(PORTAL_TOKENS.admin);
+    if (admin) return { token: admin, portal: "admin" };
+  } catch {
+    /* ignore */
+  }
+  return { token: null, portal: "customer" };
+}
+
+function writeThemeToUserStore(pref: ThemePreference, portal: "customer" | "admin") {
+  const key = portal === "admin" ? PORTAL_USER_KEYS.admin : PORTAL_USER_KEYS.customer;
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      const parsed = JSON.parse(stored) as Record<string, unknown>;
+      parsed.themePreference = pref;
+      localStorage.setItem(key, JSON.stringify(parsed));
+    }
+  } catch {
+    /* ignore */
+  }
+  // Always keep shared next-themes key in sync
+  try {
+    localStorage.setItem(THEME_STORAGE_KEY, pref);
+  } catch {
+    /* ignore */
+  }
+}
 
 const OPTIONS: {
   value: ThemePreference;
@@ -96,27 +133,18 @@ function ThemeIcon({ preference }: { preference: ThemePreference }) {
   );
 }
 
-function persistTheme(pref: ThemePreference, token: string | null) {
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, pref);
-  } catch {
-    /* ignore */
-  }
+function persistTheme(pref: ThemePreference, crmToken: string | null) {
+  const { token, portal } = resolveAuthToken(crmToken);
+  writeThemeToUserStore(pref, portal);
   if (!token) return;
-  void api
-    .patchThemePreference(pref, token)
+  const req =
+    portal === "admin"
+      ? api.platformPatchThemePreference(pref, token)
+      : api.patchThemePreference(pref, token);
+  void req
     .then((res) => {
       if (!res.success) return;
-      try {
-        const stored = localStorage.getItem("massive_mentor_user");
-        if (stored) {
-          const parsed = JSON.parse(stored) as Record<string, unknown>;
-          parsed.themePreference = pref;
-          localStorage.setItem("massive_mentor_user", JSON.stringify(parsed));
-        }
-      } catch {
-        /* ignore */
-      }
+      writeThemeToUserStore(pref, portal);
     })
     .catch(() => {
       /* keep local */

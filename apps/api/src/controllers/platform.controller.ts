@@ -23,13 +23,54 @@ export async function platformLogin(req: AuthenticatedRequest, res: Response) {
 
 export async function platformMe(req: AuthenticatedRequest, res: Response) {
   if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
-  res.json({
-    success: true,
-    data: {
-      user: req.user,
-      portal: "admin",
-    },
-  });
+  try {
+    const { getUserById } = await import("../services/auth.service.js");
+    const profile = await getUserById(req.user.id);
+    if (!profile) {
+      return res.status(404).json({ success: false, error: "User not found" });
+    }
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          role: profile.role,
+          platformRole: profile.platformRole || "super_admin",
+          themePreference: profile.themePreference,
+        },
+        portal: "admin",
+      },
+    });
+  } catch {
+    res.json({
+      success: true,
+      data: {
+        user: req.user,
+        portal: "admin",
+      },
+    });
+  }
+}
+
+/** PATCH /api/platform/auth/theme — Super Admin appearance (same User.themePreference as CRM) */
+export async function platformUpdateTheme(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const { updateUserThemePreference } = await import("../services/auth.service.js");
+    const themePreference = await updateUserThemePreference(
+      req.user.id,
+      req.body?.theme ?? req.body?.themePreference
+    );
+    res.json({ success: true, data: { themePreference } });
+  } catch (error) {
+    console.error("[platform] updateTheme:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to save theme preference",
+    });
+  }
 }
 
 export async function listBusinesses(req: AuthenticatedRequest, res: Response) {

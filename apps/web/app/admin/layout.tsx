@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PORTAL_TOKENS, PORTAL_USER_KEYS } from "@/lib/portal-config";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 const NAV = [
   { href: "/admin", label: "Overview" },
@@ -16,6 +17,7 @@ const NAV = [
   { href: "/admin/support", label: "Support" },
   { href: "/admin/monitoring", label: "Monitoring" },
   { href: "/admin/backups", label: "Backups" },
+  { href: "/admin/appearance", label: "Appearance" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -68,21 +70,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-dvh bg-background text-foreground flex">
-      <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-background sticky top-0 h-dvh">
+      <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card sticky top-0 h-dvh">
         <div className="p-5 border-b border-border">
-          <div className="text-xs uppercase tracking-widest text-violet-400/90 mb-1">Platform</div>
-          <div className="font-semibold">Super Admin</div>
+          <div className="text-xs uppercase tracking-widest text-violet-500 dark:text-violet-400/90 mb-1">
+            Platform
+          </div>
+          <div className="font-semibold text-foreground">Super Admin</div>
           <div className="text-xs text-muted-foreground mt-1 truncate">{email}</div>
         </div>
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {NAV.map((item) => {
-            const active = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
+            const active =
+              pathname === item.href ||
+              (item.href !== "/admin" && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`block px-3 py-2.5 rounded-xl text-sm ${
-                  active ? "bg-violet-500/15 text-violet-200" : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                className={`block px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                  active
+                    ? "bg-violet-500/15 text-violet-700 dark:text-violet-200 font-medium"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 {item.label}
@@ -90,11 +98,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             );
           })}
         </nav>
-        <div className="p-3 border-t border-border">
+        <div className="p-3 border-t border-border space-y-2">
+          <ThemeToggle className="w-full" showLabel />
           <button
             type="button"
             onClick={logout}
-            className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-950/40"
+            className="w-full text-left px-3 py-2.5 rounded-xl text-sm text-red-600 dark:text-red-400 hover:bg-red-500/10"
           >
             Sign out
           </button>
@@ -103,25 +112,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       <div className="flex-1 min-w-0 flex flex-col">
         <header className="lg:hidden sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur px-3 py-3 flex items-center justify-between gap-2">
-          <div className="font-semibold text-sm">Super Admin</div>
-          <button type="button" onClick={logout} className="text-xs text-red-400 px-2 py-1">
-            Sign out
-          </button>
+          <div className="font-semibold text-sm text-foreground">Super Admin</div>
+          <div className="flex items-center gap-1">
+            <ThemeToggle showLabel={false} />
+            <button
+              type="button"
+              onClick={logout}
+              className="text-xs text-red-600 dark:text-red-400 px-2 py-1"
+            >
+              Sign out
+            </button>
+          </div>
         </header>
-        <nav className="lg:hidden flex gap-1 overflow-x-auto px-2 py-2 border-b border-border text-xs">
+        <nav className="lg:hidden flex gap-1 overflow-x-auto px-2 py-2 border-b border-border text-xs bg-card">
           {NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={`shrink-0 px-3 py-2 rounded-lg ${
-                pathname === item.href ? "bg-violet-500/20 text-violet-200" : "text-muted-foreground"
+                pathname === item.href
+                  ? "bg-violet-500/20 text-violet-700 dark:text-violet-200"
+                  : "text-muted-foreground"
               }`}
             >
               {item.label}
             </Link>
           ))}
         </nav>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden">{children}</main>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden bg-background">
+          {children}
+        </main>
       </div>
     </div>
   );

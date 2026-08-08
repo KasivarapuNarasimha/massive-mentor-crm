@@ -11,6 +11,7 @@ import React, {
 import { ThemeProvider as NextThemesProvider, useTheme as useNextTheme } from "next-themes";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { PORTAL_TOKENS, PORTAL_USER_KEYS } from "@/lib/portal-config";
 
 export type ThemePreference = "light" | "dark" | "system";
 
@@ -48,7 +49,7 @@ export function ThemeSync({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Apply theme from cached user (login payload / localStorage user)
+  // Apply theme from cached CRM user (login payload / localStorage user)
   useEffect(() => {
     if (!mounted || !user) return;
     const pref = normalizeTheme(
@@ -62,7 +63,68 @@ export function ThemeSync({ children }: { children: React.ReactNode }) {
     }
   }, [mounted, user, theme, setTheme]);
 
-  // Refresh from /me so DB always wins after login
+  // Super Admin portal: apply theme from platform user store + /platform/auth/me
+  useEffect(() => {
+    if (!mounted || user) return; // CRM session owns theme when customer auth is active
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const adminToken = localStorage.getItem(PORTAL_TOKENS.admin);
+        if (!adminToken) return;
+
+        // 1) Cached login payload
+        try {
+          const raw = localStorage.getItem(PORTAL_USER_KEYS.admin);
+          if (raw) {
+            const parsed = JSON.parse(raw) as {
+              id?: string;
+              themePreference?: string;
+            };
+            const pref = normalizeTheme(parsed.themePreference);
+            const key = `admin:${parsed.id || "x"}:${pref}`;
+            if (appliedFromDb.current !== key) {
+              appliedFromDb.current = key;
+              setTheme(pref);
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+
+        // 2) Refresh from platform /me (DB wins)
+        const res = await api.platformMe(adminToken);
+        if (cancelled || !res.success || !res.data?.user) return;
+        const pref = normalizeTheme(
+          (res.data.user as { themePreference?: string }).themePreference
+        );
+        const uid = (res.data.user as { id?: string }).id || "admin";
+        const key = `admin:${uid}:${pref}`;
+        if (appliedFromDb.current === key) return;
+        appliedFromDb.current = key;
+        setTheme(pref);
+        try {
+          const stored = localStorage.getItem(PORTAL_USER_KEYS.admin);
+          if (stored) {
+            const parsed = JSON.parse(stored) as Record<string, unknown>;
+            parsed.themePreference = pref;
+            localStorage.setItem(PORTAL_USER_KEYS.admin, JSON.stringify(parsed));
+          }
+          localStorage.setItem(THEME_STORAGE_KEY, pref);
+        } catch {
+          /* ignore */
+        }
+      } catch {
+        /* offline / not on admin */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, user]);
+
+  // Refresh from CRM /me so DB always wins after login
   useEffect(() => {
     if (!mounted || !token || !user) return;
     let cancelled = false;
@@ -106,6 +168,7 @@ export function ThemeSync({ children }: { children: React.ReactNode }) {
       } catch {
         /* ignore */
       }
+      // CRM customer session
       if (token) {
         void api
           .patchThemePreference(pref, token)
@@ -125,6 +188,34 @@ export function ThemeSync({ children }: { children: React.ReactNode }) {
           .catch(() => {
             /* keep local */
           });
+        return;
+      }
+      // Super Admin platform session
+      try {
+        const adminToken = localStorage.getItem(PORTAL_TOKENS.admin);
+        if (adminToken) {
+          void api
+            .platformPatchThemePreference(pref, adminToken)
+            .then((res) => {
+              if (!res.success) return;
+              try {
+                const stored = localStorage.getItem(PORTAL_USER_KEYS.admin);
+                if (stored) {
+                  const parsed = JSON.parse(stored) as Record<string, unknown>;
+                  parsed.themePreference = pref;
+                  localStorage.setItem(
+                    PORTAL_USER_KEYS.admin,
+                    JSON.stringify(parsed)
+                  );
+                }
+              } catch {
+                /* ignore */
+              }
+            })
+            .catch(() => undefined);
+        }
+      } catch {
+        /* ignore */
       }
     },
     [setTheme, token]
