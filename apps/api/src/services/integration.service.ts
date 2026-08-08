@@ -740,7 +740,8 @@ export async function sendWhatsAppMessage(
   } catch (err) {
     // Invalid / missing Cloud credentials → never hard-fail; open Basic Mode
     const msg = err instanceof Error ? err.message : String(err);
-    if (/not configured|inactive|invalid|token/i.test(msg)) {
+    const { isCloudApiCredentialError } = await import("./whatsapp-mode.service.js");
+    if (isCloudApiCredentialError(msg)) {
       const basic = await prepareBasicWhatsAppOpen(userId, {
         contactId: opts?.contactId,
         to,
@@ -755,7 +756,25 @@ export async function sendWhatsAppMessage(
         fallbackFromEnterprise: true,
       };
     }
-    throw err;
+    // Any enterprise send failure → Basic handoff (user can still message)
+    try {
+      const basic = await prepareBasicWhatsAppOpen(userId, {
+        contactId: opts?.contactId,
+        to,
+        message: body || "Hello",
+      });
+      return {
+        success: true,
+        mode: "basic" as const,
+        status: "pending_customer_send",
+        basic,
+        uiHint: "Opening WhatsApp...",
+        fallbackFromEnterprise: true,
+        enterpriseError: msg,
+      };
+    } catch {
+      throw err;
+    }
   }
 }
 

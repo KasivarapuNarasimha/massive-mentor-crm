@@ -24,6 +24,38 @@ function digitsPhone(phone: string): string {
   return String(phone || "").replace(/\D/g, "");
 }
 
+/**
+ * Normalize Indian/local numbers for wa.me (E.164 digits, no +).
+ * Examples: "97037 12771" → "919703712771", "+91 7729878774" → "917729878774"
+ * Returns null if not a usable WhatsApp number.
+ */
+export function normalizeWhatsAppPhone(phone: string): string | null {
+  let digits = digitsPhone(phone);
+  if (!digits) return null;
+  // Strip leading zeros (0XXXXXXXXXX local)
+  digits = digits.replace(/^0+/, "");
+  if (!digits) return null;
+  // 10-digit Indian mobile (starts 6–9)
+  if (digits.length === 10 && /^[6-9]/.test(digits)) {
+    return `91${digits}`;
+  }
+  // Already country-coded (e.g. 91 + 10 digits)
+  if (digits.length >= 11 && digits.length <= 15) {
+    return digits;
+  }
+  // 11–12 digit with accidental leading 91 / 0 already stripped
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits;
+  }
+  return null;
+}
+
+export function isCloudApiCredentialError(message: string): boolean {
+  return /not configured|inactive|invalid|token|oauth|unauthorized|access token|phone number id|graph api|\b190\b|permission|expired|credentials|authentication/i.test(
+    String(message || "")
+  );
+}
+
 export async function isEnterpriseCloudConnected(userId: string): Promise<boolean> {
   const int =
     (await getWhatsAppIntegrationForTenant(userId)) ||
@@ -106,12 +138,10 @@ export async function setPreferredWhatsAppMode(
 }
 
 export function buildWaMeUrl(phone: string, message: string): string {
-  const digits = digitsPhone(phone);
-  // India 10-digit local → prefix 91
-  const e164 =
-    digits.length === 10 && !digits.startsWith("0")
-      ? `91${digits}`
-      : digits.replace(/^0+/, "");
+  const e164 = normalizeWhatsAppPhone(phone);
+  if (!e164) {
+    throw new Error("This lead does not have a valid WhatsApp number.");
+  }
   const text = encodeURIComponent(message || "");
   return `https://wa.me/${e164}?text=${text}`;
 }
@@ -130,9 +160,9 @@ export async function prepareBasicWhatsAppOpen(
   }
 ) {
   const businessId = await getUserBusinessId(userId);
-  const phone = digitsPhone(opts.to);
-  if (phone.length < 10) {
-    throw new Error("Contact has no valid phone number for WhatsApp");
+  const phone = normalizeWhatsAppPhone(opts.to);
+  if (!phone) {
+    throw new Error("This lead does not have a valid WhatsApp number.");
   }
 
   const message = String(opts.message || "").trim() || "Hello";

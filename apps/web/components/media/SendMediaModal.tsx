@@ -530,7 +530,9 @@ export function SendMediaModal({
         token
       );
       if (sent) {
-        toast.success("WhatsApp Sent (Manual)", { description: contactName });
+        toast.success("WhatsApp Sent (Manual)", {
+          description: "Message marked as manually sent.",
+        });
       } else {
         toast.message("Marked as not sent");
       }
@@ -541,13 +543,84 @@ export function SendMediaModal({
     }
   };
 
+  /** Client-side wa.me builder (mirrors API Basic Mode) when server omits waUrl. */
+  const buildClientWaUrl = (phone: string, message: string): string | null => {
+    let digits = String(phone || "").replace(/\D/g, "").replace(/^0+/, "");
+    if (!digits) return null;
+    if (digits.length === 10 && /^[6-9]/.test(digits)) digits = `91${digits}`;
+    if (digits.length < 11 || digits.length > 15) return null;
+    return `https://wa.me/${digits}?text=${encodeURIComponent(message || "Hello")}`;
+  };
+
+  const enterBasicHandoff = (opts: {
+    waUrl?: string;
+    phone?: string;
+    logIds?: string[];
+    contactId?: string | null;
+    files?: Array<{ assetId: string; name: string; downloadPath: string }>;
+  }) => {
+    const files =
+      opts.files && opts.files.length
+        ? opts.files
+        : [...selected].map((id) => {
+            const a =
+              assets.find((x) => x.id === id) || suggestions.find((x) => x.id === id);
+            return {
+              assetId: id,
+              name: a?.name || id,
+              downloadPath: `/media/assets/${id}/file`,
+            };
+          });
+    const msg =
+      (typeof caption === "string" && caption.trim()) ||
+      previewWithSignature ||
+      "Hello";
+    const phoneDigits =
+      opts.phone ||
+      String(contactPhone || "")
+        .replace(/\D/g, "")
+        .replace(/^0+/, "");
+    const waUrl =
+      opts.waUrl ||
+      buildClientWaUrl(contactPhone || phoneDigits, msg) ||
+      "";
+    if (waUrl) {
+      window.open(waUrl, "_blank", "noopener,noreferrer");
+    }
+    toast.message("WhatsApp opened", {
+      description:
+        "Your personalized message is ready. Attach the downloaded file and press Send in WhatsApp.",
+    });
+    setBasicPhase({
+      waUrl,
+      phone: phoneDigits,
+      logIds: opts.logIds || [],
+      contactId: opts.contactId ?? contactId,
+      files,
+    });
+    for (const id of selected) {
+      const a = assets.find((x) => x.id === id) || suggestions.find((x) => x.id === id);
+      if (a) {
+        void cacheMediaOffline({
+          id: a.id,
+          name: a.name,
+          originalName: a.name,
+          mimeType: "application/octet-stream",
+          kind: a.kind,
+          sizeBytes: a.sizeBytes || 0,
+        });
+      }
+    }
+  };
+
   const send = async () => {
     if (selected.size === 0) {
       toast.error("Select at least one file");
       return;
     }
-    if (!contactPhone || contactPhone.replace(/\D/g, "").length < 10) {
-      toast.error("Lead has no valid phone for WhatsApp");
+    const phoneCheck = buildClientWaUrl(contactPhone || "", "x");
+    if (!contactPhone || !phoneCheck) {
+      toast.error("This lead does not have a valid WhatsApp number.");
       return;
     }
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -577,6 +650,7 @@ export function SendMediaModal({
           sent?: number;
           failed?: number;
           uiHint?: string;
+          results?: Array<{ ok?: boolean; status?: string; error?: string }>;
           basic?: {
             waUrl?: string;
             phone?: string;
@@ -586,56 +660,42 @@ export function SendMediaModal({
           };
         };
 
-        // Basic Mode: open wa.me — never show Failed for missing Cloud API
-        if (d.mode === "basic" || d.basic?.waUrl) {
-          const waUrl = d.basic?.waUrl;
-          const files =
-            d.basic?.files ||
-            [...selected].map((id) => {
-              const a =
-                assets.find((x) => x.id === id) ||
-                suggestions.find((x) => x.id === id);
-              return {
-                assetId: id,
-                name: a?.name || id,
-                downloadPath: `/media/assets/${id}/file`,
-              };
-            });
-          if (waUrl) {
-            window.open(waUrl, "_blank", "noopener,noreferrer");
-          }
-          toast.message(d.uiHint || "Opening WhatsApp...", {
-            description: contactName,
-          });
-          setBasicPhase({
-            waUrl: waUrl || "",
-            phone: d.basic?.phone || contactPhone.replace(/\D/g, ""),
-            logIds: d.basic?.logIds || [],
+        const sentCount = Number(d.sent ?? 0);
+        const failedCount = Number(d.failed ?? 0);
+        const results = d.results || [];
+        const allFailed =
+          results.length > 0
+            ? results.every((r) => r.ok === false || r.status === "failed")
+            : failedCount > 0 && sentCount === 0;
+        const pendingManual =
+          results.some((r) => r.status === "pending_customer_send") ||
+          d.uiHint === "Opening WhatsApp...";
+
+        // Basic Mode / failed Cloud handoff — never show "Sent 0 / 1 failed"
+        if (
+          d.mode === "basic" ||
+          d.basic?.waUrl ||
+          pendingManual ||
+          (sentCount === 0 && (failedCount > 0 || allFailed))
+        ) {
+          enterBasicHandoff({
+            waUrl: d.basic?.waUrl,
+            phone: d.basic?.phone,
+            logIds: d.basic?.logIds,
             contactId: d.basic?.contactId ?? contactId,
-            files,
+            files: d.basic?.files,
           });
-          for (const id of selected) {
-            const a =
-              assets.find((x) => x.id === id) || suggestions.find((x) => x.id === id);
-            if (a) {
-              void cacheMediaOffline({
-                id: a.id,
-                name: a.name,
-                originalName: a.name,
-                mimeType: "application/octet-stream",
-                kind: a.kind,
-                sizeBytes: a.sizeBytes || 0,
-              });
-            }
-          }
           return;
         }
 
-        toast.success(`Sent ${d.sent ?? selected.size} file(s) via WhatsApp`, {
-          description: d.failed ? `${d.failed} failed` : contactName,
-        });
+        // Enterprise automatic success
+        toast.success(
+          `Sent ${sentCount || selected.size} file(s) via WhatsApp`,
+          { description: contactName }
+        );
         for (const id of selected) {
-          const a = assets.find((x) => x.id === id) || suggestions.find((x) => x.id === id);
+          const a =
+            assets.find((x) => x.id === id) || suggestions.find((x) => x.id === id);
           if (a) {
             void cacheMediaOffline({
               id: a.id,
@@ -649,13 +709,21 @@ export function SendMediaModal({
         }
         onClose();
       } else {
-        // Prefer soft messaging — never surface Cloud API setup failure as "Failed"
         const err = (res as { error?: string }).error || "";
-        if (/not configured|access token|phone number id|cloud api/i.test(err)) {
-          toast.message("Opening WhatsApp...");
-        } else {
-          toast.error(err || "Could not open WhatsApp");
+        if (
+          /not configured|access token|phone number id|cloud api|inactive|invalid.?token/i.test(
+            err
+          )
+        ) {
+          // Cloud missing — still open Basic Mode client-side
+          enterBasicHandoff({});
+          return;
         }
+        if (/valid WhatsApp number|no valid phone|phone number/i.test(err)) {
+          toast.error("This lead does not have a valid WhatsApp number.");
+          return;
+        }
+        toast.error(err || "Could not open WhatsApp");
       }
     } finally {
       setSending(false);

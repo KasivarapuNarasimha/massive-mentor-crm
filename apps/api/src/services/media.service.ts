@@ -1057,9 +1057,11 @@ export async function sendMediaViaWhatsApp(
     }));
   if (!contactRow) throw new Error("Lead/Client not found");
 
-  const phone = (contactRow.phone || contactRow.whatsapp || "").replace(/[^\d+]/g, "");
-  if (phone.replace(/\D/g, "").length < 10) {
-    throw new Error("Contact has no valid phone number for WhatsApp");
+  const rawPhone = String(contactRow.phone || contactRow.whatsapp || "").trim();
+  const { normalizeWhatsAppPhone } = await import("./whatsapp-mode.service.js");
+  const phone = normalizeWhatsAppPhone(rawPhone);
+  if (!phone) {
+    throw new Error("This lead does not have a valid WhatsApp number.");
   }
 
   const actor = await prisma.user.findUnique({
@@ -1112,26 +1114,31 @@ export async function sendMediaViaWhatsApp(
   });
 
   // ── Basic Mode (default when Cloud API not connected / preferred basic) ──
-  const { resolveWhatsAppMode, prepareBasicWhatsAppOpen } = await import(
-    "./whatsapp-mode.service.js"
-  );
-  const modeInfo = await resolveWhatsAppMode(userId);
-  if (modeInfo.mode === "basic") {
-    const message =
-      baseCaption ||
-      renderTemplate(ordered[0]?.captionDefault || "", templateVars) ||
-      "Hello";
+  const {
+    resolveWhatsAppMode,
+    prepareBasicWhatsAppOpen,
+    isCloudApiCredentialError,
+  } = await import("./whatsapp-mode.service.js");
+
+  const basicMessage =
+    baseCaption ||
+    renderTemplate(ordered[0]?.captionDefault || "", templateVars) ||
+    "Hello";
+  const basicFiles = ordered.map((a) => ({
+    assetId: a.id,
+    assetName: a.originalName || a.name,
+  }));
+
+  const returnBasicHandoff = async (fallbackFromEnterprise = false) => {
     const basic = await prepareBasicWhatsAppOpen(userId, {
       contactId: contactRow.id,
       to: phone,
-      message,
-      files: ordered.map((a) => ({
-        assetId: a.id,
-        assetName: a.originalName || a.name,
-      })),
+      message: basicMessage,
+      files: basicFiles,
     });
     return {
       mode: "basic" as const,
+      // Do not report Cloud failures as send failures — Basic Mode is a successful handoff
       sent: 0,
       failed: 0,
       results: ordered.map((a) => ({
@@ -1143,7 +1150,13 @@ export async function sendMediaViaWhatsApp(
       contact: { id: contactRow.id, name: contactRow.name, phone },
       basic,
       uiHint: "Opening WhatsApp...",
+      fallbackFromEnterprise: fallbackFromEnterprise || undefined,
     };
+  };
+
+  const modeInfo = await resolveWhatsAppMode(userId);
+  if (modeInfo.mode === "basic") {
+    return returnBasicHandoff(false);
   }
 
   const results: Array<{
@@ -1243,6 +1256,32 @@ export async function sendMediaViaWhatsApp(
   }
 
   const sent = results.filter((r) => r.ok).length;
+  const failed = results.length - sent;
+
+  // Enterprise Cloud failed completely → Basic Mode handoff (never surface "1 failed")
+  if (sent === 0 && results.length > 0) {
+    const cloudErrors = results.some((r) =>
+      isCloudApiCredentialError(r.error || "")
+    );
+    // Prefer Basic handoff for credential/config issues; also when every file failed
+    // so media send never dead-ends users without Cloud API.
+    if (cloudErrors || results.every((r) => !r.ok)) {
+      // Mark failed logs as superseded by basic handoff when credential-related
+      if (businessId) {
+        const failIds = results.map((r) => r.logId).filter(Boolean) as string[];
+        if (failIds.length) {
+          await prisma.mediaSendLog
+            .updateMany({
+              where: { id: { in: failIds }, businessId },
+              data: { status: "pending_customer_send", error: null },
+            })
+            .catch(() => undefined);
+        }
+      }
+      return returnBasicHandoff(true);
+    }
+  }
+
   await recordAudit({
     businessId,
     actorUserId: userId,
@@ -1253,16 +1292,17 @@ export async function sendMediaViaWhatsApp(
       contactName: contactRow.name,
       to: phone,
       sent,
-      failed: results.length - sent,
+      failed,
       assets: results,
       kitId: opts.kitId || null,
+      mode: "enterprise",
     },
   });
 
   return {
     mode: "enterprise" as const,
     sent,
-    failed: results.length - sent,
+    failed,
     results,
     contact: { id: contactRow.id, name: contactRow.name, phone },
   };
