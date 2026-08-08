@@ -917,7 +917,9 @@ model Contact {
   phone           String?
   company         String?
   source          String?
-  value           Decimal? @db.Decimal(18, 2) // potential or lifetime value
+  value           Decimal? @db.Decimal(18, 2) // potential or lifetime value (CRM only — not auto-Finance)
+  /// not_revenue | expected | received — explicit intent for Finance; never auto-infer from value alone
+  financialStatus String?
   description     String?  @db.Text
   lastContactedAt DateTime?
 
@@ -1432,14 +1434,21 @@ model Invoice {
   dueDate     DateTime?
   paidAt      DateTime?
   notes       String?   @db.Text
+  /// CRM link: deal | client | null (manual). Used for idempotent upsert + UI source label.
+  sourceType  String?
+  /// Deal id or Contact id when sourceType is set
+  sourceId    String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   payments    Payment[]
 
   @@unique([businessId, number])
+  /// One Finance revenue document per CRM source (prevents Deal+Client double count)
+  @@unique([businessId, sourceType, sourceId])
   @@index([businessId, status])
   @@index([userId])
   @@index([dueDate])
+  @@index([businessId, sourceType, sourceId])
 }
 
 model Expense {

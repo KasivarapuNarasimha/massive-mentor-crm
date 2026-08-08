@@ -142,6 +142,11 @@ export const contactSchema = z.object({
   company: z.string().optional().or(z.literal("")).nullable(),
   source: z.string().optional().or(z.literal("")).nullable(),
   value: z.number().nonnegative().optional().nullable(),
+  /// not_revenue | expected | received — Finance intent only; does not auto-write Finance
+  financialStatus: z
+    .enum(["not_revenue", "expected", "received"])
+    .optional()
+    .nullable(),
   notes: z.string().max(5000).optional().nullable(),
   description: z.string().max(5000).optional().nullable(),
   // Config-driven attributes (Phase 3 FieldEngine)
@@ -502,6 +507,10 @@ export async function updateContact(
           : parsed.value !== undefined
             ? parsed.value
             : existing.value,
+      financialStatus:
+        parsed.financialStatus !== undefined
+          ? parsed.financialStatus || null
+          : existing.financialStatus,
       description:
         applied.core.description !== undefined
           ? applied.core.description
@@ -1524,6 +1533,13 @@ export async function createDeal(userId: string, input: DealInput) {
       message: `Deal "${deal.title}" was added${deal.value != null ? ` (${deal.value})` : ""}`,
       notifType: "activity",
     });
+    // If created already as Won, record Finance revenue
+    try {
+      const { syncDealWonFinance } = await import("./finance-crm-sync.service.js");
+      await syncDealWonFinance(userId, deal, "lead");
+    } catch (err) {
+      console.error("[createDeal] finance CRM sync failed", err);
+    }
     scheduleFollowupRefresh(userId);
     return deal;
   });
@@ -1606,6 +1622,14 @@ export async function updateDeal(userId: string, id: string, input: Partial<Deal
     } catch (err) {
       console.error("[updateDeal] pipeline sync failed", err);
     }
+  }
+
+  // Finance: Deal Won → paid invoice + payment (idempotent); leave Won → void
+  try {
+    const { syncDealWonFinance } = await import("./finance-crm-sync.service.js");
+    await syncDealWonFinance(userId, updated, existing.stage);
+  } catch (err) {
+    console.error("[updateDeal] finance CRM sync failed", err);
   }
 
   scheduleFollowupRefresh(userId);

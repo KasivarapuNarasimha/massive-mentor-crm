@@ -28,12 +28,16 @@ interface Contact {
   company?: string;
   source?: string;
   value?: number;
+  /** not_revenue | expected | received */
+  financialStatus?: string | null;
   description?: string;
   lastContactedAt?: string;
   customFields?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
+
+type FinancialStatus = "not_revenue" | "expected" | "received";
 
 export default function ClientsPage() {
   const { token, role } = useAuth();
@@ -47,6 +51,13 @@ export default function ClientsPage() {
   const [bizConfig, setBizConfig] = useState<BusinessConfigDTO | null>(null);
   const [templateSlug, setTemplateSlug] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /** Explicit Finance bridge (does not change CRM Client Value meaning) */
+  const [finStatus, setFinStatus] = useState<FinancialStatus>("not_revenue");
+  const [finAmount, setFinAmount] = useState("");
+  const [finDate, setFinDate] = useState("");
+  const [finDealId, setFinDealId] = useState("");
+  const [clientDeals, setClientDeals] = useState<Array<{ id: string; title: string; value?: number | null; stage?: string }>>([]);
+  const [finBusy, setFinBusy] = useState(false);
 
   const fieldDefs: FieldDef[] = useMemo(() => {
     const from = contactFieldsFromConfig(bizConfig);
@@ -108,15 +119,89 @@ export default function ClientsPage() {
     setShowModal(true);
   };
 
-  const openEdit = (client: Contact) => {
+  const openEdit = async (client: Contact) => {
     setEditingClient(client);
     setFormValues(contactToFormValues(fieldDefs, client as unknown as Record<string, unknown>));
+    const fs = (client.financialStatus || "not_revenue") as FinancialStatus;
+    setFinStatus(
+      fs === "expected" || fs === "received" ? fs : "not_revenue"
+    );
+    setFinAmount(
+      client.value != null && Number.isFinite(Number(client.value))
+        ? String(client.value)
+        : ""
+    );
+    setFinDate(new Date().toISOString().slice(0, 10));
+    setFinDealId("");
+    setClientDeals([]);
     setShowModal(true);
+    if (token) {
+      try {
+        const res = await api.getCrmDeals(`?contactId=${encodeURIComponent(client.id)}`, token);
+        const data = res.data as { deals?: Array<{ id: string; title: string; value?: number | null; stage?: string }> } | undefined;
+        if (res.success && data?.deals) {
+          setClientDeals(data.deals);
+          const won = data.deals.find((d) => /won/i.test(String(d.stage || "")));
+          if (won) setFinDealId(won.id);
+        }
+      } catch {
+        /* optional */
+      }
+    }
   };
 
   const closeModal = () => {
     setShowModal(false);
     setEditingClient(null);
+    setClientDeals([]);
+  };
+
+  const handleAddToFinance = async () => {
+    if (!token || !editingClient) return;
+    setFinBusy(true);
+    const amount =
+      finStatus === "received"
+        ? Number(String(finAmount).replace(/,/g, ""))
+        : 0;
+    const res = await api.post(
+      "/finance/crm/client-revenue",
+      {
+        contactId: editingClient.id,
+        financialStatus: finStatus,
+        amount: finStatus === "received" ? amount : undefined,
+        revenueDate: finDate || undefined,
+        dealId: finDealId || undefined,
+        description: `Client: ${editingClient.company || editingClient.name}`,
+      },
+      token
+    );
+    setFinBusy(false);
+    if (res.success) {
+      const d = res.data as {
+        recorded?: boolean;
+        amount?: number;
+        sourceType?: string;
+        message?: string;
+      };
+      if (d?.recorded) {
+        toast.success(
+          `Revenue recorded in Finance (${formatCurrency(d.amount || amount)})`,
+          {
+            description:
+              d.sourceType === "deal"
+                ? "Linked as Deal source (no double count)"
+                : "Source: Client",
+          }
+        );
+      } else {
+        toast.message(d?.message || "Financial status saved");
+      }
+      const { emitDataChanged } = await import("@/lib/data-events");
+      emitDataChanged({ module: "finance", action: "update" });
+      await loadClients();
+    } else {
+      toast.error(friendlyError(res.error, "Could not update Finance."));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -348,7 +433,7 @@ export default function ClientsPage() {
             ) : (
               <div className="mb-4" />
             )}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto space-y-4">
               <DynamicForm
                 formId="client-form"
                 fields={fieldDefs}
@@ -358,6 +443,88 @@ export default function ClientsPage() {
                 statusOptions={statusOptions}
                 disabled={isSubmitting}
               />
+
+              {/* Finance bridge — explicit only; Client Value stays CRM LTV */}
+              {editingClient ? (
+                <div className="rounded-xl border border-border bg-background/60 p-4 space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">Finance</h3>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Client Value is CRM only. Use this section to record actual revenue in Finance
+                      (Finance roles / Admin). Prevents double-counting with Won Deals.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Financial Status</label>
+                    <select
+                      className="w-full mt-1 bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
+                      value={finStatus}
+                      onChange={(e) => setFinStatus(e.target.value as FinancialStatus)}
+                    >
+                      <option value="not_revenue">Not Revenue</option>
+                      <option value="expected">Expected Revenue</option>
+                      <option value="received">Revenue Received</option>
+                    </select>
+                  </div>
+                  {finStatus === "received" && (
+                    <>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Amount</label>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          className="w-full mt-1 bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
+                          value={finAmount}
+                          onChange={(e) => setFinAmount(e.target.value)}
+                          placeholder="e.g. 90000"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">Revenue Date</label>
+                        <input
+                          type="date"
+                          className="w-full mt-1 bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
+                          value={finDate}
+                          onChange={(e) => setFinDate(e.target.value)}
+                        />
+                      </div>
+                      {clientDeals.length > 0 && (
+                        <div>
+                          <label className="text-xs text-muted-foreground">
+                            Linked Deal (optional — preferred if Won)
+                          </label>
+                          <select
+                            className="w-full mt-1 bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
+                            value={finDealId}
+                            onChange={(e) => setFinDealId(e.target.value)}
+                          >
+                            <option value="">— Client only —</option>
+                            {clientDeals.map((d) => (
+                              <option key={d.id} value={d.id}>
+                                {d.title}
+                                {d.value != null ? ` · ${formatCurrency(Number(d.value))}` : ""}
+                                {d.stage ? ` (${d.stage})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    disabled={finBusy}
+                    onClick={() => void handleAddToFinance()}
+                    className="w-full min-h-10 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50"
+                  >
+                    {finBusy
+                      ? "Saving…"
+                      : finStatus === "received"
+                        ? "Add / Update Finance"
+                        : "Save Financial Status"}
+                  </button>
+                </div>
+              ) : null}
             </div>
             <div className="flex gap-3 mt-6">
               <button

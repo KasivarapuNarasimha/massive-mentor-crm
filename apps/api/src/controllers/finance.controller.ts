@@ -185,3 +185,117 @@ export async function deletePayment(req: AuthenticatedRequest, res: Response) {
     res.status(400).json({ success: false, error: msg });
   }
 }
+
+/**
+ * Explicit Client → Finance: only when user selects Revenue Received.
+ * Uses existing Finance role gate (BA / CEO / finance / admin).
+ */
+export async function recordClientRevenue(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    await finance.assertFinanceAccessForCrm(req.user.id);
+
+    const contactId = String(
+      req.body?.contactId || (req.params.id ? paramId(req) : "") || ""
+    ).trim();
+    if (!contactId) {
+      return res.status(400).json({ success: false, error: "contactId is required" });
+    }
+    const amount = Number(req.body?.amount);
+    const financialStatus = String(req.body?.financialStatus || "received").toLowerCase();
+    const dealId = req.body?.dealId ? String(req.body.dealId) : null;
+    const revenueDate = req.body?.revenueDate ? String(req.body.revenueDate) : null;
+    const description = req.body?.description ? String(req.body.description) : null;
+
+    const { prisma } = await import("../lib/prisma.js");
+    const { getUserBusinessId } = await import("../services/field-engine.service.js");
+    const businessId = await getUserBusinessId(req.user.id);
+    const contact = await prisma.contact.findFirst({
+      where: {
+        id: contactId,
+        deletedAt: null,
+        ...(businessId
+          ? { OR: [{ businessId }, { userId: req.user.id }] }
+          : { userId: req.user.id }),
+      },
+    });
+    if (!contact) {
+      return res.status(404).json({ success: false, error: "Client not found" });
+    }
+
+    // Persist financial status on contact (does not change CRM value meaning)
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: {
+        financialStatus:
+          financialStatus === "expected" || financialStatus === "received"
+            ? financialStatus
+            : "not_revenue",
+      },
+    });
+
+    if (financialStatus !== "received") {
+      // Expected / not revenue: do not create payment; optionally void prior client-source revenue
+      if (financialStatus === "not_revenue") {
+        const { voidCrmRevenue } = await import("../services/finance-crm-sync.service.js");
+        await voidCrmRevenue({
+          actorUserId: req.user.id,
+          businessId: contact.businessId,
+          sourceType: "client",
+          sourceId: contact.id,
+        });
+      }
+      return res.json({
+        success: true,
+        data: {
+          recorded: false,
+          financialStatus:
+            financialStatus === "expected" ? "expected" : "not_revenue",
+          message:
+            financialStatus === "expected"
+              ? "Marked as expected revenue (not counted in Finance yet)"
+              : "Not recorded as revenue",
+        },
+      });
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Amount must be greater than zero for Revenue Received",
+      });
+    }
+
+    const { upsertCrmRevenue } = await import("../services/finance-crm-sync.service.js");
+    const result = await upsertCrmRevenue({
+      actorUserId: req.user.id,
+      businessId: contact.businessId,
+      sourceType: "client",
+      sourceId: contact.id,
+      amount,
+      contactId: contact.id,
+      clientName: contact.company || contact.name,
+      description:
+        description ||
+        `Client revenue: ${contact.company || contact.name}`,
+      revenueDate,
+      dealId,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        recorded: true,
+        financialStatus: "received",
+        sourceType: result.sourceType,
+        sourceId: result.sourceId,
+        amount: result.amount,
+        invoiceId: result.invoice?.id,
+        invoiceNumber: result.invoice?.number,
+      },
+    });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Failed";
+    res.status(msg.includes("restricted") ? 403 : 400).json({ success: false, error: msg });
+  }
+}

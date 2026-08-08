@@ -16,5 +16,7 @@ router.delete("/expenses/:id", requireAuth, ctrl.deleteExpense);
 router.get("/payments", requireAuth, ctrl.listPayments);
 router.post("/payments", requireAuth, ctrl.createPayment);
 router.delete("/payments/:id", requireAuth, ctrl.deletePayment);
+/** Explicit Client → Finance (Revenue Received) */
+router.post("/crm/client-revenue", requireAuth, ctrl.recordClientRevenue);
 
 export default router;

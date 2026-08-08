@@ -35,6 +35,10 @@ type Invoice = {
   total: number;
   status: string;
   dueDate: string | null;
+  /** deal | client | null (manual) */
+  sourceType?: string | null;
+  sourceId?: string | null;
+  description?: string | null;
 };
 
 type Expense = {
@@ -403,18 +407,36 @@ export default function FinancePage() {
           </form>
           <input className={inputClass} placeholder="Search invoices…" value={search} onChange={(e) => { setSearch(e.target.value); setInvPage(1); }} />
           <div className="space-y-2">
-            {invoices.map((inv) => (
+            {invoices.map((inv) => {
+              const src =
+                inv.sourceType === "deal"
+                  ? "Deal"
+                  : inv.sourceType === "client"
+                    ? "Client"
+                    : "Manual";
+              return (
               <div key={inv.id} className="flex flex-wrap justify-between gap-2 bg-card border border-border rounded-xl p-3 text-sm">
-                <div>
+                <div className="min-w-0">
                   <div className="font-medium">{inv.number} · {inv.clientName || "—"}</div>
-                  <div className="text-xs text-muted-foreground">{inv.status} · tax {money(inv.taxAmount)}</div>
+                  <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-2 mt-0.5">
+                    <span className="px-1.5 py-0.5 rounded-md bg-white/10 border border-white/10">
+                      Source: {src}
+                    </span>
+                    <span>{inv.status} · tax {money(inv.taxAmount)}</span>
+                  </div>
+                  {inv.description ? (
+                    <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-md">
+                      {inv.description}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold tabular-nums">{money(inv.total)}</span>
                   <button type="button" className="text-xs text-red-400" onClick={() => deleteInvoice(inv.id)}>Delete</button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
           <PaginationBar page={invPage} pageSize={pageSize} total={invTotal} totalPages={invPages} onPageChange={setInvPage} onPageSizeChange={(s) => { setPageSize(s); setInvPage(1); }} />
         </div>

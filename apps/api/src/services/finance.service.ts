@@ -22,7 +22,7 @@ const FINANCE_ROLES = new Set([
   "super_admin",
 ]);
 
-async function assertFinanceAccess(userId: string) {
+export async function assertFinanceAccess(userId: string) {
   const role = await resolveActorRole(userId);
   if (!FINANCE_ROLES.has(role)) {
     throw new Error("Finance module is restricted to Finance, CEO, and Admin roles");
@@ -31,6 +31,9 @@ async function assertFinanceAccess(userId: string) {
   if (!businessId) throw new Error("Business context required");
   return { businessId, role };
 }
+
+/** Alias for CRM → Finance explicit actions */
+export const assertFinanceAccessForCrm = assertFinanceAccess;
 
 /**
  * Business display currency from Business Profile (user), then business owner profile.
@@ -279,6 +282,8 @@ export async function createInvoice(
       status: input.status || "draft",
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
       notes: input.notes || null,
+      sourceType: null,
+      sourceId: null,
     },
   });
 
