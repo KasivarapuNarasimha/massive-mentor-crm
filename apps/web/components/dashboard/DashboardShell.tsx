@@ -21,7 +21,7 @@ import {
 } from "@/lib/plan-entitlements";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { filterNavByModules } from "@/lib/module-permissions";
+import { canAccessPath, filterNavByModules } from "@/lib/module-permissions";
 
 /** Layout chrome heights — keep FieldStatusBar at h-12 (3rem) */
 const NAV_H = "3.5rem"; // h-14
@@ -259,6 +259,15 @@ const crmNavItems: NavItem[] = [
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/dashboard/finance",
+    label: "Finance",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
@@ -652,6 +661,37 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       if (insertAt >= 0) items.splice(insertAt, 0, mediaItem);
       else items.push(mediaItem);
       seenRoutes.add("/dashboard/media");
+    }
+
+    /**
+     * Business Admin / Owner / CEO: restore any implemented module that the member
+     * is granted but missing from a stale portal seed (e.g. Health, SWOT, Finance).
+     * Does NOT expand access for Sales Manager / SE / Marketing / etc.
+     * Appearance + Security stay under Settings (no duplicates).
+     */
+    const fullBusinessRoles = [
+      "ceo",
+      "owner",
+      "business_admin",
+      "admin",
+      "super_admin",
+    ];
+    if (fullBusinessRoles.includes(role)) {
+      const granted = portal.modules || [];
+      const catalog = [...navItems, ...crmNavItems];
+      for (const known of catalog) {
+        if (seenRoutes.has(known.href)) continue;
+        if (known.href === APPEARANCE_HREF) continue;
+        if (known.href === "/dashboard/security") continue;
+        if (!canAccessPath(known.href, granted, { loaded: true })) continue;
+        items.push({
+          key: `${rolePrefix}:mod:${known.href}`,
+          href: known.href,
+          label: known.label,
+          icon: known.icon || DEFAULT_ICON,
+        });
+        seenRoutes.add(known.href);
+      }
     }
 
     // Do not inject Appearance into primary portal menus — it lives under Settings below.
