@@ -38,6 +38,10 @@ const ACTION_LABELS: Record<string, string> = {
   ensure_business: "Business ready",
   sent: "Sent",
   failed: "Failed",
+  whatsapp_opened: "WhatsApp opened",
+  whatsapp_sent_manual: "WhatsApp Sent (Manual)",
+  whatsapp_send_cancelled: "WhatsApp send cancelled",
+  whatsapp_basic_open: "WhatsApp opened",
 };
 
 const FIELD_LABELS: Record<string, string> = {

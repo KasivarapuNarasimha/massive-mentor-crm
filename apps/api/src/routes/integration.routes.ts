@@ -9,6 +9,9 @@ import {
   createCalendarEventHandler,
   validateWhatsAppHandler,
   testWhatsAppConnectionHandler,
+  getWhatsAppModeHandler,
+  setWhatsAppPreferredModeHandler,
+  confirmBasicWhatsAppHandler,
 } from "../controllers/integration.controller.js";
 import { requireAuth } from "../middleware/auth.js";
 
@@ -20,6 +23,9 @@ const router: Router = Router();
 router.get("/", requireAuth, getIntegrations);
 router.post("/configure", requireAuth, configureIntegration);
 router.post("/toggle", requireAuth, toggleIntegrationHandler);
+router.get("/whatsapp/mode", requireAuth, getWhatsAppModeHandler);
+router.post("/whatsapp/preferred-mode", requireAuth, setWhatsAppPreferredModeHandler);
+router.post("/whatsapp/basic/confirm", requireAuth, confirmBasicWhatsAppHandler);
 router.post("/whatsapp/validate", requireAuth, validateWhatsAppHandler);
 router.post("/whatsapp/test-connection", requireAuth, testWhatsAppConnectionHandler);
 router.post("/whatsapp/send", requireAuth, sendWhatsApp);

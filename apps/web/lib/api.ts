@@ -1114,11 +1114,93 @@ class ApiClient {
     token?: string | null
   ) {
     return this.post<{
+      mode?: "basic" | "enterprise";
       sent: number;
       failed: number;
       results: Array<{ assetId: string; assetName: string; ok: boolean; status: string; error?: string }>;
       contact: { id: string; name: string; phone: string };
+      uiHint?: string;
+      basic?: {
+        mode: "basic";
+        status: string;
+        waUrl: string;
+        phone: string;
+        message: string;
+        contactId: string | null;
+        contactName: string | null;
+        logIds: string[];
+        files: Array<{ assetId: string; name: string; downloadPath: string }>;
+        uiHint?: string;
+      };
     }>("/media/send/whatsapp", body, token, { timeoutMs: 300_000 });
+  }
+
+  /** Current WhatsApp Basic vs Enterprise effective mode. */
+  async getWhatsAppMode(token?: string | null) {
+    return this.get<{
+      mode: "basic" | "enterprise";
+      preferredMode: "basic" | "enterprise";
+      enterpriseConnected: boolean;
+      label: string;
+      description: string;
+    }>("/integrations/whatsapp/mode", token);
+  }
+
+  async setWhatsAppPreferredMode(
+    preferredMode: "basic" | "enterprise",
+    token?: string | null
+  ) {
+    return this.post<{
+      mode: "basic" | "enterprise";
+      preferredMode: "basic" | "enterprise";
+      enterpriseConnected: boolean;
+      label: string;
+      description: string;
+    }>("/integrations/whatsapp/preferred-mode", { preferredMode }, token);
+  }
+
+  /** Confirm manual send after Basic Mode opened wa.me. */
+  async confirmBasicWhatsAppSend(
+    body: {
+      sent: boolean;
+      contactId?: string | null;
+      logIds?: string[];
+      phone?: string;
+    },
+    token?: string | null
+  ) {
+    return this.post<{ ok: boolean; status: string }>(
+      "/integrations/whatsapp/basic/confirm",
+      body,
+      token
+    );
+  }
+
+  async sendWhatsAppMessage(
+    body: {
+      to: string;
+      message: string;
+      contactId?: string;
+      templateName?: string;
+      templateParams?: string[];
+    },
+    token?: string | null
+  ) {
+    return this.post<{
+      success?: boolean;
+      mode?: "basic" | "enterprise";
+      status?: string;
+      messageId?: string;
+      uiHint?: string;
+      basic?: {
+        waUrl: string;
+        phone: string;
+        message: string;
+        contactId: string | null;
+        logIds: string[];
+        files?: Array<{ assetId: string; name: string; downloadPath: string }>;
+      };
+    }>("/integrations/whatsapp/send", body, token);
   }
   async listMediaKits(token?: string | null) {
     return this.get<{ kits: Array<Record<string, unknown>> }>("/media/kits", token);

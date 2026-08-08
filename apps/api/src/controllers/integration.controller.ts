@@ -155,6 +155,75 @@ export async function sendWhatsApp(req: AuthenticatedRequest, res: Response) {
   }
 }
 
+/** GET current Basic vs Enterprise effective mode (Basic is default). */
+export async function getWhatsAppModeHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const { resolveWhatsAppMode } = await import("../services/whatsapp-mode.service.js");
+    const mode = await resolveWhatsAppMode(req.user.id);
+    res.json({ success: true, data: mode });
+  } catch (error: unknown) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Failed",
+    });
+  }
+}
+
+/** POST preferred mode: basic (default) | enterprise. Invalid Cloud creds still fall back to basic. */
+export async function setWhatsAppPreferredModeHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const raw = String(req.body?.preferredMode || req.body?.mode || "").toLowerCase();
+    if (raw !== "basic" && raw !== "enterprise") {
+      return res.status(400).json({
+        success: false,
+        error: "preferredMode must be 'basic' or 'enterprise'",
+      });
+    }
+    const { setPreferredWhatsAppMode } = await import("../services/whatsapp-mode.service.js");
+    const mode = await setPreferredWhatsAppMode(req.user.id, raw);
+    res.json({ success: true, data: mode });
+  } catch (error: unknown) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Failed",
+    });
+  }
+}
+
+/**
+ * Confirm manual send after Basic Mode opened WhatsApp Web/App.
+ * Body: { sent: boolean, contactId?, logIds?, phone? }
+ */
+export async function confirmBasicWhatsAppHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const sent = req.body?.sent === true || req.body?.sent === "true" || req.body?.sent === 1;
+    const contactId =
+      req.body?.contactId != null && req.body.contactId !== ""
+        ? String(req.body.contactId)
+        : null;
+    const phone = req.body?.phone != null ? String(req.body.phone) : undefined;
+    const logIds = Array.isArray(req.body?.logIds)
+      ? (req.body.logIds as unknown[]).map(String).filter(Boolean)
+      : [];
+    const { confirmBasicWhatsAppSend } = await import("../services/whatsapp-mode.service.js");
+    const result = await confirmBasicWhatsAppSend(req.user.id, {
+      sent,
+      contactId,
+      logIds,
+      phone,
+    });
+    res.json({ success: true, data: result });
+  } catch (error: unknown) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Failed",
+    });
+  }
+}
+
 export async function listWhatsAppHistory(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });

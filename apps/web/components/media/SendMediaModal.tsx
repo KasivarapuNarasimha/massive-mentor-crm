@@ -89,6 +89,14 @@ type Props = {
   preselectedAssetIds?: string[];
 };
 
+type BasicPhaseState = {
+  waUrl: string;
+  phone: string;
+  logIds: string[];
+  contactId: string | null;
+  files: Array<{ assetId: string; name: string; downloadPath: string }>;
+};
+
 export function SendMediaModal({
   open,
   onClose,
@@ -118,6 +126,15 @@ export function SendMediaModal({
   const [templateCategories, setTemplateCategories] = useState<string[]>([]);
   const [recentTemplates, setRecentTemplates] = useState<CaptionTemplate[]>([]);
   const [templateCategory, setTemplateCategory] = useState("");
+  /** basic | enterprise — Basic is default when Cloud API not connected */
+  const [waMode, setWaMode] = useState<"basic" | "enterprise">("basic");
+  const [waModeLabel, setWaModeLabel] = useState("Basic Mode");
+  const [waModeDesc, setWaModeDesc] = useState(
+    "No setup required. Messages will open in WhatsApp."
+  );
+  /** After Basic open: show download list + "Did you send?" */
+  const [basicPhase, setBasicPhase] = useState<BasicPhaseState | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [templateScope, setTemplateScope] = useState<"all" | "global" | "personal">(
     "all"
   );
@@ -138,16 +155,28 @@ export function SendMediaModal({
   const load = useCallback(async () => {
     setLoading(true);
     setOfflineHint(false);
+    setBasicPhase(null);
     try {
-      const [a, k, rec, contactRes, tplRes, recentRes, msgRes] = await Promise.all([
-        api.listMediaAssets(token, { pageSize: 100, shareableOnly: true }),
-        api.listMediaKits(token),
-        api.recommendMediaForContact(contactId, token),
-        api.getCrmContact(contactId, token),
-        api.listCaptionTemplates(token),
-        api.recentCaptionTemplates(token),
-        api.getMessagingSettings(token),
-      ]);
+      const [a, k, rec, contactRes, tplRes, recentRes, msgRes, modeRes] =
+        await Promise.all([
+          api.listMediaAssets(token, { pageSize: 100, shareableOnly: true }),
+          api.listMediaKits(token),
+          api.recommendMediaForContact(contactId, token),
+          api.getCrmContact(contactId, token),
+          api.listCaptionTemplates(token),
+          api.recentCaptionTemplates(token),
+          api.getMessagingSettings(token),
+          api.getWhatsAppMode(token),
+        ]);
+
+      if (modeRes.success && modeRes.data) {
+        setWaMode(modeRes.data.mode === "enterprise" ? "enterprise" : "basic");
+        setWaModeLabel(modeRes.data.label || "Basic Mode");
+        setWaModeDesc(
+          modeRes.data.description ||
+            "No setup required. Messages will open in WhatsApp."
+        );
+      }
 
       if (tplRes.success && tplRes.data) {
         setCaptionTemplates((tplRes.data.templates || []) as CaptionTemplate[]);
@@ -442,8 +471,6 @@ export function SendMediaModal({
     return `${renderedCaption}\n\n${sig}`;
   }, [renderedCaption, messaging]);
 
-  if (!open) return null;
-
   const toggle = (id: string) => {
     setSelected((prev) => {
       const n = new Set(prev);
@@ -455,6 +482,63 @@ export function SendMediaModal({
 
   const selectAllSuggestions = () => {
     setSelected(new Set(suggestions.map((s) => s.id)));
+  };
+
+  const downloadSelectedFiles = (files: Array<{ assetId: string; name: string }>) => {
+    for (const f of files) {
+      const url = api.mediaFileUrl(f.assetId);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = f.name || "file";
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      // Auth via query is not used; open with fetch+blob when token present
+      void (async () => {
+        try {
+          const res = await fetch(url, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          if (!res.ok) throw new Error("download failed");
+          const blob = await res.blob();
+          const obj = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = obj;
+          link.download = f.name || "file";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(obj);
+        } catch {
+          // Fallback: open file URL in new tab
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
+      })();
+    }
+    toast.message("Download started — attach files in WhatsApp after saving.");
+  };
+
+  const confirmBasicSend = async (sent: boolean, phase: BasicPhaseState) => {
+    setConfirming(true);
+    try {
+      await api.confirmBasicWhatsAppSend(
+        {
+          sent,
+          contactId: phase.contactId || contactId,
+          logIds: phase.logIds,
+          phone: phase.phone,
+        },
+        token
+      );
+      if (sent) {
+        toast.success("WhatsApp Sent (Manual)", { description: contactName });
+      } else {
+        toast.message("Marked as not sent");
+      }
+      setBasicPhase(null);
+      onClose();
+    } finally {
+      setConfirming(false);
+    }
   };
 
   const send = async () => {
@@ -471,7 +555,6 @@ export function SendMediaModal({
       return;
     }
     // Always send the template form — server re-renders with full context (assignee, deal, etc.)
-    // Also send if user edited already-rendered text
     setSending(true);
     try {
       const res = kitId
@@ -489,7 +572,65 @@ export function SendMediaModal({
             token
           );
       if (res.success && res.data) {
-        const d = res.data as { sent?: number; failed?: number };
+        const d = res.data as {
+          mode?: "basic" | "enterprise";
+          sent?: number;
+          failed?: number;
+          uiHint?: string;
+          basic?: {
+            waUrl?: string;
+            phone?: string;
+            logIds?: string[];
+            contactId?: string | null;
+            files?: Array<{ assetId: string; name: string; downloadPath: string }>;
+          };
+        };
+
+        // Basic Mode: open wa.me — never show Failed for missing Cloud API
+        if (d.mode === "basic" || d.basic?.waUrl) {
+          const waUrl = d.basic?.waUrl;
+          const files =
+            d.basic?.files ||
+            [...selected].map((id) => {
+              const a =
+                assets.find((x) => x.id === id) ||
+                suggestions.find((x) => x.id === id);
+              return {
+                assetId: id,
+                name: a?.name || id,
+                downloadPath: `/media/assets/${id}/file`,
+              };
+            });
+          if (waUrl) {
+            window.open(waUrl, "_blank", "noopener,noreferrer");
+          }
+          toast.message(d.uiHint || "Opening WhatsApp...", {
+            description: contactName,
+          });
+          setBasicPhase({
+            waUrl: waUrl || "",
+            phone: d.basic?.phone || contactPhone.replace(/\D/g, ""),
+            logIds: d.basic?.logIds || [],
+            contactId: d.basic?.contactId ?? contactId,
+            files,
+          });
+          for (const id of selected) {
+            const a =
+              assets.find((x) => x.id === id) || suggestions.find((x) => x.id === id);
+            if (a) {
+              void cacheMediaOffline({
+                id: a.id,
+                name: a.name,
+                originalName: a.name,
+                mimeType: "application/octet-stream",
+                kind: a.kind,
+                sizeBytes: a.sizeBytes || 0,
+              });
+            }
+          }
+          return;
+        }
+
         toast.success(`Sent ${d.sent ?? selected.size} file(s) via WhatsApp`, {
           description: d.failed ? `${d.failed} failed` : contactName,
         });
@@ -508,12 +649,113 @@ export function SendMediaModal({
         }
         onClose();
       } else {
-        toast.error((res as { error?: string }).error || "Send failed");
+        // Prefer soft messaging — never surface Cloud API setup failure as "Failed"
+        const err = (res as { error?: string }).error || "";
+        if (/not configured|access token|phone number id|cloud api/i.test(err)) {
+          toast.message("Opening WhatsApp...");
+        } else {
+          toast.error(err || "Could not open WhatsApp");
+        }
       }
     } finally {
       setSending(false);
     }
   };
+
+  if (!open) return null;
+
+  // ── Basic Mode post-open: media list + confirm manual send ──────────────
+  if (basicPhase) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center sm:p-4">
+        <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto p-5 space-y-4">
+          <div className="flex justify-between items-start gap-2">
+            <div>
+              <h3 className="text-lg font-semibold">Opening WhatsApp...</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                To {contactName}
+                {basicPhase.phone ? ` · ${basicPhase.phone}` : ""}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="text-sm text-muted-foreground"
+              onClick={() => {
+                setBasicPhase(null);
+                onClose();
+              }}
+            >
+              Close
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-100">
+            🟢 Basic Mode — message opened in WhatsApp Web/App. Click Send there when ready.
+          </div>
+
+          {basicPhase.files.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold">Selected Files</h4>
+              <ul className="space-y-1.5">
+                {basicPhase.files.map((f) => (
+                  <li
+                    key={f.assetId}
+                    className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-sm"
+                  >
+                    <span className="text-base">📄</span>
+                    <span className="truncate flex-1">{f.name}</span>
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => downloadSelectedFiles(basicPhase.files)}
+                className="w-full min-h-11 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold"
+              >
+                Download Selected Files
+              </button>
+              <p className="text-[11px] text-muted-foreground">
+                Download these files and attach them manually in WhatsApp.
+              </p>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-border bg-background/60 p-4 space-y-3">
+            <p className="text-sm font-medium">Did you send the message?</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={confirming}
+                onClick={() => void confirmBasicSend(true, basicPhase)}
+                className="flex-1 min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50"
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                disabled={confirming}
+                onClick={() => void confirmBasicSend(false, basicPhase)}
+                className="flex-1 min-h-11 rounded-xl border border-border bg-muted/40 hover:bg-muted text-sm font-semibold disabled:opacity-50"
+              >
+                No
+              </button>
+            </div>
+            {basicPhase.waUrl ? (
+              <button
+                type="button"
+                onClick={() =>
+                  window.open(basicPhase.waUrl, "_blank", "noopener,noreferrer")
+                }
+                className="w-full text-xs text-emerald-400 hover:underline"
+              >
+                Re-open WhatsApp
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center sm:p-4">
@@ -529,6 +771,20 @@ export function SendMediaModal({
           <button type="button" className="text-sm text-muted-foreground" onClick={onClose}>
             Close
           </button>
+        </div>
+
+        {/* WhatsApp Mode badge — Basic is default when Cloud API not configured */}
+        <div
+          className={`mt-3 rounded-xl border px-3 py-2.5 text-sm ${
+            waMode === "enterprise"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-100"
+              : "border-sky-500/40 bg-sky-500/10 text-sky-100"
+          }`}
+        >
+          <div className="font-semibold">
+            WhatsApp Mode · 🟢 {waModeLabel}
+          </div>
+          <p className="text-xs opacity-90 mt-0.5">{waModeDesc}</p>
         </div>
 
         {offlineHint && (
@@ -945,8 +1201,12 @@ export function SendMediaModal({
           className="mt-4 w-full min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50"
         >
           {sending
-            ? "Sending…"
-            : `Send ${selected.size || ""} file(s) via WhatsApp`}
+            ? waMode === "basic"
+              ? "Opening WhatsApp..."
+              : "Sending…"
+            : waMode === "basic"
+              ? `Send via WhatsApp (${selected.size || 0} file${selected.size === 1 ? "" : "s"})`
+              : `Send ${selected.size || ""} file(s) via WhatsApp`}
         </button>
 
         {/* Save template modal */}

@@ -138,9 +138,9 @@ export async function listIntegrations(userId: string) {
         status = connectionStatus;
       }
 
-      return {
+      const base = {
         provider,
-        isActive: int?.isActive ?? false,
+        isActive: int?.isActive ?? (provider === "whatsapp" ? true : false),
         configured,
         status,
         connectionStatus: provider === "whatsapp" ? connectionStatus : status,
@@ -166,6 +166,33 @@ export async function listIntegrations(userId: string) {
         configPreview: maskConfig(provider, cfg),
         mvp: provider === "whatsapp",
       };
+
+      // Basic Mode is the default onboarding experience; expose effective mode for UI.
+      if (provider === "whatsapp") {
+        try {
+          const { resolveWhatsAppMode } = await import("./whatsapp-mode.service.js");
+          const modeInfo = await resolveWhatsAppMode(userId);
+          return {
+            ...base,
+            preferredMode: modeInfo.preferredMode,
+            effectiveMode: modeInfo.mode,
+            modeLabel: modeInfo.label,
+            modeDescription: modeInfo.description,
+            enterpriseConnected: modeInfo.enterpriseConnected,
+          };
+        } catch {
+          return {
+            ...base,
+            preferredMode: "basic",
+            effectiveMode: "basic",
+            modeLabel: "Basic Mode",
+            modeDescription: "No setup required. Messages will open in WhatsApp.",
+            enterpriseConnected: false,
+          };
+        }
+      }
+
+      return base;
     })
   );
   return rows;
@@ -187,6 +214,10 @@ function isProviderConfigured(provider: string, cfg: Record<string, unknown>): b
 function maskConfig(provider: string, cfg: Record<string, unknown>) {
   if (provider === "whatsapp") {
     const token = String(cfg.accessToken || "");
+    const preferred =
+      String(cfg.preferredMode || "basic").toLowerCase() === "enterprise"
+        ? "enterprise"
+        : "basic";
     return {
       hasAccessToken: !!token,
       accessTokenPreview: token ? `${token.slice(0, 6)}…${token.slice(-4)}` : null,
@@ -205,6 +236,7 @@ function maskConfig(provider: string, cfg: Record<string, unknown>) {
       lastWebhookReceivedAt: cfg.lastWebhookReceivedAt
         ? String(cfg.lastWebhookReceivedAt)
         : null,
+      preferredMode: preferred,
     };
   }
   return { configuredKeys: Object.keys(cfg) };
@@ -648,21 +680,83 @@ export async function sendWhatsAppMessage(
   message: string,
   opts?: { contactId?: string; templateName?: string; templateParams?: string[] }
 ) {
+  const { resolveWhatsAppMode, prepareBasicWhatsAppOpen } = await import(
+    "./whatsapp-mode.service.js"
+  );
+  const modeInfo = await resolveWhatsAppMode(userId);
+
+  // Render template vars when contact known
+  let body = message || "";
+  if (opts?.contactId) {
+    try {
+      const { buildContactTemplateVars, renderTemplate } = await import(
+        "./template-vars.service.js"
+      );
+      const businessId = await getUserBusinessId(userId);
+      const vars = await buildContactTemplateVars({
+        contactId: opts.contactId,
+        actorUserId: userId,
+        businessId,
+      });
+      body = renderTemplate(body, vars) || body;
+    } catch {
+      /* keep raw body */
+    }
+  }
+
+  if (modeInfo.mode === "basic") {
+    // Templates require Cloud API — ignore templateName in basic mode
+    const basic = await prepareBasicWhatsAppOpen(userId, {
+      contactId: opts?.contactId,
+      to,
+      message: body || "Hello",
+    });
+    return {
+      success: true,
+      mode: "basic" as const,
+      status: "pending_customer_send",
+      basic,
+      uiHint: "Opening WhatsApp...",
+    };
+  }
+
   const { sendWhatsAppCloudMessage } = await import("./whatsapp.service.js");
-  const record = await sendWhatsAppCloudMessage({
-    userId,
-    to,
-    body: message,
-    contactId: opts?.contactId,
-    templateName: opts?.templateName,
-    templateParams: opts?.templateParams,
-  });
-  return {
-    success: true,
-    messageId: record.waMessageId || record.id,
-    status: record.status,
-    record,
-  };
+  try {
+    const record = await sendWhatsAppCloudMessage({
+      userId,
+      to,
+      body,
+      contactId: opts?.contactId,
+      templateName: opts?.templateName,
+      templateParams: opts?.templateParams,
+    });
+    return {
+      success: true,
+      mode: "enterprise" as const,
+      messageId: record.waMessageId || record.id,
+      status: record.status,
+      record,
+    };
+  } catch (err) {
+    // Invalid / missing Cloud credentials → never hard-fail; open Basic Mode
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/not configured|inactive|invalid|token/i.test(msg)) {
+      const basic = await prepareBasicWhatsAppOpen(userId, {
+        contactId: opts?.contactId,
+        to,
+        message: body || "Hello",
+      });
+      return {
+        success: true,
+        mode: "basic" as const,
+        status: "pending_customer_send",
+        basic,
+        uiHint: "Opening WhatsApp...",
+        fallbackFromEnterprise: true,
+      };
+    }
+    throw err;
+  }
 }
 
 export async function sendGmail(_userId: string, _to: string, _subject: string, _body: string) {

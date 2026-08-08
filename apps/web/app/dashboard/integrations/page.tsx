@@ -15,6 +15,11 @@ type IntegrationRow = {
   lastValidatedAt?: string | null;
   lastError?: string | null;
   businessId?: string | null;
+  preferredMode?: "basic" | "enterprise";
+  effectiveMode?: "basic" | "enterprise";
+  modeLabel?: string;
+  modeDescription?: string;
+  enterpriseConnected?: boolean;
   webhook?: {
     callbackUrl?: string;
     verifyToken?: string | null;
@@ -38,6 +43,7 @@ type IntegrationRow = {
     qualityRating?: string | null;
     webhookVerifiedAt?: string | null;
     lastWebhookReceivedAt?: string | null;
+    preferredMode?: "basic" | "enterprise";
   };
 };
 
@@ -143,8 +149,15 @@ export default function IntegrationsPage() {
   const [testMsg, setTestMsg] = useState("Hello from Massive Mentor CRM — connection test.");
   const [sending, setSending] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [savingMode, setSavingMode] = useState(false);
 
   const wa = integrations.find((i) => i.provider === "whatsapp");
+  const preferredMode: "basic" | "enterprise" =
+    wa?.preferredMode ||
+    wa?.configPreview?.preferredMode ||
+    "basic";
+  const effectiveMode: "basic" | "enterprise" = wa?.effectiveMode || "basic";
+  const enterpriseConnected = !!wa?.enterpriseConnected;
 
   const connectionStatus = useMemo(
     () => (wa?.connectionStatus || wa?.status || "not_connected").toLowerCase(),
@@ -342,6 +355,26 @@ export default function IntegrationsPage() {
     }
   };
 
+  const setPreferredMode = async (mode: "basic" | "enterprise") => {
+    if (!token) return;
+    if (mode === "enterprise" && !enterpriseConnected && !wa?.configured) {
+      toast.message("Enterprise Mode needs Cloud API credentials below. You can still use Basic Mode now.");
+    }
+    setSavingMode(true);
+    const res = await api.setWhatsAppPreferredMode(mode, token);
+    setSavingMode(false);
+    if (res.success && res.data) {
+      toast.success(
+        res.data.mode === "enterprise"
+          ? "Enterprise Mode — automatic WhatsApp delivery"
+          : "Basic Mode — messages open in WhatsApp (no setup required)"
+      );
+      await load();
+    } else {
+      toast.error(res.error || "Could not update preferred mode");
+    }
+  };
+
   const sendTest = async () => {
     if (!token) return;
     if (!testTo.trim() || !testMsg.trim()) {
@@ -349,18 +382,35 @@ export default function IntegrationsPage() {
       return;
     }
     setSending(true);
-    const res = await api.post(
-      "/integrations/whatsapp/send",
+    const res = await api.sendWhatsAppMessage(
       { to: testTo.trim(), message: testMsg.trim() },
       token
     );
     setSending(false);
-    if (res.success) {
-      const st = (res.data as { status?: string })?.status || "sent";
+    if (res.success && res.data) {
+      const d = res.data as {
+        mode?: string;
+        status?: string;
+        uiHint?: string;
+        basic?: { waUrl?: string };
+      };
+      if (d.mode === "basic" || d.basic?.waUrl) {
+        if (d.basic?.waUrl) {
+          window.open(d.basic.waUrl, "_blank", "noopener,noreferrer");
+        }
+        toast.message(d.uiHint || "Opening WhatsApp...");
+        return;
+      }
+      const st = d.status || "sent";
       toast.success(`Test WhatsApp message ${st}`);
       await loadHistory();
     } else {
-      toast.error(res.error || "Send failed");
+      const err = res.error || "";
+      if (/not configured|access token|phone number id|cloud api/i.test(err)) {
+        toast.message("Opening WhatsApp...");
+      } else {
+        toast.error(err || "Could not send");
+      }
     }
   };
 
@@ -391,26 +441,126 @@ export default function IntegrationsPage() {
     );
   };
 
-  const canSend =
-    connectionStatus === "connected" || connectionStatus === "verification_pending";
-
   return (
     <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
       <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-2">Integrations</h1>
       <p className="text-muted-foreground mb-8 text-sm sm:text-base">
-        Connect <strong className="text-muted-foreground">your own</strong> Meta WhatsApp Cloud API. Each
-        workspace keeps separate credentials.
+        Start with <strong className="text-muted-foreground">Basic WhatsApp</strong> (no Meta setup).
+        Optionally connect your own Cloud API later for automatic delivery.
       </p>
 
       {isLoading ? (
         <div className="h-48 bg-card border border-border rounded-2xl animate-pulse" />
       ) : (
         <div className="space-y-6">
+          {/* Preferred Mode — Basic is default onboarding */}
+          <section className="bg-card border border-border rounded-2xl p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-lg font-semibold">WhatsApp</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Preferred Mode · effective now:{" "}
+                  <span className="text-emerald-400 font-medium">
+                    🟢 {effectiveMode === "enterprise" ? "Enterprise Mode" : "Basic Mode"}
+                  </span>
+                </p>
+              </div>
+              {effectiveMode === "enterprise" ? (
+                <span className="px-2.5 py-0.5 rounded-full text-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  Automatic delivery
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full text-xs bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                  No setup required
+                </span>
+              )}
+            </div>
+
+            <div
+              className={`mb-5 rounded-xl border px-3 py-2.5 text-sm ${
+                effectiveMode === "enterprise"
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
+                  : "border-sky-500/30 bg-sky-500/10 text-sky-100"
+              }`}
+            >
+              {effectiveMode === "enterprise" ? (
+                <>
+                  <div className="font-semibold">🟢 Enterprise Mode</div>
+                  <p className="text-xs opacity-90 mt-0.5">
+                    Automatic WhatsApp delivery enabled. Conversations, delivery & read status available.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="font-semibold">🟢 Basic Mode</div>
+                  <p className="text-xs opacity-90 mt-0.5">
+                    No setup required. Messages will open in WhatsApp Web/App with a pre-filled message.
+                    {preferredMode === "enterprise" && !enterpriseConnected
+                      ? " (Enterprise preferred, but Cloud API is not connected — using Basic.)"
+                      : ""}
+                  </p>
+                </>
+              )}
+            </div>
+
+            <h3 className="text-sm font-semibold mb-3">Preferred Mode</h3>
+            <div className="space-y-2">
+              <label
+                className={`flex items-start gap-3 rounded-xl border px-3 py-3 cursor-pointer transition-colors ${
+                  preferredMode === "basic"
+                    ? "border-sky-500/50 bg-sky-500/10"
+                    : "border-border bg-background/60 hover:border-border"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="wa-preferred-mode"
+                  className="mt-1"
+                  checked={preferredMode === "basic"}
+                  disabled={savingMode}
+                  onChange={() => void setPreferredMode("basic")}
+                />
+                <div>
+                  <div className="text-sm font-medium">Basic WhatsApp (Default)</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Opens WhatsApp with a pre-filled message. Works in under 30 seconds — no Meta Developer
+                    account.
+                  </p>
+                </div>
+              </label>
+              <label
+                className={`flex items-start gap-3 rounded-xl border px-3 py-3 cursor-pointer transition-colors ${
+                  preferredMode === "enterprise"
+                    ? "border-emerald-500/50 bg-emerald-500/10"
+                    : "border-border bg-background/60 hover:border-border"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="wa-preferred-mode"
+                  className="mt-1"
+                  checked={preferredMode === "enterprise"}
+                  disabled={savingMode}
+                  onChange={() => void setPreferredMode("enterprise")}
+                />
+                <div>
+                  <div className="text-sm font-medium">Enterprise Cloud API</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Automatic send, delivery & read receipts, Conversation Center. Requires valid Access
+                    Token + Phone Number ID below.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </section>
+
           <section className="bg-card border border-border rounded-2xl p-6">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
               <div>
-                <h2 className="text-lg font-semibold">WhatsApp Cloud API</h2>
-                <p className="text-xs text-muted-foreground mt-1">Self-service multi-tenant setup</p>
+                <h2 className="text-lg font-semibold">Enterprise Cloud API (Optional)</h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Meta WhatsApp Cloud API — only needed for automatic delivery
+                </p>
               </div>
               {statusBadge(connectionStatus)}
             </div>
@@ -669,12 +819,13 @@ export default function IntegrationsPage() {
               </div>
             </div>
 
-            {/* Send test WhatsApp */}
+            {/* Send test WhatsApp — works in Basic Mode without Cloud API */}
             <div className="mt-8 pt-6 border-t border-border">
               <h3 className="font-medium mb-1">Send Test WhatsApp Message</h3>
               <p className="text-xs text-muted-foreground mb-3">
-                Sends a sample message using this workspace&apos;s credentials. Use international
-                format (e.g. 9198xxxxxxxx). Default destination can be your own WhatsApp number.
+                {effectiveMode === "enterprise"
+                  ? "Sends via Cloud API when connected. Use international format (e.g. 9198xxxxxxxx)."
+                  : "Opens WhatsApp with a pre-filled message (Basic Mode). Use international format (e.g. 9198xxxxxxxx)."}
               </p>
               <div className="space-y-2">
                 <input
@@ -690,17 +841,16 @@ export default function IntegrationsPage() {
                 />
                 <button
                   type="button"
-                  disabled={sending || !canSend}
+                  disabled={sending}
                   onClick={sendTest}
                   className="px-4 py-2 rounded-xl text-sm bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 disabled:opacity-40"
                 >
-                  {sending ? "Sending…" : "Send Test WhatsApp Message"}
+                  {sending
+                    ? effectiveMode === "basic"
+                      ? "Opening WhatsApp..."
+                      : "Sending…"
+                    : "Send Test WhatsApp Message"}
                 </button>
-                {!canSend && (
-                  <p className="text-xs text-amber-400/90">
-                    Save valid credentials before sending a test message.
-                  </p>
-                )}
               </div>
             </div>
 

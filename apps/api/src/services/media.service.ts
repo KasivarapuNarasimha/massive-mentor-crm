@@ -1111,6 +1111,41 @@ export async function sendMediaViaWhatsApp(
     caption: opts.caption || "",
   });
 
+  // ── Basic Mode (default when Cloud API not connected / preferred basic) ──
+  const { resolveWhatsAppMode, prepareBasicWhatsAppOpen } = await import(
+    "./whatsapp-mode.service.js"
+  );
+  const modeInfo = await resolveWhatsAppMode(userId);
+  if (modeInfo.mode === "basic") {
+    const message =
+      baseCaption ||
+      renderTemplate(ordered[0]?.captionDefault || "", templateVars) ||
+      "Hello";
+    const basic = await prepareBasicWhatsAppOpen(userId, {
+      contactId: contactRow.id,
+      to: phone,
+      message,
+      files: ordered.map((a) => ({
+        assetId: a.id,
+        assetName: a.originalName || a.name,
+      })),
+    });
+    return {
+      mode: "basic" as const,
+      sent: 0,
+      failed: 0,
+      results: ordered.map((a) => ({
+        assetId: a.id,
+        assetName: a.name,
+        ok: true,
+        status: "pending_customer_send",
+      })),
+      contact: { id: contactRow.id, name: contactRow.name, phone },
+      basic,
+      uiHint: "Opening WhatsApp...",
+    };
+  }
+
   const results: Array<{
     assetId: string;
     assetName: string;
@@ -1225,6 +1260,7 @@ export async function sendMediaViaWhatsApp(
   });
 
   return {
+    mode: "enterprise" as const,
     sent,
     failed: results.length - sent,
     results,
