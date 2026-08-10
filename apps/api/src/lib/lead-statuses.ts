@@ -1,7 +1,7 @@
 /**
- * Canonical Lead pipeline statuses for ALL workspaces / business types.
- * Contact.status is a free string in DB (not a Prisma enum) — these are product defaults.
- * Keep in sync with apps/web/lib/business-config.ts FALLBACK_LEAD_STATUSES.
+ * Canonical Lead statuses for ALL workspaces / business types.
+ * Contact.status is a free String in DB (not a Prisma enum).
+ * Keep UI FALLBACK_LEAD_STATUSES in apps/web/lib/business-config.ts in sync.
  */
 
 export type LeadStatusDef = {
@@ -11,40 +11,52 @@ export type LeadStatusDef = {
   color?: string;
   isWon?: boolean;
   isLost?: boolean;
-  /** Telecalling / call-result statuses (not classic sales pipeline stages) */
   isCallResult?: boolean;
+  /** Older sales-pipeline keys kept for existing data only */
+  isLegacy?: boolean;
 };
 
-/** Classic pipeline — preserve order and keys exactly */
-export const CLASSIC_LEAD_STATUSES: LeadStatusDef[] = [
+/**
+ * Primary telecalling Lead workflow (Edit Lead / filters).
+ * Order matches product requirement.
+ */
+export const TELECALLING_LEAD_STATUSES: LeadStatusDef[] = [
   { key: "new", label: "New", color: "#3b82f6", order: 1 },
-  { key: "contacted", label: "Contacted", color: "#8b5cf6", order: 2 },
-  { key: "qualified", label: "Qualified", color: "#06b6d4", order: 3 },
-  { key: "proposal", label: "Proposal Sent", color: "#f59e0b", order: 4 },
-  { key: "negotiation", label: "Negotiation", color: "#f97316", order: 5 },
-  { key: "won", label: "Won", color: "#22c55e", isWon: true, order: 6 },
-  { key: "lost", label: "Lost", color: "#ef4444", isLost: true, order: 7 },
+  { key: "rnr", label: "RNR", color: "#64748b", order: 2, isCallResult: true },
+  { key: "busy", label: "Busy", color: "#94a3b8", order: 3, isCallResult: true },
+  { key: "call_back", label: "Call back", color: "#38bdf8", order: 4, isCallResult: true },
+  { key: "not_interested", label: "Not interested", color: "#f87171", order: 5, isCallResult: true },
+  { key: "interested", label: "Interested", color: "#34d399", order: 6, isCallResult: true },
+  { key: "switch_off", label: "Switch off", color: "#a78bfa", order: 7, isCallResult: true },
+  { key: "no_incoming_calls", label: "No Incoming calls", color: "#fb923c", order: 8, isCallResult: true },
+  { key: "invalid_number", label: "Invalid number", color: "#ef4444", order: 9, isCallResult: true },
+  { key: "won", label: "Won", color: "#22c55e", isWon: true, order: 10 },
+  { key: "lost", label: "Lost", color: "#ef4444", isLost: true, order: 11 },
 ];
 
-/** Global call-result statuses (telecalling) — all business types */
-export const CALL_RESULT_LEAD_STATUSES: LeadStatusDef[] = [
-  { key: "rnr", label: "RNR", color: "#64748b", order: 10, isCallResult: true },
-  { key: "busy", label: "Busy", color: "#94a3b8", order: 11, isCallResult: true },
-  { key: "call_back", label: "Call back", color: "#38bdf8", order: 12, isCallResult: true },
-  { key: "not_interested", label: "Not interested", color: "#f87171", order: 13, isCallResult: true },
-  { key: "interested", label: "Interested", color: "#34d399", order: 14, isCallResult: true },
-  { key: "switch_off", label: "Switch off", color: "#a78bfa", order: 15, isCallResult: true },
-  { key: "no_incoming_calls", label: "No Incoming calls", color: "#fb923c", order: 16, isCallResult: true },
-  { key: "invalid_number", label: "Invalid number", color: "#ef4444", order: 17, isCallResult: true },
+/**
+ * Legacy sales-pipeline keys — still valid in DB and sync maps.
+ * Shown in dropdown only so existing records remain editable/filterable.
+ */
+export const LEGACY_LEAD_STATUSES: LeadStatusDef[] = [
+  { key: "contacted", label: "Contacted", color: "#8b5cf6", order: 20, isLegacy: true },
+  { key: "qualified", label: "Qualified", color: "#06b6d4", order: 21, isLegacy: true },
+  { key: "proposal", label: "Proposal Sent", color: "#f59e0b", order: 22, isLegacy: true },
+  { key: "negotiation", label: "Negotiation", color: "#f97316", order: 23, isLegacy: true },
 ];
 
-/** Full default list for UI / seed / import */
-export const CANONICAL_LEAD_STATUSES: LeadStatusDef[] = [
-  ...CLASSIC_LEAD_STATUSES,
-  ...CALL_RESULT_LEAD_STATUSES,
+/** Product defaults (primary telecalling list) */
+export const CANONICAL_LEAD_STATUSES: LeadStatusDef[] = [...TELECALLING_LEAD_STATUSES];
+
+/** All known keys for labels + mapping (primary + legacy) */
+export const ALL_KNOWN_LEAD_STATUSES: LeadStatusDef[] = [
+  ...TELECALLING_LEAD_STATUSES,
+  ...LEGACY_LEAD_STATUSES,
 ];
 
-const CALL_RESULT_KEYS = new Set(CALL_RESULT_LEAD_STATUSES.map((s) => s.key));
+const CALL_RESULT_KEYS = new Set(
+  TELECALLING_LEAD_STATUSES.filter((s) => s.isCallResult).map((s) => s.key)
+);
 
 export function isCallResultStatus(status: string): boolean {
   const s = (status || "").trim().toLowerCase().replace(/\s+/g, "_");
@@ -52,15 +64,12 @@ export function isCallResultStatus(status: string): boolean {
 }
 
 /**
- * Map Lead status → Deal pipeline stage (existing architecture).
- * Call results land on open pipeline stages so My Deals still shows the deal;
- * the human call result is also stored on deal.customFields.leadStatus and contact.status.
+ * Map Lead status → Deal pipeline stage (Deal pipeline is separate; do not replace Deal stages).
  */
 export function leadStatusToDealStageKey(status: string): string | null {
   const s = (status || "").trim().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
   if (!s) return null;
 
-  // Classic
   if (s === "new" || s === "contacted") return "lead";
   if (s === "qualified") return "qualified";
   if (s === "proposal" || s === "proposal_sent" || s === "proposalsent") return "proposal";
@@ -68,7 +77,6 @@ export function leadStatusToDealStageKey(status: string): string | null {
   if (s === "won" || s === "closed_won" || s === "active") return "closed_won";
   if (s === "lost" || s === "closed_lost" || s === "churned") return "closed_lost";
 
-  // Call results
   if (s === "interested") return "qualified";
   if (s === "not_interested" || s === "invalid_number") return "closed_lost";
   if (
@@ -90,7 +98,7 @@ export function leadStatusToDealStageKey(status: string): string | null {
 
 export function leadStatusLabel(status: string): string {
   const s = (status || "").trim().toLowerCase().replace(/\s+/g, "_");
-  const hit = CANONICAL_LEAD_STATUSES.find((x) => x.key === s);
+  const hit = ALL_KNOWN_LEAD_STATUSES.find((x) => x.key === s);
   if (hit) return hit.label;
   if (!status) return "";
   return String(status)
@@ -98,27 +106,64 @@ export function leadStatusLabel(status: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** Merge config pipeline statuses with canonical defaults (never drop call results globally). */
+/**
+ * Merge BusinessConfig pipeline with telecalling defaults.
+ * - Always ensure telecalling statuses exist (all workspaces)
+ * - Preserve custom config statuses
+ * - Keep legacy keys available for existing data
+ * - Sort: telecalling order first, then extras
+ */
 export function mergeLeadStatusesWithCanonical(
-  fromConfig: Array<{ key: string; label: string; color?: string; order?: number; isWon?: boolean; isLost?: boolean }>
+  fromConfig: Array<{
+    key: string;
+    label: string;
+    color?: string;
+    order?: number;
+    isWon?: boolean;
+    isLost?: boolean;
+  }>
 ): LeadStatusDef[] {
   const byKey = new Map<string, LeadStatusDef>();
+
+  // 1) Primary telecalling list (product order)
+  for (const s of TELECALLING_LEAD_STATUSES) {
+    byKey.set(s.key, { ...s });
+  }
+
+  // 2) Overlay / add from BusinessConfig (custom labels + extra keys)
   for (const s of fromConfig) {
     if (!s?.key) continue;
-    byKey.set(s.key, {
-      key: s.key,
-      label: s.label || s.key,
-      order: s.order ?? 50,
-      color: s.color,
-      isWon: s.isWon,
-      isLost: s.isLost,
-    });
+    const existing = byKey.get(s.key);
+    if (existing) {
+      byKey.set(s.key, {
+        ...existing,
+        label: s.label || existing.label,
+        color: s.color || existing.color,
+        isWon: s.isWon ?? existing.isWon,
+        isLost: s.isLost ?? existing.isLost,
+        // keep telecalling order for known keys
+        order: existing.order,
+      });
+    } else {
+      byKey.set(s.key, {
+        key: s.key,
+        label: s.label || s.key,
+        order: s.order ?? 50,
+        color: s.color,
+        isWon: s.isWon,
+        isLost: s.isLost,
+      });
+    }
   }
+
   if (byKey.has("proposal") && byKey.get("proposal")!.label?.toLowerCase() === "proposal") {
     byKey.set("proposal", { ...byKey.get("proposal")!, label: "Proposal Sent" });
   }
-  for (const req of CANONICAL_LEAD_STATUSES) {
-    if (!byKey.has(req.key)) byKey.set(req.key, { ...req });
+
+  // 3) Legacy keys for existing Contact.status values
+  for (const leg of LEGACY_LEAD_STATUSES) {
+    if (!byKey.has(leg.key)) byKey.set(leg.key, { ...leg });
   }
+
   return [...byKey.values()].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }

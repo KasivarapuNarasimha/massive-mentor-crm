@@ -361,6 +361,7 @@ export default function LeadsPage() {
 
   const tableFields = useMemo(() => listFields(fieldDefs), [fieldDefs]);
   const filterableFields = useMemo(() => filterFields(fieldDefs), [fieldDefs]);
+  // Always telecalling defaults + config merge (leadStatusesFromConfig never empty)
   const statusOptions: PipelineStatus[] = useMemo(() => {
     const fromConfig = leadStatusesFromConfig(bizConfig);
     return fromConfig.length ? fromConfig : FALLBACK_LEAD_STATUSES;

@@ -14,7 +14,6 @@ import {
   type BusinessConfigDTO,
   type FieldDef,
   contactFieldsFromConfig,
-  leadStatusesFromConfig,
   FALLBACK_CONTACT_FIELDS,
 } from "@/lib/business-config";
 
@@ -64,15 +63,16 @@ export default function ClientsPage() {
     return from.length ? from : FALLBACK_CONTACT_FIELDS;
   }, [bizConfig]);
 
-  const statusOptions = useMemo(() => {
-    const from = leadStatusesFromConfig(bizConfig);
-    if (from.length) return from.map((s) => ({ key: s.key, label: s.label }));
-    return [
-      { key: "active", label: "active" },
-      { key: "churned", label: "churned" },
-      { key: "new", label: "new" },
-    ];
-  }, [bizConfig]);
+  // Client lifecycle statuses (not the Lead telecalling pipeline)
+  const statusOptions = useMemo(
+    () => [
+      { key: "active", label: "Active" },
+      { key: "churned", label: "Churned" },
+      { key: "won", label: "Won" },
+      { key: "new", label: "New" },
+    ],
+    []
+  );
 
   const loadConfig = useCallback(async () => {
     if (!token) return;

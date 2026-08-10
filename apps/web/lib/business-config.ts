@@ -65,23 +65,51 @@ export function filterFields(fields: FieldDef[]): FieldDef[] {
   return fields.filter((f) => f.showInFilter);
 }
 
+/**
+ * Lead statuses for UI: telecalling defaults + BusinessConfig extras + legacy keys.
+ * Always returns a usable list even when config is missing.
+ */
 export function leadStatusesFromConfig(config: BusinessConfigDTO | null | undefined): PipelineStatus[] {
-  if (!config?.pipelines || !Array.isArray(config.pipelines)) return [];
-  const pipelines = config.pipelines as PipelineDef[];
+  const pipelines = (config?.pipelines || []) as PipelineDef[];
   const lead =
     pipelines.find((p) => p.entity === "contact" && p.key === "lead") ||
     pipelines.find((p) => p.entity === "contact");
-  if (!lead?.statuses?.length) return [];
-  const fromConfig = lead.statuses.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  // Ensure required production statuses exist even on older BusinessConfig manifests
-  const byKey = new Map(fromConfig.map((s) => [s.key, { ...s }]));
-  // Prefer human labels for known keys
+  const fromConfig = lead?.statuses?.length
+    ? lead.statuses.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    : [];
+
+  // Start with telecalling product defaults (required order)
+  const byKey = new Map<string, PipelineStatus>();
+  for (const req of FALLBACK_LEAD_STATUSES) {
+    byKey.set(req.key, { ...req });
+  }
+
+  // Overlay / add BusinessConfig (custom labels + extra statuses)
+  for (const s of fromConfig) {
+    if (!s?.key) continue;
+    const existing = byKey.get(s.key);
+    if (existing) {
+      byKey.set(s.key, {
+        ...existing,
+        label: s.label || existing.label,
+        color: s.color || existing.color,
+        // keep telecalling order for known keys
+        order: existing.order,
+      });
+    } else {
+      byKey.set(s.key, { ...s });
+    }
+  }
+
   if (byKey.has("proposal") && byKey.get("proposal")!.label?.toLowerCase() === "proposal") {
     byKey.set("proposal", { ...byKey.get("proposal")!, label: "Proposal Sent" });
   }
-  for (const req of FALLBACK_LEAD_STATUSES) {
-    if (!byKey.has(req.key)) byKey.set(req.key, { ...req });
+
+  // Legacy mid-pipeline keys for existing Contact.status values (do not break old data)
+  for (const leg of LEGACY_LEAD_STATUSES) {
+    if (!byKey.has(leg.key)) byKey.set(leg.key, { ...leg });
   }
+
   return [...byKey.values()].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
@@ -101,24 +129,27 @@ export function getContactFieldValue(
   return null;
 }
 
+/** Primary telecalling Lead workflow — keep in sync with apps/api/src/lib/lead-statuses.ts */
 export const FALLBACK_LEAD_STATUSES: PipelineStatus[] = [
-  // Keep in sync with apps/api DEFAULT_LEAD_PIPELINE + lead-statuses.ts
   { key: "new", label: "New", order: 1 },
-  { key: "contacted", label: "Contacted", order: 2 },
-  { key: "qualified", label: "Qualified", order: 3 },
-  { key: "proposal", label: "Proposal Sent", order: 4 },
-  { key: "negotiation", label: "Negotiation", order: 5 },
-  { key: "won", label: "Won", order: 6 },
-  { key: "lost", label: "Lost", order: 7 },
-  // Global telecalling call results — all business types / workspaces
-  { key: "rnr", label: "RNR", order: 10 },
-  { key: "busy", label: "Busy", order: 11 },
-  { key: "call_back", label: "Call back", order: 12 },
-  { key: "not_interested", label: "Not interested", order: 13 },
-  { key: "interested", label: "Interested", order: 14 },
-  { key: "switch_off", label: "Switch off", order: 15 },
-  { key: "no_incoming_calls", label: "No Incoming calls", order: 16 },
-  { key: "invalid_number", label: "Invalid number", order: 17 },
+  { key: "rnr", label: "RNR", order: 2 },
+  { key: "busy", label: "Busy", order: 3 },
+  { key: "call_back", label: "Call back", order: 4 },
+  { key: "not_interested", label: "Not interested", order: 5 },
+  { key: "interested", label: "Interested", order: 6 },
+  { key: "switch_off", label: "Switch off", order: 7 },
+  { key: "no_incoming_calls", label: "No Incoming calls", order: 8 },
+  { key: "invalid_number", label: "Invalid number", order: 9 },
+  { key: "won", label: "Won", order: 10 },
+  { key: "lost", label: "Lost", order: 11 },
+];
+
+/** Older sales keys — kept so existing leads remain filterable/editable */
+export const LEGACY_LEAD_STATUSES: PipelineStatus[] = [
+  { key: "contacted", label: "Contacted", order: 20 },
+  { key: "qualified", label: "Qualified", order: 21 },
+  { key: "proposal", label: "Proposal Sent", order: 22 },
+  { key: "negotiation", label: "Negotiation", order: 23 },
 ];
 
 export const FALLBACK_CONTACT_FIELDS: FieldDef[] = [
