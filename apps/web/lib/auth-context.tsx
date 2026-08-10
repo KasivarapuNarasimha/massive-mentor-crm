@@ -207,7 +207,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         }
 
-        // Background validation — if invalid, clear session (do not re-enter loading)
+        // Background validation — only clear session on definitive auth failure (401).
+        // 429 / 5xx / network errors must NOT log the user out.
         try {
           const response = await api.getCurrentUser(storedToken);
           if (cancelled) return;
@@ -215,11 +216,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(response.data.user);
             localStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
             if (response.data.user.role) setRole(response.data.user.role);
-          } else {
+            return;
+          }
+          const httpStatus = response.status;
+          const err = String(response.error || "");
+          const isUnauthorized =
+            httpStatus === 401 ||
+            /session expired|not authenticated|unauthorized|invalid token|invalid or expired/i.test(
+              err
+            );
+          // Rate limit / temporary server errors: keep local session
+          if (
+            httpStatus === 429 ||
+            (typeof httpStatus === "number" && httpStatus >= 500) ||
+            /too many requests|slow down|network|timeout|unreachable|failed to fetch/i.test(err)
+          ) {
+            return;
+          }
+          if (isUnauthorized) {
             clearSessionStorage();
             setToken(null);
             setUser(null);
           }
+          // Other non-success without clear 401: keep session (safer for production)
         } catch {
           // Network blip: keep local session, user can retry
         }

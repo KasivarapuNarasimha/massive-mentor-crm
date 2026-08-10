@@ -281,6 +281,7 @@ class ApiClient {
             success: false,
             error: (data.error as string) || "Session expired. Please sign in again.",
             code: data.code as string | undefined,
+            status: 401,
             ...(data.data !== undefined ? { data: data.data as T } : {}),
           };
         }
@@ -288,6 +289,7 @@ class ApiClient {
           success: false,
           error: (data.error as string) || `Request failed (${response.status})`,
           code: data.code as string | undefined,
+          status: response.status,
           ...(data.data !== undefined ? { data: data.data as T } : {}),
         };
       }

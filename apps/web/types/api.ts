@@ -4,6 +4,8 @@ export interface ApiResponse<T = unknown> {
   error?: string;
   /** Machine-readable code e.g. SESSION_LIMIT */
   code?: string;
+  /** HTTP status when the request failed (e.g. 401, 429, 500) */
+  status?: number;
 }
 
 export interface User {

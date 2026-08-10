@@ -81,6 +81,25 @@ export const mentorChatLimiter = rateLimit({
   },
 });
 
+/**
+ * Paths under /api that must NOT share the general IP bucket.
+ * Auth entrypoints keep their dedicated limiters (loginLimiter, etc.).
+ * When mounted via app.use("/api", …), req.path is relative to the mount.
+ */
+function isAuthEntrypointPath(req: Request): boolean {
+  const p = (req.path || "").split("?")[0];
+  const original = (req.originalUrl || "").split("?")[0];
+  const candidates = [p, original.replace(/^\/api/, "") || p];
+  const authPaths = new Set([
+    "/auth/login",
+    "/auth/register",
+    "/auth/forgot-password",
+    "/auth/reset-password",
+    "/auth/reset-password/validate",
+  ]);
+  return candidates.some((c) => authPaths.has(c));
+}
+
 /** General API rate limit — mitigates abuse / scraping */
 export const apiGeneralLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -93,7 +112,13 @@ export const apiGeneralLimiter = rateLimit({
   legacyHeaders: false,
   store: store("api"),
   validate: false,
-  skip: (req) => req.path === "/health" || req.path === "/ready",
+  skip: (req) => {
+    const p = req.path || "";
+    if (p === "/health" || p === "/ready") return true;
+    // Login/register/password-reset: dedicated limiters only (avoid lockout after heavy CRM use)
+    if (isAuthEntrypointPath(req)) return true;
+    return false;
+  },
 });
 
 /** Stricter export / backup download limiter */
