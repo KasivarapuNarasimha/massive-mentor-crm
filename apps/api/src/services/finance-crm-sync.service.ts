@@ -75,7 +75,7 @@ export async function upsertCrmRevenue(input: UpsertCrmRevenueInput) {
       where: {
         businessId,
         contactId: input.contactId,
-        stage: { in: ["closed_won", "won"] },
+        stage: { in: ["closed_won", "won", "closedwon"] },
       },
       select: { id: true },
       take: 20,
@@ -273,8 +273,13 @@ export async function syncDealWonFinance(
   prevStage: string,
   opts?: { contactName?: string | null }
 ) {
-  const isWon = /^(closed_)?won$/i.test(String(deal.stage || "").replace(/[\s-]+/g, "_"));
-  const wasWon = /^(closed_)?won$/i.test(String(prevStage || "").replace(/[\s-]+/g, "_"));
+  const normStage = (s: string) =>
+    String(s || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_");
+  const isWon = /^(closed_)?won$|^active$/.test(normStage(String(deal.stage || "")));
+  const wasWon = /^(closed_)?won$|^active$/.test(normStage(String(prevStage || "")));
   const valueNum =
     deal.value == null ? 0 : toMoneyNumber(deal.value as never);
 

@@ -94,23 +94,21 @@ const CRM_FIELDS: CrmImportField[] = [
 ];
 
 const DEFAULT_ALLOWED_STATUSES: Array<{ key: string; label: string }> = [
-  // Primary telecalling workflow
   { key: "new", label: "New" },
   { key: "rnr", label: "RNR" },
+  { key: "contacted", label: "Contacted" },
   { key: "busy", label: "Busy" },
+  { key: "qualified", label: "Qualified" },
   { key: "call_back", label: "Call back" },
+  { key: "proposal", label: "Proposal Sent" },
   { key: "not_interested", label: "Not interested" },
+  { key: "negotiation", label: "Negotiation" },
   { key: "interested", label: "Interested" },
   { key: "switch_off", label: "Switch off" },
   { key: "no_incoming_calls", label: "No Incoming calls" },
   { key: "invalid_number", label: "Invalid number" },
   { key: "won", label: "Won" },
   { key: "lost", label: "Lost" },
-  // Legacy (existing rows / older configs)
-  { key: "contacted", label: "Contacted" },
-  { key: "qualified", label: "Qualified" },
-  { key: "proposal", label: "Proposal Sent" },
-  { key: "negotiation", label: "Negotiation" },
 ];
 
 /** Normalized header token → CRM field key (Zoho / HubSpot / Salesforce / Sheets / Excel) */

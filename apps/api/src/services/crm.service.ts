@@ -166,7 +166,7 @@ export const dealSchema = z.object({
   contactId: z.string().optional().nullable(),
   title: z.string().min(1, "Title is required"),
   value: z.number().nonnegative().optional().nullable(),
-  stage: z.string().min(1).default("lead"),
+  stage: z.string().min(1).default("new"),
   expectedClose: flexibleDateTime,
   probability: z.number().int().min(0).max(100).optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
@@ -1581,17 +1581,10 @@ export async function updateDeal(userId: string, id: string, input: Partial<Deal
 
   const parsed = dealSchema.partial().parse(input);
 
-  // Normalize aliases so Kanban never stores both "won" and "closed_won"
+  // Normalize to unified Lead/Deal vocabulary (legacy closed_won → won, lead → new, …)
+  const { normalizeStatusKey } = await import("../lib/lead-statuses.js");
   const rawStage = parsed.stage ?? existing.stage;
-  const nextStage = (() => {
-    const s = String(rawStage || "lead")
-      .trim()
-      .toLowerCase()
-      .replace(/[\s-]+/g, "_");
-    if (s === "won" || s === "closedwon") return "closed_won";
-    if (s === "lost" || s === "closedlost") return "closed_lost";
-    return s || "lead";
-  })();
+  const nextStage = normalizeStatusKey(String(rawStage || "new")) || "new";
   const stageChanged =
     String(nextStage).trim().toLowerCase() !==
     String(existing.stage || "").trim().toLowerCase();
@@ -1614,7 +1607,7 @@ export async function updateDeal(userId: string, id: string, input: Partial<Deal
   let pipelineSync: PipelineSyncResult | null = null;
 
   if (stageChanged) {
-    if (/won|closed_won/i.test(nextStage)) {
+    if (/^(won|closed_won)$/i.test(nextStage)) {
       await notifyUser(userId, {
         type: "deal_won",
         title: "Deal won",
@@ -1622,7 +1615,7 @@ export async function updateDeal(userId: string, id: string, input: Partial<Deal
         entityType: "deal",
         entityId: updated.id,
       }).catch(() => {});
-    } else if (/lost|closed_lost/i.test(nextStage)) {
+    } else if (/^(lost|closed_lost)$/i.test(nextStage)) {
       await notifyUser(userId, {
         type: "deal_lost",
         title: "Deal lost",

@@ -49,11 +49,11 @@ export async function getContactFieldDefs(businessId: string | null | undefined)
 export async function getLeadPipelineStatuses(
   businessId: string | null | undefined
 ): Promise<Array<{ key: string; label: string; color?: string }>> {
-  const { TELECALLING_LEAD_STATUSES, mergeLeadStatusesWithCanonical } = await import(
+  const { UNIFIED_PIPELINE_STATUSES, mergeLeadStatusesWithCanonical } = await import(
     "../lib/lead-statuses.js"
   );
   if (!businessId) {
-    return TELECALLING_LEAD_STATUSES.map((s) => ({
+    return UNIFIED_PIPELINE_STATUSES.map((s) => ({
       key: s.key,
       label: s.label,
       color: s.color,
@@ -61,7 +61,7 @@ export async function getLeadPipelineStatuses(
   }
   const config = await getBusinessConfig(businessId);
   if (!config?.pipelines) {
-    return TELECALLING_LEAD_STATUSES.map((s) => ({
+    return UNIFIED_PIPELINE_STATUSES.map((s) => ({
       key: s.key,
       label: s.label,
       color: s.color,
@@ -73,7 +73,7 @@ export async function getLeadPipelineStatuses(
     statuses?: Array<{ key: string; label: string; color?: string; order?: number }>;
   }>;
   if (!Array.isArray(pipelines)) {
-    return TELECALLING_LEAD_STATUSES.map((s) => ({
+    return UNIFIED_PIPELINE_STATUSES.map((s) => ({
       key: s.key,
       label: s.label,
       color: s.color,

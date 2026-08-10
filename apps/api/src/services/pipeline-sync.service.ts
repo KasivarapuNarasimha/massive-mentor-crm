@@ -16,8 +16,13 @@ import { getUserBusinessId } from "./field-engine.service.js";
 import { tenantWhereClause } from "./tenant-scope.service.js";
 import {
   isCallResultStatus,
+  isClosedStatusKey,
+  isLostStatusKey,
+  isWonStatusKey,
   leadStatusLabel,
   leadStatusToDealStageKey,
+  normalizeStatusKey,
+  UNIFIED_PIPELINE_STATUSES,
 } from "../lib/lead-statuses.js";
 
 export type PipelineSyncResult = {
@@ -45,120 +50,68 @@ const DEFAULT_SETTINGS: PipelineSyncSettings = {
   protectClosedDeals: true,
 };
 
-/** Lead status → Deal stage (business rules) — includes global call-result statuses */
-const LEAD_STATUS_TO_DEAL_STAGE: Record<string, string> = {
-  new: "lead",
-  contacted: "lead",
-  qualified: "qualified",
-  proposal: "proposal",
-  proposal_sent: "proposal",
-  proposalsent: "proposal",
-  negotiation: "negotiation",
-  negotiating: "negotiation",
-  won: "closed_won",
-  lost: "closed_lost",
-  // client lifecycle
-  active: "closed_won",
-  churned: "closed_lost",
-  // Telecalling / call results (all business types) → open or terminal deal stages
-  rnr: "lead",
-  busy: "lead",
-  call_back: "lead",
-  callback: "lead",
-  switch_off: "lead",
-  switchoff: "lead",
-  no_incoming_calls: "lead",
-  no_incoming: "lead",
-  noincomingcalls: "lead",
-  interested: "qualified",
-  not_interested: "closed_lost",
-  invalid_number: "closed_lost",
-};
-
-/** Deal stage → Lead/Client status */
-const DEAL_STAGE_TO_LEAD: Record<
-  string,
-  { status: string; type?: "lead" | "client"; probability?: number }
-> = {
-  lead: { status: "contacted", type: "lead", probability: 10 },
-  qualified: { status: "qualified", type: "lead", probability: 30 },
-  proposal: { status: "proposal", type: "lead", probability: 50 },
-  negotiation: { status: "proposal", type: "lead", probability: 70 },
-  closed_won: { status: "won", type: "client", probability: 100 },
-  closed_lost: { status: "lost", type: "lead", probability: 0 },
-  won: { status: "won", type: "client", probability: 100 },
-  lost: { status: "lost", type: "lead", probability: 0 },
-};
-
-const STAGE_ORDER = [
-  "lead",
-  "qualified",
-  "proposal",
-  "negotiation",
-  "closed_won",
-  "closed_lost",
-];
+/** Unified 15-status order for rank/protect logic */
+const STAGE_ORDER = UNIFIED_PIPELINE_STATUSES.map((s) => s.key);
 
 function norm(s: string | null | undefined): string {
-  return (s || "").trim().toLowerCase().replace(/\s+/g, "_");
+  return normalizeStatusKey(s);
 }
 
+/**
+ * Lead status → Deal stage: 1:1 same vocabulary (after legacy normalize).
+ * Lead=RNR → Deal=RNR, Lead=Contacted → Deal=Contacted, etc.
+ */
 export function mapLeadStatusToDealStage(status: string): string | null {
-  const s = norm(status);
-  if (!s) return null;
-  if (LEAD_STATUS_TO_DEAL_STAGE[s]) return LEAD_STATUS_TO_DEAL_STAGE[s];
-  const mapped = leadStatusToDealStageKey(status);
-  if (mapped) return mapped;
-  if (/^won$|closed_won|converted|customer|enrolled/.test(s)) return "closed_won";
-  if (/^lost$|closed_lost|dead|rejected|churned/.test(s)) return "closed_lost";
-  if (/qualified|hot|warm|interested/.test(s)) return "qualified";
-  if (/proposal|quote|pitched/.test(s)) return "proposal";
-  if (/negotiat/.test(s)) return "negotiation";
-  if (/contact|outreach|called|rnr|busy|call_back|switch_off|no_incoming/.test(s)) return "lead";
-  if (/not_interested|invalid_number/.test(s)) return "closed_lost";
-  return null;
+  return leadStatusToDealStageKey(status);
 }
 
+/** Deal stage → Lead status: 1:1 after legacy normalize */
 export function mapDealStageToLeadStatus(stage: string): {
   status: string;
   type?: "lead" | "client";
   probability?: number;
 } | null {
-  const s = norm(stage);
+  const s = normalizeStatusKey(stage);
   if (!s) return null;
-  if (DEAL_STAGE_TO_LEAD[s]) return DEAL_STAGE_TO_LEAD[s];
-  if (/won|closed_won/.test(s)) return { status: "won", type: "client", probability: 100 };
-  if (/lost|closed_lost/.test(s)) return { status: "lost", type: "lead", probability: 0 };
-  return null;
+  if (isWonStatusKey(s)) {
+    return { status: "won", type: "client", probability: 100 };
+  }
+  if (isLostStatusKey(s)) {
+    return { status: "lost", type: "lead", probability: 0 };
+  }
+  return {
+    status: s,
+    type: "lead",
+    probability: probabilityForStage(s),
+  };
 }
 
 export function isWonStatus(status: string): boolean {
-  const s = norm(status);
-  return s === "won" || s === "closed_won" || s === "active" || /converted|customer/.test(s);
+  return isWonStatusKey(status) || /converted|customer|enrolled/i.test(String(status || ""));
 }
 
 export function isLostStatus(status: string): boolean {
-  const s = norm(status);
-  return s === "lost" || s === "closed_lost" || s === "churned" || s === "dead";
+  return isLostStatusKey(status);
 }
 
 export function isClosedDealStage(stage: string): boolean {
-  const s = norm(stage);
-  return /closed_won|closed_lost|^won$|^lost$/.test(s);
+  return isClosedStatusKey(stage);
 }
 
 function stageRank(stage: string): number {
-  const s = norm(stage);
+  const s = normalizeStatusKey(stage);
   const i = STAGE_ORDER.indexOf(s);
   return i >= 0 ? i : 0;
 }
 
 function probabilityForStage(targetStage: string): number {
-  if (targetStage === "closed_won") return 100;
-  if (targetStage === "closed_lost") return 0;
-  if (targetStage === "negotiation") return 70;
-  if (targetStage === "proposal") return 50;
-  if (targetStage === "qualified") return 30;
+  const s = normalizeStatusKey(targetStage);
+  if (s === "won") return 100;
+  if (s === "lost" || s === "not_interested" || s === "invalid_number") return 0;
+  if (s === "negotiation" || s === "interested") return 70;
+  if (s === "proposal") return 50;
+  if (s === "qualified" || s === "call_back") return 30;
+  if (s === "contacted" || s === "busy") return 15;
   return 10;
 }
 

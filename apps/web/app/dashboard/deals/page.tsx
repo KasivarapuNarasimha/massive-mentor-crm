@@ -12,6 +12,12 @@ import { toIsoDateTime, toDateInputValue } from "@/lib/date-input";
 import { useDataVersion } from "@/lib/data-events";
 import { PageLoading } from "@/components/ui/PageLoading";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
+import {
+  normalizePipelineStatus,
+  pipelineStatusLabel,
+  UNIFIED_PIPELINE_STATUSES,
+  UNIFIED_STATUS_KEYS,
+} from "@/lib/pipeline-statuses";
 
 interface Deal {
   id: string;
@@ -23,7 +29,6 @@ interface Deal {
   notes?: string;
   contactId?: string;
   contact?: { id: string; name: string; type: string; status?: string };
-  /** Latest Lead status (for My Deals display after Lead → Deal sync) */
   leadStatus?: string | null;
   leadStatusLabel?: string | null;
   customFields?: Record<string, unknown> | null;
@@ -31,47 +36,22 @@ interface Deal {
   updatedAt: string;
 }
 
-function dealLeadStatusLabel(deal: Deal): string | null {
-  const fromApi = deal.leadStatusLabel || deal.leadStatus;
-  if (fromApi) {
-    return String(fromApi)
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-  const cf = deal.customFields || {};
-  const lbl = cf.leadStatusLabel || cf.leadStatus || deal.contact?.status;
-  if (!lbl) return null;
-  return String(lbl)
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+/** Unified 15-status Kanban (same vocabulary as Leads) */
+const STAGES = UNIFIED_STATUS_KEYS as readonly string[];
+type StageKey = string;
+
+const STAGE_LABELS: Record<string, string> = Object.fromEntries(
+  UNIFIED_PIPELINE_STATUSES.map((s) => [s.key, s.label])
+);
+
+/** Map any API/legacy Deal.stage onto exactly one Kanban column key. */
+function normalizeDealStage(raw: string | null | undefined): StageKey {
+  return normalizePipelineStatus(raw);
 }
 
-const STAGES = ["lead", "qualified", "proposal", "negotiation", "closed_won", "closed_lost"] as const;
-type StageKey = (typeof STAGES)[number];
-
-const STAGE_LABELS: Record<string, string> = {
-  lead: "Lead",
-  qualified: "Qualified",
-  proposal: "Proposal",
-  negotiation: "Negotiation",
-  closed_won: "Closed Won",
-  closed_lost: "Closed Lost",
-};
-
-/** Map any API/legacy alias onto exactly one Kanban column key. */
-function normalizeDealStage(raw: string | null | undefined): StageKey {
-  const s = String(raw || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\s-]+/g, "_");
-  if (s === "closed_won" || s === "won" || s === "closedwon") return "closed_won";
-  if (s === "closed_lost" || s === "lost" || s === "closedlost") return "closed_lost";
-  if (s === "qualified" || s === "qualification") return "qualified";
-  if (s === "proposal" || s === "propose" || s === "quoted") return "proposal";
-  if (s === "negotiation" || s === "negotiate") return "negotiation";
-  if (s === "lead" || s === "new" || s === "contacted") return "lead";
-  if ((STAGES as readonly string[]).includes(s)) return s as StageKey;
-  return "lead";
+function stageLabel(stage: string): string {
+  const k = normalizeDealStage(stage);
+  return STAGE_LABELS[k] || pipelineStatusLabel(k) || stage || "Unknown";
 }
 
 /** One card per id — keep the most recently updated row. */
@@ -108,7 +88,7 @@ export default function DealsPage() {
   const [formData, setFormData] = useState({
     title: "",
     value: "",
-    stage: "lead",
+    stage: "new",
     expectedClose: "",
     probability: "",
     notes: "",
@@ -187,25 +167,18 @@ export default function DealsPage() {
    * Rebuilt every render from DB-backed state — no multi-column membership.
    */
   const dealsByStage = useMemo(() => {
-    const buckets: Record<StageKey, Deal[]> = {
-      lead: [],
-      qualified: [],
-      proposal: [],
-      negotiation: [],
-      closed_won: [],
-      closed_lost: [],
-    };
+    const buckets: Record<string, Deal[]> = {};
+    for (const key of STAGES) buckets[key] = [];
     const seen = new Set<string>();
     for (const deal of filteredDeals) {
       if (!deal?.id || seen.has(deal.id)) continue;
       seen.add(deal.id);
       const stage = normalizeDealStage(deal.stage);
+      if (!buckets[stage]) buckets[stage] = [];
       buckets[stage].push({ ...deal, stage });
     }
     return buckets;
   }, [filteredDeals]);
-
-  const stageLabel = (stage: string) => STAGE_LABELS[normalizeDealStage(stage)] || stage || "Unknown";
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -216,7 +189,7 @@ export default function DealsPage() {
     setFormData({
       title: "",
       value: "",
-      stage: "lead",
+      stage: "new",
       expectedClose: "",
       probability: "",
       notes: "",
@@ -229,7 +202,7 @@ export default function DealsPage() {
     setFormData({
       title: deal.title,
       value: deal.value ? String(deal.value) : "",
-      stage: deal.stage,
+      stage: normalizeDealStage(deal.stage),
       expectedClose: toDateInputValue(deal.expectedClose),
       probability: deal.probability ? String(deal.probability) : "",
       notes: deal.notes || "",
@@ -490,14 +463,6 @@ export default function DealsPage() {
                         {deal.contact?.name ? (
                           <div className="text-xs text-muted-foreground">{deal.contact.name}</div>
                         ) : null}
-                        {dealLeadStatusLabel(deal) ? (
-                          <div className="text-[11px] text-sky-300/90">
-                            Lead status:{" "}
-                            <span className="font-medium text-foreground">
-                              {dealLeadStatusLabel(deal)}
-                            </span>
-                          </div>
-                        ) : null}
                         <div className="flex justify-between items-center gap-2">
                           <div className="text-sm text-emerald-400 tabular-nums">
                             {deal.value != null ? formatCurrency(deal.value) : "—"}
@@ -521,7 +486,7 @@ export default function DealsPage() {
                         </div>
                         {/* Stage change on mobile (no drag) */}
                         <select
-                          value={deal.stage}
+                          value={normalizeDealStage(deal.stage)}
                           onChange={async (e) => {
                             if (!token || e.target.value === deal.stage) return;
                             const newStage = normalizeDealStage(e.target.value);
@@ -562,8 +527,9 @@ export default function DealsPage() {
             ))}
           </div>
 
-          {/* Tablet+: multi-column kanban; desktop full 6-col pipeline */}
-          <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* Tablet/desktop: horizontal scroll for 15-status pipeline */}
+          <div className="hidden md:block overflow-x-auto pb-2">
+            <div className="flex gap-3 min-w-max">
             {STAGES.map((stage) => (
               <div
                 key={stage}
@@ -573,7 +539,7 @@ export default function DealsPage() {
                     stageColRefs.current[stage] = el;
                   }
                 }}
-                className={`bg-card border rounded-2xl p-3 min-h-[400px] ${
+                className={`bg-card border rounded-2xl p-3 min-h-[400px] w-[200px] shrink-0 ${
                   highlightStage === stage
                     ? "border-violet-500/60 ring-2 ring-violet-500/30"
                     : "border-border"
@@ -581,9 +547,11 @@ export default function DealsPage() {
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, stage)}
               >
-                <div className="flex items-center justify-between mb-3 px-1">
-                  <div className="text-sm font-semibold text-white/90">{stageLabel(stage)}</div>
-                  <div className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                <div className="flex items-center justify-between mb-3 px-1 gap-1">
+                  <div className="text-xs font-semibold text-foreground leading-tight">
+                    {stageLabel(stage)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
                     {(dealsByStage[stage] || []).length}
                   </div>
                 </div>
@@ -598,15 +566,7 @@ export default function DealsPage() {
                       >
                         <div className="font-medium text-sm text-foreground mb-1.5">{deal.title || "Untitled"}</div>
                         {deal.contact?.name ? (
-                          <div className="text-xs text-muted-foreground mb-1">{deal.contact.name}</div>
-                        ) : null}
-                        {dealLeadStatusLabel(deal) ? (
-                          <div className="text-[11px] text-sky-300/90 mb-2">
-                            Lead status:{" "}
-                            <span className="font-medium text-foreground">
-                              {dealLeadStatusLabel(deal)}
-                            </span>
-                          </div>
+                          <div className="text-xs text-muted-foreground mb-2">{deal.contact.name}</div>
                         ) : null}
                         <div className="flex justify-between items-center text-xs">
                           <div className="text-emerald-400">
@@ -639,6 +599,7 @@ export default function DealsPage() {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         </>
       ) : (

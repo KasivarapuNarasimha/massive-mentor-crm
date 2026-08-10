@@ -218,38 +218,38 @@ const CORE_CONTACT_FIELDS: IndustryTemplateManifest["fields"] = [
   },
 ];
 
+/** Shared 15-status vocabulary for Lead + Deal (same keys, same order). */
+const UNIFIED_PIPELINE_STATUS_LIST = [
+  { key: "new", label: "New", color: "#3b82f6", order: 1 },
+  { key: "rnr", label: "RNR", color: "#64748b", order: 2 },
+  { key: "contacted", label: "Contacted", color: "#8b5cf6", order: 3 },
+  { key: "busy", label: "Busy", color: "#94a3b8", order: 4 },
+  { key: "qualified", label: "Qualified", color: "#06b6d4", order: 5 },
+  { key: "call_back", label: "Call back", color: "#38bdf8", order: 6 },
+  { key: "proposal", label: "Proposal Sent", color: "#f59e0b", order: 7 },
+  { key: "not_interested", label: "Not interested", color: "#f87171", order: 8 },
+  { key: "negotiation", label: "Negotiation", color: "#f97316", order: 9 },
+  { key: "interested", label: "Interested", color: "#34d399", order: 10 },
+  { key: "switch_off", label: "Switch off", color: "#a78bfa", order: 11 },
+  { key: "no_incoming_calls", label: "No Incoming calls", color: "#fb923c", order: 12 },
+  { key: "invalid_number", label: "Invalid number", color: "#ef4444", order: 13 },
+  { key: "won", label: "Won", color: "#22c55e", isWon: true, order: 14 },
+  { key: "lost", label: "Lost", color: "#ef4444", isLost: true, order: 15 },
+];
+
 const DEFAULT_LEAD_PIPELINE: IndustryTemplateManifest["pipelines"][0] = {
   key: "lead",
   label: "Lead Pipeline",
   entity: "contact",
-  // Telecalling Lead workflow (all business types). Deal pipeline stays separate.
-  statuses: [
-    { key: "new", label: "New", color: "#3b82f6", order: 1 },
-    { key: "rnr", label: "RNR", color: "#64748b", order: 2 },
-    { key: "busy", label: "Busy", color: "#94a3b8", order: 3 },
-    { key: "call_back", label: "Call back", color: "#38bdf8", order: 4 },
-    { key: "not_interested", label: "Not interested", color: "#f87171", order: 5 },
-    { key: "interested", label: "Interested", color: "#34d399", order: 6 },
-    { key: "switch_off", label: "Switch off", color: "#a78bfa", order: 7 },
-    { key: "no_incoming_calls", label: "No Incoming calls", color: "#fb923c", order: 8 },
-    { key: "invalid_number", label: "Invalid number", color: "#ef4444", order: 9 },
-    { key: "won", label: "Won", color: "#22c55e", isWon: true, order: 10 },
-    { key: "lost", label: "Lost", color: "#ef4444", isLost: true, order: 11 },
-  ],
+  statuses: UNIFIED_PIPELINE_STATUS_LIST,
 };
 
 const DEFAULT_DEAL_PIPELINE: IndustryTemplateManifest["pipelines"][0] = {
   key: "deal",
   label: "Deal Pipeline",
   entity: "deal",
-  statuses: [
-    { key: "lead", label: "Lead", order: 1 },
-    { key: "qualified", label: "Qualified", order: 2 },
-    { key: "proposal", label: "Proposal", order: 3 },
-    { key: "negotiation", label: "Negotiation", order: 4 },
-    { key: "closed_won", label: "Closed Won", isWon: true, order: 5 },
-    { key: "closed_lost", label: "Closed Lost", isLost: true, order: 6 },
-  ],
+  // Same 15 statuses as Lead (1:1 sync vocabulary)
+  statuses: UNIFIED_PIPELINE_STATUS_LIST,
 };
 
 const DEFAULT_AI_FEATURES: IndustryTemplateManifest["aiPromptPack"]["features"] = [
