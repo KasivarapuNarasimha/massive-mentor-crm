@@ -102,7 +102,7 @@ export function getContactFieldValue(
 }
 
 export const FALLBACK_LEAD_STATUSES: PipelineStatus[] = [
-  // Keep in sync with apps/api DEFAULT_LEAD_PIPELINE keys
+  // Keep in sync with apps/api DEFAULT_LEAD_PIPELINE + lead-statuses.ts
   { key: "new", label: "New", order: 1 },
   { key: "contacted", label: "Contacted", order: 2 },
   { key: "qualified", label: "Qualified", order: 3 },
@@ -110,6 +110,15 @@ export const FALLBACK_LEAD_STATUSES: PipelineStatus[] = [
   { key: "negotiation", label: "Negotiation", order: 5 },
   { key: "won", label: "Won", order: 6 },
   { key: "lost", label: "Lost", order: 7 },
+  // Global telecalling call results — all business types / workspaces
+  { key: "rnr", label: "RNR", order: 10 },
+  { key: "busy", label: "Busy", order: 11 },
+  { key: "call_back", label: "Call back", order: 12 },
+  { key: "not_interested", label: "Not interested", order: 13 },
+  { key: "interested", label: "Interested", order: 14 },
+  { key: "switch_off", label: "Switch off", order: 15 },
+  { key: "no_incoming_calls", label: "No Incoming calls", order: 16 },
+  { key: "invalid_number", label: "Invalid number", order: 17 },
 ];
 
 export const FALLBACK_CONTACT_FIELDS: FieldDef[] = [

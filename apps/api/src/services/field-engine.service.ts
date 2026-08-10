@@ -49,23 +49,45 @@ export async function getContactFieldDefs(businessId: string | null | undefined)
 export async function getLeadPipelineStatuses(
   businessId: string | null | undefined
 ): Promise<Array<{ key: string; label: string; color?: string }>> {
-  if (!businessId) return [];
+  const { CANONICAL_LEAD_STATUSES, mergeLeadStatusesWithCanonical } = await import(
+    "../lib/lead-statuses.js"
+  );
+  if (!businessId) {
+    return CANONICAL_LEAD_STATUSES.map((s) => ({
+      key: s.key,
+      label: s.label,
+      color: s.color,
+    }));
+  }
   const config = await getBusinessConfig(businessId);
-  if (!config?.pipelines) return [];
+  if (!config?.pipelines) {
+    return CANONICAL_LEAD_STATUSES.map((s) => ({
+      key: s.key,
+      label: s.label,
+      color: s.color,
+    }));
+  }
   const pipelines = config.pipelines as Array<{
     key: string;
     entity: string;
     statuses?: Array<{ key: string; label: string; color?: string; order?: number }>;
   }>;
-  if (!Array.isArray(pipelines)) return [];
+  if (!Array.isArray(pipelines)) {
+    return CANONICAL_LEAD_STATUSES.map((s) => ({
+      key: s.key,
+      label: s.label,
+      color: s.color,
+    }));
+  }
   const lead =
     pipelines.find((p) => p.entity === "contact" && p.key === "lead") ||
     pipelines.find((p) => p.entity === "contact");
-  if (!lead?.statuses?.length) return [];
-  return lead.statuses
-    .slice()
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    .map((s) => ({ key: s.key, label: s.label, color: s.color }));
+  const fromConfig = lead?.statuses?.length ? lead.statuses : [];
+  return mergeLeadStatusesWithCanonical(fromConfig).map((s) => ({
+    key: s.key,
+    label: s.label,
+    color: s.color,
+  }));
 }
 
 /**

@@ -97,9 +97,19 @@ const DEFAULT_ALLOWED_STATUSES: Array<{ key: string; label: string }> = [
   { key: "new", label: "New" },
   { key: "contacted", label: "Contacted" },
   { key: "qualified", label: "Qualified" },
-  { key: "proposal", label: "Proposal" },
+  { key: "proposal", label: "Proposal Sent" },
+  { key: "negotiation", label: "Negotiation" },
   { key: "won", label: "Won" },
   { key: "lost", label: "Lost" },
+  // Global telecalling call results (all business types)
+  { key: "rnr", label: "RNR" },
+  { key: "busy", label: "Busy" },
+  { key: "call_back", label: "Call back" },
+  { key: "not_interested", label: "Not interested" },
+  { key: "interested", label: "Interested" },
+  { key: "switch_off", label: "Switch off" },
+  { key: "no_incoming_calls", label: "No Incoming calls" },
+  { key: "invalid_number", label: "Invalid number" },
 ];
 
 /** Normalized header token → CRM field key (Zoho / HubSpot / Salesforce / Sheets / Excel) */

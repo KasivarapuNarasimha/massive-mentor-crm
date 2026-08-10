@@ -14,6 +14,11 @@ import { recordAudit } from "./audit.service.js";
 import { scheduleFollowupRefresh } from "./followup-engine.service.js";
 import { getUserBusinessId } from "./field-engine.service.js";
 import { tenantWhereClause } from "./tenant-scope.service.js";
+import {
+  isCallResultStatus,
+  leadStatusLabel,
+  leadStatusToDealStageKey,
+} from "../lib/lead-statuses.js";
 
 export type PipelineSyncResult = {
   dealsUpdated: number;
@@ -40,7 +45,7 @@ const DEFAULT_SETTINGS: PipelineSyncSettings = {
   protectClosedDeals: true,
 };
 
-/** Lead status → Deal stage (business rules) */
+/** Lead status → Deal stage (business rules) — includes global call-result statuses */
 const LEAD_STATUS_TO_DEAL_STAGE: Record<string, string> = {
   new: "lead",
   contacted: "lead",
@@ -55,6 +60,19 @@ const LEAD_STATUS_TO_DEAL_STAGE: Record<string, string> = {
   // client lifecycle
   active: "closed_won",
   churned: "closed_lost",
+  // Telecalling / call results (all business types) → open or terminal deal stages
+  rnr: "lead",
+  busy: "lead",
+  call_back: "lead",
+  callback: "lead",
+  switch_off: "lead",
+  switchoff: "lead",
+  no_incoming_calls: "lead",
+  no_incoming: "lead",
+  noincomingcalls: "lead",
+  interested: "qualified",
+  not_interested: "closed_lost",
+  invalid_number: "closed_lost",
 };
 
 /** Deal stage → Lead/Client status */
@@ -89,12 +107,15 @@ export function mapLeadStatusToDealStage(status: string): string | null {
   const s = norm(status);
   if (!s) return null;
   if (LEAD_STATUS_TO_DEAL_STAGE[s]) return LEAD_STATUS_TO_DEAL_STAGE[s];
+  const mapped = leadStatusToDealStageKey(status);
+  if (mapped) return mapped;
   if (/^won$|closed_won|converted|customer|enrolled/.test(s)) return "closed_won";
   if (/^lost$|closed_lost|dead|rejected|churned/.test(s)) return "closed_lost";
-  if (/qualified|hot|warm/.test(s)) return "qualified";
+  if (/qualified|hot|warm|interested/.test(s)) return "qualified";
   if (/proposal|quote|pitched/.test(s)) return "proposal";
   if (/negotiat/.test(s)) return "negotiation";
-  if (/contact|outreach|called/.test(s)) return "lead";
+  if (/contact|outreach|called|rnr|busy|call_back|switch_off|no_incoming/.test(s)) return "lead";
+  if (/not_interested|invalid_number/.test(s)) return "closed_lost";
   return null;
 }
 
@@ -242,16 +263,20 @@ export async function syncFromLeadStatusChange(
   const terminal = isWonStatus(contact.status) || isLostStatus(contact.status);
 
   // Won/lost ALWAYS create-or-update a deal (production requirement).
+  // Call-result statuses also create/update so My Deals reflects telecalling outcomes.
   // Earlier pipeline stages respect autoCreateDeal setting.
   const stageCreatesDeal =
     terminal ||
+    isCallResultStatus(contact.status) ||
     targetStage === "proposal" ||
     targetStage === "negotiation" ||
     targetStage === "qualified" ||
     ["proposal", "proposal_sent", "negotiation", "qualified", "won", "lost"].includes(next);
 
   const shouldCreateIfMissing =
-    terminal || (settings.autoCreateDeal && stageCreatesDeal);
+    terminal ||
+    isCallResultStatus(contact.status) ||
+    (settings.autoCreateDeal && stageCreatesDeal);
 
   await prisma.$transaction(
     async (tx) => {
@@ -354,22 +379,25 @@ export async function syncFromLeadStatusChange(
             value: contact.value ?? null,
             stage: targetStage,
             probability,
-            notes: `Auto-created from lead status → ${contact.status}`,
+            notes: `Auto-created from lead status → ${leadStatusLabel(contact.status)}`,
             customFields: {
               autoCreatedFromLead: true,
-              leadStatus: contact.status,
+              leadStatus: norm(contact.status),
+              leadStatusLabel: leadStatusLabel(contact.status),
             },
           },
         });
         result.dealCreated = true;
         result.dealIds.push(created.id);
-        result.messages.push(`Deal created at stage ${targetStage}`);
+        result.messages.push(
+          `Deal created at stage ${targetStage} (lead status: ${leadStatusLabel(contact.status)})`
+        );
         return;
       }
 
       // Update existing deal(s) — prefer primary (most recently updated)
       for (const deal of deals) {
-        if (!terminal) {
+        if (!terminal && !isCallResultStatus(contact.status)) {
           if (settings.protectClosedDeals && isClosedDealStage(deal.stage)) {
             const allow =
               (isWonStatus(contact.status) && /lost|closed_lost/i.test(deal.stage)) ||
@@ -386,13 +414,18 @@ export async function syncFromLeadStatusChange(
           }
         }
 
+        const prevCf = (deal.customFields || {}) as Record<string, unknown>;
+        const nextLeadStatus = norm(contact.status);
         const needsStage = norm(deal.stage) !== norm(targetStage) || deal.stage !== targetStage;
         const needsLink = deal.contactId !== contact.id;
         const needsBiz = !!(businessId && deal.businessId !== businessId);
         const needsValue =
           contact.value != null && (deal.value == null || deal.value === undefined);
+        const needsLeadStatus =
+          String(prevCf.leadStatus || "") !== nextLeadStatus ||
+          String(prevCf.leadStatusLabel || "") !== leadStatusLabel(contact.status);
 
-        if (!needsStage && !needsLink && !needsBiz && !needsValue) {
+        if (!needsStage && !needsLink && !needsBiz && !needsValue && !needsLeadStatus) {
           // Still record as "synced" for primary deal so UI can refresh
           if (result.dealIds.length === 0) result.dealIds.push(deal.id);
           continue;
@@ -406,11 +439,18 @@ export async function syncFromLeadStatusChange(
             probability,
             ...(businessId ? { businessId } : {}),
             ...(needsValue ? { value: contact.value } : {}),
+            customFields: {
+              ...prevCf,
+              leadStatus: nextLeadStatus,
+              leadStatusLabel: leadStatusLabel(contact.status),
+            },
           },
         });
         result.dealsUpdated++;
         result.dealIds.push(updated.id);
-        result.messages.push(`Deal "${updated.title}" → ${targetStage}`);
+        result.messages.push(
+          `Deal "${updated.title}" → ${targetStage} (${leadStatusLabel(contact.status)})`
+        );
       }
 
       // If protect-closed skipped all and we still need a deal for won/lost, create one
@@ -427,16 +467,19 @@ export async function syncFromLeadStatusChange(
             value: contact.value ?? null,
             stage: targetStage,
             probability,
-            notes: `Auto-created from lead status → ${contact.status}`,
+            notes: `Auto-created from lead status → ${leadStatusLabel(contact.status)}`,
             customFields: {
               autoCreatedFromLead: true,
-              leadStatus: contact.status,
+              leadStatus: norm(contact.status),
+              leadStatusLabel: leadStatusLabel(contact.status),
             },
           },
         });
         result.dealCreated = true;
         result.dealIds.push(created.id);
-        result.messages.push(`Deal created at stage ${targetStage}`);
+        result.messages.push(
+          `Deal created at stage ${targetStage} (${leadStatusLabel(contact.status)})`
+        );
       }
     },
     {

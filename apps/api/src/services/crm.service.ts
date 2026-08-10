@@ -1478,10 +1478,36 @@ export async function getDeals(userId: string, filters?: DealListFilters) {
       orderBy: { [sortBy]: sortDir },
       skip,
       take,
-      include: { contact: { select: { id: true, name: true, type: true } } },
+      include: {
+        contact: {
+          select: { id: true, name: true, type: true, status: true },
+        },
+      },
     }),
   ]);
-  return paginated(items, total, page, pageSize);
+  // Surface latest Lead status for My Deals cards (from contact + customFields.leadStatus)
+  const enriched = items.map((d) => {
+    const cf = (d.customFields || {}) as Record<string, unknown>;
+    const leadStatus =
+      (d.contact as { status?: string } | null)?.status ||
+      (typeof cf.leadStatus === "string" ? cf.leadStatus : null) ||
+      null;
+    const leadStatusLabel =
+      (typeof cf.leadStatusLabel === "string" ? cf.leadStatusLabel : null) ||
+      leadStatus;
+    return {
+      ...d,
+      leadStatus,
+      leadStatusLabel,
+      contact: d.contact
+        ? {
+            ...d.contact,
+            status: (d.contact as { status?: string }).status,
+          }
+        : d.contact,
+    };
+  });
+  return paginated(enriched, total, page, pageSize);
 }
 
 export async function createDeal(userId: string, input: DealInput) {

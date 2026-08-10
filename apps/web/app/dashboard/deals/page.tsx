@@ -22,9 +22,28 @@ interface Deal {
   probability?: number;
   notes?: string;
   contactId?: string;
-  contact?: { id: string; name: string; type: string };
+  contact?: { id: string; name: string; type: string; status?: string };
+  /** Latest Lead status (for My Deals display after Lead → Deal sync) */
+  leadStatus?: string | null;
+  leadStatusLabel?: string | null;
+  customFields?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
+}
+
+function dealLeadStatusLabel(deal: Deal): string | null {
+  const fromApi = deal.leadStatusLabel || deal.leadStatus;
+  if (fromApi) {
+    return String(fromApi)
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  const cf = deal.customFields || {};
+  const lbl = cf.leadStatusLabel || cf.leadStatus || deal.contact?.status;
+  if (!lbl) return null;
+  return String(lbl)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 const STAGES = ["lead", "qualified", "proposal", "negotiation", "closed_won", "closed_lost"] as const;
@@ -130,6 +149,9 @@ export default function DealsPage() {
             title: d?.title || "Untitled",
             // Exactly one pipeline stage — aliases collapse here
             stage: normalizeDealStage(d?.stage),
+            leadStatus: d?.leadStatus ?? d?.contact?.status ?? null,
+            leadStatusLabel: d?.leadStatusLabel ?? null,
+            customFields: d?.customFields ?? null,
           }))
         );
         setDeals(normalized);
@@ -468,6 +490,14 @@ export default function DealsPage() {
                         {deal.contact?.name ? (
                           <div className="text-xs text-muted-foreground">{deal.contact.name}</div>
                         ) : null}
+                        {dealLeadStatusLabel(deal) ? (
+                          <div className="text-[11px] text-sky-300/90">
+                            Lead status:{" "}
+                            <span className="font-medium text-foreground">
+                              {dealLeadStatusLabel(deal)}
+                            </span>
+                          </div>
+                        ) : null}
                         <div className="flex justify-between items-center gap-2">
                           <div className="text-sm text-emerald-400 tabular-nums">
                             {deal.value != null ? formatCurrency(deal.value) : "—"}
@@ -568,7 +598,15 @@ export default function DealsPage() {
                       >
                         <div className="font-medium text-sm text-foreground mb-1.5">{deal.title || "Untitled"}</div>
                         {deal.contact?.name ? (
-                          <div className="text-xs text-muted-foreground mb-2">{deal.contact.name}</div>
+                          <div className="text-xs text-muted-foreground mb-1">{deal.contact.name}</div>
+                        ) : null}
+                        {dealLeadStatusLabel(deal) ? (
+                          <div className="text-[11px] text-sky-300/90 mb-2">
+                            Lead status:{" "}
+                            <span className="font-medium text-foreground">
+                              {dealLeadStatusLabel(deal)}
+                            </span>
+                          </div>
                         ) : null}
                         <div className="flex justify-between items-center text-xs">
                           <div className="text-emerald-400">

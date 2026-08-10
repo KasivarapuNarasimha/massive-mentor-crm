@@ -222,6 +222,7 @@ const DEFAULT_LEAD_PIPELINE: IndustryTemplateManifest["pipelines"][0] = {
   key: "lead",
   label: "Lead Pipeline",
   entity: "contact",
+  // Classic sales stages + global telecalling call-result statuses (all business types)
   statuses: [
     { key: "new", label: "New", color: "#3b82f6", order: 1 },
     { key: "contacted", label: "Contacted", color: "#8b5cf6", order: 2 },
@@ -230,6 +231,14 @@ const DEFAULT_LEAD_PIPELINE: IndustryTemplateManifest["pipelines"][0] = {
     { key: "negotiation", label: "Negotiation", color: "#f97316", order: 5 },
     { key: "won", label: "Won", color: "#22c55e", isWon: true, order: 6 },
     { key: "lost", label: "Lost", color: "#ef4444", isLost: true, order: 7 },
+    { key: "rnr", label: "RNR", color: "#64748b", order: 10 },
+    { key: "busy", label: "Busy", color: "#94a3b8", order: 11 },
+    { key: "call_back", label: "Call back", color: "#38bdf8", order: 12 },
+    { key: "not_interested", label: "Not interested", color: "#f87171", order: 13 },
+    { key: "interested", label: "Interested", color: "#34d399", order: 14 },
+    { key: "switch_off", label: "Switch off", color: "#a78bfa", order: 15 },
+    { key: "no_incoming_calls", label: "No Incoming calls", color: "#fb923c", order: 16 },
+    { key: "invalid_number", label: "Invalid number", color: "#ef4444", order: 17 },
   ],
 };
 
