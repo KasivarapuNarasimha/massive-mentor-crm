@@ -33,7 +33,10 @@ export function DynamicForm({
     <form id={formId} onSubmit={onSubmit} className="space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {visible.map((field) => {
-          const fullWidth = field.type === "textarea" || field.key === "description";
+          const fullWidth =
+            field.type === "textarea" ||
+            field.key === "description" ||
+            field.key === "feedback";
           return (
             <div key={field.key} className={fullWidth ? "sm:col-span-2" : undefined}>
               <DynamicField

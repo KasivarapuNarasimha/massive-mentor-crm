@@ -83,9 +83,12 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
             id={id}
             value={str}
             disabled={disabled}
-            rows={3}
+            rows={field.rows && field.rows > 0 ? field.rows : field.key === "feedback" ? 6 : 3}
+            placeholder={field.placeholder || undefined}
             onChange={(e) => onChange(field.key, e.target.value)}
-            className={`${inputClass} resize-y`}
+            className={`${inputClass} resize-y${
+              field.key === "feedback" || (field.rows && field.rows >= 5) ? " min-h-[8rem]" : ""
+            }`}
           />
         </div>
       );

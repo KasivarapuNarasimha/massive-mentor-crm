@@ -17,6 +17,9 @@ export type FieldDef = {
   showInDetail?: boolean;
   defaultValue?: unknown;
   order?: number;
+  /** Optional textarea rows (UI only) */
+  rows?: number;
+  placeholder?: string;
 };
 
 export type PipelineStatus = {
@@ -145,6 +148,22 @@ export const FALLBACK_LEAD_STATUSES: PipelineStatus[] = [
   { key: "lost", label: "Lost", order: 15 },
 ];
 
+/** Lead Feedback — stored in Contact.customFields.feedback (no schema migration). */
+export const LEAD_FEEDBACK_FIELD: FieldDef = {
+  key: "feedback",
+  label: "Feedback",
+  entity: "contact",
+  type: "textarea",
+  required: false,
+  showInList: false,
+  showInForm: true,
+  showInFilter: false,
+  showInDetail: true,
+  order: 90,
+  rows: 6,
+  placeholder: "Sales / customer feedback notes…",
+};
+
 export const FALLBACK_CONTACT_FIELDS: FieldDef[] = [
   { key: "name", label: "Name", entity: "contact", type: "text", required: true, coreMap: "name", showInList: true, showInForm: true, order: 1 },
   { key: "phone", label: "Phone", entity: "contact", type: "phone", coreMap: "phone", showInList: true, showInForm: true, order: 2 },
@@ -154,4 +173,21 @@ export const FALLBACK_CONTACT_FIELDS: FieldDef[] = [
   { key: "source", label: "Source", entity: "contact", type: "text", coreMap: undefined, showInForm: true, order: 6 },
   { key: "value", label: "Value", entity: "contact", type: "currency", coreMap: "value", showInForm: true, order: 7 },
   { key: "description", label: "Description", entity: "contact", type: "textarea", coreMap: "description", showInForm: true, order: 8 },
+  LEAD_FEEDBACK_FIELD,
 ];
+
+/**
+ * Ensure Lead form always includes Feedback even when BusinessConfig fields omit it.
+ * Does not replace existing fields; only injects when missing.
+ */
+export function ensureLeadFormFields(fields: FieldDef[]): FieldDef[] {
+  if (!fields.length) return [...FALLBACK_CONTACT_FIELDS];
+  if (fields.some((f) => f.key === "feedback")) {
+    return fields;
+  }
+  const maxOrder = fields.reduce((m, f) => Math.max(m, f.order ?? 0), 0);
+  return [
+    ...fields,
+    { ...LEAD_FEEDBACK_FIELD, order: maxOrder + 1 },
+  ];
+}

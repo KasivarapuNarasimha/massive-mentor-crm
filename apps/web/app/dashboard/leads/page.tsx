@@ -31,6 +31,7 @@ import {
   getContactFieldValue,
   FALLBACK_CONTACT_FIELDS,
   FALLBACK_LEAD_STATUSES,
+  ensureLeadFormFields,
 } from "@/lib/business-config";
 import { formatCurrency, parseAmount } from "@/lib/currency";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
@@ -358,7 +359,9 @@ export default function LeadsPage() {
 
   const fieldDefs: FieldDef[] = useMemo(() => {
     const fromConfig = contactFieldsFromConfig(bizConfig);
-    return fromConfig.length ? fromConfig : FALLBACK_CONTACT_FIELDS;
+    const base = fromConfig.length ? fromConfig : FALLBACK_CONTACT_FIELDS;
+    // Always expose Feedback on New/Edit Lead (customFields.feedback)
+    return ensureLeadFormFields(base);
   }, [bizConfig]);
 
   const tableFields = useMemo(() => listFields(fieldDefs), [fieldDefs]);
