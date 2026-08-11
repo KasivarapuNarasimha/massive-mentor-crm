@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -145,6 +145,8 @@ export default function LeadsPage() {
   const [bizConfig, setBizConfig] = useState<BusinessConfigDTO | null>(null);
   const [templateSlug, setTemplateSlug] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /** Sync lock — state alone cannot block double-click before re-render */
+  const submitLockRef = useRef(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importReport, setImportReport] = useState<ImportReport | null>(null);
@@ -807,7 +809,8 @@ export default function LeadsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    // Guard before setState — blocks double-click / double-submit races
+    if (!token || isSubmitting || submitLockRef.current) return;
 
     const payload = buildContactPayload(fieldDefs, formValues, "lead");
     if (!payload.name || !String(payload.name).trim()) {
@@ -817,49 +820,51 @@ export default function LeadsPage() {
     // Always store userId (or null), never free-text name/email
     payload.assignedTo = formAssigneeId.trim() || null;
 
+    submitLockRef.current = true;
     setIsSubmitting(true);
-    const apiResponse = editingLead
-      ? await api.updateCrmContact(editingLead.id, payload, token)
-      : await api.createCrmContact(payload, token);
+    try {
+      const apiResponse = editingLead
+        ? await api.updateCrmContact(editingLead.id, payload, token)
+        : await api.createCrmContact(payload, token);
 
-    if (apiResponse.success) {
-      const sync = (
-        apiResponse.data as {
-          pipelineSync?: {
-            dealCreated?: boolean;
-            dealsUpdated?: number;
-            contactConvertedToClient?: boolean;
-            promptCreateDeal?: boolean;
-            messages?: string[];
-          } | null;
-        } | undefined
-      )?.pipelineSync;
+      if (apiResponse.success) {
+        const sync = (
+          apiResponse.data as {
+            pipelineSync?: {
+              dealCreated?: boolean;
+              dealsUpdated?: number;
+              contactConvertedToClient?: boolean;
+              promptCreateDeal?: boolean;
+              messages?: string[];
+            } | null;
+          } | undefined
+        )?.pipelineSync;
 
-      let msg: string = editingLead ? SuccessMsg.leadUpdated : SuccessMsg.leadCreated;
-      if (sync?.contactConvertedToClient) msg = "Lead won — converted to Client";
-      else if (sync?.dealCreated) msg = "Lead updated — deal created & pipeline synced";
-      else if (sync?.dealsUpdated) msg = `Lead updated — ${sync.dealsUpdated} deal(s) synced`;
-      toast.success(msg);
-      if (sync?.messages?.length) {
-        toast.message(sync.messages.slice(0, 2).join(" · "), { duration: 5000 });
+        let msg: string = editingLead ? SuccessMsg.leadUpdated : SuccessMsg.leadCreated;
+        if (sync?.contactConvertedToClient) msg = "Lead won — converted to Client";
+        else if (sync?.dealCreated) msg = "Lead updated — deal created & pipeline synced";
+        else if (sync?.dealsUpdated) msg = `Lead updated — ${sync.dealsUpdated} deal(s) synced`;
+        toast.success(msg);
+        if (sync?.messages?.length) {
+          toast.message(sync.messages.slice(0, 2).join(" · "), { duration: 5000 });
+        }
+        if (sync?.promptCreateDeal) {
+          toast.message("No linked deal. Create one from Deals, or enable auto-create in business settings.", {
+            duration: 7000,
+          });
+        }
+        closeModal();
+        const { emitDataChanged } = await import("@/lib/data-events");
+        // One consolidated refresh — avoids 4× notification/media fan-out from DashboardShell
+        emitDataChanged({ module: "all", action: editingLead ? "update" : "create" });
+        await loadLeads();
+      } else {
+        toast.error(friendlyError(apiResponse.error, "Could not save lead. Please try again."));
       }
-      if (sync?.promptCreateDeal) {
-        toast.message("No linked deal. Create one from Deals, or enable auto-create in business settings.", {
-          duration: 7000,
-        });
-      }
-      closeModal();
-      const { emitDataChanged } = await import("@/lib/data-events");
-      // Refresh dashboard metrics, deals, notifications, AI, reports in one pass
-      emitDataChanged({ module: "all", action: editingLead ? "update" : "create" });
-      emitDataChanged({ module: "contact", action: editingLead ? "update" : "create" });
-      emitDataChanged({ module: "deal", action: "update" });
-      emitDataChanged({ module: "notification", action: "create" });
-      await loadLeads();
-    } else {
-      toast.error(friendlyError(apiResponse.error, "Could not save lead. Please try again."));
+    } finally {
+      submitLockRef.current = false;
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -1335,10 +1340,8 @@ export default function LeadsPage() {
       clearSelection();
       await loadLeads();
       const { emitDataChanged } = await import("@/lib/data-events");
+      // One consolidated refresh (same as single Lead save)
       emitDataChanged({ module: "all", action: "update" });
-      emitDataChanged({ module: "contact", action: "update" });
-      emitDataChanged({ module: "deal", action: "update" });
-      emitDataChanged({ module: "notification", action: "refresh" });
     } else {
       toast.error(res.error || "Bulk edit failed");
     }

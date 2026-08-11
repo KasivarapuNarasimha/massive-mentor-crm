@@ -127,6 +127,8 @@ export function WhatsAppConversationCenter() {
   const [showDash, setShowDash] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Sync lock — state alone cannot block double-click before re-render */
+  const sendLockRef = useRef(false);
 
   const loadList = useCallback(async () => {
     if (!token) return;
@@ -230,7 +232,9 @@ export function WhatsAppConversationCenter() {
   }, [token, selectedId, loadList, loadThread]);
 
   const send = async () => {
-    if (!token || !selectedId || !composer.trim()) return;
+    // Guard before setState — blocks double-click / double-send races
+    if (!token || !selectedId || !composer.trim() || sending || sendLockRef.current) return;
+    sendLockRef.current = true;
     setSending(true);
     try {
       if (noteMode) {
@@ -250,6 +254,7 @@ export function WhatsAppConversationCenter() {
         }
       }
     } finally {
+      sendLockRef.current = false;
       setSending(false);
     }
   };
