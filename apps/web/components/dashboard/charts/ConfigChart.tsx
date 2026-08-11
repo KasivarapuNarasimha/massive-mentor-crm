@@ -1,6 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  ChartTooltipPortal,
+  readChartSurfaceBoundary,
+  type ChartTooltipBoundary,
+} from "@/components/dashboard/charts/ChartTooltipPortal";
 
 /**
  * Config-driven charts (no industry hardcoding).
@@ -37,8 +42,9 @@ type Props = {
 };
 
 type TooltipState = {
-  x: number;
-  y: number;
+  clientX: number;
+  clientY: number;
+  boundary?: ChartTooltipBoundary | null;
   point: ChartPoint;
   pct: number;
   trend: number | null;
@@ -59,39 +65,48 @@ function trendPct(current: number, previous?: number): number | null {
 function ChartTooltip({ tip }: { tip: NonNullable<TooltipState> }) {
   const trend = tip.trend;
   return (
-    <div
-      className="pointer-events-none absolute z-20 min-w-[160px] max-w-[220px] rounded-xl border border-border bg-background/95 px-3 py-2 shadow-xl backdrop-blur-sm text-left"
-      style={{
-        left: tip.x,
-        top: tip.y,
-        transform: "translate(-50%, calc(-100% - 10px))",
+    <ChartTooltipPortal
+      open
+      width={248}
+      anchor={{
+        clientX: tip.clientX,
+        clientY: tip.clientY,
+        boundary: tip.boundary,
       }}
-      role="tooltip"
     >
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2 mb-1.5 pb-1.5 border-b border-white/10">
         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: tip.color }} />
         <span className="text-xs font-medium text-foreground truncate">{tip.point.name}</span>
       </div>
-      <div className="text-sm font-semibold tabular-nums text-emerald-400">
-        {fmt(tip.point.value)}
-        <span className="text-muted-foreground font-normal text-xs ml-1.5">
-          ({tip.pct.toFixed(1)}%)
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="shrink-0 text-muted-foreground text-xs">Value</span>
+        <span className="shrink-0 tabular-nums font-semibold text-emerald-400 text-right">
+          {fmt(tip.point.value)}
+          <span className="text-muted-foreground font-normal text-xs ml-1.5">
+            ({tip.pct.toFixed(1)}%)
+          </span>
         </span>
       </div>
       {trend != null && (
         <div
-          className={`text-[11px] mt-0.5 ${
+          className={`flex items-baseline justify-between gap-3 text-[11px] mt-1.5 ${
             trend >= 0 ? "text-emerald-400/90" : "text-red-400/90"
           }`}
         >
-          {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(1)}% vs prior
-          {tip.point.previous != null && (
-            <span className="text-muted-foreground"> · was {fmt(tip.point.previous)}</span>
-          )}
+          <span className="shrink-0 text-muted-foreground">Growth</span>
+          <span className="shrink-0 tabular-nums font-semibold text-right">
+            {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(1)}%
+            {tip.point.previous != null && (
+              <span className="text-muted-foreground font-normal">
+                {" "}
+                · was {fmt(tip.point.previous)}
+              </span>
+            )}
+          </span>
         </div>
       )}
-      <div className="text-[10px] text-muted-foreground mt-1">Click to open related records</div>
-    </div>
+      <div className="text-[10px] text-muted-foreground mt-2">Click to open related records</div>
+    </ChartTooltipPortal>
   );
 }
 
@@ -136,19 +151,12 @@ export function ConfigChart({
   const max = Math.max(...data.map((d) => d.value), 1);
   const hasData = data.length > 0 && (total > 0 || chartType === "gauge");
 
-  const showTip = (
-    e: React.MouseEvent,
-    point: ChartPoint,
-    color: string,
-    container?: HTMLElement | null
-  ) => {
-    const rect = (container || (e.currentTarget as HTMLElement).closest("[data-chart-root]") ||
-      (e.currentTarget as HTMLElement)) as HTMLElement;
-    const box = rect.getBoundingClientRect();
+  const showTip = (e: React.MouseEvent, point: ChartPoint, color: string) => {
     const pct = total > 0 ? (point.value / total) * 100 : 0;
     setTip({
-      x: e.clientX - box.left,
-      y: e.clientY - box.top,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      boundary: readChartSurfaceBoundary(e.currentTarget),
       point,
       pct,
       trend: trendPct(point.value, point.previous),
@@ -211,7 +219,11 @@ export function ConfigChart({
       return { ...d, start, sweep, color: COLORS[i % COLORS.length], idx: i };
     });
     return (
-      <div data-chart-root className="relative flex flex-col sm:flex-row items-center gap-4">
+      <div
+        data-chart-root
+        data-chart-surface
+        className="relative flex flex-col sm:flex-row items-center gap-4"
+      >
         {tip && <ChartTooltip tip={tip} />}
         <svg width="160" height="160" viewBox="0 0 160 160" className="shrink-0">
           {slices.map((s) => {
@@ -277,7 +289,12 @@ export function ConfigChart({
   if (chartType === "funnel") {
     const sorted = [...data].sort((a, b) => b.value - a.value);
     return (
-      <div data-chart-root className="relative space-y-1.5 py-1" style={{ minHeight: height }}>
+      <div
+        data-chart-root
+        data-chart-surface
+        className="relative space-y-1.5 py-1"
+        style={{ minHeight: height }}
+      >
         {tip && <ChartTooltip tip={tip} />}
         {sorted.map((d, i) => {
           const w = 40 + (d.value / max) * 60;
@@ -339,7 +356,7 @@ export function ConfigChart({
       points.map((p, i) => (i === 0 ? `L ${p.x},${p.y}` : `L ${p.x},${p.y}`)).join(" ") +
       ` L ${pad + plotW},${pad + plotH} Z`;
     return (
-      <div data-chart-root className="relative w-full">
+      <div data-chart-root data-chart-surface className="relative w-full">
         {tip && <ChartTooltip tip={tip} />}
         <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
           {chartType === "area" && (
@@ -388,7 +405,7 @@ export function ConfigChart({
 
   // default bar
   return (
-    <div data-chart-root className="relative w-full">
+    <div data-chart-root data-chart-surface className="relative w-full">
       {tip && <ChartTooltip tip={tip} />}
       <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
         {data.map((d, i) => {

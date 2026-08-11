@@ -6,6 +6,11 @@
  */
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  ChartTooltipPortal,
+  readChartSurfaceBoundary,
+  type ChartTooltipBoundary,
+} from "@/components/dashboard/charts/ChartTooltipPortal";
 
 export type AnalyticPoint = {
   name: string;
@@ -59,13 +64,47 @@ function growthPct(current: number, previous?: number): number | null {
 }
 
 type Tip = {
-  x: number;
-  y: number;
+  clientX: number;
+  clientY: number;
+  boundary?: ChartTooltipBoundary | null;
   point: AnalyticPoint;
   pct: number;
   growth: number | null;
   color: string;
 };
+
+function tipFromEvent(
+  e: React.MouseEvent,
+  rest: Omit<Tip, "clientX" | "clientY" | "boundary">
+): Tip {
+  return {
+    clientX: e.clientX,
+    clientY: e.clientY,
+    boundary: readChartSurfaceBoundary(e.currentTarget),
+    ...rest,
+  };
+}
+
+function MetricRow({
+  label,
+  value,
+  valueClass = "text-foreground",
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 w-full">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span
+        className={`min-w-0 shrink-0 text-right tabular-nums font-semibold ${valueClass}`}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
 
 function ChartTooltip({
   tip,
@@ -75,63 +114,57 @@ function ChartTooltip({
   currency?: string;
 }) {
   const growth = tip.growth;
+  const growthText =
+    growth == null
+      ? "—"
+      : `${growth >= 0 ? "▲" : "▼"} ${Math.abs(growth).toFixed(1)}%`;
+  const growthClass =
+    growth == null
+      ? "text-muted-foreground"
+      : growth >= 0
+        ? "text-emerald-400"
+        : "text-red-400";
+
   return (
-    <div
-      className="pointer-events-none absolute z-30 min-w-[180px] max-w-[260px] rounded-2xl border border-white/12 bg-background/98 px-3.5 py-3 shadow-2xl shadow-black/60 backdrop-blur-xl text-left ring-1 ring-white/5"
-      style={{
-        left: tip.x,
-        top: tip.y,
-        transform: "translate(-50%, calc(-100% - 14px))",
+    <ChartTooltipPortal
+      open
+      width={248}
+      anchor={{
+        clientX: tip.clientX,
+        clientY: tip.clientY,
+        boundary: tip.boundary,
       }}
-      role="tooltip"
     >
-      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
+      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/10">
         <span
-          className="h-2.5 w-2.5 rounded-full shrink-0 ring-2 ring-white/15 shadow-[0_0_8px_currentColor]"
-          style={{ background: tip.color, color: tip.color }}
+          className="h-2.5 w-2.5 rounded-full shrink-0 ring-2 ring-white/15"
+          style={{ background: tip.color }}
         />
         <span className="text-xs font-semibold text-foreground truncate tracking-tight">
           {tip.point.name}
         </span>
       </div>
-      <div className="space-y-1.5 text-[11px]">
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Count</span>
-          <span className="tabular-nums text-foreground font-semibold">
-            {fmtNum(tip.point.count ?? tip.point.value)}
-          </span>
-        </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Share</span>
-          <span className="tabular-nums text-sky-300 font-semibold">{tip.pct.toFixed(1)}%</span>
-        </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Revenue</span>
-          <span className="tabular-nums text-emerald-300 font-semibold">
-            {fmtMoney(tip.point.revenue ?? 0, currency)}
-          </span>
-        </div>
-        <div className="flex justify-between gap-6">
-          <span className="text-muted-foreground">Growth</span>
-          <span
-            className={`tabular-nums font-semibold ${
-              growth == null
-                ? "text-muted-foreground"
-                : growth >= 0
-                  ? "text-emerald-400"
-                  : "text-red-400"
-            }`}
-          >
-            {growth == null
-              ? "—"
-              : `${growth >= 0 ? "▲" : "▼"} ${Math.abs(growth).toFixed(1)}%`}
-          </span>
-        </div>
+      <div className="space-y-1.5 text-[11px] w-full">
+        <MetricRow
+          label="Count"
+          value={fmtNum(tip.point.count ?? tip.point.value)}
+        />
+        <MetricRow
+          label="Share"
+          value={`${tip.pct.toFixed(1)}%`}
+          valueClass="text-sky-300"
+        />
+        <MetricRow
+          label="Revenue"
+          value={fmtMoney(tip.point.revenue ?? 0, currency)}
+          valueClass="text-emerald-300"
+        />
+        <MetricRow label="Growth" value={growthText} valueClass={growthClass} />
       </div>
       <div className="mt-2.5 text-[10px] text-muted-foreground font-medium tracking-wide">
         Click to drill down
       </div>
-    </div>
+    </ChartTooltipPortal>
   );
 }
 
@@ -200,6 +233,7 @@ export function GlassCard({
 }) {
   return (
     <article
+      data-chart-surface="card"
       className={[
         "group/card relative overflow-hidden rounded-3xl border border-white/10",
         "bg-gradient-to-br from-white/[0.07] via-card/65 to-background/85",
@@ -398,7 +432,11 @@ export function InteractiveAreaChart({
   const area = `${line} L${pts[pts.length - 1].x},${h - pad} L${pts[0].x},${h - pad} Z`;
 
   return (
-    <div className="relative w-full select-none" style={{ minHeight: height }}>
+    <div
+      className="relative w-full select-none"
+      style={{ minHeight: height }}
+      data-chart-surface
+    >
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
         <defs>
           <linearGradient id={`area-${uid}`} x1="0" y1="0" x2="0" y2="1">
@@ -440,22 +478,33 @@ export function InteractiveAreaChart({
               fill="transparent"
               className="cursor-pointer"
               onMouseEnter={(e) => {
-                const parent = (e.target as SVGElement).closest(".relative") as HTMLElement;
-                const pr = parent?.getBoundingClientRect();
-                if (!pr) return;
                 const point = {
                   ...p.s,
                   count: p.s.count ?? p.s.value,
                   revenue: valueIsMoney ? p.s.value : p.s.revenue ?? 0,
                 };
-                setTip({
-                  x: e.clientX - pr.left,
-                  y: e.clientY - pr.top,
-                  point,
-                  pct: total > 0 ? (p.s.value / total) * 100 : 0,
-                  growth: growthPct(p.s.value, p.s.previous),
-                  color: "#a78bfa",
-                });
+                setTip(
+                  tipFromEvent(e, {
+                    point,
+                    pct: total > 0 ? (p.s.value / total) * 100 : 0,
+                    growth: growthPct(p.s.value, p.s.previous),
+                    color: "#a78bfa",
+                  })
+                );
+              }}
+              onMouseMove={(e) => {
+                setTip((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        boundary:
+                          readChartSurfaceBoundary(e.currentTarget) ??
+                          prev.boundary,
+                      }
+                    : prev
+                );
               }}
               onMouseLeave={() => setTip(null)}
               onClick={() => onDrill?.(p.s)}
@@ -502,7 +551,7 @@ export function InteractiveBarChart({
   const total = series.reduce((s, p) => s + p.value, 0);
 
   return (
-    <div className="relative" style={{ minHeight: height }}>
+    <div className="relative" style={{ minHeight: height }} data-chart-surface>
       <div className="flex items-end gap-1.5 sm:gap-2 h-full px-1 pt-2" style={{ height: height - 28 }}>
         {series.map((s, i) => {
           const color = s.color || PALETTE[i % PALETTE.length];
@@ -513,16 +562,28 @@ export function InteractiveBarChart({
               key={s.name + i}
               className="flex-1 min-w-0 flex flex-col items-center gap-1 group h-full justify-end focus-ring rounded-t-lg"
               onMouseEnter={(e) => {
-                const pr = (e.currentTarget.closest(".relative") as HTMLElement)?.getBoundingClientRect();
-                if (!pr) return;
-                setTip({
-                  x: e.clientX - pr.left,
-                  y: e.clientY - pr.top,
-                  point: s,
-                  pct: total > 0 ? (s.value / total) * 100 : 0,
-                  growth: growthPct(s.value, s.previous),
-                  color,
-                });
+                setTip(
+                  tipFromEvent(e, {
+                    point: s,
+                    pct: total > 0 ? (s.value / total) * 100 : 0,
+                    growth: growthPct(s.value, s.previous),
+                    color,
+                  })
+                );
+              }}
+              onMouseMove={(e) => {
+                setTip((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        boundary:
+                          readChartSurfaceBoundary(e.currentTarget) ??
+                          prev.boundary,
+                      }
+                    : prev
+                );
               }}
               onMouseLeave={() => setTip(null)}
               onClick={() => onDrill?.(s)}
@@ -576,7 +637,10 @@ export function InteractiveDonutChart({
   });
 
   return (
-    <div className="relative flex flex-col sm:flex-row items-center gap-5 sm:gap-6 min-h-[200px]">
+    <div
+      className="relative flex flex-col sm:flex-row items-center gap-5 sm:gap-6 min-h-[200px]"
+      data-chart-surface
+    >
       <div className="relative shrink-0 w-[200px] h-[200px] sm:w-[220px] sm:h-[220px]">
         <svg viewBox="0 0 180 180" className="w-full h-full -rotate-90">
           <circle
@@ -602,18 +666,28 @@ export function InteractiveDonutChart({
               className="cursor-pointer transition-all duration-300 hover:opacity-90"
               style={{ filter: `drop-shadow(0 0 10px ${s.color}55)` }}
               onMouseEnter={(e) => {
-                const parent = (
-                  e.currentTarget.closest(".relative.flex") as HTMLElement | null
-                )?.getBoundingClientRect();
-                if (!parent) return;
-                setTip({
-                  x: e.clientX - parent.left,
-                  y: e.clientY - parent.top,
-                  point: s,
-                  pct: (s.value / total) * 100,
-                  growth: growthPct(s.value, s.previous),
-                  color: s.color!,
-                });
+                setTip(
+                  tipFromEvent(e, {
+                    point: s,
+                    pct: (s.value / total) * 100,
+                    growth: growthPct(s.value, s.previous),
+                    color: s.color!,
+                  })
+                );
+              }}
+              onMouseMove={(e) => {
+                setTip((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        boundary:
+                          readChartSurfaceBoundary(e.currentTarget) ??
+                          prev.boundary,
+                      }
+                    : prev
+                );
               }}
               onMouseLeave={() => setTip(null)}
               onClick={() => onDrill?.(s)}
@@ -668,7 +742,7 @@ export function InteractiveFunnelChart({
   const funnelBase = series[0]?.value || 1;
 
   return (
-    <div className="relative space-y-2 py-1">
+    <div className="relative space-y-2 py-1" data-chart-surface>
       {series.map((s, i) => {
         const color = PALETTE[i % PALETTE.length];
         const widthPct = Math.max(18, (s.value / max) * 100);
@@ -679,16 +753,28 @@ export function InteractiveFunnelChart({
             key={s.name}
             className="w-full flex flex-col items-center gap-0.5 group focus-ring rounded-lg"
             onMouseEnter={(e) => {
-              const pr = (e.currentTarget.closest(".relative") as HTMLElement)?.getBoundingClientRect();
-              if (!pr) return;
-              setTip({
-                x: e.clientX - pr.left,
-                y: e.clientY - pr.top,
-                point: { ...s, count: s.value },
-                pct: conv,
-                growth: growthPct(s.value, s.previous),
-                color,
-              });
+              setTip(
+                tipFromEvent(e, {
+                  point: { ...s, count: s.value },
+                  pct: conv,
+                  growth: growthPct(s.value, s.previous),
+                  color,
+                })
+              );
+            }}
+            onMouseMove={(e) => {
+              setTip((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      clientX: e.clientX,
+                      clientY: e.clientY,
+                      boundary:
+                        readChartSurfaceBoundary(e.currentTarget) ??
+                        prev.boundary,
+                    }
+                  : prev
+              );
             }}
             onMouseLeave={() => setTip(null)}
             onClick={() => onDrill?.(s)}
@@ -726,7 +812,7 @@ export function InteractiveHorizontalBar({
   const total = series.reduce((s, p) => s + p.value, 0) || 1;
 
   return (
-    <div className="relative space-y-2.5">
+    <div className="relative space-y-2.5" data-chart-surface>
       {series.map((s, i) => {
         const color = PALETTE[i % PALETTE.length];
         const w = (s.value / max) * 100;
@@ -736,16 +822,28 @@ export function InteractiveHorizontalBar({
             key={s.name + i}
             className="w-full text-left group focus-ring rounded-lg"
             onMouseEnter={(e) => {
-              const pr = (e.currentTarget.closest(".relative") as HTMLElement)?.getBoundingClientRect();
-              if (!pr) return;
-              setTip({
-                x: e.clientX - pr.left,
-                y: e.clientY - pr.top,
-                point: { ...s, count: s.count ?? s.value },
-                pct: (s.value / total) * 100,
-                growth: growthPct(s.value, s.previous),
-                color,
-              });
+              setTip(
+                tipFromEvent(e, {
+                  point: { ...s, count: s.count ?? s.value },
+                  pct: (s.value / total) * 100,
+                  growth: growthPct(s.value, s.previous),
+                  color,
+                })
+              );
+            }}
+            onMouseMove={(e) => {
+              setTip((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      clientX: e.clientX,
+                      clientY: e.clientY,
+                      boundary:
+                        readChartSurfaceBoundary(e.currentTarget) ??
+                        prev.boundary,
+                    }
+                  : prev
+              );
             }}
             onMouseLeave={() => setTip(null)}
             onClick={() => onDrill?.(s)}
