@@ -262,20 +262,33 @@ function coerceFieldValue(def: FieldDef, raw: unknown, errors: string[]): unknow
 /**
  * Active customer workspace for CRM/billing.
  * - Never binds to demo portals
- * - Prefer non-deleted customer businesses
+ * - Prefer non-deleted customer businesses (null portalKind treated as customer)
  * - When the user has multiple memberships, pick the workspace with the most
- *   active contacts (so a re-created empty "abc" business does not hide a
- *   38k-lead import that landed on a prior workspace)
+ *   active contacts (so a re-created empty trial business does not hide CRM data)
+ * - Falls back to businesses the user owns even if membership row was missing
  * - As a last resort, fall back to any non-demo membership (even deleted) that
  *   still holds CRM data so imports remain visible after soft-delete churn
  */
 export async function getUserBusinessId(userId: string): Promise<string | null> {
+  // Align with ensureDefaultBusiness — same resolution rules (no create)
+  try {
+    const { resolveExistingCustomerBusiness } = await import("./business.service.js");
+    const resolved = await resolveExistingCustomerBusiness(userId);
+    if (resolved?.businessId) return resolved.businessId;
+  } catch (err) {
+    console.error(
+      "[tenant] resolveExistingCustomerBusiness failed:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  // Soft-deleted fallback with CRM data (legacy recovery)
   const members = await prisma.businessMember.findMany({
     where: {
       userId,
       business: {
         isDemo: false,
-        portalKind: "customer",
+        NOT: { portalKind: "demo" },
       },
     },
     select: {

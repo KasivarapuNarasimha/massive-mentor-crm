@@ -252,17 +252,14 @@ export async function loginUser(
     },
     include: { business: true },
   });
-  const customerMember = await prisma.businessMember.findFirst({
-    where: {
-      userId: user.id,
-      business: { isDemo: false, portalKind: "customer", status: { not: "deleted" } },
-    },
-  });
-  if (demoOnly && !customerMember) {
+  // Include null portalKind + owner path — same rules as ensureDefaultBusiness
+  const { resolveExistingCustomerBusiness } = await import("./business.service.js");
+  const customerWorkspace = await resolveExistingCustomerBusiness(user.id);
+  if (demoOnly && !customerWorkspace) {
     throw new Error("Demo accounts must sign in at the Demo portal (demo.massivementor.in).");
   }
 
-  // Ensure tenant + backfill CRM businessId (idempotent)
+  // Ensure tenant + backfill CRM businessId (idempotent — must NOT spawn new Trial for existing owners)
   const business = await ensureDefaultBusiness(user.id);
 
   // Never attach a demo business as customer tenant

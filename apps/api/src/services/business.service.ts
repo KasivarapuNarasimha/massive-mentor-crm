@@ -87,35 +87,161 @@ export async function createBusinessWithTemplate(opts: {
 }
 
 /**
- * Ensure the user has a default Business + membership.
- * Backfills businessId on their CRM rows (dual-scope migration).
- * Idempotent — safe on every login /me.
+ * Non-demo customer workspace filter.
+ * CRITICAL: do NOT require portalKind === "customer" only — legacy rows may have
+ * null/empty portalKind. Excluding them caused login/me to spawn a NEW Trial
+ * workspace after password reset (same user, empty "Acme"/generic shell).
  */
-export async function ensureDefaultBusiness(userId: string): Promise<BusinessSummary> {
-  // Prefer real customer workspace — never bind customer CRM to demo tenant
-  const existingMember = await prisma.businessMember.findFirst({
+export function customerWorkspaceWhere() {
+  return {
+    isDemo: false as const,
+    status: { not: "deleted" as const },
+    NOT: { portalKind: "demo" },
+  };
+}
+
+/**
+ * Pick the best existing customer workspace for a user.
+ * Prefer: most active contacts → paid/non-trial plan → oldest membership/ownership.
+ * Never creates a business.
+ */
+export async function resolveExistingCustomerBusiness(
+  userId: string
+): Promise<{ businessId: string; role: string; source: "member" | "owner" } | null> {
+  const members = await prisma.businessMember.findMany({
     where: {
       userId,
+      business: customerWorkspaceWhere(),
+    },
+    select: {
+      businessId: true,
+      role: true,
+      createdAt: true,
       business: {
-        isDemo: false,
-        portalKind: "customer",
-        status: { not: "deleted" },
+        select: {
+          id: true,
+          plan: true,
+          isTrial: true,
+          planStatus: true,
+          createdAt: true,
+        },
       },
     },
-    include: { business: true },
     orderBy: { createdAt: "asc" },
   });
 
-  if (existingMember?.business) {
-    await backfillUserCrmToBusiness(userId, existingMember.businessId);
-    // Ensure Phase 2 config exists for legacy businesses
-    try {
-      await ensureBusinessConfig(existingMember.businessId, userId, existingMember.business.templateSlug);
-    } catch (err) {
-      console.error("[business] ensureBusinessConfig (existing) failed:", err instanceof Error ? err.message : err);
+  if (members.length > 0) {
+    const scored = await Promise.all(
+      members.map(async (m) => {
+        const n = await prisma.contact.count({
+          where: { businessId: m.businessId, deletedAt: null },
+        });
+        const plan = String(m.business.plan || "").toLowerCase();
+        const paid =
+          plan &&
+          plan !== "trial" &&
+          (m.business.planStatus === "active" ||
+            m.business.planStatus === "past_due" ||
+            m.business.isTrial === false)
+            ? 1
+            : 0;
+        return {
+          businessId: m.businessId,
+          role: m.role,
+          n,
+          paid,
+          createdAt: m.createdAt.getTime(),
+        };
+      })
+    );
+    scored.sort((a, b) => b.n - a.n || b.paid - a.paid || a.createdAt - b.createdAt);
+    const best = scored[0];
+    if (best) {
+      return { businessId: best.businessId, role: best.role, source: "member" };
     }
-    const biz = await prisma.business.findUniqueOrThrow({ where: { id: existingMember.businessId } });
-    return toSummary(biz, existingMember.role);
+  }
+
+  // Owner without membership (or membership filtered out) — NEVER create a second workspace
+  const owned = await prisma.business.findMany({
+    where: {
+      ownerUserId: userId,
+      ...customerWorkspaceWhere(),
+    },
+    select: {
+      id: true,
+      plan: true,
+      isTrial: true,
+      planStatus: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (owned.length === 0) return null;
+
+  const scoredOwned = await Promise.all(
+    owned.map(async (b) => {
+      const n = await prisma.contact.count({
+        where: { businessId: b.id, deletedAt: null },
+      });
+      const plan = String(b.plan || "").toLowerCase();
+      const paid =
+        plan &&
+        plan !== "trial" &&
+        (b.planStatus === "active" || b.planStatus === "past_due" || b.isTrial === false)
+          ? 1
+          : 0;
+      return { businessId: b.id, n, paid, createdAt: b.createdAt.getTime() };
+    })
+  );
+  scoredOwned.sort((a, b) => b.n - a.n || b.paid - a.paid || a.createdAt - b.createdAt);
+  const bestOwned = scoredOwned[0];
+  if (!bestOwned) return null;
+
+  // Repair missing membership so future logins resolve via member path
+  await prisma.businessMember.upsert({
+    where: {
+      businessId_userId: { businessId: bestOwned.businessId, userId },
+    },
+    create: {
+      businessId: bestOwned.businessId,
+      userId,
+      role: "owner",
+    },
+    update: {},
+  });
+
+  console.info(
+    `[business] repaired owner membership userId=${userId} businessId=${bestOwned.businessId}`
+  );
+
+  return { businessId: bestOwned.businessId, role: "owner", source: "owner" };
+}
+
+/**
+ * Ensure the user has a default Business + membership.
+ * Backfills businessId on their CRM rows (dual-scope migration).
+ * Idempotent — safe on every login /me.
+ *
+ * MUST NOT create a new Trial workspace when the user already has any
+ * non-demo, non-deleted customer business (member or owner). Password reset
+ * only changes password; re-login must bind the SAME workspace.
+ */
+export async function ensureDefaultBusiness(userId: string): Promise<BusinessSummary> {
+  const existing = await resolveExistingCustomerBusiness(userId);
+
+  if (existing) {
+    await backfillUserCrmToBusiness(userId, existing.businessId);
+    const biz = await prisma.business.findUniqueOrThrow({ where: { id: existing.businessId } });
+    try {
+      await ensureBusinessConfig(biz.id, userId, biz.templateSlug);
+    } catch (err) {
+      console.error(
+        "[business] ensureBusinessConfig (existing) failed:",
+        err instanceof Error ? err.message : err
+      );
+    }
+    return toSummary(biz, existing.role);
   }
 
   const user = await prisma.user.findUnique({
@@ -125,6 +251,12 @@ export async function ensureDefaultBusiness(userId: string): Promise<BusinessSum
   if (!user) {
     throw new Error("User not found");
   }
+
+  // Last resort: truly no workspace. Do not run this path for password-reset users
+  // who already own a business (handled above).
+  console.warn(
+    `[business] ensureDefaultBusiness CREATING new workspace for userId=${userId} email=${user.email} — no existing customer member/owner found`
+  );
 
   const businessName =
     user.profile?.businessName?.trim() ||
@@ -138,6 +270,8 @@ export async function ensureDefaultBusiness(userId: string): Promise<BusinessSum
       name: businessName,
       ownerUserId: userId,
       status: "active",
+      portalKind: "customer",
+      isDemo: false,
       templateSlug: industryHint ? industryHint.toLowerCase().replace(/\s+/g, "_") : null,
       members: {
         create: {

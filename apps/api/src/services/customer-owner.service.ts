@@ -11,13 +11,14 @@ import { prisma } from "../lib/prisma.js";
 
 /** True when user has at least one non-deleted customer business (member or owner). */
 export async function userHasActiveCustomerBusiness(userId: string): Promise<boolean> {
+  // Match ensureDefaultBusiness: null portalKind is still a real customer workspace
   const activeMember = await prisma.businessMember.findFirst({
     where: {
       userId,
       business: {
         isDemo: false,
-        portalKind: "customer",
         status: { not: "deleted" },
+        NOT: { portalKind: "demo" },
       },
     },
     select: { id: true },
@@ -28,8 +29,8 @@ export async function userHasActiveCustomerBusiness(userId: string): Promise<boo
     where: {
       ownerUserId: userId,
       isDemo: false,
-      portalKind: "customer",
       status: { not: "deleted" },
+      NOT: { portalKind: "demo" },
     },
     select: { id: true },
   });
