@@ -207,7 +207,7 @@ export function ExportFiltersBar({
       <button
         type="button"
         onClick={apply}
-        className="px-3 py-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/15 border border-white/10"
+        className="px-3 py-1.5 text-xs rounded-lg mm-soft-control"
       >
         Apply filters
       </button>

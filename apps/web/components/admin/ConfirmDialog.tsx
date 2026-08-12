@@ -38,7 +38,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="flex-1 min-h-11 rounded-xl bg-white/10 text-sm font-medium"
+            className="flex-1 min-h-11 rounded-xl mm-soft-control text-sm font-medium"
           >
             Cancel
           </button>

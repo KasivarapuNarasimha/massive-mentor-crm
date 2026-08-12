@@ -235,16 +235,17 @@ export function GlassCard({
     <article
       data-chart-surface="card"
       className={[
-        "group/card relative overflow-hidden rounded-3xl border border-white/10",
-        "bg-gradient-to-br from-white/[0.07] via-card/65 to-background/85",
-        "backdrop-blur-xl shadow-xl shadow-black/25",
-        "p-4 sm:p-5 transition-all duration-300 hover:border-white/18 hover:shadow-violet-950/25",
+        "group/card relative overflow-hidden rounded-3xl border border-border",
+        "bg-gradient-to-br from-card via-card to-background-secondary",
+        "dark:from-white/[0.07] dark:via-card/65 dark:to-background/85",
+        "backdrop-blur-xl shadow-lg dark:shadow-xl dark:shadow-black/25",
+        "p-4 sm:p-5 transition-all duration-300 hover:border-primary/25 dark:hover:border-white/18",
         "min-w-0 mm-card-hover",
         className,
       ].join(" ")}
     >
       <div
-        className="pointer-events-none absolute -top-16 -right-12 h-36 w-36 rounded-full bg-violet-500/12 blur-3xl group-hover/card:bg-violet-500/18 transition-colors"
+        className="pointer-events-none absolute -top-16 -right-12 h-36 w-36 rounded-full bg-primary/10 dark:bg-violet-500/12 blur-3xl group-hover/card:bg-primary/15 dark:group-hover/card:bg-violet-500/18 transition-colors"
         aria-hidden
       />
       <div className="pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-sky-500/8 blur-3xl" aria-hidden />

@@ -582,13 +582,13 @@ export function PremiumDashboard() {
 
   return (
     <div className="space-y-6 sm:space-y-8 overflow-x-hidden mm-page-enter">
-      {/* 1. Welcome Hero */}
+      {/* 1. Welcome Hero — shared mm-dash-hero (light clean SaaS / dark premium glass) */}
       <section
-        className="mm-fade-up relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-950/90 via-zinc-950 to-sky-950/60 p-5 sm:p-7 shadow-xl shadow-violet-950/20"
+        className="mm-fade-up mm-dash-hero p-5 sm:p-7"
         aria-labelledby="dash-welcome"
       >
         <div className="mm-hero-mesh" aria-hidden />
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent,rgba(9,9,11,0.35))]" aria-hidden />
+        <div className="mm-dash-hero-overlay" aria-hidden />
         <div className="relative">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div className="min-w-0">
@@ -605,34 +605,35 @@ export function PremiumDashboard() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2 shrink-0">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] font-medium text-muted-foreground backdrop-blur-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-violet-400" aria-hidden />
-                {companyName}
+              <span className="mm-dash-hero-chip">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
+                <span className="mm-dash-hero-chip-title">{companyName}</span>
               </span>
               <span
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold backdrop-blur-sm ${
+                className={`mm-dash-hero-chip font-semibold ${
                   isTrial
-                    ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
-                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                    ? "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                    : "border-emerald-500/35 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
                 }`}
               >
                 {isTrial ? "Trial" : "Plan"} · {planLabel}
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[11px] text-muted-foreground backdrop-blur-sm tabular-nums">
-                {todayDateLabel}
-              </span>
+              <span className="mm-dash-hero-chip tabular-nums">{todayDateLabel}</span>
             </div>
           </div>
 
           {/* AI Executive Summary */}
-          <div className="mt-6 rounded-2xl border border-white/10 bg-black/35 backdrop-blur-md p-4 sm:p-5">
+          <div className="mm-dash-hero-panel mt-6 p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/20 border border-violet-400/20 text-violet-300" aria-hidden>
+              <span
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 border border-primary/25 text-primary dark:bg-violet-500/20 dark:border-violet-400/20 dark:text-violet-300"
+                aria-hidden
+              >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </span>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-200/90">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-primary dark:text-violet-200/90">
                 AI Executive Summary
               </h2>
             </div>
@@ -646,14 +647,9 @@ export function PremiumDashboard() {
                 { label: "Pipeline", value: formatCurrency(reports?.pipelineValue ?? 0, currency) },
                 { label: "Tasks today", value: String(tasksToday.length || reports?.tasksDue || 0) },
               ].map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5"
-                >
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{item.label}</div>
-                  <div className="mt-0.5 text-base sm:text-lg font-semibold tabular-nums text-foreground truncate">
-                    {item.value}
-                  </div>
+                <div key={item.label} className="mm-dash-hero-stat">
+                  <div className="mm-dash-hero-stat-label">{item.label}</div>
+                  <div className="mm-dash-hero-stat-value">{item.value}</div>
                 </div>
               ))}
             </div>

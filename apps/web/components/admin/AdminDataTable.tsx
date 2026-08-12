@@ -142,13 +142,13 @@ export function AdminDataTable<T extends { id: string }>({
               setPage(1);
             }}
             placeholder="Search…"
-            className="flex-1 min-w-[160px] bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground min-h-10"
+            className="flex-1 min-w-[160px] bg-background border border-input-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground min-h-10"
           />
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowCols((v) => !v)}
-              className="min-h-10 px-3 rounded-xl bg-white/10 text-xs"
+              className="min-h-10 px-3 rounded-xl mm-soft-control text-xs font-medium"
             >
               Columns
             </button>
@@ -179,21 +179,21 @@ export function AdminDataTable<T extends { id: string }>({
           <button
             type="button"
             onClick={() => exportCsv(exportName, exportRows())}
-            className="min-h-10 px-3 rounded-xl bg-white/10 text-xs"
+            className="min-h-10 px-3 rounded-xl mm-soft-control text-xs font-medium"
           >
             CSV
           </button>
           <button
             type="button"
             onClick={() => exportExcelHtml(exportName, exportRows())}
-            className="min-h-10 px-3 rounded-xl bg-white/10 text-xs"
+            className="min-h-10 px-3 rounded-xl mm-soft-control text-xs font-medium"
           >
             Excel
           </button>
           <button
             type="button"
             onClick={() => exportPdfPrint(exportName, exportRows())}
-            className="min-h-10 px-3 rounded-xl bg-white/10 text-xs"
+            className="min-h-10 px-3 rounded-xl mm-soft-control text-xs font-medium"
           >
             PDF
           </button>
@@ -203,7 +203,11 @@ export function AdminDataTable<T extends { id: string }>({
 
       {selectable && (
         <div className="flex flex-wrap gap-2 text-xs items-center">
-          <button type="button" onClick={selectAllFiltered} className="px-2.5 py-1.5 rounded-lg bg-violet-500/20 text-violet-200">
+          <button
+            type="button"
+            onClick={selectAllFiltered}
+            className="px-2.5 py-1.5 rounded-lg bg-primary/15 text-primary font-medium dark:bg-violet-500/20 dark:text-violet-200"
+          >
             Select all ({filtered.length})
           </button>
           <button
@@ -220,7 +224,7 @@ export function AdminDataTable<T extends { id: string }>({
                 onSelectionChange(next);
               }
             }}
-            className="px-2.5 py-1.5 rounded-lg bg-white/10"
+            className="px-2.5 py-1.5 rounded-lg mm-soft-control"
           >
             {allPageSelected ? "Clear page" : "Select page"}
           </button>
@@ -350,7 +354,7 @@ export function AdminDataTable<T extends { id: string }>({
             type="button"
             disabled={pageSafe <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="px-3 py-1.5 rounded-lg bg-white/10 disabled:opacity-40"
+            className="px-3 py-1.5 rounded-lg mm-soft-control disabled:opacity-40"
           >
             Prev
           </button>
@@ -361,7 +365,7 @@ export function AdminDataTable<T extends { id: string }>({
             type="button"
             disabled={pageSafe >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className="px-3 py-1.5 rounded-lg bg-white/10 disabled:opacity-40"
+            className="px-3 py-1.5 rounded-lg mm-soft-control disabled:opacity-40"
           >
             Next
           </button>

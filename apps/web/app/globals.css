@@ -967,15 +967,154 @@ body {
   height: 18rem;
   top: -4rem;
   right: -3rem;
-  background: color-mix(in srgb, var(--primary) 35%, transparent);
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
 .mm-hero-mesh::after {
   width: 14rem;
   height: 14rem;
   bottom: -3rem;
   left: -2rem;
-  background: color-mix(in srgb, var(--mm-sky) 22%, transparent);
+  background: color-mix(in srgb, var(--mm-sky) 16%, transparent);
   animation-delay: -4s;
+}
+.dark .mm-hero-mesh::before {
+  background: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+.dark .mm-hero-mesh::after {
+  background: color-mix(in srgb, var(--mm-sky) 22%, transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Dashboard / portal hero (CRM + Super Admin)
+   Light: clean premium SaaS · Dark: existing violet/zinc glass
+   ═══════════════════════════════════════════════════════════ */
+
+.mm-dash-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--mm-radius-2xl);
+  border: 1px solid color-mix(in srgb, var(--primary) 16%, var(--border));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--primary) 9%, #ffffff) 0%,
+    #ffffff 40%,
+    color-mix(in srgb, #0ea5e9 7%, #f8fafc) 100%
+  );
+  box-shadow: var(--mm-shadow);
+  color: var(--foreground);
+}
+
+.dark .mm-dash-hero {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(
+    to bottom right,
+    rgba(46, 16, 101, 0.9),
+    #09090b,
+    rgba(8, 47, 73, 0.6)
+  );
+  box-shadow: 0 20px 40px rgba(46, 16, 101, 0.2);
+}
+
+.mm-dash-hero-overlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--background) 18%, transparent)
+  );
+}
+
+.dark .mm-dash-hero-overlay {
+  background: linear-gradient(to bottom, transparent, rgba(9, 9, 11, 0.35));
+}
+
+.mm-dash-hero-panel {
+  border-radius: var(--mm-radius-xl);
+  border: 1px solid color-mix(in srgb, var(--border) 85%, var(--primary));
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--mm-shadow-sm);
+}
+
+.dark .mm-dash-hero-panel {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: none;
+}
+
+.mm-dash-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 90%, var(--muted));
+  padding: 0.375rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  backdrop-filter: blur(8px);
+}
+
+.dark .mm-dash-hero-chip {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.mm-dash-hero-chip-title {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.mm-dash-hero-stat {
+  border-radius: var(--mm-radius);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 70%, var(--card));
+  padding: 0.625rem 0.75rem;
+}
+
+.dark .mm-dash-hero-stat {
+  border-color: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mm-dash-hero-stat-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.mm-dash-hero-stat-value {
+  margin-top: 0.125rem;
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+  .mm-dash-hero-stat-value {
+    font-size: 1.125rem;
+  }
+}
+
+/* Soft control chrome — filters / toolbar buttons (light + dark) */
+.mm-soft-control {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+.mm-soft-control:hover {
+  background: color-mix(in srgb, var(--muted) 70%, var(--foreground) 6%);
 }
 
 main .mm-page-enter {

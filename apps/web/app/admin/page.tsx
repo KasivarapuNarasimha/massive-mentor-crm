@@ -51,15 +51,41 @@ export default function AdminOverviewPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Platform Overview</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Enterprise Super Admin dashboard — customer lifecycle, health, and growth at a glance.
-        </p>
-      </div>
+      {/* Shared portal hero surface (same system as CRM Welcome Back) */}
+      <section className="mm-dash-hero p-5 sm:p-6" aria-labelledby="admin-welcome">
+        <div className="mm-hero-mesh" aria-hidden />
+        <div className="mm-dash-hero-overlay" aria-hidden />
+        <div className="relative">
+          <p className="mm-section-label">Welcome back</p>
+          <h1
+            id="admin-welcome"
+            className="mt-2 text-2xl sm:text-3xl font-semibold tracking-tight text-foreground"
+          >
+            Platform Overview
+          </h1>
+          <p className="text-muted-foreground text-sm mt-2 max-w-2xl">
+            Enterprise Super Admin dashboard — customer lifecycle, health, and growth at a glance.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span className="mm-dash-hero-chip">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
+              Super Admin
+            </span>
+            <span className="mm-dash-hero-chip tabular-nums">
+              {new Date().toLocaleDateString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+          </div>
+        </div>
+      </section>
 
       {error && (
-        <div className="rounded-xl border border-red-900/50 bg-red-950/30 text-red-300 text-sm p-4">{error}</div>
+        <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 text-sm p-4">
+          {error}
+        </div>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
@@ -72,20 +98,23 @@ export default function AdminOverviewPage() {
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
-          <h2 className="font-semibold">System health</h2>
+          <h2 className="font-semibold text-foreground">System health</h2>
           {Object.keys(healthCards).length ? (
             <div className="space-y-3">
               {["api", "database", "ram", "activeBusinesses"].map((k) => {
                 const c = healthCards[k];
                 if (!c) return null;
                 return (
-                  <div key={k} className="flex items-center justify-between gap-2 text-sm border-b border-border pb-2">
+                  <div
+                    key={k}
+                    className="flex items-center justify-between gap-2 text-sm border-b border-border pb-2"
+                  >
                     <div>
-                      <div className="text-foreground">{c.label}</div>
+                      <div className="text-foreground font-medium">{c.label}</div>
                       <div className="text-xs text-muted-foreground">{c.detail}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-medium">{c.value}</div>
+                      <div className="font-medium text-foreground">{c.value}</div>
                       <HealthDot status={c.status} />
                     </div>
                   </div>
@@ -95,7 +124,10 @@ export default function AdminOverviewPage() {
           ) : (
             <div className="h-24 animate-pulse bg-muted rounded-xl" />
           )}
-          <Link href="/admin/monitoring" className="text-xs text-violet-300 hover:underline">
+          <Link
+            href="/admin/monitoring"
+            className="text-xs text-primary font-medium hover:underline dark:text-violet-300"
+          >
             Open monitoring →
           </Link>
         </div>
