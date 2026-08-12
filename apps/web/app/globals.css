@@ -6,29 +6,34 @@
    Light / Dark driven by next-themes (class on <html>)
    ═══════════════════════════════════════════════════════════ */
 
-/* ── Light theme (default / :root) ── */
+/* ── Light theme (default / :root) ──
+   Contrast: primary text near-black; secondary ≥ WCAG AA on white (~4.5:1+).
+   Dark theme tokens live only under .dark — do not change them here. */
 :root {
   color-scheme: light;
 
   /* Canvas */
   --background: #ffffff;
   --background-secondary: #f8fafc;
-  --foreground: #111827;
+  /* Slate-950 — sharp primary body text on white */
+  --foreground: #020617;
   --card: #ffffff;
-  --card-foreground: #111827;
+  --card-foreground: #020617;
   --popover: #ffffff;
-  --popover-foreground: #111827;
+  --popover-foreground: #020617;
   --sidebar: #ffffff;
-  --sidebar-foreground: #111827;
+  --sidebar-foreground: #020617;
 
-  /* Brand */
+  /* Brand (accents unchanged) */
   --primary: #7c3aed;
   --primary-hover: #6d28d9;
   --primary-foreground: #ffffff;
   --secondary: #f1f5f9;
-  --secondary-foreground: #111827;
+  --secondary-foreground: #0f172a;
   --muted: #f1f5f9;
-  --muted-foreground: #6b7280;
+  /* Was #6b7280 (~4.6:1) — too soft for table meta / filters / placeholders.
+     Slate-600 ≈ 5.9:1 on white (AA for normal text). */
+  --muted-foreground: #475569;
   --accent: #f5f3ff;
   --accent-foreground: #5b21b6;
 
@@ -38,12 +43,12 @@
   --success: #10b981;
   --success-foreground: #ffffff;
   --warning: #f59e0b;
-  --warning-foreground: #111827;
+  --warning-foreground: #0f172a;
 
-  /* Borders / inputs / focus */
-  --border: #e5e7eb;
+  /* Borders / inputs — slightly firmer edges for light surfaces */
+  --border: #e2e8f0;
   --input: #ffffff;
-  --input-border: #d1d5db;
+  --input-border: #94a3b8;
   --ring: #7c3aed;
 
   /* MM legacy aliases → semantic */
@@ -54,8 +59,9 @@
   --mm-surface-hover: color-mix(in srgb, var(--muted) 80%, transparent);
   --mm-fg: var(--foreground);
   --mm-fg-muted: var(--muted-foreground);
-  --mm-fg-subtle: #9ca3af;
-  --mm-fg-faint: #9ca3af;
+  /* Was #9ca3af (~2.5:1 on white) — unreadable for secondary labels */
+  --mm-fg-subtle: #64748b;
+  --mm-fg-faint: #64748b;
   --mm-border: var(--border);
   --mm-border-soft: color-mix(in srgb, var(--border) 70%, transparent);
   --mm-ring: color-mix(in srgb, var(--ring) 45%, transparent);
@@ -84,8 +90,8 @@
   --mm-duration: 200ms;
 
   /* Scrollbar */
-  --mm-scrollbar: #d1d5db;
-  --mm-scrollbar-hover: #9ca3af;
+  --mm-scrollbar: #cbd5e1;
+  --mm-scrollbar-hover: #94a3b8;
 }
 
 /* ── Dark theme ── */
@@ -629,6 +635,8 @@ body {
 }
 .mm-input::placeholder {
   color: var(--muted-foreground);
+  /* Browsers default ~0.54 opacity — would wash out light-theme placeholders */
+  opacity: 1;
 }
 .mm-input:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--input-border) 60%, var(--foreground));
@@ -802,7 +810,8 @@ body {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
-  color: var(--muted-foreground);
+  /* Strong header contrast (uses theme foreground; light tokens already sharpened) */
+  color: var(--foreground);
   font-weight: 600;
   font-size: 0.75rem;
   letter-spacing: 0.04em;

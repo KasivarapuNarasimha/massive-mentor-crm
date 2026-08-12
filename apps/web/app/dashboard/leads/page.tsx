@@ -1419,7 +1419,7 @@ export default function LeadsPage() {
   };
 
   const inputClass =
-    "bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground focus:outline-none focus:border-border w-full min-w-0";
+    "bg-background border border-input-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring w-full min-w-0";
   const selectClass = `${inputClass} appearance-none`;
 
   return (
@@ -1904,7 +1904,7 @@ export default function LeadsPage() {
                           {lead.district}
                         </span>
                       )}
-                      <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/10 text-white/80">
+                      <span className="px-2 py-0.5 rounded-full bg-muted border border-border text-foreground capitalize">
                         {lead.status}
                       </span>
                       {lead.aiScore != null ? (
@@ -2009,7 +2009,7 @@ export default function LeadsPage() {
                       return (
                         <td key={f.key} className="p-3 max-w-[180px]">
                           {isStatus ? (
-                            <span className="inline-block px-2.5 py-0.5 text-xs rounded-full bg-white/10 text-white/80 border border-white/10 capitalize">
+                            <span className="inline-block px-2.5 py-0.5 text-xs rounded-full bg-muted text-foreground border border-border capitalize">
                               {display}
                             </span>
                           ) : isName ? (

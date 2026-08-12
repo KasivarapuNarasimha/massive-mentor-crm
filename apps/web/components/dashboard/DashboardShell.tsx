@@ -877,7 +877,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 {portal.portalLabel}
               </div>
             ) : (
-              <div className="hidden sm:block text-[10px] px-2.5 py-1 rounded-full bg-white/10 text-white/50 tracking-widest shrink-0">
+              <div className="hidden sm:block text-[10px] px-2.5 py-1 rounded-full bg-muted border border-border text-muted-foreground tracking-widest shrink-0">
                 CRM
               </div>
             )}
