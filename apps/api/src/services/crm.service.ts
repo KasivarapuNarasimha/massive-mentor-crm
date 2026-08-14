@@ -1499,6 +1499,7 @@ export async function getDeals(userId: string, filters?: DealListFilters) {
     }),
   ]);
   // Surface latest Lead status for My Deals cards (from contact + customFields.leadStatus)
+  // Always serialize Decimal `value` to a finite number so clients never string-concatenate money.
   const enriched = items.map((d) => {
     const cf = (d.customFields || {}) as Record<string, unknown>;
     const leadStatus =
@@ -1510,6 +1511,7 @@ export async function getDeals(userId: string, filters?: DealListFilters) {
       leadStatus;
     return {
       ...d,
+      value: d.value == null ? null : toMoneyNumber(d.value),
       leadStatus,
       leadStatusLabel,
       contact: d.contact

@@ -5,9 +5,14 @@ import { useAuth } from "@/lib/auth-context";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, parseAmount } from "@/lib/currency";
 import { LanguageSelector, getLanguageLabel } from "@/components/ai/LanguageSelector";
 import { useDataVersion } from "@/lib/data-events";
+
+/** Safe numeric deal amount — never string-concatenate Decimal/API strings. */
+function dealAmount(value: unknown): number {
+  return parseAmount(value as string | number | null | undefined) ?? 0;
+}
 
 interface Contact {
   id: string;
@@ -131,65 +136,105 @@ function AiSalesIntelligencePageInner() {
     setIsLoading(true);
 
     try {
-      // Total Leads/Clients KPIs: use paginated `total` from the same CRM list API
-      // (countContacts / buildContactListWhere on the server) — never page array length.
+      // KPI money totals: always from full-tenant /reports/dashboard SQL aggregates
+      // (same as main CRM dashboard). Never sum a paginated deals page client-side —
+      // that under-counts large workspaces and used to string-concatenate Decimal values.
       // Selectors only need a recent subset for AI tools (score, WhatsApp, etc.).
-      const [leadsCountRes, clientsCountRes, leadsPickRes, dealsRes, tasksRes, meetingsRes] =
-        await Promise.all([
-          api.getCrmContacts("?type=lead&page=1&pageSize=1", token),
-          api.getCrmContacts("?type=client&page=1&pageSize=1", token),
-          api.getCrmContacts("?type=lead&page=1&pageSize=50&sortBy=updatedAt&sortDir=desc", token),
-          api.getCrmDeals("", token),
-          api.getCrmTasks("", token),
-          api.getCrmMeetings("?page=1&pageSize=100&sortBy=scheduledAt&sortDir=desc", token),
-        ]);
+      type ReportsDash = {
+        totalLeads?: number;
+        totalClients?: number;
+        totalDealValue?: number;
+        pipelineValue?: number;
+        conversionRate?: number;
+        tasksDue?: number;
+        meetingsToday?: number;
+        wonDeals?: number;
+        lostDeals?: number;
+      };
+
+      const [reportsRes, leadsPickRes, dealsRes, tasksRes, meetingsRes] = await Promise.all([
+        api.get<ReportsDash>("/reports/dashboard", token),
+        api.getCrmContacts("?type=lead&page=1&pageSize=50&sortBy=updatedAt&sortDir=desc", token),
+        // Deal picker only — not used for Total/Pipeline KPI math
+        api.getCrmDeals("?page=1&pageSize=100&sortBy=updatedAt&sortDir=desc", token),
+        api.getCrmTasks("?page=1&pageSize=50", token),
+        api.getCrmMeetings("?page=1&pageSize=100&sortBy=scheduledAt&sortDir=desc", token),
+      ]);
 
       type ListMeta = { contacts?: Contact[]; total?: number };
-      const leadsMeta = leadsCountRes.data as ListMeta | undefined;
-      const clientsMeta = clientsCountRes.data as ListMeta | undefined;
       const leadsPick = (leadsPickRes.data as ListMeta | undefined)?.contacts || [];
-
-      const totalLeads =
-        typeof leadsMeta?.total === "number" ? leadsMeta.total : leadsPick.length;
-      const totalClients =
-        typeof clientsMeta?.total === "number" ? clientsMeta.total : 0;
+      const reports = (reportsRes.success && reportsRes.data ? reportsRes.data : null) as ReportsDash | null;
 
       const dealsData = dealsRes.data as { deals?: Deal[]; total?: number } | undefined;
-      const allDeals = dealsData?.deals || [];
+      const dealRows = dealsData?.deals || [];
       const tasksData = tasksRes.data as { tasks?: { status?: string }[] } | undefined;
       const tasks = tasksData?.tasks || [];
       const meetingsData = meetingsRes.data as { meetings?: MeetingOption[]; total?: number } | undefined;
       const meetingsList = meetingsData?.meetings || [];
 
-      const totalDealsValue = allDeals.reduce((sum: number, d: Deal) => sum + (d.value || 0), 0);
-      const wonDeals = allDeals.filter((d: Deal) => d.stage === "closed_won").length;
-      const closedDeals = allDeals.filter((d: Deal) =>
-        ["closed_won", "closed_lost"].includes(d.stage)
-      ).length;
-      const conversionRate =
-        closedDeals > 0 ? Math.round((wonDeals / closedDeals) * 100) : 0;
+      // Prefer server aggregates; fall back to safe numeric sum of loaded deals only
+      const fallbackTotal = dealRows.reduce((sum, d) => sum + dealAmount(d.value), 0);
+      const fallbackPipeline = dealRows
+        .filter((d) => !["closed_won", "closed_lost"].includes(d.stage))
+        .reduce((sum, d) => sum + dealAmount(d.value), 0);
 
-      const pipelineValue = allDeals
-        .filter((d: Deal) => !["closed_won", "closed_lost"].includes(d.stage))
-        .reduce((sum: number, d: Deal) => sum + (d.value || 0), 0);
+      const totalDealsValue =
+        reports && typeof reports.totalDealValue === "number"
+          ? reports.totalDealValue
+          : fallbackTotal;
+      const pipelineValue =
+        reports && typeof reports.pipelineValue === "number"
+          ? reports.pipelineValue
+          : fallbackPipeline;
+
+      let conversionRate = 0;
+      if (reports && typeof reports.conversionRate === "number") {
+        conversionRate = reports.conversionRate;
+      } else {
+        const wonDeals = dealRows.filter((d) => d.stage === "closed_won").length;
+        const closedDeals = dealRows.filter((d) =>
+          ["closed_won", "closed_lost"].includes(d.stage)
+        ).length;
+        conversionRate = closedDeals > 0 ? Math.round((wonDeals / closedDeals) * 100) : 0;
+      }
 
       const today = new Date().toISOString().split("T")[0];
-      const meetingsToday = meetingsList.filter((m) => m.scheduledAt?.startsWith(today)).length;
-      const tasksDue = tasks.filter((t: { status?: string }) => t.status !== "done").length;
+      const meetingsToday =
+        reports && typeof reports.meetingsToday === "number"
+          ? reports.meetingsToday
+          : meetingsList.filter((m) => m.scheduledAt?.startsWith(today)).length;
+      const tasksDue =
+        reports && typeof reports.tasksDue === "number"
+          ? reports.tasksDue
+          : tasks.filter((t: { status?: string }) => t.status !== "done").length;
+
+      const totalLeads =
+        reports && typeof reports.totalLeads === "number"
+          ? reports.totalLeads
+          : typeof (leadsPickRes.data as ListMeta | undefined)?.total === "number"
+            ? (leadsPickRes.data as ListMeta).total!
+            : leadsPick.length;
+      const totalClients =
+        reports && typeof reports.totalClients === "number" ? reports.totalClients : 0;
 
       setKpis({
         totalLeads,
         totalClients,
-        totalDealsValue: Math.round(totalDealsValue),
+        totalDealsValue: Math.round(dealAmount(totalDealsValue)),
         conversionRate,
-        pipelineValue: Math.round(pipelineValue),
+        pipelineValue: Math.round(dealAmount(pipelineValue)),
         tasksDue,
         meetingsToday,
       });
 
       // Subset for AI tool dropdowns only (scoring / follow-up / WhatsApp)
       setLeads(leadsPick);
-      setDeals(allDeals);
+      setDeals(
+        dealRows.map((d) => ({
+          ...d,
+          value: d.value == null ? undefined : dealAmount(d.value),
+        }))
+      );
       setMeetings(meetingsList);
     } catch {
       toast.error("Failed to load CRM data");
