@@ -32,6 +32,9 @@ import {
   FALLBACK_CONTACT_FIELDS,
   FALLBACK_LEAD_STATUSES,
   ensureLeadFormFields,
+  isRealEstateBusiness,
+  getLeadFeedbackText,
+  applyRealEstateLeadListFields,
 } from "@/lib/business-config";
 import { formatCurrency, parseAmount } from "@/lib/currency";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
@@ -369,8 +372,21 @@ export default function LeadsPage() {
     return ensureLeadFormFields(base);
   }, [bizConfig]);
 
-  const tableFields = useMemo(() => listFields(fieldDefs), [fieldDefs]);
-  const filterableFields = useMemo(() => filterFields(fieldDefs), [fieldDefs]);
+  /** Real Estate portal only — templateSlug from business config (not business name). */
+  const isRealEstate = useMemo(
+    () => isRealEstateBusiness(templateSlug),
+    [templateSlug]
+  );
+
+  const tableFields = useMemo(() => {
+    const listed = listFields(fieldDefs);
+    return isRealEstate ? applyRealEstateLeadListFields(listed) : listed;
+  }, [fieldDefs, isRealEstate]);
+
+  const filterableFields = useMemo(() => {
+    const filters = filterFields(fieldDefs);
+    return isRealEstate ? applyRealEstateLeadListFields(filters) : filters;
+  }, [fieldDefs, isRealEstate]);
   // Always telecalling defaults + config merge (leadStatusesFromConfig never empty)
   const statusOptions: PipelineStatus[] = useMemo(() => {
     const fromConfig = leadStatusesFromConfig(bizConfig);
@@ -1932,12 +1948,14 @@ export default function LeadsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-foreground truncate">{lead.name}</div>
                     <div className="text-sm text-muted-foreground">{lead.phone || "—"}</div>
-                    <div
-                      className="text-xs text-muted-foreground truncate max-w-full"
-                      title={lead.company || undefined}
-                    >
-                      {lead.company || "—"}
-                    </div>
+                    {!isRealEstate && (
+                      <div
+                        className="text-xs text-muted-foreground truncate max-w-full"
+                        title={lead.company || undefined}
+                      >
+                        {lead.company || "—"}
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2 mt-2 text-xs">
                       {lead.district && (
                         <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-muted-foreground">
@@ -1953,7 +1971,19 @@ export default function LeadsPage() {
                       >
                         Assigned To: {assigneeLabel(lead.assignedTo)}
                       </span>
-                      {lead.aiScore != null ? (
+                      {isRealEstate ? (
+                        (() => {
+                          const fb = getLeadFeedbackText(lead as Record<string, unknown>);
+                          return (
+                            <span
+                              className="px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/25 text-violet-200 max-w-[220px] truncate"
+                              title={fb || undefined}
+                            >
+                              {fb ? fb : "No feedback"}
+                            </span>
+                          );
+                        })()
+                      ) : lead.aiScore != null ? (
                         <ScoreBadge score={lead.aiScore} />
                       ) : (
                         <span className="text-muted-foreground">No score</span>
@@ -2014,7 +2044,7 @@ export default function LeadsPage() {
                     </th>
                   ))}
                   <th>Assigned To</th>
-                  <th>AI Score</th>
+                  <th>{isRealEstate ? "Feedback" : "AI Score"}</th>
                   <th className="text-right">Actions</th>
                 </tr>
               </thead>
@@ -2063,7 +2093,7 @@ export default function LeadsPage() {
                               <div className="font-medium text-foreground truncate" title={display}>
                                 {display}
                               </div>
-                              {lead.email ? (
+                              {!isRealEstate && lead.email ? (
                                 <div className="text-xs text-muted-foreground truncate" title={String(lead.email)}>
                                   {String(lead.email)}
                                 </div>
@@ -2103,8 +2133,27 @@ export default function LeadsPage() {
                         {assigneeLabel(lead.assignedTo)}
                       </span>
                     </td>
-                    <td className="p-3">
-                      {lead.aiScore != null ? (
+                    <td className="p-3 max-w-[200px]">
+                      {isRealEstate ? (
+                        (() => {
+                          const fb = getLeadFeedbackText(lead as Record<string, unknown>);
+                          if (!fb) {
+                            return (
+                              <span className="text-xs text-muted-foreground italic">—</span>
+                            );
+                          }
+                          const short =
+                            fb.length > 80 ? `${fb.slice(0, 77).trimEnd()}…` : fb;
+                          return (
+                            <span
+                              className="text-xs text-foreground line-clamp-2 break-words"
+                              title={fb}
+                            >
+                              {short}
+                            </span>
+                          );
+                        })()
+                      ) : lead.aiScore != null ? (
                         <button
                           type="button"
                           onClick={() => scoreLead(lead)}

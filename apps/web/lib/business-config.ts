@@ -191,3 +191,48 @@ export function ensureLeadFormFields(fields: FieldDef[]): FieldDef[] {
     { ...LEAD_FEEDBACK_FIELD, order: maxOrder + 1 },
   ];
 }
+
+/**
+ * Business / industry template detection (from Business.templateSlug).
+ * Real Estate portal uses slug `real_estate` (aliases: real-estate, realestate).
+ */
+export function isRealEstateBusiness(
+  templateSlug: string | null | undefined
+): boolean {
+  const s = String(templateSlug || "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+  return s === "real_estate" || s === "realestate";
+}
+
+/** Read Lead Feedback from Contact.customFields.feedback (existing storage). */
+export function getLeadFeedbackText(
+  contact: Record<string, unknown> | null | undefined
+): string {
+  if (!contact) return "";
+  const custom = (contact.customFields || {}) as Record<string, unknown>;
+  const raw =
+    custom.feedback !== undefined && custom.feedback !== null
+      ? custom.feedback
+      : contact.feedback !== undefined && contact.feedback !== null
+        ? contact.feedback
+        : null;
+  if (raw == null) return "";
+  const s = String(raw).trim();
+  return s;
+}
+
+/**
+ * Real Estate Leads list: hide Company + Email columns/filters (UI only).
+ * Does not mutate form fields or schema — create/edit still have email/company if configured.
+ */
+export function applyRealEstateLeadListFields(fields: FieldDef[]): FieldDef[] {
+  return fields.filter((f) => {
+    const key = (f.key || "").toLowerCase();
+    const core = (f.coreMap || "").toLowerCase();
+    if (key === "email" || core === "email") return false;
+    if (key === "company" || core === "company") return false;
+    return true;
+  });
+}
