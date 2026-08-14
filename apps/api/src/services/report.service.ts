@@ -525,9 +525,129 @@ export type ExportFilters = {
   to?: string;
   status?: string;
   stage?: string;
+  /** Filter contacts by assignee userId; "unassigned" for null */
+  assignedTo?: string;
   sortBy?: string;
   sortDir?: "asc" | "desc";
 };
+
+/** Display date for exports: 14-Aug-2026 */
+function formatExportDate(d: Date | null | undefined): string {
+  if (!d || !(d instanceof Date) || Number.isNaN(d.getTime())) return "";
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const day = String(d.getDate()).padStart(2, "0");
+  const mon = months[d.getMonth()] || "";
+  const year = d.getFullYear();
+  return `${day}-${mon}-${year}`;
+}
+
+/**
+ * Resolve Contact.assignedTo ids → display names (scoped users).
+ * Also builds latest assignment date per contact from LeadAssignment history when available.
+ */
+async function resolveAssigneeMaps(
+  contacts: Array<{ id: string; assignedTo: string | null; lastContactedAt: Date | null }>
+): Promise<{
+  nameByUserId: Map<string, string>;
+  assignedDateByContactId: Map<string, Date>;
+}> {
+  const userIds = [
+    ...new Set(
+      contacts
+        .map((c) => c.assignedTo)
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+    ),
+  ];
+  const nameByUserId = new Map<string, string>();
+  if (userIds.length) {
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, email: true },
+    });
+    for (const u of users) {
+      nameByUserId.set(u.id, (u.name && u.name.trim()) || u.email || u.id);
+    }
+    // Legacy free-text assignees (name/email stored before userId)
+    for (const id of userIds) {
+      if (!nameByUserId.has(id)) {
+        nameByUserId.set(id, id.includes("@") || id.length < 24 ? id : "Assigned user");
+      }
+    }
+  }
+
+  const assignedDateByContactId = new Map<string, Date>();
+  const contactIds = contacts.filter((c) => c.assignedTo).map((c) => c.id);
+  if (contactIds.length) {
+    // Latest assignment batch date per contact (tenant history)
+    try {
+      const items = await prisma.leadAssignmentItem.findMany({
+        where: { contactId: { in: contactIds } },
+        select: {
+          contactId: true,
+          batch: { select: { createdAt: true } },
+        },
+      });
+      for (const it of items) {
+        const at = it.batch?.createdAt;
+        if (!at) continue;
+        const prev = assignedDateByContactId.get(it.contactId);
+        if (!prev || at > prev) assignedDateByContactId.set(it.contactId, at);
+      }
+    } catch {
+      /* history table may be empty / unavailable — fall back below */
+    }
+    // Fallback: lastContactedAt is set on assign when history missing
+    for (const c of contacts) {
+      if (!c.assignedTo) continue;
+      if (assignedDateByContactId.has(c.id)) continue;
+      if (c.lastContactedAt) assignedDateByContactId.set(c.id, c.lastContactedAt);
+    }
+  }
+
+  return { nameByUserId, assignedDateByContactId };
+}
+
+function buildAssignmentSummaryFromRows(
+  rows: Array<{ assignedToId: string; assignedToName: string }>
+): {
+  totalLeads: number;
+  assignedLeads: number;
+  unassignedLeads: number;
+  byMember: Array<{ name: string; count: number }>;
+} {
+  const totalLeads = rows.length;
+  let assignedLeads = 0;
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    if (r.assignedToId) {
+      assignedLeads++;
+      const key = r.assignedToName || "Unknown";
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
+  const byMember = Array.from(counts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  return {
+    totalLeads,
+    assignedLeads,
+    unassignedLeads: totalLeads - assignedLeads,
+    byMember,
+  };
+}
 
 function dateRange(from?: string, to?: string) {
   if (!from && !to) return undefined;
@@ -565,11 +685,24 @@ async function fetchAllBatched<T extends { id: string }>(
   return all;
 }
 
+export type ExportResult = {
+  headers: string[];
+  rows: unknown[][];
+  title: string;
+  /** Present for lead/client/contact exports — used by PDF/XLSX summary section */
+  assignmentSummary?: {
+    totalLeads: number;
+    assignedLeads: number;
+    unassignedLeads: number;
+    byMember: Array<{ name: string; count: number }>;
+  };
+};
+
 export async function fetchExportRows(
   userId: string,
   module: ExportModule,
   filters: ExportFilters = {}
-): Promise<{ headers: string[]; rows: unknown[][]; title: string }> {
+): Promise<ExportResult> {
   const createdAt = dateRange(filters.from, filters.to);
   const search = filters.search?.trim();
   const contactScope = await buildCrmScope(userId);
@@ -585,6 +718,14 @@ export async function fetchExportRows(
       if (type) extra.type = type;
       if (filters.status) extra.status = filters.status;
       if (createdAt) extra.createdAt = createdAt;
+      if (filters.assignedTo) {
+        const a = String(filters.assignedTo).trim();
+        if (a === "unassigned" || a === "__unassigned__" || a === "null") {
+          extra.assignedTo = null;
+        } else if (a) {
+          extra.assignedTo = a;
+        }
+      }
       if (search) {
         extra.OR = [
           { name: { contains: search, mode: "insensitive" } },
@@ -607,38 +748,61 @@ export async function fetchExportRows(
             : {}),
         });
       });
+
+      const { nameByUserId, assignedDateByContactId } = await resolveAssigneeMaps(
+        items.map((c) => ({
+          id: c.id,
+          assignedTo: c.assignedTo,
+          lastContactedAt: c.lastContactedAt,
+        }))
+      );
+
+      const detailMeta = items.map((c) => {
+        const aid = c.assignedTo || "";
+        const aname = aid ? nameByUserId.get(aid) || aid : "Unassigned";
+        return { assignedToId: aid, assignedToName: aname };
+      });
+      const assignmentSummary = buildAssignmentSummaryFromRows(detailMeta);
+
       return {
         title: module === "leads" ? "Leads" : module === "clients" ? "Clients" : "Contacts",
         headers: [
+          "Lead Name",
+          "Contact/Phone",
+          "Email",
+          "Company",
+          "Status",
+          "Assigned To",
+          "Assigned Date",
+          "Source",
+          "Priority",
+          "Value",
+          "AI Score",
+          "Created At",
           "id",
           "type",
-          "name",
-          "email",
-          "phone",
-          "company",
-          "status",
-          "value",
-          "source",
-          "priority",
-          "assignedTo",
-          "aiScore",
-          "createdAt",
         ],
-        rows: items.map((c) => [
-          c.id,
-          c.type,
-          c.name,
-          c.email || "",
-          c.phone || "",
-          c.company || "",
-          c.status,
-          c.value ?? "",
-          c.source || "",
-          c.priority || "",
-          c.assignedTo || "",
-          c.aiScore ?? "",
-          c.createdAt.toISOString(),
-        ]),
+        rows: items.map((c, i) => {
+          const meta = detailMeta[i]!;
+          const assignedDate = assignedDateByContactId.get(c.id);
+          return [
+            c.name,
+            c.phone || "",
+            c.email || "",
+            c.company || "",
+            c.status,
+            meta.assignedToName,
+            formatExportDate(assignedDate),
+            c.source || "",
+            c.priority || "",
+            c.value ?? "",
+            c.aiScore ?? "",
+            c.createdAt.toISOString(),
+            c.id,
+            c.type,
+          ];
+        }),
+        assignmentSummary,
       };
     }
     case "deals": {
@@ -926,12 +1090,20 @@ export async function exportModulePdf(
   res: NodeJS.WritableStream
 ): Promise<void> {
   const { streamPdfTable } = await import("./export-format.service.js");
-  const { headers, rows, title } = await fetchExportRows(userId, module, filters);
+  const { headers, rows, title, assignmentSummary } = await fetchExportRows(
+    userId,
+    module,
+    filters
+  );
   await streamPdfTable(res, {
     title,
     headers,
     rows,
     maxRows: 15_000,
+    assignmentSummary:
+      module === "leads" || module === "clients" || module === "contacts"
+        ? assignmentSummary
+        : undefined,
   });
 }
 
@@ -940,7 +1112,38 @@ export async function exportModuleXlsx(
   module: ExportModule,
   filters?: ExportFilters
 ): Promise<Buffer> {
-  const { buildXlsxBuffer } = await import("./export-format.service.js");
-  const { headers, rows, title } = await fetchExportRows(userId, module, filters);
+  const { buildXlsxBuffer, buildMultiSheetXlsxBuffer } = await import(
+    "./export-format.service.js"
+  );
+  const { headers, rows, title, assignmentSummary } = await fetchExportRows(
+    userId,
+    module,
+    filters
+  );
+
+  if (
+    assignmentSummary &&
+    (module === "leads" || module === "clients" || module === "contacts")
+  ) {
+    const summaryHeaders = ["Sales Executive", "Leads Assigned"];
+    const summaryRows: unknown[][] = assignmentSummary.byMember.map((m) => [
+      m.name,
+      m.count,
+    ]);
+    // Total row = sum of per-member assigned counts (matches dashboard assignment table)
+    summaryRows.push(["Total", assignmentSummary.assignedLeads]);
+    // Totals block below member table
+    summaryRows.push([]);
+    summaryRows.push(["Metric", "Count"]);
+    summaryRows.push(["Total Leads", assignmentSummary.totalLeads]);
+    summaryRows.push(["Assigned Leads", assignmentSummary.assignedLeads]);
+    summaryRows.push(["Unassigned Leads", assignmentSummary.unassignedLeads]);
+
+    return buildMultiSheetXlsxBuffer([
+      { name: "Assignment Summary", headers: summaryHeaders, rows: summaryRows },
+      { name: title, headers, rows },
+    ]);
+  }
+
   return buildXlsxBuffer(title, headers, rows);
 }

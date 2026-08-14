@@ -117,12 +117,12 @@ function cellToSheetValue(v: unknown): string | number | boolean {
  * Build a real .xlsx workbook via SheetJS (xlsx package).
  * Never HTML-as-xls. Validates OOXML magic bytes before return.
  */
-export async function buildXlsxBuffer(
+function sheetFromAoa(
+  XLSX: typeof import("xlsx"),
   sheetName: string,
   headers: string[],
   rows: unknown[][]
-): Promise<Buffer> {
-  const XLSX = await import("xlsx");
+) {
   const cols = headers.length;
   const aoa: (string | number | boolean)[][] = [headers.map((h) => String(h ?? ""))];
   for (const row of rows) {
@@ -133,7 +133,6 @@ export async function buildXlsxBuffer(
     aoa.push(r);
   }
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  // Column widths from content sample (first 200 rows)
   ws["!cols"] = headers.map((h, i) => {
     let max = String(h).length;
     const sample = Math.min(rows.length, 200);
@@ -143,10 +142,20 @@ export async function buildXlsxBuffer(
     }
     return { wch: Math.min(48, Math.max(10, max + 2)) };
   });
-  const wb = XLSX.utils.book_new();
   const safeName =
     (sheetName || "Export").replace(/[\\/?*[\]]/g, " ").replace(/'/g, "").trim().slice(0, 31) ||
     "Export";
+  return { ws, safeName };
+}
+
+export async function buildXlsxBuffer(
+  sheetName: string,
+  headers: string[],
+  rows: unknown[][]
+): Promise<Buffer> {
+  const XLSX = await import("xlsx");
+  const { ws, safeName } = sheetFromAoa(XLSX, sheetName, headers, rows);
+  const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, safeName);
   const raw = XLSX.write(wb, {
     type: "buffer",
@@ -158,8 +167,37 @@ export async function buildXlsxBuffer(
   if (!isValidXlsxBuffer(buf)) {
     throw new Error("Generated XLSX failed validation (invalid OOXML signature)");
   }
-  // Secondary sanity: must be a zip with [Content_Types].xml typically present —
-  // PK signature is enough for Excel/Sheets/LibreOffice open checks.
+  return buf;
+}
+
+/** Multi-sheet workbook (e.g. Assignment Summary + Leads detail). */
+export async function buildMultiSheetXlsxBuffer(
+  sheets: Array<{ name: string; headers: string[]; rows: unknown[][] }>
+): Promise<Buffer> {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.utils.book_new();
+  const used = new Set<string>();
+  for (const s of sheets) {
+    let { ws, safeName } = sheetFromAoa(XLSX, s.name, s.headers, s.rows);
+    // Ensure unique sheet names
+    let n = safeName;
+    let i = 2;
+    while (used.has(n.toLowerCase())) {
+      n = `${safeName.slice(0, 28)}_${i++}`.slice(0, 31);
+    }
+    used.add(n.toLowerCase());
+    XLSX.utils.book_append_sheet(wb, ws, n);
+  }
+  const raw = XLSX.write(wb, {
+    type: "buffer",
+    bookType: "xlsx",
+    compression: true,
+    cellStyles: false,
+  });
+  const buf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer);
+  if (!isValidXlsxBuffer(buf)) {
+    throw new Error("Generated XLSX failed validation (invalid OOXML signature)");
+  }
   return buf;
 }
 
@@ -169,6 +207,13 @@ type PdfTableOpts = {
   rows: unknown[][];
   /** Soft cap — PDF of 50k rows is huge; default 15k with notice */
   maxRows?: number;
+  /** Optional Assignment Summary block (leads exports) */
+  assignmentSummary?: {
+    totalLeads: number;
+    assignedLeads: number;
+    unassignedLeads: number;
+    byMember: Array<{ name: string; count: number }>;
+  };
 };
 
 function cellText(v: unknown): string {
@@ -322,6 +367,59 @@ export async function streamPdfTable(
     return y + h;
   };
 
+  const drawAssignmentSummary = (startY: number): number => {
+    const summary = opts.assignmentSummary;
+    if (!summary) return startY;
+    let y = startY;
+    doc.font("Helvetica-Bold").fontSize(10).fillColor("#111111");
+    doc.text("Assignment Summary", margin, y, { width: contentWidth() });
+    y += 16;
+    doc.font("Helvetica").fontSize(8).fillColor("#333333");
+    doc.text(
+      `Total Leads: ${summary.totalLeads.toLocaleString("en-IN")}  ·  Assigned: ${summary.assignedLeads.toLocaleString("en-IN")}  ·  Unassigned: ${summary.unassignedLeads.toLocaleString("en-IN")}`,
+      margin,
+      y,
+      { width: contentWidth() }
+    );
+    y += 14;
+    // Mini table: Sales Executive | Leads Assigned
+    const col1 = Math.min(220, contentWidth() * 0.55);
+    const col2 = Math.min(100, contentWidth() * 0.25);
+    const rowH = 14;
+    doc.font("Helvetica-Bold").fontSize(8);
+    doc.rect(margin, y, col1 + col2, rowH).fill("#eef2f7");
+    doc.fillColor("#111111");
+    doc.text("Sales Executive", margin + 3, y + 3, { width: col1 - 6 });
+    doc.text("Leads Assigned", margin + col1 + 3, y + 3, { width: col2 - 6 });
+    y += rowH;
+    doc.font("Helvetica").fontSize(8).fillColor("#111111");
+    for (const m of summary.byMember) {
+      if (y + rowH > bottomLimit()) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(m.name || "—", margin + 3, y + 2, { width: col1 - 6, ellipsis: true });
+      doc.text(String(m.count), margin + col1 + 3, y + 2, { width: col2 - 6 });
+      y += rowH;
+    }
+    if (y + rowH > bottomLimit()) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.font("Helvetica-Bold").fontSize(8);
+    doc.text("Total", margin + 3, y + 2, { width: col1 - 6 });
+    doc.text(String(summary.assignedLeads), margin + col1 + 3, y + 2, { width: col2 - 6 });
+    y += rowH + 10;
+    doc
+      .moveTo(margin, y)
+      .lineTo(margin + contentWidth(), y)
+      .strokeColor("#c5cdd8")
+      .lineWidth(0.5)
+      .stroke();
+    y += 12;
+    return y;
+  };
+
   const drawTitleBlock = (): number => {
     let y = margin;
     doc.font("Helvetica-Bold").fontSize(titleFontSize).fillColor("#111111");
@@ -360,6 +458,7 @@ export async function streamPdfTable(
   };
 
   let y = drawTitleBlock();
+  y = drawAssignmentSummary(y);
   y = drawHeaderRow(y);
 
   for (const row of rows) {

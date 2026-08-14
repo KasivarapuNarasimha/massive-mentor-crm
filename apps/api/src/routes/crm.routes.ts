@@ -47,6 +47,7 @@ import {
   bulkRestoreLeadsHandler,
   sendLeadEmailHandler,
   listAssignableMembersHandler,
+  leadAssignmentSummaryHandler,
   listLeadAssignmentsHandler,
   getLeadAssignmentHandler,
   moveLeadAssignmentHandler,
@@ -61,6 +62,7 @@ router.post("/leads/bulk-edit", requireAuth, bulkEditLeadsHandler);
 router.post("/leads/bulk-delete", requireAuth, bulkDeleteLeadsHandler);
 router.post("/leads/bulk-assign", requireAuth, bulkAssignLeadsHandler);
 router.get("/leads/assignable-members", requireAuth, listAssignableMembersHandler);
+router.get("/leads/assignment-summary", requireAuth, leadAssignmentSummaryHandler);
 router.get("/leads/assignments", requireAuth, listLeadAssignmentsHandler);
 router.get("/leads/assignments/:id", requireAuth, getLeadAssignmentHandler);
 router.post("/leads/assignments/:id/move", requireAuth, moveLeadAssignmentHandler);

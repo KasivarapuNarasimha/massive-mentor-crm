@@ -86,6 +86,18 @@ type FinanceKpis = {
   profit?: number;
 };
 
+type LeadAssignmentSummary = {
+  totalLeads: number;
+  assignedLeads: number;
+  unassignedLeads: number;
+  byMember: Array<{
+    userId: string | null;
+    name: string;
+    email: string | null;
+    count: number;
+  }>;
+};
+
 /* ── Pipeline stages (display order) ───────────────────────── */
 
 const PIPELINE_STAGES: { key: string; label: string; match: string[] }[] = [
@@ -210,7 +222,7 @@ function sparkFromValue(n: number, len = 8): number[] {
 }
 
 export function PremiumDashboard() {
-  const { user, token } = useAuth();
+  const { user, token, role } = useAuth();
   const { currency } = useBusinessCurrency();
   const dataVersion = useDataVersion();
   const { portal } = usePortal();
@@ -235,6 +247,21 @@ export function PremiumDashboard() {
       brochures: number;
     };
   } | null>(null);
+  const [assignmentSummary, setAssignmentSummary] = useState<LeadAssignmentSummary | null>(
+    null
+  );
+
+  const roleKey = (role || user?.role || "").toLowerCase();
+  const canSeeAssignmentSummary =
+    [
+      "ceo",
+      "owner",
+      "business_admin",
+      "admin",
+      "super_admin",
+      "sales_manager",
+      "manager",
+    ].includes(roleKey) || roleKey.includes("admin");
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -253,16 +280,25 @@ export function PremiumDashboard() {
 
     // Analytics: ONLY /reports/dashboard (full-tenant SQL/groupBy — no pageSize samples)
     // Lists (tasks/meetings/activity/AI): small recent slices for widgets only
-    const [reportsRes, tasksRes, meetingsRes, activityRes, financeRes, aiRes, mediaRes] =
-      await Promise.all([
-        api.get<ReportsDash>("/reports/dashboard", token),
-        api.getCrmTasks("?pageSize=50", token),
-        api.getCrmMeetings("?pageSize=30", token),
-        safeJson(`${API_BASE_URL}/automations/activity?pageSize=20`),
-        api.get<{ kpis?: FinanceKpis }>("/finance/dashboard", token),
-        safeJson(`${API_BASE_URL}/crm/ai/followup-engine?limit=8`),
-        api.getMediaStats(token),
-      ]);
+    const [
+      reportsRes,
+      tasksRes,
+      meetingsRes,
+      activityRes,
+      financeRes,
+      aiRes,
+      mediaRes,
+      assignRes,
+    ] = await Promise.all([
+      api.get<ReportsDash>("/reports/dashboard", token),
+      api.getCrmTasks("?pageSize=50", token),
+      api.getCrmMeetings("?pageSize=30", token),
+      safeJson(`${API_BASE_URL}/automations/activity?pageSize=20`),
+      api.get<{ kpis?: FinanceKpis }>("/finance/dashboard", token),
+      safeJson(`${API_BASE_URL}/crm/ai/followup-engine?limit=8`),
+      api.getMediaStats(token),
+      api.getLeadAssignmentSummary(token),
+    ]);
 
     if (reportsRes.success && reportsRes.data) {
       const r = reportsRes.data;
@@ -327,6 +363,12 @@ export function PremiumDashboard() {
       });
     } else {
       setMediaStats(null);
+    }
+
+    if (assignRes.success && assignRes.data) {
+      setAssignmentSummary(assignRes.data);
+    } else {
+      setAssignmentSummary(null);
     }
 
     setLoading(false);
@@ -709,6 +751,141 @@ export function PremiumDashboard() {
           ))}
         </div>
       </section>
+
+      {/* Lead Assignment Summary — Business Admin visibility */}
+      {canSeeAssignmentSummary && (
+        <section aria-labelledby="lead-assignment-heading" className="mt-2">
+          <div className="rounded-2xl border border-border bg-card/70 p-5 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+              <div>
+                <h2
+                  id="lead-assignment-heading"
+                  className="text-lg font-semibold tracking-tight text-foreground flex items-center gap-2"
+                >
+                  <span aria-hidden>👥</span> Lead Assignment
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Live counts for your business — total, assigned, and per team member
+                </p>
+              </div>
+              <Link
+                href="/dashboard/leads"
+                className="text-xs font-semibold text-sky-300 hover:text-sky-200 focus-ring rounded shrink-0"
+              >
+                Manage leads →
+              </Link>
+            </div>
+
+            {loading && !assignmentSummary ? (
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 rounded-xl" />
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                  <div className="rounded-xl border border-border bg-background/40 px-4 py-3">
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                      Total Leads
+                    </div>
+                    <div className="text-2xl font-semibold tabular-nums mt-1">
+                      {(assignmentSummary?.totalLeads ?? reports?.totalLeads ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3">
+                    <div className="text-[11px] uppercase tracking-wide text-emerald-300/90">
+                      Assigned Leads
+                    </div>
+                    <div className="text-2xl font-semibold tabular-nums mt-1 text-emerald-200">
+                      {(assignmentSummary?.assignedLeads ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
+                    <div className="text-[11px] uppercase tracking-wide text-amber-300/90">
+                      Unassigned Leads
+                    </div>
+                    <div className="text-2xl font-semibold tabular-nums mt-1 text-amber-200">
+                      {(assignmentSummary?.unassignedLeads ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/30 text-left">
+                        <th className="px-4 py-2.5 font-semibold text-muted-foreground">
+                          Team Member
+                        </th>
+                        <th className="px-4 py-2.5 font-semibold text-muted-foreground text-right tabular-nums">
+                          Leads Assigned
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(assignmentSummary?.byMember?.length ?? 0) === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={2}
+                            className="px-4 py-6 text-center text-muted-foreground text-xs"
+                          >
+                            No leads assigned to team members yet
+                          </td>
+                        </tr>
+                      ) : (
+                        assignmentSummary!.byMember.map((m) => (
+                          <tr
+                            key={m.userId || m.name}
+                            className="border-b border-border/60 last:border-0"
+                          >
+                            <td className="px-4 py-2.5">
+                              <Link
+                                href={`/dashboard/leads?assignedTo=${encodeURIComponent(m.userId || "")}`}
+                                className="font-medium text-foreground hover:text-sky-300 focus-ring rounded"
+                              >
+                                {m.name}
+                              </Link>
+                              {m.email ? (
+                                <div className="text-[11px] text-muted-foreground truncate max-w-[220px]">
+                                  {m.email}
+                                </div>
+                              ) : null}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                              {m.count.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-border bg-muted/20">
+                        <td className="px-4 py-2.5 font-semibold">Total (assigned)</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                          {(assignmentSummary?.assignedLeads ?? 0).toLocaleString()}
+                        </td>
+                      </tr>
+                      <tr className="border-t border-border/60">
+                        <td className="px-4 py-2 font-semibold text-muted-foreground">
+                          Grand total (incl. unassigned)
+                        </td>
+                        <td className="px-4 py-2 text-right tabular-nums font-semibold text-muted-foreground">
+                          {(
+                            assignmentSummary?.totalLeads ??
+                            reports?.totalLeads ??
+                            0
+                          ).toLocaleString()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Media Library widget */}
       <section aria-labelledby="media-lib-heading" className="mt-2">

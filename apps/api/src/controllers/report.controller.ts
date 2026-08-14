@@ -32,6 +32,7 @@ function parseExportFilters(req: AuthenticatedRequest): ExportFilters {
     to: req.query.to ? String(req.query.to) : undefined,
     status: req.query.status ? String(req.query.status) : undefined,
     stage: req.query.stage ? String(req.query.stage) : undefined,
+    assignedTo: req.query.assignedTo ? String(req.query.assignedTo) : undefined,
     sortBy: req.query.sortBy ? String(req.query.sortBy) : undefined,
     sortDir: req.query.sortDir === "asc" ? "asc" : req.query.sortDir === "desc" ? "desc" : undefined,
   };

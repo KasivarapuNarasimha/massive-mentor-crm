@@ -26,12 +26,17 @@ type Props = {
   status?: string;
   onStatusChange?: (v: string) => void;
   statusOptions?: Array<{ value: string; label: string }>;
+  /** Filter by assignee userId (leads/contacts). Use "unassigned" for none. */
+  assignedTo?: string;
+  onAssignedToChange?: (v: string) => void;
+  assigneeOptions?: Array<{ value: string; label: string }>;
   /** Called when filter values change so parent can re-query list */
   onFiltersApply?: (filters: {
     search: string;
     from: string;
     to: string;
     status: string;
+    assignedTo?: string;
   }) => void;
   className?: string;
 };
@@ -47,6 +52,9 @@ export function ExportFiltersBar({
   status: controlledStatus,
   onStatusChange,
   statusOptions,
+  assignedTo: controlledAssignedTo,
+  onAssignedToChange,
+  assigneeOptions,
   onFiltersApply,
   className = "",
 }: Props) {
@@ -54,10 +62,13 @@ export function ExportFiltersBar({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [localStatus, setLocalStatus] = useState("");
+  const [localAssignedTo, setLocalAssignedTo] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
   const search = controlledSearch !== undefined ? controlledSearch : localSearch;
   const status = controlledStatus !== undefined ? controlledStatus : localStatus;
+  const assignedTo =
+    controlledAssignedTo !== undefined ? controlledAssignedTo : localAssignedTo;
 
   const setSearch = (v: string) => {
     if (onSearchChange) onSearchChange(v);
@@ -67,9 +78,13 @@ export function ExportFiltersBar({
     if (onStatusChange) onStatusChange(v);
     else setLocalStatus(v);
   };
+  const setAssignedTo = (v: string) => {
+    if (onAssignedToChange) onAssignedToChange(v);
+    else setLocalAssignedTo(v);
+  };
 
   const apply = () => {
-    onFiltersApply?.({ search, from, to, status });
+    onFiltersApply?.({ search, from, to, status, assignedTo });
   };
 
   const download = async (format: "csv" | "pdf" | "xlsx") => {
@@ -84,6 +99,7 @@ export function ExportFiltersBar({
       if (from) q.set("from", from);
       if (to) q.set("to", to);
       if (status) q.set("status", status);
+      if (assignedTo) q.set("assignedTo", assignedTo);
       const url = `${API_BASE_URL}/reports/export/${format}?${q.toString()}`;
       const res = await fetch(url, {
         headers: {
@@ -197,6 +213,27 @@ export function ExportFiltersBar({
           >
             <option value="">All</option>
             {statusOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {assigneeOptions && assigneeOptions.length > 0 && (
+        <div>
+          <label className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+            Assigned To
+          </label>
+          <select
+            value={assignedTo}
+            onChange={(e) => setAssignedTo(e.target.value)}
+            className={inputClass}
+            aria-label="Filter by assigned team member"
+          >
+            <option value="">All assignees</option>
+            <option value="unassigned">Unassigned</option>
+            {assigneeOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

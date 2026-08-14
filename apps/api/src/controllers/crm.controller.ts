@@ -56,6 +56,7 @@ export async function listContacts(req: AuthenticatedRequest, res: Response) {
     const type = getQueryParam(req, "type") as "lead" | "client" | undefined;
     const status = getQueryParam(req, "status");
     const search = getQueryParam(req, "search");
+    const assignedTo = getQueryParam(req, "assignedTo");
     const limitRaw = getQueryParam(req, "limit");
     const pageRaw = getQueryParam(req, "page");
     const pageSizeRaw = getQueryParam(req, "pageSize");
@@ -69,6 +70,7 @@ export async function listContacts(req: AuthenticatedRequest, res: Response) {
       type,
       status,
       search,
+      assignedTo: assignedTo || undefined,
       limit,
       page,
       pageSize,
@@ -329,6 +331,12 @@ export async function bulkAssignLeadsHandler(req: AuthenticatedRequest, res: Res
     const dryRun = req.body?.dryRun === true || req.body?.preview === true;
 
     const { smartBulkAssignLeads } = await import("../services/lead-assignment.service.js");
+    const filterAssignedTo =
+      typeof req.body?.filterAssignedTo === "string"
+        ? req.body.filterAssignedTo
+        : typeof req.body?.currentAssignedTo === "string"
+          ? req.body.currentAssignedTo
+          : undefined;
     const data = await smartBulkAssignLeads(req.user.id, {
       mode,
       assignedTo: mode === "single" ? assignedTo : undefined,
@@ -337,6 +345,7 @@ export async function bulkAssignLeadsHandler(req: AuthenticatedRequest, res: Res
       limit,
       search: typeof req.body?.search === "string" ? req.body.search : undefined,
       status: typeof req.body?.status === "string" ? req.body.status : undefined,
+      filterAssignedTo,
       notes: typeof req.body?.notes === "string" ? req.body.notes : undefined,
       dryRun,
     });
@@ -374,6 +383,20 @@ export async function listAssignableMembersHandler(req: AuthenticatedRequest, re
     const message = error instanceof Error ? error.message : "Failed to list members";
     const status = message.includes("permission") ? 403 : 400;
     res.status(status).json({ success: false, error: message });
+  }
+}
+
+/** GET /api/leads/assignment-summary — live assigned/unassigned + per-member counts */
+export async function leadAssignmentSummaryHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const { getLeadAssignmentSummary } = await import("../services/lead-assignment.service.js");
+    const data = await getLeadAssignmentSummary(req.user.id);
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    console.error("Lead assignment summary error:", error);
+    const message = error instanceof Error ? error.message : "Failed to load assignment summary";
+    res.status(500).json({ success: false, error: message });
   }
 }
 

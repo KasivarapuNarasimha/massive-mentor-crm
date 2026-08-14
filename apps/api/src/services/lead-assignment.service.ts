@@ -159,12 +159,14 @@ async function collectTargetLeadIds(
     limit?: number;
     search?: string;
     status?: string;
+    assignedTo?: string;
   }
 ): Promise<{ targetIds: string[]; matched: number; requested: number }> {
   const scopeMode = input.scope === "first_n" || input.scope === "all_filtered" ? input.scope : "ids";
   const filters = {
     search: input.search?.trim() || undefined,
     status: input.status?.trim() || undefined,
+    assignedTo: input.assignedTo?.trim() || undefined,
   };
 
   if (scopeMode === "ids" || input.scope === "reassign") {
@@ -194,6 +196,7 @@ async function collectTargetLeadIds(
     type: "lead",
     search: filters.search,
     status: filters.status,
+    assignedTo: filters.assignedTo,
     trashOnly: false,
     includeDeleted: false,
   });
@@ -251,7 +254,7 @@ async function collectTargetLeadIds(
 }
 
 export type SmartAssignInput = {
-  /** single | all_members  (all_members ignores assignedTo) */
+  /** single | all_members  (all_members ignores assignedTo target) */
   mode: AssignMode;
   /** Target user when mode=single */
   assignedTo?: string;
@@ -260,6 +263,8 @@ export type SmartAssignInput = {
   limit?: number;
   search?: string;
   status?: string;
+  /** Filter leads currently assigned to this userId (or "unassigned") */
+  filterAssignedTo?: string;
   notes?: string;
   /** Preview only — no writes */
   dryRun?: boolean;
@@ -317,6 +322,7 @@ export async function smartBulkAssignLeads(
     scope: input.scope === "reassign" ? "ids" : input.scope,
     ids: input.ids,
     limit: input.limit,
+    assignedTo: input.filterAssignedTo,
     search: input.search,
     status: input.status,
   });
@@ -820,6 +826,85 @@ export async function moveAssignmentLeads(
     distribution: result.distribution,
     assignmentId: result.batchId,
     sequence: result.sequence,
+  };
+}
+
+/**
+ * Live Lead Assignment summary for Business Admin dashboard / exports.
+ * Counts are computed from real Contact rows in the actor's CRM scope (tenant-isolated).
+ * Uses existing Contact.assignedTo — no duplicate assignment system.
+ */
+export type LeadAssignmentSummary = {
+  totalLeads: number;
+  assignedLeads: number;
+  unassignedLeads: number;
+  byMember: Array<{
+    userId: string | null;
+    name: string;
+    email: string | null;
+    count: number;
+  }>;
+};
+
+export async function getLeadAssignmentSummary(
+  actorUserId: string
+): Promise<LeadAssignmentSummary> {
+  // Any user who can list leads gets scoped counts (SE sees only their slice via buildCrmScope).
+  // Admins see full business totals.
+  const where = await buildContactListWhere(actorUserId, { type: "lead" });
+
+  const [totalLeads, assignedLeads, unassignedLeads, groups] = await Promise.all([
+    prisma.contact.count({ where: where as never }),
+    prisma.contact.count({
+      where: andTenant(where, { assignedTo: { not: null } }) as never,
+    }),
+    prisma.contact.count({
+      where: andTenant(where, { assignedTo: null }) as never,
+    }),
+    prisma.contact.groupBy({
+      by: ["assignedTo"],
+      where: andTenant(where, { assignedTo: { not: null } }) as never,
+      _count: { _all: true },
+    }),
+  ]);
+
+  const userIds = groups
+    .map((g) => g.assignedTo)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+  const users =
+    userIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+  const uMap = new Map(users.map((u) => [u.id, u]));
+
+  const byMember = groups
+    .map((g) => {
+      const uid = g.assignedTo;
+      const u = uid ? uMap.get(uid) : undefined;
+      const name =
+        (u?.name && u.name.trim()) ||
+        u?.email ||
+        // Legacy free-text assignedTo values
+        (uid && (uid.includes("@") || uid.length < 24) ? uid : null) ||
+        "Unknown user";
+      return {
+        userId: uid,
+        name,
+        email: u?.email || null,
+        count: g._count._all,
+      };
+    })
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+  return {
+    totalLeads,
+    assignedLeads,
+    unassignedLeads,
+    byMember,
   };
 }
 

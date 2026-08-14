@@ -225,6 +225,11 @@ export type ContactListFilters = {
   type?: "lead" | "client";
   status?: string;
   search?: string;
+  /**
+   * Filter by assignee userId.
+   * Use "unassigned" / "__unassigned__" for leads with no assignee.
+   */
+  assignedTo?: string;
   limit?: number;
   page?: number;
   pageSize?: number;
@@ -273,6 +278,14 @@ export async function buildContactListWhere(
 
   if (filters?.type) extra.type = filters.type;
   if (filters?.status) extra.status = filters.status;
+  if (filters?.assignedTo !== undefined && filters.assignedTo !== null) {
+    const a = String(filters.assignedTo).trim();
+    if (a === "unassigned" || a === "__unassigned__" || a === "null") {
+      extra.assignedTo = null;
+    } else if (a) {
+      extra.assignedTo = a;
+    }
+  }
   if (filters?.search) {
     const term = filters.search;
     extra.OR = [

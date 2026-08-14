@@ -680,6 +680,8 @@ class ApiClient {
       limit?: number;
       search?: string;
       status?: string;
+      /** Filter which leads to assign (current assignee / "unassigned") */
+      filterAssignedTo?: string;
       notes?: string;
       dryRun?: boolean;
       preview?: boolean;
@@ -721,6 +723,21 @@ class ApiClient {
         role: string;
       }>;
     }>("/leads/assignable-members", token);
+  }
+
+  /** Live assigned/unassigned + per-member lead counts (tenant-scoped) */
+  async getLeadAssignmentSummary(token?: string | null) {
+    return this.get<{
+      totalLeads: number;
+      assignedLeads: number;
+      unassignedLeads: number;
+      byMember: Array<{
+        userId: string | null;
+        name: string;
+        email: string | null;
+        count: number;
+      }>;
+    }>("/leads/assignment-summary", token);
   }
 
   async listLeadAssignments(

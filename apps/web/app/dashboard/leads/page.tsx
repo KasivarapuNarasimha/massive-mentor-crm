@@ -125,17 +125,21 @@ export default function LeadsPage() {
   /** Server total from CRM list API (must match Dashboard "My Leads") */
   const [serverTotal, setServerTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  // Analytics drill-down: ?status= & ?search=
+  // Analytics drill-down: ?status= & ?search= & ?assignedTo=
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  /** Filter by assignee userId or "unassigned" */
+  const [assignedToFilter, setAssignedToFilter] = useState("");
   const [urlFiltersApplied, setUrlFiltersApplied] = useState(false);
 
   useEffect(() => {
     const qSearch = searchParams.get("search") || "";
     const qStatus = searchParams.get("status") || "";
+    const qAssigned = searchParams.get("assignedTo") || "";
     if (qSearch) setSearch(qSearch);
     if (qStatus) setStatusFilter(qStatus);
-    if (qSearch || qStatus) setUrlFiltersApplied(true);
+    if (qAssigned) setAssignedToFilter(qAssigned);
+    if (qSearch || qStatus || qAssigned) setUrlFiltersApplied(true);
   }, [searchParams]);
   const [metaFilters, setMetaFilters] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
@@ -311,6 +315,7 @@ export default function LeadsPage() {
     });
     if (search.trim()) q.set("search", search.trim());
     if (statusFilter) q.set("status", statusFilter);
+    if (assignedToFilter) q.set("assignedTo", assignedToFilter);
 
     const apiRes = await api.getCrmContacts(`?${q.toString()}`, token);
     const data = apiRes.data as {
@@ -355,7 +360,7 @@ export default function LeadsPage() {
     }
     if (!opts?.silent) setIsLoading(false);
     return { ok: false as const, total: serverTotal };
-  }, [token, page, search, statusFilter, serverTotal]);
+  }, [token, page, search, statusFilter, assignedToFilter, serverTotal]);
 
   const fieldDefs: FieldDef[] = useMemo(() => {
     const fromConfig = contactFieldsFromConfig(bizConfig);
@@ -696,17 +701,17 @@ export default function LeadsPage() {
     );
   }, [enriched, metaFilters, filterableFields]);
 
-  // Reset to first page when search/status change
+  // Reset to first page when search/status/assignee filters change
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, assignedToFilter]);
 
-  // Server-driven load (page + search + status)
+  // Server-driven load (page + search + status + assignee)
   useEffect(() => {
     if (!token) return;
     void loadLeads({ page });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, page, search, statusFilter]);
+  }, [token, page, search, statusFilter, assignedToFilter]);
 
   const pageSizeUsed = Math.min(200, PAGE_SIZE > 50 ? PAGE_SIZE : 50);
   const totalFiltered = serverTotal;
@@ -965,6 +970,7 @@ export default function LeadsPage() {
         scope: "all_filtered" as const,
         search: search.trim() || undefined,
         status: statusFilter || undefined,
+        filterAssignedTo: assignedToFilter || undefined,
       };
     }
     return {
@@ -973,6 +979,7 @@ export default function LeadsPage() {
       limit: Math.min(resolvedAssignLimit || 0, serverTotal, BULK_ASSIGN_MAX),
       search: search.trim() || undefined,
       status: statusFilter || undefined,
+      filterAssignedTo: assignedToFilter || undefined,
     };
   };
 
@@ -1251,16 +1258,16 @@ export default function LeadsPage() {
 
   const runBulkExport = () => {
     if (selectedLeads.length === 0) return;
-    // RFC 4180 CSV + UTF-8 BOM for Excel compatibility
+    // RFC 4180 CSV + UTF-8 BOM for Excel compatibility — include human Assigned To names
     const headers = [
-      "Name",
+      "Lead Name",
+      "Contact/Phone",
       "Email",
-      "Phone",
       "Company",
       "Status",
+      "Assigned To",
       "Source",
       "Priority",
-      "AssignedTo",
       "Tags",
       "AI Score",
     ];
@@ -1275,17 +1282,16 @@ export default function LeadsPage() {
     for (const l of selectedLeads) {
       const cells = [
         l.name,
-        l.email,
         l.phone,
+        l.email,
         l.company,
         l.status,
+        assigneeLabel(l.assignedTo),
         l.source,
         l.priority,
-        l.assignedTo,
         Array.isArray(l.tags) ? (l.tags as string[]).join(";") : "",
         l.aiScore,
       ];
-      // Pad to header count
       while (cells.length < headers.length) cells.push("");
       lines.push(cells.slice(0, headers.length).map(esc).join(","));
     }
@@ -1620,15 +1626,31 @@ export default function LeadsPage() {
         status={statusFilter}
         onStatusChange={setStatusFilter}
         statusOptions={statusOptions.map((s) => ({ value: s.key, label: s.label }))}
+        assignedTo={assignedToFilter}
+        onAssignedToChange={(v) => {
+          setAssignedToFilter(v);
+          setPage(1);
+        }}
+        assigneeOptions={teamMembers.map((m) => ({
+          value: m.id,
+          label: m.name?.trim() || m.email,
+        }))}
         className="mb-4"
       />
 
-      {urlFiltersApplied && (search || statusFilter) && (
+      {urlFiltersApplied && (search || statusFilter || assignedToFilter) && (
         <div className="mb-3 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-200 flex flex-wrap items-center gap-2">
           <span>
             Filtered from analytics
             {statusFilter ? ` · status: ${statusFilter}` : ""}
             {search ? ` · search: ${search}` : ""}
+            {assignedToFilter
+              ? ` · assigned: ${
+                  assignedToFilter === "unassigned"
+                    ? "Unassigned"
+                    : assigneeLabel(assignedToFilter)
+                }`
+              : ""}
           </span>
           <button
             type="button"
@@ -1636,6 +1658,7 @@ export default function LeadsPage() {
             onClick={() => {
               setSearch("");
               setStatusFilter("");
+              setAssignedToFilter("");
               setUrlFiltersApplied(false);
             }}
           >
@@ -1644,7 +1667,7 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Filters — status + config-driven filter fields */}
+      {/* Filters — status + assignee + config-driven filter fields */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-4 items-stretch sm:items-center">
         {templateSlug && (
           <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 border border-border text-muted-foreground w-fit">
@@ -1668,6 +1691,23 @@ export default function LeadsPage() {
           {statusOptions.map((s) => (
             <option key={s.key} value={s.key}>
               {s.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={assignedToFilter}
+          onChange={(e) => {
+            setAssignedToFilter(e.target.value);
+            setPage(1);
+          }}
+          className={`${selectClass} w-full sm:w-auto sm:min-w-[160px] min-h-11 text-base sm:text-sm`}
+          aria-label="Filter by assigned team member"
+        >
+          <option value="">All assignees</option>
+          <option value="unassigned">Unassigned</option>
+          {teamMembers.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name?.trim() || m.email}
             </option>
           ))}
         </select>
@@ -1907,6 +1947,12 @@ export default function LeadsPage() {
                       <span className="px-2 py-0.5 rounded-full bg-muted border border-border text-foreground capitalize">
                         {lead.status}
                       </span>
+                      <span
+                        className="px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-200"
+                        title={lead.assignedTo || undefined}
+                      >
+                        Assigned To: {assigneeLabel(lead.assignedTo)}
+                      </span>
                       {lead.aiScore != null ? (
                         <ScoreBadge score={lead.aiScore} />
                       ) : (
@@ -1967,7 +2013,7 @@ export default function LeadsPage() {
                       {f.label}
                     </th>
                   ))}
-                  <th>Assigned</th>
+                  <th>Assigned To</th>
                   <th>AI Score</th>
                   <th className="text-right">Actions</th>
                 </tr>
@@ -2045,8 +2091,14 @@ export default function LeadsPage() {
                     })}
                     <td className="p-3">
                       <span
-                        className={`text-xs ${lead.assignedTo ? "text-muted-foreground" : "text-muted-foreground"}`}
-                        title={lead.assignedTo || undefined}
+                        className={`text-xs font-medium ${
+                          lead.assignedTo ? "text-foreground" : "text-muted-foreground italic"
+                        }`}
+                        title={
+                          lead.assignedTo
+                            ? `Assigned To: ${assigneeLabel(lead.assignedTo)}`
+                            : "Unassigned"
+                        }
                       >
                         {assigneeLabel(lead.assignedTo)}
                       </span>
