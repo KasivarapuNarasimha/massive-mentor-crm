@@ -56,6 +56,9 @@ export function buildWelcomeAccountEmail(opts: {
   const who = opts.ownerName?.trim() || "there";
   const trialEnd = formatDateLong(opts.trialEndDate);
   const subject = "Welcome to Massive Mentor CRM";
+  // Defense: never render whitespace inside credential values (generation also forbids it)
+  const tempPassword = String(opts.temporaryPassword || "").replace(/\s+/g, "");
+  const emailAddr = String(opts.email || "").trim();
 
   const text = [
     `Welcome to Massive Mentor CRM`,
@@ -65,8 +68,10 @@ export function buildWelcomeAccountEmail(opts: {
     `Your CRM workspace is ready.`,
     ``,
     `Company Name: ${opts.companyName}`,
-    `Username (Email): ${opts.email}`,
-    `Temporary Password: ${opts.temporaryPassword}`,
+    `Username (Email): ${emailAddr}`,
+    // Password alone on the next line after a clear label — no trailing spaces
+    `Temporary Password:`,
+    tempPassword,
     `Trial End Date: ${trialEnd}`,
     ``,
     `Login: ${loginUrl}`,
@@ -83,8 +88,8 @@ export function buildWelcomeAccountEmail(opts: {
     )}
     ${detailCard([
       { label: "Company Name", value: opts.companyName },
-      { label: "Username (Email)", value: opts.email, mono: true },
-      { label: "Temporary Password", value: opts.temporaryPassword, mono: true, emphasize: true },
+      { label: "Username (Email)", value: emailAddr, mono: true },
+      { label: "Temporary Password", value: tempPassword, mono: true, emphasize: true },
       { label: "Trial End Date", value: trialEnd },
     ])}
     ${ctaButton("Login to CRM", loginUrl)}
@@ -519,14 +524,17 @@ export function buildInvitationEmail(opts: {
     `Username (Email): ${opts.inviteeEmail}`,
     `Role: ${role}`,
   ];
-  if (opts.temporaryPassword) {
-    textLines.push(`Temporary Password: ${opts.temporaryPassword}`);
+  const invitePwd = opts.temporaryPassword
+    ? String(opts.temporaryPassword).replace(/\s+/g, "")
+    : null;
+  if (invitePwd) {
+    textLines.push(`Temporary Password:`, invitePwd);
   }
   textLines.push(
     ``,
     `Login: ${loginUrl}`,
     ``,
-    opts.temporaryPassword
+    invitePwd
       ? `For your security, please change your password after your first login.`
       : `Sign in with the link above to accept your invitation.`,
     footerText()
@@ -535,13 +543,13 @@ export function buildInvitationEmail(opts: {
 
   const rows: Array<{ label: string; value: string; mono?: boolean; emphasize?: boolean }> = [
     { label: "Company Name", value: opts.companyName },
-    { label: "Username (Email)", value: opts.inviteeEmail, mono: true },
+    { label: "Username (Email)", value: opts.inviteeEmail.trim(), mono: true },
     { label: "Role", value: role },
   ];
-  if (opts.temporaryPassword) {
+  if (invitePwd) {
     rows.push({
       label: "Temporary Password",
-      value: opts.temporaryPassword,
+      value: invitePwd,
       mono: true,
       emphasize: true,
     });
@@ -556,7 +564,7 @@ export function buildInvitationEmail(opts: {
     ${detailCard(rows)}
     ${ctaButton("Login to CRM", loginUrl)}
     ${
-      opts.temporaryPassword
+      invitePwd
         ? securityNotice(
             "For your security, please change your password after your first login."
           )

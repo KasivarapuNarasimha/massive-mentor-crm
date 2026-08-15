@@ -15,12 +15,10 @@ import { createBusinessWithTemplate } from "./business.service.js";
 import { resolveOrCreateCustomerOwner } from "./customer-owner.service.js";
 import { startTrialForBusiness, trialDaysDefault } from "./saas-billing.service.js";
 import { ensureSubscriptionPlans } from "./subscription-plan.service.js";
-
-function generateTempPassword(): string {
-  // Readable + strong enough (12 chars)
-  const raw = crypto.randomBytes(9).toString("base64url");
-  return `Mm@${raw.slice(0, 9)}!`;
-}
+import {
+  generateTempPassword,
+  passwordContainsWhitespace,
+} from "../lib/password-policy.js";
 
 export type CreateCustomerInput = {
   actorUserId: string;
@@ -60,6 +58,10 @@ export async function provisionCustomer(input: CreateCustomerInput) {
   });
 
   const tempPassword = generateTempPassword();
+  if (passwordContainsWhitespace(tempPassword)) {
+    // Should be impossible with generateTempPassword — fail closed rather than email a bad secret
+    throw new Error("Password generation failed safety check");
+  }
   const trialDays = input.trialDays ?? trialDaysDefault();
 
   const owner = await resolveOrCreateCustomerOwner({

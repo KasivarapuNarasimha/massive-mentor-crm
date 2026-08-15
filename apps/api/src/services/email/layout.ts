@@ -215,18 +215,21 @@ export function detailCard(
       const border =
         i < rows.length - 1 ? `border-bottom:1px solid ${B.cardBorder};` : "";
       const valueStyle = r.mono
-        ? `font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:14px;letter-spacing:0.02em;`
+        ? `font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:14px;letter-spacing:0.02em;white-space:nowrap;`
         : `font-family:${B.font};font-size:14px;`;
       const weight = r.emphasize ? "700" : "600";
-      return `
-        <tr>
-          <td style="padding:12px 0;${border}vertical-align:top;width:38%;font-family:${B.font};font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:${B.textSubtle};">
-            ${escapeHtml(r.label)}
-          </td>
-          <td style="padding:12px 0;${border}vertical-align:top;${valueStyle}font-weight:${weight};color:${B.text};word-break:break-word;">
-            ${escapeHtml(r.value)}
-          </td>
-        </tr>`;
+      // CRITICAL: mono credential values must have ZERO whitespace around the text node
+      // (newlines/indentation inside <td> become leading/trailing spaces on copy-paste in Gmail/Outlook).
+      const valueHtml = r.mono
+        ? `<code style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:14px;font-weight:${weight};letter-spacing:0.02em;color:${B.text};background:transparent;border:0;padding:0;margin:0;white-space:nowrap;">${escapeHtml(r.value)}</code>`
+        : escapeHtml(r.value);
+      return (
+        `<tr>` +
+        `<td style="padding:12px 0;${border}vertical-align:top;width:38%;font-family:${B.font};font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:${B.textSubtle};">${escapeHtml(r.label)}</td>` +
+        // No newline/space between > and value — copy selects clean password/email only
+        `<td style="padding:12px 0;${border}vertical-align:top;${valueStyle}font-weight:${weight};color:${B.text};word-break:break-word;">${valueHtml}</td>` +
+        `</tr>`
+      );
     })
     .join("");
 

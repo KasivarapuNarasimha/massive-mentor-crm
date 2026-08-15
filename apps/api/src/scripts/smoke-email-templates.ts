@@ -38,6 +38,14 @@ assert(welcome.html.includes("Support Email"), "support section");
 assert(welcome.html.includes("2026 Massive Mentor CRM"), "footer year");
 assert(welcome.html.includes("inline") || welcome.html.includes("style="), "inline styles");
 assert(!!welcome.text && welcome.text.includes("Temporary Password"), "plain text fallback");
+// Password must appear without surrounding HTML whitespace that copy-paste would include
+assert(
+  welcome.html.includes(`>Mm@TempPass1!<`) || welcome.html.includes(`>Mm@TempPass1!</code>`),
+  "password has no leading/trailing space inside HTML value cell"
+);
+assert(!welcome.html.includes(` Mm@TempPass1!`), "no space before password in HTML");
+assert(!welcome.html.includes(`Mm@TempPass1! `), "no space after password in HTML");
+assert(welcome.text.includes("\nMm@TempPass1!\n"), "plain text password alone on its line");
 
 const reset = buildPasswordResetEmail({
   name: "Te",

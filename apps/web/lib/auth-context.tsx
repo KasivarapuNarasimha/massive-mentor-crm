@@ -312,7 +312,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ): Promise<LoginResult> => {
     setIsLoading(true);
     try {
-      const response = await api.login(email, password, {
+      // Outer trim only — matches API normalizeLoginPassword (email copy/paste whitespace)
+      const response = await api.login(email.trim(), password.replace(/^\s+|\s+$/g, ""), {
         forceNewSession: opts?.forceNewSession,
       });
 

@@ -193,6 +193,9 @@ export async function loginUser(
   } = await import("./session.service.js");
 
   const email = input.email.toLowerCase().trim();
+  const { normalizeLoginPassword } = await import("../lib/password-policy.js");
+  // Strip accidental outer whitespace from email copy/paste — never log the secret
+  const password = normalizeLoginPassword(input.password);
   const deviceMeta = {
     userAgent: device?.userAgent,
     ipAddress: device?.ipAddress,
@@ -214,7 +217,7 @@ export async function loginUser(
     throw new Error("Invalid email or password");
   }
 
-  const isValidPassword = await bcrypt.compare(input.password, user.passwordHash);
+  const isValidPassword = await bcrypt.compare(password, user.passwordHash);
 
   if (!isValidPassword) {
     await recordLoginEvent({
@@ -331,13 +334,16 @@ export async function loginUser(
 
 /** Super Admin portal login — Massive Mentor staff only */
 export async function loginPlatformAdmin(input: LoginInput): Promise<AuthResponse> {
+  const { normalizeLoginPassword } = await import("../lib/password-policy.js");
+  const email = input.email.toLowerCase().trim();
+  const password = normalizeLoginPassword(input.password);
   const user = await prisma.user.findUnique({
-    where: { email: input.email.toLowerCase() },
+    where: { email },
   });
 
   if (!user) throw new Error("Invalid email or password");
 
-  const ok = await bcrypt.compare(input.password, user.passwordHash);
+  const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw new Error("Invalid email or password");
   if (user.isDisabled) throw new Error("This account has been disabled.");
 
@@ -400,13 +406,16 @@ export async function loginPlatformAdmin(input: LoginInput): Promise<AuthRespons
 export async function loginDemoUser(input: LoginInput): Promise<AuthResponse> {
   const { ensureDemoWorkspace, DEMO_EMAIL } = await import("./demo.service.js");
   await ensureDemoWorkspace();
+  const { normalizeLoginPassword } = await import("../lib/password-policy.js");
+  const email = input.email.toLowerCase().trim();
+  const password = normalizeLoginPassword(input.password);
 
   const user = await prisma.user.findUnique({
-    where: { email: input.email.toLowerCase() },
+    where: { email },
   });
   if (!user) throw new Error("Invalid email or password");
 
-  const ok = await bcrypt.compare(input.password, user.passwordHash);
+  const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) throw new Error("Invalid email or password");
   if (user.isDisabled) throw new Error("This account has been disabled.");
 

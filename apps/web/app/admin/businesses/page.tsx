@@ -251,9 +251,15 @@ export default function AdminBusinessesPage() {
       );
       if (pwd) {
         try {
-          await navigator.clipboard.writeText(
-            `Login: ${d.loginUrl || ""}\nEmail: ${d.owner?.email}\nPassword: ${pwd}`
-          );
+          // Password alone first line for clean single-field paste; full block below
+          const cleanPwd = String(pwd).replace(/\s+/g, "");
+          const block = [
+            `Login: ${(d.loginUrl || "").trim()}`,
+            `Email: ${(d.owner?.email || "").trim()}`,
+            `Password:`,
+            cleanPwd,
+          ].join("\n");
+          await navigator.clipboard.writeText(block);
           toast.message("Credentials copied to clipboard");
         } catch {
           /* ignore */
