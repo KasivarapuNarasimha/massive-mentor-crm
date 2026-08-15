@@ -307,66 +307,136 @@ export default function LeadsPage() {
     return teamMembers.filter((m) => memberMatchesSearch(m, q));
   }, [teamMembers, teamSearch, memberMatchesSearch]);
 
-  const loadLeads = useCallback(async (opts?: { page?: number; silent?: boolean }) => {
-    if (!token) return { ok: false as const, total: 0 };
-    if (!opts?.silent) setIsLoading(true);
-    const pageNum = opts?.page && opts.page > 0 ? opts.page : page;
-    // Server-side pagination (API caps pageSize at 200). Total from server is authoritative.
-    const q = new URLSearchParams({
-      type: "lead",
-      page: String(pageNum),
-      pageSize: String(Math.min(200, PAGE_SIZE > 50 ? PAGE_SIZE : 50)),
-      sortBy: "updatedAt",
-      sortDir: "desc",
-    });
-    if (search.trim()) q.set("search", search.trim());
-    if (statusFilter) q.set("status", statusFilter);
-    if (assignedToFilter) q.set("assignedTo", assignedToFilter);
-
-    const apiRes = await api.getCrmContacts(`?${q.toString()}`, token);
-    const data = apiRes.data as {
-      contacts?: Contact[];
-      total?: number;
-      page?: number;
-      pageSize?: number;
-      totalPages?: number;
-    } | undefined;
-    if (apiRes.success && data?.contacts) {
-      setLeads(data.contacts);
-      const total =
-        typeof data.total === "number" ? data.total : data.contacts.length;
-      setServerTotal(total);
-      if (typeof data.page === "number" && data.page !== page) {
-        setPage(data.page);
+  /**
+   * Apply an updated lead in the current list without re-fetching (avoids jump-to-top
+   * when the default server sort is updatedAt desc).
+   * If active filters would exclude the lead, drop it from the current page list.
+   */
+  const applyLeadUpdateInPlace = useCallback(
+    (updated: Contact | Record<string, unknown>) => {
+      const id = String((updated as Contact).id || "");
+      if (!id) return;
+      const nextStatus = String((updated as Contact).status || "");
+      const nextAssignee =
+        (updated as Contact).assignedTo === undefined
+          ? undefined
+          : (updated as Contact).assignedTo;
+      // Drop from list if no longer matches active filters
+      if (statusFilter && nextStatus && nextStatus !== statusFilter) {
+        setLeads((prev) => prev.filter((l) => l.id !== id));
+        setServerTotal((t) => Math.max(0, t - 1));
+        return;
       }
-      setSelectedIds(new Set());
-      // AI map is best-effort — never toast; never block import UX
-      const ids = data.contacts.map((c) => c.id);
-      if (ids.length) {
-        api
-          .post<Record<string, AiFollowupRec>>(
-            "/crm/ai/followup-engine/map",
-            { contactIds: ids },
-            token
-          )
-          .then((r) => {
-            if (r.success && r.data) setAiRecMap(r.data);
-          })
-          .catch(() => {});
+      if (
+        assignedToFilter &&
+        nextAssignee !== undefined &&
+        (assignedToFilter === "unassigned"
+          ? nextAssignee
+          : nextAssignee !== assignedToFilter)
+      ) {
+        setLeads((prev) => prev.filter((l) => l.id !== id));
+        setServerTotal((t) => Math.max(0, t - 1));
+        return;
+      }
+      setLeads((prev) =>
+        prev.map((l) => (l.id === id ? ({ ...l, ...updated } as Contact) : l))
+      );
+    },
+    [statusFilter, assignedToFilter]
+  );
+
+  const loadLeads = useCallback(
+    async (opts?: {
+      page?: number;
+      silent?: boolean;
+      /** Keep current row order after refresh (edit/status update paths). */
+      preserveOrder?: boolean;
+      /** When true, do not clear multi-select (default clears on full reload). */
+      keepSelection?: boolean;
+    }) => {
+      if (!token) return { ok: false as const, total: 0 };
+      if (!opts?.silent) setIsLoading(true);
+      const pageNum = opts?.page && opts.page > 0 ? opts.page : page;
+      // Server-side pagination (API caps pageSize at 200). Total from server is authoritative.
+      // Default sort remains updatedAt desc for full loads / hard refresh / navigation.
+      const q = new URLSearchParams({
+        type: "lead",
+        page: String(pageNum),
+        pageSize: String(Math.min(200, PAGE_SIZE > 50 ? PAGE_SIZE : 50)),
+        sortBy: "updatedAt",
+        sortDir: "desc",
+      });
+      if (search.trim()) q.set("search", search.trim());
+      if (statusFilter) q.set("status", statusFilter);
+      if (assignedToFilter) q.set("assignedTo", assignedToFilter);
+
+      const apiRes = await api.getCrmContacts(`?${q.toString()}`, token);
+      const data = apiRes.data as {
+        contacts?: Contact[];
+        total?: number;
+        page?: number;
+        pageSize?: number;
+        totalPages?: number;
+      } | undefined;
+      if (apiRes.success && data?.contacts) {
+        const fetched = data.contacts;
+        if (opts?.preserveOrder) {
+          // Re-apply server field values but keep the on-screen order of the current page.
+          setLeads((prev) => {
+            if (!prev.length) return fetched;
+            const byId = new Map(fetched.map((c) => [c.id, c]));
+            const ordered: Contact[] = [];
+            for (const row of prev) {
+              const next = byId.get(row.id);
+              if (next) {
+                ordered.push(next);
+                byId.delete(row.id);
+              }
+              // IDs missing from fetch (filtered out / deleted) are dropped — intentional.
+            }
+            return ordered.length ? ordered : fetched;
+          });
+        } else {
+          setLeads(fetched);
+        }
+        const total =
+          typeof data.total === "number" ? data.total : data.contacts.length;
+        setServerTotal(total);
+        if (typeof data.page === "number" && data.page !== page) {
+          setPage(data.page);
+        }
+        if (!opts?.keepSelection && !opts?.preserveOrder) {
+          setSelectedIds(new Set());
+        }
+        // AI map is best-effort — never toast; never block import UX
+        const ids = fetched.map((c) => c.id);
+        if (ids.length) {
+          api
+            .post<Record<string, AiFollowupRec>>(
+              "/crm/ai/followup-engine/map",
+              { contactIds: ids },
+              token
+            )
+            .then((r) => {
+              if (r.success && r.data) setAiRecMap(r.data);
+            })
+            .catch(() => {});
+        }
+        if (!opts?.silent) setIsLoading(false);
+        return { ok: true as const, total };
+      }
+
+      // List refresh failed — never surface raw "Cannot reach API" on this path
+      if (!apiRes.success && !opts?.silent) {
+        toast.message("Could not refresh leads list", {
+          description: "Reload the page if the table looks out of date.",
+        });
       }
       if (!opts?.silent) setIsLoading(false);
-      return { ok: true as const, total };
-    }
-
-    // List refresh failed — never surface raw "Cannot reach API" on this path
-    if (!apiRes.success && !opts?.silent) {
-      toast.message("Could not refresh leads list", {
-        description: "Reload the page if the table looks out of date.",
-      });
-    }
-    if (!opts?.silent) setIsLoading(false);
-    return { ok: false as const, total: serverTotal };
-  }, [token, page, search, statusFilter, assignedToFilter, serverTotal]);
+      return { ok: false as const, total: serverTotal };
+    },
+    [token, page, search, statusFilter, assignedToFilter, serverTotal]
+  );
 
   const fieldDefs: FieldDef[] = useMemo(() => {
     const fromConfig = contactFieldsFromConfig(bizConfig);
@@ -888,7 +958,20 @@ export default function LeadsPage() {
         const { emitDataChanged } = await import("@/lib/data-events");
         // One consolidated refresh — avoids 4× notification/media fan-out from DashboardShell
         emitDataChanged({ module: "all", action: editingLead ? "update" : "create" });
-        await loadLeads();
+        if (editingLead) {
+          // Keep list position: do not re-fetch with updatedAt desc (would jump to top).
+          const contact =
+            (apiResponse.data as { contact?: Contact } | undefined)?.contact ||
+            ({
+              ...editingLead,
+              ...payload,
+              id: editingLead.id,
+            } as Contact);
+          applyLeadUpdateInPlace(contact);
+        } else {
+          // New leads: keep existing create ordering (appears in default list sort on reload).
+          await loadLeads();
+        }
       } else {
         toast.error(friendlyError(apiResponse.error, "Could not save lead. Please try again."));
       }
@@ -1108,7 +1191,8 @@ export default function LeadsPage() {
         setAssignCustomCount("");
         setAssignNotes("");
         clearSelection();
-        await loadLeads();
+        // Assignee changes: refresh data but keep current row order stable.
+        await loadLeads({ silent: true, preserveOrder: true });
         const { emitDataChanged } = await import("@/lib/data-events");
         emitDataChanged({ module: "contact", action: "update" });
       } else {
@@ -1370,7 +1454,8 @@ export default function LeadsPage() {
         description: res.data.failed ? `${res.data.failed} failed` : "Audit log recorded",
       });
       clearSelection();
-      await loadLeads();
+      // Preserve on-screen order after status/field bulk updates (no jump-to-top).
+      await loadLeads({ silent: true, preserveOrder: true });
       const { emitDataChanged } = await import("@/lib/data-events");
       // One consolidated refresh (same as single Lead save)
       emitDataChanged({ module: "all", action: "update" });
