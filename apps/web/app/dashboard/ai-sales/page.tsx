@@ -5,7 +5,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { formatCurrency, parseAmount } from "@/lib/currency";
+import { parseAmount } from "@/lib/currency";
+import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { LanguageSelector, getLanguageLabel } from "@/components/ai/LanguageSelector";
 import { useDataVersion } from "@/lib/data-events";
 
@@ -75,6 +76,7 @@ interface KpiData {
 
 function AiSalesIntelligencePageInner() {
   const { token } = useAuth();
+  const { money } = useBusinessCurrency();
   const dataVersion = useDataVersion();
   const searchParams = useSearchParams();
   const meetingIdFromUrl = searchParams.get("meetingId") || "";
@@ -577,8 +579,8 @@ function AiSalesIntelligencePageInner() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             <KpiCard label="Total Leads" value={kpis.totalLeads} />
             <KpiCard label="Clients" value={kpis.totalClients} />
-            <KpiCard label="Pipeline Value" value={formatCurrency(kpis.pipelineValue)} />
-            <KpiCard label="Total Deals Value" value={formatCurrency(kpis.totalDealsValue)} />
+            <KpiCard label="Pipeline Value" value={money(kpis.pipelineValue)} />
+            <KpiCard label="Total Deals Value" value={money(kpis.totalDealsValue)} />
             <KpiCard label="Conversion Rate" value={`${kpis.conversionRate}%`} />
             <KpiCard label="Tasks Due" value={kpis.tasksDue} />
             <KpiCard label="Meetings Today" value={kpis.meetingsToday} />
@@ -1061,7 +1063,7 @@ function AiSalesIntelligencePageInner() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-background border border-border rounded-xl p-3">
                       <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Expected Revenue</div>
-                      <div className="text-lg font-semibold text-emerald-400 tabular-nums">{formatCurrency(revenue)}</div>
+                      <div className="text-lg font-semibold text-emerald-400 tabular-nums">{money(revenue)}</div>
                     </div>
                     <div className="bg-background border border-border rounded-xl p-3">
                       <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Win Rate</div>

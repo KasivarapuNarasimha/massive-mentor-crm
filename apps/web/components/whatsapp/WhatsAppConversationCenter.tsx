@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/currency";
+import { useBusinessCurrency } from "@/lib/use-business-currency";
 
 type Conv = {
   id: string;
@@ -85,6 +85,7 @@ function deliveryIcon(status: string) {
 
 export function WhatsAppConversationCenter() {
   const { token, role } = useAuth();
+  const { money } = useBusinessCurrency();
   const canAssign = ["ceo", "owner", "business_admin", "admin", "sales_manager", "manager", "super_admin"].includes(
     (role || "").toLowerCase()
   );
@@ -970,7 +971,7 @@ export function WhatsAppConversationCenter() {
                     contact?.dealValueLabel
                       ? String(contact.dealValueLabel)
                       : contact?.value != null
-                        ? formatCurrency(Number(contact.value))
+                        ? money(Number(contact.value))
                         : "—"
                   }
                 />

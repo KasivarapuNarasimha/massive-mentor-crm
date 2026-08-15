@@ -365,7 +365,72 @@ export async function getBusinessConfigOrEnsure(businessId: string, userId?: str
       templateId: true,
       templateSlug: true,
       templateVersion: true,
+      country: true,
+      timezone: true,
+      settings: true,
     },
   });
-  return { business, config };
+  const currency = resolveBusinessCurrency(business);
+  return {
+    business: business
+      ? {
+          id: business.id,
+          name: business.name,
+          templateId: business.templateId,
+          templateSlug: business.templateSlug,
+          templateVersion: business.templateVersion,
+          country: business.country,
+          timezone: business.timezone,
+          currency,
+        }
+      : null,
+    config,
+  };
+}
+
+/**
+ * Single source of truth for tenant display currency.
+ * Prefer Business.settings.currency (set at Super Admin provision), then country → INR/etc.
+ */
+export function resolveBusinessCurrency(
+  business:
+    | {
+        settings?: unknown;
+        country?: string | null;
+      }
+    | null
+    | undefined
+): string {
+  const settings =
+    business?.settings && typeof business.settings === "object"
+      ? (business.settings as Record<string, unknown>)
+      : {};
+  const fromSettings = settings.currency;
+  if (typeof fromSettings === "string" && fromSettings.trim()) {
+    const code = fromSettings.trim().toUpperCase();
+    if (
+      ["INR", "USD", "EUR", "GBP", "AED", "SAR", "SGD", "AUD", "CAD"].includes(code)
+    ) {
+      return code;
+    }
+  }
+  const country = String(business?.country || "").toUpperCase();
+  if (
+    !country ||
+    country === "IN" ||
+    country === "IND" ||
+    country === "INDIA" ||
+    country.includes("INDIA")
+  ) {
+    return "INR";
+  }
+  if (country === "US" || country === "USA" || country === "UNITED STATES") return "USD";
+  if (country === "GB" || country === "UK") return "GBP";
+  if (country === "AE" || country === "UAE") return "AED";
+  if (country === "SA") return "SAR";
+  if (country === "SG") return "SGD";
+  if (country === "AU") return "AUD";
+  if (country === "CA") return "CAD";
+  // India-first SaaS default — never invent USD for empty/unknown country
+  return "INR";
 }

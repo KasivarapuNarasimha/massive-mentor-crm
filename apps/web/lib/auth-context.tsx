@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { api } from "@/lib/api";
 import { User } from "@/types/api";
+import { isCurrencyCode, setAppCurrency } from "@/lib/currency";
 
 export type LoginResult =
   | { success: true }
@@ -216,6 +217,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(response.data.user);
             localStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
             if (response.data.user.role) setRole(response.data.user.role);
+            // Tenant currency from Business.settings (Super Admin provision)
+            const biz = (response.data as { business?: { currency?: string } }).business;
+            if (biz?.currency && isCurrencyCode(biz.currency)) {
+              setAppCurrency(biz.currency);
+            }
             return;
           }
           const httpStatus = response.status;
@@ -319,6 +325,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(authToken);
         setUser(loggedInUser);
         if (loggedInUser.role) setRole(loggedInUser.role);
+
+        // Resolve tenant currency ASAP (Business.settings via /me)
+        void api.getCurrentUser(authToken).then((me) => {
+          const biz = (me.data as { business?: { currency?: string } } | undefined)?.business;
+          if (biz?.currency && isCurrencyCode(biz.currency)) {
+            setAppCurrency(biz.currency);
+          }
+        });
 
         api.get("/teams/role", authToken).then((r) => {
           if (r.success && (r.data as { role?: string })?.role) {

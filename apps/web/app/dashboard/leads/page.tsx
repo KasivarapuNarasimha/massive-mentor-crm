@@ -25,18 +25,20 @@ import {
   type BusinessConfigDTO,
   type PipelineStatus,
   contactFieldsFromConfig,
-  listFields,
-  filterFields,
   leadStatusesFromConfig,
   getContactFieldValue,
   FALLBACK_CONTACT_FIELDS,
   FALLBACK_LEAD_STATUSES,
   ensureLeadFormFields,
-  isRealEstateBusiness,
+  templatePrefersFeedbackColumn,
+  templateHidesCompanyInLeadList,
+  templateHidesEmailInLeadList,
   getLeadFeedbackText,
-  applyRealEstateLeadListFields,
+  leadListColumns,
+  leadFilterColumns,
 } from "@/lib/business-config";
-import { formatCurrency, parseAmount } from "@/lib/currency";
+import { parseAmount } from "@/lib/currency";
+import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 
 interface Contact {
@@ -123,6 +125,7 @@ function ScoreBadge({ score }: { score: number }) {
 
 export default function LeadsPage() {
   const { token, role } = useAuth();
+  const { money } = useBusinessCurrency();
   const searchParams = useSearchParams();
   const [leads, setLeads] = useState<Contact[]>([]);
   /** Server total from CRM list API (must match Dashboard "My Leads") */
@@ -372,21 +375,25 @@ export default function LeadsPage() {
     return ensureLeadFormFields(base);
   }, [bizConfig]);
 
-  /** Real Estate portal only — templateSlug from business config (not business name). */
-  const isRealEstate = useMemo(
-    () => isRealEstateBusiness(templateSlug),
+  /** templateSlug from BusinessConfig — never business name. */
+  const prefersFeedbackCol = useMemo(
+    () => templatePrefersFeedbackColumn(templateSlug),
     [templateSlug]
   );
+  const hideCompanyUi = useMemo(
+    () => templateHidesCompanyInLeadList(templateSlug),
+    [templateSlug]
+  );
+  /** List/filter columns derived from BusinessConfig + template visibility rules */
+  const tableFields = useMemo(
+    () => leadListColumns(fieldDefs, templateSlug, 6),
+    [fieldDefs, templateSlug]
+  );
 
-  const tableFields = useMemo(() => {
-    const listed = listFields(fieldDefs);
-    return isRealEstate ? applyRealEstateLeadListFields(listed) : listed;
-  }, [fieldDefs, isRealEstate]);
-
-  const filterableFields = useMemo(() => {
-    const filters = filterFields(fieldDefs);
-    return isRealEstate ? applyRealEstateLeadListFields(filters) : filters;
-  }, [fieldDefs, isRealEstate]);
+  const filterableFields = useMemo(
+    () => leadFilterColumns(fieldDefs, templateSlug),
+    [fieldDefs, templateSlug]
+  );
   // Always telecalling defaults + config merge (leadStatusesFromConfig never empty)
   const statusOptions: PipelineStatus[] = useMemo(() => {
     const fromConfig = leadStatusesFromConfig(bizConfig);
@@ -1948,7 +1955,7 @@ export default function LeadsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-foreground truncate">{lead.name}</div>
                     <div className="text-sm text-muted-foreground">{lead.phone || "—"}</div>
-                    {!isRealEstate && (
+                    {!hideCompanyUi && (
                       <div
                         className="text-xs text-muted-foreground truncate max-w-full"
                         title={lead.company || undefined}
@@ -1971,7 +1978,7 @@ export default function LeadsPage() {
                       >
                         Assigned To: {assigneeLabel(lead.assignedTo)}
                       </span>
-                      {isRealEstate ? (
+                      {prefersFeedbackCol ? (
                         (() => {
                           const fb = getLeadFeedbackText(lead as Record<string, unknown>);
                           return (
@@ -2038,13 +2045,13 @@ export default function LeadsPage() {
                       aria-label="Select all on page"
                     />
                   </th>
-                  {tableFields.slice(0, 6).map((f) => (
+                  {tableFields.map((f) => (
                     <th key={f.key} className="max-w-[180px]">
                       {f.label}
                     </th>
                   ))}
                   <th>Assigned To</th>
-                  <th>{isRealEstate ? "Feedback" : "AI Score"}</th>
+                  <th>{prefersFeedbackCol ? "Feedback" : "AI Score"}</th>
                   <th className="text-right">Actions</th>
                 </tr>
               </thead>
@@ -2063,7 +2070,7 @@ export default function LeadsPage() {
                         aria-label={`Select ${lead.name}`}
                       />
                     </td>
-                    {tableFields.slice(0, 6).map((f) => {
+                    {tableFields.map((f) => {
                       const raw = getContactFieldValue(lead as Record<string, unknown>, f);
                       const isMoney =
                         f.type === "currency" ||
@@ -2077,11 +2084,18 @@ export default function LeadsPage() {
                           ? "—"
                           : isMoney
                             ? moneyN != null
-                              ? formatCurrency(moneyN)
+                              ? money(moneyN)
                               : "—"
                             : String(raw);
                       const isStatus = f.coreMap === "status" || f.key === "status";
                       const isName = f.coreMap === "name" || f.key === "name";
+                      const showEmailUnderName =
+                        !templateHidesEmailInLeadList(templateSlug) &&
+                        !tableFields.some(
+                          (tf) =>
+                            tf.key === "email" ||
+                            tf.coreMap === "email"
+                        );
                       return (
                         <td key={f.key} className="p-3 max-w-[180px]">
                           {isStatus ? (
@@ -2093,7 +2107,7 @@ export default function LeadsPage() {
                               <div className="font-medium text-foreground truncate" title={display}>
                                 {display}
                               </div>
-                              {!isRealEstate && lead.email ? (
+                              {showEmailUnderName && lead.email ? (
                                 <div className="text-xs text-muted-foreground truncate" title={String(lead.email)}>
                                   {String(lead.email)}
                                 </div>
@@ -2134,7 +2148,7 @@ export default function LeadsPage() {
                       </span>
                     </td>
                     <td className="p-3 max-w-[200px]">
-                      {isRealEstate ? (
+                      {prefersFeedbackCol ? (
                         (() => {
                           const fb = getLeadFeedbackText(lead as Record<string, unknown>);
                           if (!fb) {

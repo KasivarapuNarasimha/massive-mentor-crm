@@ -137,6 +137,22 @@ export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
     // Phase 1: ensure tenant on every /me (idempotent backfill)
     const business = await ensureDefaultBusiness(req.user.id);
 
+    // Currency: Business.settings (Super Admin provision) — not browser locale
+    let currency = "INR";
+    let country: string | null = null;
+    try {
+      const { prisma } = await import("../lib/prisma.js");
+      const { resolveBusinessCurrency } = await import("../services/template.service.js");
+      const full = await prisma.business.findUnique({
+        where: { id: business.id },
+        select: { settings: true, country: true },
+      });
+      country = full?.country ?? null;
+      currency = resolveBusinessCurrency(full);
+    } catch {
+      /* keep INR */
+    }
+
     res.json({
       success: true,
       data: {
@@ -153,6 +169,8 @@ export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
           status: business.status,
           templateSlug: business.templateSlug,
           templateId: business.templateId,
+          currency,
+          country,
         },
       },
     });

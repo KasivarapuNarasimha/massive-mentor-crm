@@ -17,6 +17,10 @@ const SEED_DEFS: SeedTemplateMeta[] = [
     name: "Coaching Institute",
     description: "Admissions, batches, fees, counsellors",
     category: "education",
+    // B2C admissions — Company (college) stays in form/import, not list density
+    coreFieldOverrides: [
+      { key: "company", showInList: false, showInFilter: false, label: "College / Institute" },
+    ],
     extraFields: [
       { key: "parent_name", label: "Parent Name", entity: "contact", type: "text", showInForm: true, showInList: true, order: 10 },
       { key: "course", label: "Course", entity: "contact", type: "text", showInForm: true, showInList: true, showInFilter: true, order: 11 },
@@ -86,6 +90,10 @@ const SEED_DEFS: SeedTemplateMeta[] = [
     name: "Real Estate",
     description: "Buyers, budgets, properties, site visits",
     category: "real_estate",
+    coreFieldOverrides: [
+      { key: "company", showInList: false, showInFilter: false, showInForm: false },
+      { key: "email", showInList: false, showInFilter: false },
+    ],
     extraFields: [
       { key: "budget", label: "Budget", entity: "contact", type: "currency", showInForm: true, showInList: true, order: 10 },
       { key: "location", label: "Location", entity: "contact", type: "text", showInForm: true, showInList: true, showInFilter: true, order: 11 },
@@ -141,6 +149,10 @@ const SEED_DEFS: SeedTemplateMeta[] = [
     name: "Hospital",
     description: "Patients, doctors, appointments",
     category: "healthcare",
+    coreFieldOverrides: [
+      { key: "company", showInList: false, showInFilter: false, showInForm: false },
+      { key: "name", label: "Patient Name" },
+    ],
     extraFields: [
       { key: "patient", label: "Patient", entity: "contact", type: "text", coreMap: "name", showInForm: true, showInList: true, order: 1 },
       { key: "doctor", label: "Doctor", entity: "contact", type: "text", showInForm: true, showInList: true, showInFilter: true, order: 10 },

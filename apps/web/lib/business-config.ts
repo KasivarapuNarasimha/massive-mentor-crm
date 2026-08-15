@@ -192,6 +192,16 @@ export function ensureLeadFormFields(fields: FieldDef[]): FieldDef[] {
   ];
 }
 
+/** Normalize template slug for comparisons. */
+export function normalizeTemplateSlug(
+  templateSlug: string | null | undefined
+): string {
+  return String(templateSlug || "")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+}
+
 /**
  * Business / industry template detection (from Business.templateSlug).
  * Real Estate portal uses slug `real_estate` (aliases: real-estate, realestate).
@@ -199,11 +209,68 @@ export function ensureLeadFormFields(fields: FieldDef[]): FieldDef[] {
 export function isRealEstateBusiness(
   templateSlug: string | null | undefined
 ): boolean {
-  const s = String(templateSlug || "")
-    .trim()
-    .toLowerCase()
-    .replace(/-/g, "_");
+  const s = normalizeTemplateSlug(templateSlug);
   return s === "real_estate" || s === "realestate";
+}
+
+export function isCoachingBusiness(
+  templateSlug: string | null | undefined
+): boolean {
+  const s = normalizeTemplateSlug(templateSlug);
+  return (
+    s === "coaching_institute" ||
+    s === "coaching" ||
+    s.includes("coaching") ||
+    s.includes("education") ||
+    s.includes("tuition") ||
+    s.includes("school") ||
+    s.includes("college")
+  );
+}
+
+export function isHospitalBusiness(
+  templateSlug: string | null | undefined
+): boolean {
+  const s = normalizeTemplateSlug(templateSlug);
+  return s === "hospital" || s.includes("clinic") || s.includes("healthcare");
+}
+
+/**
+ * Templates where "Company" is not a meaningful lead-list column
+ * (B2C education / property / healthcare). Agency/generic keep Company.
+ */
+export function templateHidesCompanyInLeadList(
+  templateSlug: string | null | undefined
+): boolean {
+  return (
+    isRealEstateBusiness(templateSlug) ||
+    isCoachingBusiness(templateSlug) ||
+    isHospitalBusiness(templateSlug)
+  );
+}
+
+/**
+ * Templates where Email is secondary for list density
+ * (Real Estate telecalling focus). Coaching keeps email when showInList.
+ */
+export function templateHidesEmailInLeadList(
+  templateSlug: string | null | undefined
+): boolean {
+  return isRealEstateBusiness(templateSlug);
+}
+
+/**
+ * Prefer Feedback list column over AI Score for B2C verticals
+ * where sales notes matter more than model scores in the table.
+ */
+export function templatePrefersFeedbackColumn(
+  templateSlug: string | null | undefined
+): boolean {
+  return (
+    isRealEstateBusiness(templateSlug) ||
+    isCoachingBusiness(templateSlug) ||
+    isHospitalBusiness(templateSlug)
+  );
 }
 
 /** Read Lead Feedback from Contact.customFields.feedback (existing storage). */
@@ -224,8 +291,36 @@ export function getLeadFeedbackText(
 }
 
 /**
+ * Apply template-aware list/filter visibility on top of BusinessConfig fields.
+ * Works for already-provisioned configs without requiring re-install of the template.
+ * Does not remove form fields unless they are list/filter-only flags.
+ */
+export function applyTemplateLeadFieldVisibility(
+  fields: FieldDef[],
+  templateSlug: string | null | undefined
+): FieldDef[] {
+  const hideCompany = templateHidesCompanyInLeadList(templateSlug);
+  const hideEmail = templateHidesEmailInLeadList(templateSlug);
+  if (!hideCompany && !hideEmail) return fields;
+
+  return fields.map((f) => {
+    const key = (f.key || "").toLowerCase();
+    const core = (f.coreMap || "").toLowerCase();
+    const isCompany = key === "company" || core === "company";
+    const isEmail = key === "email" || core === "email";
+    if (hideCompany && isCompany) {
+      return { ...f, showInList: false, showInFilter: false };
+    }
+    if (hideEmail && isEmail) {
+      return { ...f, showInList: false, showInFilter: false };
+    }
+    return f;
+  });
+}
+
+/**
+ * @deprecated Use applyTemplateLeadFieldVisibility — kept for callers.
  * Real Estate Leads list: hide Company + Email columns/filters (UI only).
- * Does not mutate form fields or schema — create/edit still have email/company if configured.
  */
 export function applyRealEstateLeadListFields(fields: FieldDef[]): FieldDef[] {
   return fields.filter((f) => {
@@ -235,4 +330,37 @@ export function applyRealEstateLeadListFields(fields: FieldDef[]): FieldDef[] {
     if (key === "company" || core === "company") return false;
     return true;
   });
+}
+
+/**
+ * List columns: fields with showInList, after template visibility rules.
+ * Cap keeps table usable; prefers core identity + industry extras.
+ */
+export function leadListColumns(
+  fields: FieldDef[],
+  templateSlug: string | null | undefined,
+  max = 6
+): FieldDef[] {
+  const adjusted = applyTemplateLeadFieldVisibility(fields, templateSlug);
+  const listed = listFields(adjusted);
+  // Prefer name, phone, status, then template extras (budget, course, …)
+  const priority = (f: FieldDef): number => {
+    const k = (f.coreMap || f.key || "").toLowerCase();
+    if (k === "name") return 0;
+    if (k === "phone") return 1;
+    if (k === "status") return 2;
+    if (k === "email") return 3;
+    if (k === "company") return 4;
+    if (k === "value" || k === "budget" || k === "fee") return 5;
+    return 10 + (f.order ?? 50);
+  };
+  return listed.slice().sort((a, b) => priority(a) - priority(b)).slice(0, max);
+}
+
+export function leadFilterColumns(
+  fields: FieldDef[],
+  templateSlug: string | null | undefined
+): FieldDef[] {
+  const adjusted = applyTemplateLeadFieldVisibility(fields, templateSlug);
+  return filterFields(adjusted);
 }

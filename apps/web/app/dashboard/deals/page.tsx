@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { formatCurrency, parseAmount } from "@/lib/currency";
+import { parseAmount } from "@/lib/currency";
+import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { CurrencyAmountInput } from "@/components/ui/CurrencyAmountInput";
 import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
 import { toIsoDateTime, toDateInputValue } from "@/lib/date-input";
@@ -73,6 +74,7 @@ function dedupeDeals(list: Deal[]): Deal[] {
 
 export default function DealsPage() {
   const { token } = useAuth();
+  const { money } = useBusinessCurrency();
   const dataVersion = useDataVersion();
   const searchParams = useSearchParams();
   // Analytics drill-down: ?stage=
@@ -465,7 +467,7 @@ export default function DealsPage() {
                         ) : null}
                         <div className="flex justify-between items-center gap-2">
                           <div className="text-sm text-emerald-400 tabular-nums">
-                            {deal.value != null ? formatCurrency(deal.value) : "—"}
+                            {deal.value != null ? money(deal.value) : "—"}
                           </div>
                           <div className="flex gap-2">
                             <button
@@ -570,7 +572,7 @@ export default function DealsPage() {
                         ) : null}
                         <div className="flex justify-between items-center text-xs">
                           <div className="text-emerald-400">
-                            {deal.value != null ? formatCurrency(deal.value) : "-"}
+                            {deal.value != null ? money(deal.value) : "-"}
                           </div>
                           <div className="flex gap-1.5">
                             <button
@@ -622,7 +624,7 @@ export default function DealsPage() {
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm text-emerald-400 tabular-nums">
-                    {deal.value != null ? formatCurrency(deal.value) : "—"}
+                    {deal.value != null ? money(deal.value) : "—"}
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -666,7 +668,7 @@ export default function DealsPage() {
                       <td className="p-4">
                         <span className="px-2 py-0.5 text-xs rounded bg-white/10">{stageLabel(deal.stage)}</span>
                       </td>
-                      <td className="p-4 text-emerald-400">{deal.value != null ? formatCurrency(deal.value) : "-"}</td>
+                      <td className="p-4 text-emerald-400">{deal.value != null ? money(deal.value) : "-"}</td>
                       <td className="p-4 text-right space-x-2">
                         <button type="button" onClick={() => openEdit(deal)} className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 rounded">Edit</button>
                         <button type="button" onClick={() => handleDelete(deal.id, deal.title)} className="px-3 py-1 text-xs text-red-400 hover:bg-red-950/50 rounded border border-red-900/50">Delete</button>

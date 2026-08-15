@@ -40,6 +40,17 @@ export function useBusinessCurrency(override?: string | null) {
     let cancelled = false;
     (async () => {
       try {
+        // 1) Business tenant currency (Super Admin provision → Business.settings)
+        const cfg = await api.getBusinessConfig(token);
+        if (!cancelled && cfg.success && cfg.data?.business) {
+          const b = cfg.data.business as { currency?: string };
+          if (b.currency && isCurrencyCode(b.currency)) {
+            setAppCurrency(b.currency);
+            setCurrency(b.currency);
+            return;
+          }
+        }
+        // 2) Profile (resolves business currency on API)
         const res = await api.getProfile(token);
         if (cancelled || !res.success || !res.data?.profile) return;
         const p = res.data.profile as { currency?: string };

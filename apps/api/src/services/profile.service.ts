@@ -32,10 +32,37 @@ export async function getProfile(userId: string) {
     where: { userId },
   });
 
-  if (!profile) return null;
+  // Tenant currency from Business.settings (provisioned by Super Admin) wins over
+  // per-user profile / location guesses — fixes SE users with no profile showing USD.
+  let businessCurrency: string | null = null;
+  try {
+    const { getUserBusinessId } = await import("./field-engine.service.js");
+    const { resolveBusinessCurrency } = await import("./template.service.js");
+    const businessId = await getUserBusinessId(userId);
+    if (businessId) {
+      const biz = await prisma.business.findUnique({
+        where: { id: businessId },
+        select: { settings: true, country: true },
+      });
+      businessCurrency = resolveBusinessCurrency(biz);
+    }
+  } catch {
+    /* ignore */
+  }
 
-  // Safe default for rows created before currency column existed
+  if (!profile) {
+    return businessCurrency
+      ? {
+          businessName: "",
+          industry: "",
+          description: "",
+          currency: businessCurrency,
+        }
+      : null;
+  }
+
   const currency =
+    businessCurrency ||
     (profile as { currency?: string | null }).currency ||
     detectDefaultCurrency(profile.location);
 

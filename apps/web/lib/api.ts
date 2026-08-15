@@ -1880,6 +1880,9 @@ class ApiClient {
         templateId: string | null;
         templateSlug: string | null;
         templateVersion: number | null;
+        /** ISO 4217 from Business.settings / country — tenant single source of truth */
+        currency?: string | null;
+        country?: string | null;
       };
       config: {
         version: number;

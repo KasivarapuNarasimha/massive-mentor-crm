@@ -703,6 +703,13 @@ export type SeedTemplateMeta = {
   description: string;
   category: string;
   extraFields?: IndustryTemplateManifest["fields"];
+  /**
+   * Override CORE_CONTACT_FIELDS by key (e.g. hide company from list for coaching).
+   * Merged after core fields, before extraFields.
+   */
+  coreFieldOverrides?: Array<
+    Partial<IndustryTemplateManifest["fields"][number]> & { key: string }
+  >;
   extraImportMappings?: IndustryTemplateManifest["importMappings"];
   extraAiFeatures?: IndustryTemplateManifest["aiPromptPack"]["features"];
   extraWidgets?: IndustryTemplateManifest["dashboards"][0]["widgets"];
@@ -1035,7 +1042,18 @@ function defaultPortals(): PortalDef[] {
  * Build a full manifest from pure data inputs (no industry branching in engines).
  */
 export function buildManifest(meta: SeedTemplateMeta): IndustryTemplateManifest {
-  const fields = [...CORE_CONTACT_FIELDS, ...(meta.extraFields || [])].map((f, i) => ({
+  // Merge core field overrides by key (template-aware list/form visibility)
+  const coreByKey = new Map(
+    CORE_CONTACT_FIELDS.map((f) => [f.key, { ...f }] as const)
+  );
+  for (const ov of meta.coreFieldOverrides || []) {
+    const prev = coreByKey.get(ov.key);
+    if (prev) coreByKey.set(ov.key, { ...prev, ...ov, key: ov.key });
+  }
+  const fields = [
+    ...Array.from(coreByKey.values()),
+    ...(meta.extraFields || []),
+  ].map((f, i) => ({
     ...f,
     order: f.order ?? i + 1,
   }));

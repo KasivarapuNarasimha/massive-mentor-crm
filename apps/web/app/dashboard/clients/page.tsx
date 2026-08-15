@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/currency";
+import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { DynamicForm, buildContactPayload, contactToFormValues } from "@/components/dynamic/DynamicForm";
 import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
 import { PageLoading } from "@/components/ui/PageLoading";
@@ -15,6 +15,7 @@ import {
   type FieldDef,
   contactFieldsFromConfig,
   FALLBACK_CONTACT_FIELDS,
+  applyTemplateLeadFieldVisibility,
 } from "@/lib/business-config";
 
 interface Contact {
@@ -40,6 +41,7 @@ type FinancialStatus = "not_revenue" | "expected" | "received";
 
 export default function ClientsPage() {
   const { token, role } = useAuth();
+  const { money } = useBusinessCurrency();
   const [clients, setClients] = useState<Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -60,8 +62,9 @@ export default function ClientsPage() {
 
   const fieldDefs: FieldDef[] = useMemo(() => {
     const from = contactFieldsFromConfig(bizConfig);
-    return from.length ? from : FALLBACK_CONTACT_FIELDS;
-  }, [bizConfig]);
+    const base = from.length ? from : FALLBACK_CONTACT_FIELDS;
+    return applyTemplateLeadFieldVisibility(base, templateSlug);
+  }, [bizConfig, templateSlug]);
 
   // Client lifecycle statuses (not the Lead telecalling pipeline)
   const statusOptions = useMemo(
@@ -185,7 +188,7 @@ export default function ClientsPage() {
       };
       if (d?.recorded) {
         toast.success(
-          `Revenue recorded in Finance (${formatCurrency(d.amount || amount)})`,
+          `Revenue recorded in Finance (${money(d.amount || amount)})`,
           {
             description:
               d.sourceType === "deal"
@@ -343,7 +346,7 @@ export default function ClientsPage() {
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm text-muted-foreground tabular-nums">
-                    {client.value != null ? formatCurrency(client.value) : "—"}
+                    {client.value != null ? money(client.value) : "—"}
                   </span>
                   <div className="flex gap-2">
                     <button
@@ -397,7 +400,7 @@ export default function ClientsPage() {
                         </span>
                       </td>
                       <td className="p-4 text-muted-foreground">
-                        {client.value != null ? formatCurrency(client.value) : "-"}
+                        {client.value != null ? money(client.value) : "-"}
                       </td>
                       <td className="p-4 text-right space-x-2">
                         <button
@@ -502,7 +505,7 @@ export default function ClientsPage() {
                             {clientDeals.map((d) => (
                               <option key={d.id} value={d.id}>
                                 {d.title}
-                                {d.value != null ? ` · ${formatCurrency(Number(d.value))}` : ""}
+                                {d.value != null ? ` · ${money(Number(d.value))}` : ""}
                                 {d.stage ? ` (${d.stage})` : ""}
                               </option>
                             ))}
