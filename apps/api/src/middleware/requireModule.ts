@@ -119,6 +119,44 @@ export async function requireModuleFromPath(
         required: ["whatsapp", "leads"],
       });
     }
+    // ERP Phase 1 shell — finance/approvals roles keep access before erp is granted
+    if (mod === "erp") {
+      if (
+        keys.includes("erp") ||
+        keys.includes("finance") ||
+        keys.includes("approvals")
+      ) {
+        return next();
+      }
+      return res.status(403).json({
+        success: false,
+        error: "You do not have permission to access this resource.",
+        code: "MODULE_FORBIDDEN",
+        required: ["erp", "finance"],
+      });
+    }
+    // ERP Phase 2 ops modules — allow erp / finance umbrella grants
+    if (
+      mod === "erp_products" ||
+      mod === "erp_inventory" ||
+      mod === "erp_vendors" ||
+      mod === "erp_purchases" ||
+      mod === "erp_sales"
+    ) {
+      if (
+        keys.includes(mod) ||
+        keys.includes("erp") ||
+        keys.includes("finance")
+      ) {
+        return next();
+      }
+      return res.status(403).json({
+        success: false,
+        error: "You do not have permission to access this resource.",
+        code: "MODULE_FORBIDDEN",
+        required: [mod, "erp", "finance"],
+      });
+    }
     if (!keys.includes(mod)) {
       return res.status(403).json({
         success: false,

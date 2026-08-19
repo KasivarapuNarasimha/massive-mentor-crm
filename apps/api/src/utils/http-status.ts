@@ -21,7 +21,9 @@ export function messageToHttpStatus(
     return 404;
   }
   if (
-    /required|must be|invalid|validation|too many|maximum|cannot merge|already/i.test(m)
+    /required|must be|invalid|validation|too many|maximum|cannot merge|already|business workspace/i.test(
+      m
+    )
   ) {
     return 400;
   }

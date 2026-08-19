@@ -284,6 +284,29 @@ export async function syncDealWonFinance(
     deal.value == null ? 0 : toMoneyNumber(deal.value as never);
 
   if (isWon && valueNum > 0) {
+    // Phase 2.5 — Sales Order is finance source of truth when a non-cancelled SO is linked
+    const businessId =
+      deal.businessId || (await getUserBusinessId(userId));
+    if (businessId) {
+      const activeSo = await prisma.salesOrder.count({
+        where: {
+          businessId,
+          dealId: deal.id,
+          status: { not: "cancelled" },
+        },
+      });
+      if (activeSo > 0) {
+        // Ensure no stale Deal auto-invoice remains
+        await voidCrmRevenue({
+          actorUserId: userId,
+          businessId,
+          sourceType: "deal",
+          sourceId: deal.id,
+        });
+        return { skipped: true, reason: "active_sales_order" as const };
+      }
+    }
+
     let clientName = opts?.contactName || null;
     if (!clientName && deal.contactId) {
       const c = await prisma.contact.findFirst({

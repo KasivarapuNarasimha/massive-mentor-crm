@@ -1549,8 +1549,11 @@ export async function createDeal(userId: string, input: DealInput) {
     });
     if (linked?.businessId) dealBusinessId = linked.businessId;
   }
+  // Phase 1.1 — never create a Deal without workspace isolation
   if (!dealBusinessId) {
-    console.warn(`[createDeal] no businessId for user=${userId} — deal will be user-scoped only`);
+    throw new Error(
+      "Business workspace is required to create a deal. Join or select a business workspace and try again."
+    );
   }
 
   return prisma.deal.create({

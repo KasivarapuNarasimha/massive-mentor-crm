@@ -44,6 +44,7 @@ const CRM_PREFIXES = [
   "/api/crm",
   "/api/leads",
   "/api/dashboards",
+  "/api/erp",
   "/api/finance",
   "/api/reports",
   "/api/ai",

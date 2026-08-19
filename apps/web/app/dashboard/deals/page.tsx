@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -469,7 +470,14 @@ export default function DealsPage() {
                           <div className="text-sm text-emerald-400 tabular-nums">
                             {deal.value != null ? money(deal.value) : "—"}
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap">
+                            <Link
+                              href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
+                              className="min-h-10 inline-flex items-center px-3 py-2 bg-primary/20 text-primary rounded-xl text-xs touch-manipulation"
+                              title="Create Sales Order"
+                            >
+                              SO
+                            </Link>
                             <button
                               type="button"
                               onClick={() => openEdit(deal)}
@@ -575,6 +583,14 @@ export default function DealsPage() {
                             {deal.value != null ? money(deal.value) : "-"}
                           </div>
                           <div className="flex gap-1.5">
+                            <Link
+                              href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
+                              className="px-2 py-0.5 bg-primary/20 text-primary rounded text-[10px]"
+                              title="Create Sales Order"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              SO
+                            </Link>
                             <button
                               type="button"
                               onClick={() => openEdit(deal)}
@@ -626,7 +642,13 @@ export default function DealsPage() {
                   <span className="text-sm text-emerald-400 tabular-nums">
                     {deal.value != null ? money(deal.value) : "—"}
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <Link
+                      href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
+                      className="min-h-10 inline-flex items-center px-3 py-2 text-xs bg-primary/20 text-primary rounded-xl touch-manipulation"
+                    >
+                      SO
+                    </Link>
                     <button
                       type="button"
                       onClick={() => openEdit(deal)}
@@ -670,6 +692,12 @@ export default function DealsPage() {
                       </td>
                       <td className="p-4 text-emerald-400">{deal.value != null ? money(deal.value) : "-"}</td>
                       <td className="p-4 text-right space-x-2">
+                        <Link
+                          href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
+                          className="px-3 py-1 text-xs bg-primary/20 text-primary hover:bg-primary/30 rounded inline-block"
+                        >
+                          SO
+                        </Link>
                         <button type="button" onClick={() => openEdit(deal)} className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 rounded">Edit</button>
                         <button type="button" onClick={() => handleDelete(deal.id, deal.title)} className="px-3 py-1 text-xs text-red-400 hover:bg-red-950/50 rounded border border-red-900/50">Delete</button>
                       </td>

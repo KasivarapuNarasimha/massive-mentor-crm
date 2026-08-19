@@ -310,13 +310,16 @@ export async function syncFromLeadStatusChange(
           return;
         }
 
-        // Require businessId for new deals whenever workspace exists
-        const createBusinessId = businessId;
-        if (!createBusinessId) {
-          // Last resort: still create under userId so won is not lost; log loudly
-          console.warn(
-            `[pipeline-sync] creating deal without businessId for contact=${contact.id} actor=${userId}`
+        // Never create deals with null businessId — breaks tenant isolation
+        if (!businessId) {
+          console.error(
+            `[pipeline-sync] refusing deal create: no businessId for contact=${contact.id} actor=${userId}`
           );
+          result.promptCreateDeal = true;
+          result.messages.push(
+            "Cannot auto-create deal: workspace (businessId) could not be resolved"
+          );
+          return;
         }
 
         const title = contact.company?.trim()
@@ -326,7 +329,7 @@ export async function syncFromLeadStatusChange(
         const created = await tx.deal.create({
           data: {
             userId: ownerUserId,
-            businessId: createBusinessId,
+            businessId,
             contactId: contact.id,
             title,
             value: contact.value ?? null,
@@ -408,6 +411,16 @@ export async function syncFromLeadStatusChange(
 
       // If protect-closed skipped all and we still need a deal for won/lost, create one
       if (terminal && result.dealsUpdated === 0 && result.dealIds.length === 0) {
+        if (!businessId) {
+          console.error(
+            `[pipeline-sync] refusing terminal deal create: no businessId contact=${contact.id}`
+          );
+          result.promptCreateDeal = true;
+          result.messages.push(
+            "Cannot auto-create deal: workspace (businessId) could not be resolved"
+          );
+          return;
+        }
         const title = contact.company?.trim()
           ? `${contact.company} — ${contact.name}`
           : `Deal: ${contact.name}`;

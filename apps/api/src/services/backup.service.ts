@@ -727,6 +727,11 @@ async function restoreBusinessData(
   }
   await onProgress?.(70);
   for (const d of deals) {
+    // Phase 1.1 — restore always scopes deals to the target businessId (never null)
+    if (!businessId) {
+      console.error("[backup] refusing deal restore without businessId");
+      continue;
+    }
     const data = stripUndefined({ ...d, businessId }) as Parameters<typeof prisma.deal.create>[0]["data"];
     await prisma.deal.upsert({
       where: { id: String(d.id) },
@@ -796,6 +801,11 @@ async function restoreFullData(
   const deals = (tables.deals as Array<Record<string, unknown>>) || [];
   for (const d of deals.slice(0, 50000)) {
     const data = stripUndefined(d) as Parameters<typeof prisma.deal.create>[0]["data"];
+    // Phase 1.1 — never create/restore a Deal without businessId
+    if (!data.businessId) {
+      console.error(`[backup] skipping deal ${String(d.id)} — missing businessId`);
+      continue;
+    }
     await prisma.deal.upsert({
       where: { id: String(d.id) },
       create: data,

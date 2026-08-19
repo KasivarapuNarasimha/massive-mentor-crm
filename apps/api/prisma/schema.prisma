@@ -350,6 +350,23 @@ model Business {
   whatsappAssignRules   WhatsAppAssignRule[]
   whatsappSlaPolicies   WhatsAppSlaPolicy[]
   whatsappBroadcasts    WhatsAppBroadcast[]
+
+  /// ERP Phase 2 — products / inventory / purchasing (additive)
+  productCategories   ProductCategory[]
+  products            Product[]
+  warehouses          Warehouse[]
+  inventoryBalances   InventoryBalance[]
+  stockMovements      StockMovement[]
+  vendors             Vendor[]
+  purchaseOrders      PurchaseOrder[]
+  purchaseOrderItems  PurchaseOrderItem[]
+  goodsReceipts       GoodsReceipt[]
+  goodsReceiptItems   GoodsReceiptItem[]
+  purchaseReturns     PurchaseReturn[]
+  purchaseReturnItems PurchaseReturnItem[]
+  salesOrders         SalesOrder[]
+  salesOrderItems     SalesOrderItem[]
+
   currentPlanId      String?
   currentPlan        SubscriptionPlan? @relation(fields: [currentPlanId], references: [id], onDelete: SetNull)
 
@@ -945,6 +962,7 @@ model Contact {
   deals     Deal[]
   tasks     Task[]
   meetings  Meeting[]
+  salesOrders SalesOrder[]
   aiGenerations AiGeneration[]
   // notes and documents are fetched polymorphically via entityType/entityId (see crm.service)
 
@@ -1063,6 +1081,7 @@ model Deal {
 
   tasks    Task[]
   meetings Meeting[]
+  salesOrders SalesOrder[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -1441,6 +1460,8 @@ model Invoice {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   payments    Payment[]
+  /// Optional reverse link when Invoice was created from a Sales Order post
+  salesOrders SalesOrder[]
 
   @@unique([businessId, number])
   /// One Finance revenue document per CRM source (prevents Deal+Client double count)
@@ -2103,4 +2124,367 @@ model AiUsageEvent {
   @@index([businessId, monthKey])
   @@index([userId, dayKey])
   @@index([feature, createdAt])
+}
+
+// =====================================================
+// ERP Phase 2 — Products, Inventory, Vendors, Purchases
+// Additive only. All rows require non-null businessId.
+// Stock source of truth = StockMovement; InventoryBalance is materialized.
+// Do NOT duplicate Invoice / Payment / Expense / P&L.
+// =====================================================
+
+model ProductCategory {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  parentId   String?
+  parent     ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   ProductCategory[] @relation("CategoryTree")
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  products   Product[]
+
+  @@unique([businessId, name])
+  @@index([businessId])
+  @@index([parentId])
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  categoryId      String?
+  category        ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  sku             String
+  name            String
+  description     String?  @db.Text
+  /// pcs | kg | hrs | box | ...
+  unit            String   @default("pcs")
+  /// goods | service
+  type            String   @default("goods")
+  trackInventory  Boolean  @default(true)
+  sellingPrice    Decimal? @db.Decimal(18, 2)
+  costPrice       Decimal? @db.Decimal(18, 2)
+  taxRate         Decimal? @db.Decimal(8, 4)
+  reorderLevel    Decimal? @db.Decimal(18, 4)
+  isActive        Boolean  @default(true)
+  createdByUserId String?
+  deletedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  balances            InventoryBalance[]
+  movements           StockMovement[]
+  purchaseOrderItems  PurchaseOrderItem[]
+  goodsReceiptItems   GoodsReceiptItem[]
+  purchaseReturnItems PurchaseReturnItem[]
+  salesOrderItems     SalesOrderItem[]
+
+  @@unique([businessId, sku])
+  @@index([businessId, name])
+  @@index([businessId, isActive])
+  @@index([categoryId])
+  @@index([businessId, deletedAt])
+}
+
+model Warehouse {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  code       String
+  name       String
+  address    String?  @db.Text
+  isDefault  Boolean  @default(false)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  balances            InventoryBalance[]
+  movements           StockMovement[]
+  goodsReceipts       GoodsReceipt[]
+  purchaseReturns     PurchaseReturn[]
+  salesOrders         SalesOrder[]
+
+  @@unique([businessId, code])
+  @@index([businessId])
+  @@index([businessId, isActive])
+}
+
+/// Materialized on-hand qty per product × warehouse (updated with StockMovement in same TX)
+model InventoryBalance {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  qtyOnHand   Decimal  @default(0) @db.Decimal(18, 4)
+  qtyReserved Decimal  @default(0) @db.Decimal(18, 4)
+  avgCost     Decimal? @db.Decimal(18, 4)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([businessId, productId, warehouseId])
+  @@index([businessId, warehouseId])
+  @@index([businessId, productId])
+}
+
+/// Append-only stock ledger — source of truth for inventory
+model StockMovement {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  /// purchase_in | sale_out | adjustment | transfer_in | transfer_out | return_in | return_out | opening
+  type            String
+  /// Signed quantity: + inbound, − outbound
+  qty             Decimal  @db.Decimal(18, 4)
+  unitCost        Decimal? @db.Decimal(18, 4)
+  /// purchase_order | goods_receipt | purchase_return | invoice | manual | transfer
+  referenceType   String?
+  referenceId     String?
+  notes           String?  @db.Text
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  @@index([businessId, productId, createdAt])
+  @@index([businessId, warehouseId, createdAt])
+  @@index([businessId, referenceType, referenceId])
+  @@index([businessId, type, createdAt])
+}
+
+model Vendor {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name            String
+  email           String?
+  phone           String?
+  company         String?
+  gstNumber       String?
+  address         String?  @db.Text
+  paymentTerms    String?
+  notes           String?  @db.Text
+  isActive        Boolean  @default(true)
+  createdByUserId String?
+  deletedAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchaseOrders  PurchaseOrder[]
+  purchaseReturns PurchaseReturn[]
+
+  @@index([businessId, name])
+  @@index([businessId, isActive])
+  @@index([businessId, deletedAt])
+}
+
+model PurchaseOrder {
+  id                String   @id @default(cuid())
+  businessId        String
+  business          Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  vendorId          String
+  vendor            Vendor   @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  number            String
+  /// draft | sent | partial | received | cancelled | closed
+  status            String   @default("draft")
+  orderDate         DateTime @default(now())
+  expectedDate      DateTime?
+  currency          String   @default("INR")
+  subtotal          Decimal  @default(0) @db.Decimal(18, 2)
+  taxAmount         Decimal  @default(0) @db.Decimal(18, 2)
+  total             Decimal  @default(0) @db.Decimal(18, 2)
+  notes             String?  @db.Text
+  createdByUserId   String
+  approvedAt        DateTime?
+  approvedByUserId  String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  items         PurchaseOrderItem[]
+  goodsReceipts GoodsReceipt[]
+  returns       PurchaseReturn[]
+
+  @@unique([businessId, number])
+  @@index([businessId, status])
+  @@index([businessId, vendorId])
+  @@index([businessId, orderDate])
+}
+
+model PurchaseOrderItem {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  description     String?
+  qtyOrdered      Decimal  @db.Decimal(18, 4)
+  qtyReceived     Decimal  @default(0) @db.Decimal(18, 4)
+  unitCost        Decimal  @db.Decimal(18, 2)
+  taxRate         Decimal  @default(0) @db.Decimal(8, 4)
+  lineTotal       Decimal  @db.Decimal(18, 2)
+  sortOrder       Int      @default(0)
+
+  goodsReceiptItems GoodsReceiptItem[]
+
+  @@index([purchaseOrderId])
+  @@index([businessId, productId])
+}
+
+model GoodsReceipt {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Restrict)
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  number          String
+  /// draft | posted | cancelled
+  status          String   @default("draft")
+  receivedAt      DateTime @default(now())
+  notes           String?  @db.Text
+  createdByUserId String
+  postedAt        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items   GoodsReceiptItem[]
+  returns PurchaseReturn[]
+
+  @@unique([businessId, number])
+  @@index([businessId, status])
+  @@index([businessId, purchaseOrderId])
+  @@index([warehouseId])
+}
+
+model GoodsReceiptItem {
+  id                  String   @id @default(cuid())
+  businessId          String
+  business            Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  goodsReceiptId      String
+  goodsReceipt        GoodsReceipt @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderItemId String
+  purchaseOrderItem   PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id], onDelete: Restrict)
+  productId           String
+  product             Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  qtyReceived         Decimal  @db.Decimal(18, 4)
+  unitCost            Decimal  @db.Decimal(18, 2)
+
+  @@index([goodsReceiptId])
+  @@index([businessId, productId])
+  @@index([purchaseOrderItemId])
+}
+
+model PurchaseReturn {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  vendorId        String
+  vendor          Vendor   @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  purchaseOrderId String?
+  purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
+  goodsReceiptId  String?
+  goodsReceipt    GoodsReceipt? @relation(fields: [goodsReceiptId], references: [id], onDelete: SetNull)
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  number          String
+  /// draft | posted | cancelled
+  status          String   @default("draft")
+  reason          String?  @db.Text
+  createdByUserId String
+  postedAt        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items PurchaseReturnItem[]
+
+  @@unique([businessId, number])
+  @@index([businessId, status])
+  @@index([businessId, vendorId])
+  @@index([warehouseId])
+}
+
+model PurchaseReturnItem {
+  id               String   @id @default(cuid())
+  businessId       String
+  business         Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  purchaseReturnId String
+  purchaseReturn   PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  qty              Decimal  @db.Decimal(18, 4)
+  unitCost         Decimal  @db.Decimal(18, 2)
+
+  @@index([purchaseReturnId])
+  @@index([businessId, productId])
+}
+
+// =====================================================
+// ERP Phase 2.5 — Sales Orders (CRM Deal → stock out → Finance)
+// Additive only. Invoice/Payment reused via sourceType=sales_order.
+// =====================================================
+
+model SalesOrder {
+  id              String   @id @default(cuid())
+  businessId      String
+  business        Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  dealId          String?
+  deal            Deal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  contactId       String?
+  contact         Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  number          String
+  /// draft | confirmed | posting | posted | cancelled
+  status          String   @default("draft")
+  orderDate       DateTime @default(now())
+  currency        String   @default("INR")
+  subtotal        Decimal  @default(0) @db.Decimal(18, 2)
+  taxAmount       Decimal  @default(0) @db.Decimal(18, 2)
+  total           Decimal  @default(0) @db.Decimal(18, 2)
+  notes           String?  @db.Text
+  invoiceId       String?
+  invoice         Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  createdByUserId String
+  postedAt        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items SalesOrderItem[]
+
+  @@unique([businessId, number])
+  @@index([businessId, status])
+  @@index([businessId, dealId])
+  @@index([businessId, contactId])
+  @@index([warehouseId])
+  @@index([invoiceId])
+}
+
+model SalesOrderItem {
+  id            String   @id @default(cuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  salesOrderId  String
+  salesOrder    SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  description   String?
+  qtyOrdered    Decimal  @db.Decimal(18, 4)
+  qtyFulfilled  Decimal  @default(0) @db.Decimal(18, 4)
+  unitPrice     Decimal  @db.Decimal(18, 2)
+  taxRate       Decimal  @default(0) @db.Decimal(8, 4)
+  lineTotal     Decimal  @db.Decimal(18, 2)
+  sortOrder     Int      @default(0)
+
+  @@index([salesOrderId])
+  @@index([businessId, productId])
 }

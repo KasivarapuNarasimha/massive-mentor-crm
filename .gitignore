@@ -15,8 +15,8 @@ dist/
 build/
 out/
 
-# Prisma
-apps/api/prisma/migrations/
+# Prisma — migrations ARE tracked (required for production migrate deploy)
+# Do not ignore apps/api/prisma/migrations/
 
 # Logs
 logs/

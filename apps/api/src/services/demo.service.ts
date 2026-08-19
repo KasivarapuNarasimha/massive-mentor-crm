@@ -138,6 +138,9 @@ async function seedDemoData(userId: string, businessId: string) {
     },
   });
 
+  if (!businessId) {
+    throw new Error("Business workspace is required to create a deal (demo seed).");
+  }
   const stages = ["lead", "qualified", "proposal", "negotiation", "closed_won"] as const;
   for (let i = 0; i < stages.length; i++) {
     await prisma.deal.create({

@@ -23,6 +23,13 @@ export const ROUTE_MODULE: Record<string, string> = {
   "/dashboard/roadmap": "roadmap",
   "/dashboard/health": "health",
   "/dashboard/finance": "finance",
+  "/dashboard/erp": "erp",
+  "/dashboard/erp/products": "erp_products",
+  "/dashboard/erp/inventory": "erp_inventory",
+  "/dashboard/erp/warehouses": "erp_inventory",
+  "/dashboard/erp/vendors": "erp_vendors",
+  "/dashboard/erp/purchases": "erp_purchases",
+  "/dashboard/erp/sales-orders": "erp_sales",
   "/dashboard/field-sales": "field_sales",
   "/dashboard/integrations": "integrations",
   "/dashboard/approvals": "approvals",
@@ -84,6 +91,24 @@ export function canAccessPath(
       modules.includes("leads") ||
       modules.includes("clients")
     );
+  }
+  // ERP shell: finance users keep access even before erp is granted on older memberships
+  if (key === "erp") {
+    return (
+      modules.includes("erp") ||
+      modules.includes("finance") ||
+      modules.includes("approvals")
+    );
+  }
+  // Phase 2 ERP modules: specific grant OR parent erp/finance
+  if (
+    key === "erp_products" ||
+    key === "erp_inventory" ||
+    key === "erp_vendors" ||
+    key === "erp_purchases" ||
+    key === "erp_sales"
+  ) {
+    return modules.includes(key) || modules.includes("erp") || modules.includes("finance");
   }
   return false;
 }

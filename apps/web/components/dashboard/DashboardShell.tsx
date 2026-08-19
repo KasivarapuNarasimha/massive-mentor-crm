@@ -344,6 +344,163 @@ const SETTINGS_NAV: NavItem[] = [
 
 const APPEARANCE_HREF = "/dashboard/settings/appearance";
 
+/** ERP section routes — Finance is existing; do not duplicate modules */
+const ERP_HREFS = new Set([
+  "/dashboard/erp",
+  "/dashboard/finance",
+  "/dashboard/approvals",
+  "/dashboard/erp/products",
+  "/dashboard/erp/inventory",
+  "/dashboard/erp/warehouses",
+  "/dashboard/erp/vendors",
+  "/dashboard/erp/purchases",
+  "/dashboard/erp/sales-orders",
+]);
+
+const ERP_NAV_ORDER = [
+  "/dashboard/erp",
+  "/dashboard/finance",
+  "/dashboard/approvals",
+  "/dashboard/erp/products",
+  "/dashboard/erp/inventory",
+  "/dashboard/erp/warehouses",
+  "/dashboard/erp/vendors",
+  "/dashboard/erp/sales-orders",
+  "/dashboard/erp/purchases",
+];
+
+/** Settings / platform (not CRM sales, not ERP ops) */
+const SETTINGS_HREFS = new Set([
+  "/dashboard/profile",
+  "/dashboard/billing",
+  "/dashboard/team",
+  "/dashboard/security",
+  "/dashboard/backups",
+  "/dashboard/settings/appearance",
+  APPEARANCE_HREF,
+]);
+
+function navSectionFor(href: string): "crm" | "erp" | "settings" {
+  if (ERP_HREFS.has(href) || href.startsWith("/dashboard/erp/")) return "erp";
+  if (SETTINGS_HREFS.has(href) || href.startsWith("/dashboard/settings/")) return "settings";
+  return "crm";
+}
+
+const ERP_DASHBOARD_ITEM: NavItem = {
+  key: "erp:dashboard",
+  href: "/dashboard/erp",
+  label: "ERP Dashboard",
+  icon: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM11 13a1 1 0 011-1h7a1 1 0 011 1v6a1 1 0 01-1 1h-7a1 1 0 01-1-1v-6z"
+      />
+    </svg>
+  ),
+};
+
+const ERP_PHASE2_ITEMS: Array<NavItem & { moduleKey: string }> = [
+  {
+    key: "erp:products",
+    href: "/dashboard/erp/products",
+    label: "Products",
+    moduleKey: "erp_products",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+        />
+      </svg>
+    ),
+  },
+  {
+    key: "erp:inventory",
+    href: "/dashboard/erp/inventory",
+    label: "Inventory",
+    moduleKey: "erp_inventory",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M4 7h16M4 12h16M4 17h16"
+        />
+      </svg>
+    ),
+  },
+  {
+    key: "erp:warehouses",
+    href: "/dashboard/erp/warehouses",
+    label: "Warehouses",
+    moduleKey: "erp_inventory",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M3 21h18M5 21V8l7-4 7 4v13M9 21v-6h6v6"
+        />
+      </svg>
+    ),
+  },
+  {
+    key: "erp:vendors",
+    href: "/dashboard/erp/vendors",
+    label: "Vendors",
+    moduleKey: "erp_vendors",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8 17a4 4 0 118 0M5 21h14M9 7h6m-7 4h8M7 3h10l1 8H6L7 3z"
+        />
+      </svg>
+    ),
+  },
+  {
+    key: "erp:sales-orders",
+    href: "/dashboard/erp/sales-orders",
+    label: "Sales Orders",
+    moduleKey: "erp_sales",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+        />
+      </svg>
+    ),
+  },
+  {
+    key: "erp:purchases",
+    href: "/dashboard/erp/purchases",
+    label: "Purchases",
+    moduleKey: "erp_purchases",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+        />
+      </svg>
+    ),
+  },
+];
+
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { user, logout, token } = useAuth();
   const { portal, workspaceRole, setWorkspaceRole, isLoading: portalLoading } = usePortal();
@@ -375,7 +532,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const notifRef = useRef<HTMLDivElement>(null);
 
   const isActive = (href: string) => {
-    if (href === "/dashboard") return pathname === "/dashboard";
+    if (href === "/dashboard" || href === "/dashboard/erp") return pathname === href;
     return pathname.startsWith(href);
   };
 
@@ -727,6 +884,123 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const settingsNavFiltered = filterNavByModules(SETTINGS_NAV, moduleKeys);
 
+  /** Flat list then split into CRM | ERP | Settings for sidebar clarity */
+  const allSidebarItems = (() => {
+    const merged = [...primaryNav, ...crmNav];
+    const seen = new Set(merged.map((i) => i.href));
+    const canErpDash =
+      !moduleKeys ||
+      moduleKeys.includes("erp") ||
+      moduleKeys.includes("finance") ||
+      moduleKeys.includes("approvals");
+    if (canErpDash && !seen.has("/dashboard/erp")) {
+      merged.push(ERP_DASHBOARD_ITEM);
+      seen.add("/dashboard/erp");
+    }
+    const canAllErpOps =
+      !moduleKeys || moduleKeys.includes("erp") || moduleKeys.includes("finance");
+    for (const item of ERP_PHASE2_ITEMS) {
+      if (seen.has(item.href)) continue;
+      const allowed =
+        canAllErpOps || (!!moduleKeys && moduleKeys.includes(item.moduleKey));
+      if (!allowed) continue;
+      merged.push({
+        key: item.key,
+        href: item.href,
+        label: item.label,
+        icon: item.icon,
+      });
+      seen.add(item.href);
+    }
+    return merged;
+  })();
+
+  const crmSectionNav = allSidebarItems.filter((i) => navSectionFor(i.href) === "crm");
+  const erpSectionNav = allSidebarItems
+    .filter((i) => navSectionFor(i.href) === "erp")
+    .sort((a, b) => {
+      const ia = ERP_NAV_ORDER.indexOf(a.href);
+      const ib = ERP_NAV_ORDER.indexOf(b.href);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+  const settingsSectionNav = (() => {
+    const fromMain = allSidebarItems.filter((i) => navSectionFor(i.href) === "settings");
+    const extras = settingsNavFiltered.filter(
+      (s) => !fromMain.some((m) => m.href === s.href)
+    );
+    return [...fromMain, ...extras];
+  })();
+
+  const renderNavLink = (item: NavItem) => {
+    const locked = isRouteLocked(item.href);
+    return (
+      <Link
+        key={item.key || item.href}
+        href={item.href}
+        title={item.label}
+        onClick={(e) => {
+          onNavClick(e, item.href);
+          if (!locked) setSidebarOpen(false);
+        }}
+        aria-current={isActive(item.href) ? "page" : undefined}
+        className={`mm-nav-link focus-ring ${locked ? "opacity-60" : ""} ${
+          sidebarCollapsed ? "lg:justify-center lg:px-2" : ""
+        }`}
+      >
+        <span className="mm-nav-icon" aria-hidden>
+          {item.icon}
+        </span>
+        <span className={`flex-1 truncate ${sidebarCollapsed ? "lg:hidden" : ""}`}>
+          {item.label}
+        </span>
+        {item.badge != null && item.badge !== "" && !sidebarCollapsed && (
+          <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded-md bg-white/10 text-muted-foreground shrink-0">
+            {item.badge}
+          </span>
+        )}
+        {locked && (
+          <svg
+            className={`w-3.5 h-3.5 text-muted-foreground shrink-0 ${
+              sidebarCollapsed ? "lg:hidden" : ""
+            }`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-label="Locked"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+            />
+          </svg>
+        )}
+      </Link>
+    );
+  };
+
+  const renderNavSection = (title: string, items: NavItem[]) => {
+    if (!items.length) return null;
+    return (
+      <div className="mb-4">
+        {!sidebarCollapsed && (
+          <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2 px-1">
+            {title}
+          </div>
+        )}
+        {sidebarCollapsed && (
+          <div
+            className="hidden lg:block mx-auto mb-2 h-px w-6 bg-border/80"
+            aria-hidden
+            title={title}
+          />
+        )}
+        <div className="space-y-0.5">{items.map(renderNavLink)}</div>
+      </div>
+    );
+  };
+
   // Body scroll lock when mobile sidebar is open (prevents background scroll)
   useEffect(() => {
     if (sidebarOpen) {
@@ -740,12 +1014,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   /** Primary destinations for mobile bottom nav (auto from portal, not a second app mode) */
   const mobileTabs: NavItem[] = (() => {
-    const all = [...primaryNav, ...crmNav];
+    const all = [...crmSectionNav, ...erpSectionNav];
     const preferred = [
       "/dashboard",
       "/dashboard/leads",
       "/dashboard/deals",
       "/dashboard/tasks",
+      "/dashboard/erp",
       "/dashboard/field-sales",
       "/dashboard/meetings",
     ];
@@ -1223,42 +1498,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
               )}
-              <nav className="space-y-0.5" aria-label="Main navigation">
-                {primaryNav.map((item) => {
-                  const locked = isRouteLocked(item.href);
-                  return (
-                  <Link
-                    key={item.key || item.href}
-                    href={item.href}
-                    title={item.label}
-                    onClick={(e) => {
-                      onNavClick(e, item.href);
-                      if (!locked) setSidebarOpen(false);
-                    }}
-                    aria-current={isActive(item.href) ? "page" : undefined}
-                    className={`mm-nav-link focus-ring ${
-                      locked ? "opacity-60" : ""
-                    } ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""}`}
-                  >
-                    <span className="mm-nav-icon" aria-hidden>
-                      {item.icon}
-                    </span>
-                    <span className={`flex-1 truncate ${sidebarCollapsed ? "lg:hidden" : ""}`}>
-                      {item.label}
-                    </span>
-                    {item.badge != null && item.badge !== "" && !sidebarCollapsed && (
-                      <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded-md bg-white/10 text-muted-foreground shrink-0">
-                        {item.badge}
-                      </span>
-                    )}
-                    {locked && (
-                      <svg className={`w-3.5 h-3.5 text-muted-foreground shrink-0 ${sidebarCollapsed ? "lg:hidden" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Locked">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                    )}
-                  </Link>
-                  );
-                })}
+              <nav className="space-y-1" aria-label="Main navigation">
+                {renderNavSection("CRM", crmSectionNav)}
+                {renderNavSection("ERP", erpSectionNav)}
+                {renderNavSection("Settings", settingsSectionNav)}
               </nav>
 
               {portal?.actions && portal.actions.length > 0 && !sidebarCollapsed && (
@@ -1291,91 +1534,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 </>
               )}
 
-              {crmNav.length > 0 && (
-                <div
-                  className={`text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2 mt-6 ${
-                    sidebarCollapsed ? "lg:hidden" : ""
-                  }`}
-                >
-                  CRM
-                </div>
-              )}
-              <nav className="space-y-0.5" aria-label="CRM navigation">
-                {crmNav.map((item) => {
-                  const locked = isRouteLocked(item.href);
-                  return (
-                  <Link
-                    key={item.key || `crm:${item.href}`}
-                    href={item.href}
-                    title={item.label}
-                    onClick={(e) => {
-                      onNavClick(e, item.href);
-                      if (!locked) setSidebarOpen(false);
-                    }}
-                    aria-current={isActive(item.href) ? "page" : undefined}
-                    className={`mm-nav-link focus-ring ${
-                      locked ? "opacity-60" : ""
-                    } ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""}`}
-                  >
-                    <span className="mm-nav-icon" aria-hidden>
-                      {item.icon}
-                    </span>
-                    <span className={`flex-1 truncate ${sidebarCollapsed ? "lg:hidden" : ""}`}>
-                      {item.label}
-                    </span>
-                    {item.badge != null && item.badge !== "" && !sidebarCollapsed && (
-                      <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded-md bg-white/10 text-muted-foreground shrink-0">
-                        {item.badge}
-                      </span>
-                    )}
-                    {locked && (
-                      <svg className={`w-3.5 h-3.5 text-muted-foreground shrink-0 ${sidebarCollapsed ? "lg:hidden" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Locked">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                    )}
-                  </Link>
-                  );
-                })}
-              </nav>
-
-              {/*
-                Settings — filtered by Super Admin module grants (settings / appearance).
-              */}
-              {settingsNavFiltered.length > 0 && (
-              <>
-              <div
-                className={`text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2 mt-6 ${
-                  sidebarCollapsed ? "lg:hidden" : ""
-                }`}
-              >
-                Settings
-              </div>
-              <nav className="space-y-0.5" aria-label="Settings navigation" data-testid="settings-nav">
-                {settingsNavFiltered.map((item) => (
-                  <Link
-                    key={item.key || `settings:${item.href}`}
-                    href={item.href}
-                    title={item.label}
-                    onClick={() => setSidebarOpen(false)}
-                    aria-current={isActive(item.href) ? "page" : undefined}
-                    className={`mm-nav-link focus-ring ${
-                      sidebarCollapsed ? "lg:justify-center lg:px-2" : ""
-                    }`}
-                    data-testid={
-                      item.href === APPEARANCE_HREF ? "nav-appearance" : undefined
-                    }
-                  >
-                    <span className="mm-nav-icon" aria-hidden>
-                      {item.icon}
-                    </span>
-                    <span className={`flex-1 truncate ${sidebarCollapsed ? "lg:hidden" : ""}`}>
-                      {item.label}
-                    </span>
-                  </Link>
-                ))}
-              </nav>
-              </>
-              )}
+              {/* CRM | ERP | Settings rendered above via renderNavSection */}
             </div>
 
             <div

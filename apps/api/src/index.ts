@@ -251,6 +251,7 @@ import dashboardRoutes from "./routes/dashboard.routes.js";
 import portalRoutes from "./routes/portal.routes.js";
 import userAdminRoutes from "./routes/user-admin.routes.js";
 import financeRoutes from "./routes/finance.routes.js";
+import erpRoutes from "./routes/erp.routes.js";
 import locationRoutes from "./routes/location.routes.js";
 import platformRoutes from "./routes/platform.routes.js";
 import demoRoutes from "./routes/demo.routes.js";
@@ -305,6 +306,8 @@ app.use("/api/dashboards", requireAuthMw, requireModuleFromPath, dashboardRoutes
 app.use("/api/portal", portalRoutes);
 app.use("/api/business-users", requireAuthMw, requireModuleFromPath, userAdminRoutes);
 app.use("/api/finance", requireAuthMw, requireModuleFromPath, financeRoutes);
+/** ERP Phase 1 — route-level requireModule(erp|finance|approvals); path gate also maps /api/erp → erp */
+app.use("/api/erp", requireAuthMw, requireModuleFromPath, erpRoutes);
 app.use("/api/location", requireAuthMw, requireModuleFromPath, locationRoutes);
 app.use("/api/backups", requireAuthMw, requireModuleFromPath, backupRoutes);
 app.use("/api/approvals", requireAuthMw, requireModuleFromPath, approvalRoutes);
