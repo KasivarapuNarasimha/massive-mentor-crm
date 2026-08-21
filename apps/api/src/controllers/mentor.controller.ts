@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { sendChatMessage, getChatHistory } from "../services/mentor.service.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
+import { sanitizeAiUserError } from "../utils/ai-error.js";
 
 export async function chatWithMentor(req: AuthenticatedRequest, res: Response) {
   try {
@@ -28,10 +29,13 @@ export async function chatWithMentor(req: AuthenticatedRequest, res: Response) {
     });
   } catch (error: unknown) {
     console.error("Mentor chat error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    res.status(500).json({
+    const { status, message } = sanitizeAiUserError(
+      error,
+      "AI Mentor is temporarily unavailable. Please try again."
+    );
+    res.status(status).json({
       success: false,
-      error: errorMessage || "Failed to get response from AI Mentor",
+      error: message,
     });
   }
 }

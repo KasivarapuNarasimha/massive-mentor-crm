@@ -33,6 +33,7 @@ import {
   documentSchema,
 } from "../services/crm.service.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
+import { sanitizeAiUserError } from "../utils/ai-error.js";
 
 // Safe query param extractor (handles string | string[] | ParsedQs)
 function getQueryParam(req: AuthenticatedRequest, key: string): string | undefined {
@@ -1017,8 +1018,8 @@ export async function aiLeadScore(req: AuthenticatedRequest, res: Response) {
     const result = await (await import("../services/crm.service.js")).generateLeadScore(req.user.id, contactId);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed";
-    res.status(500).json({ success: false, error: msg });
+    const { status, message } = sanitizeAiUserError(error, "Failed to generate lead score");
+    res.status(status).json({ success: false, error: message });
   }
 }
 
@@ -1031,7 +1032,8 @@ export async function aiFollowUpSuggestions(req: AuthenticatedRequest, res: Resp
     const result = await (await import("../services/crm.service.js")).generateFollowUpSuggestions(req.user.id, contactId);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: "Failed to generate suggestions" });
+    const { status, message } = sanitizeAiUserError(error, "Failed to generate suggestions");
+    res.status(status).json({ success: false, error: message });
   }
 }
 
@@ -1063,8 +1065,8 @@ export async function aiWhatsApp(req: AuthenticatedRequest, res: Response) {
 
     res.json({ success: true, data: result });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed";
-    res.status(500).json({ success: false, error: msg });
+    const { status, message } = sanitizeAiUserError(error, "Failed to generate WhatsApp message");
+    res.status(status).json({ success: false, error: message });
   }
 }
 
@@ -1077,7 +1079,8 @@ export async function aiEmail(req: AuthenticatedRequest, res: Response) {
     const result = await (await import("../services/crm.service.js")).generateEmail(req.user.id, contactId, goal);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: "Failed" });
+    const { status, message } = sanitizeAiUserError(error, "Failed to generate email");
+    res.status(status).json({ success: false, error: message });
   }
 }
 
@@ -1090,7 +1093,8 @@ export async function aiProposal(req: AuthenticatedRequest, res: Response) {
     const result = await (await import("../services/crm.service.js")).generateProposal(req.user.id, dealId);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: "Failed to generate proposal" });
+    const { status, message } = sanitizeAiUserError(error, "Failed to generate proposal");
+    res.status(status).json({ success: false, error: message });
   }
 }
 
@@ -1100,7 +1104,8 @@ export async function aiSalesForecast(req: AuthenticatedRequest, res: Response) 
     const result = await (await import("../services/crm.service.js")).generateSalesForecast(req.user.id);
     res.json({ success: true, data: result });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: "Failed to forecast" });
+    const { status, message } = sanitizeAiUserError(error, "Failed to forecast");
+    res.status(status).json({ success: false, error: message });
   }
 }
 
@@ -1113,8 +1118,8 @@ export async function aiNextBestAction(req: AuthenticatedRequest, res: Response)
     const result = await (await import("../services/crm.service.js")).generateNextBestAction(req.user.id, entityType, entityId);
     res.json({ success: true, ...result });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed";
-    res.status(500).json({ success: false, error: msg });
+    const { status, message } = sanitizeAiUserError(error, "Failed to generate next best action");
+    res.status(status).json({ success: false, error: message });
   }
 }
 
@@ -1134,33 +1139,14 @@ export async function aiMeetingSummary(req: AuthenticatedRequest, res: Response)
   } catch (error: unknown) {
     console.error("[aiMeetingSummary]", error);
     const raw = error instanceof Error ? error.message : String(error);
-    let userMsg = "Failed to generate meeting summary";
-    let status = 500;
-
-    if (/not found/i.test(raw)) {
-      userMsg = "Meeting not found or you do not have access to it";
-      status = 404;
-    } else if (/not properly configured|API key|AI_PROVIDER|not-configured/i.test(raw)) {
-      userMsg = "AI provider not configured — set a valid GROQ_API_KEY (or OpenAI key) in apps/api/.env and restart the API";
-      status = 503;
-    } else if (/rate limit|429/i.test(raw)) {
-      userMsg = "AI rate limit reached — wait a moment and try again";
-      status = 429;
-    } else if (/timed out|timeout|ETIMEDOUT|ECONNRESET/i.test(raw)) {
-      userMsg = "AI request timed out — try again";
-      status = 504;
-    } else if (/parse JSON|Invalid AI|json_object|must contain the word 'json'|invalid_request/i.test(raw)) {
-      userMsg = "Invalid AI response format — please retry";
-      status = 502;
-    } else if (/Empty response/i.test(raw)) {
-      userMsg = "AI returned an empty response — please retry";
-      status = 502;
-    } else if (process.env.NODE_ENV !== "production" && raw && raw.length < 280) {
-      // Surface provider detail in development
-      userMsg = raw.replace(/^400\s*/, "").replace(/^AIError:\s*/i, "") || userMsg;
+    if (/Meeting not found|do not have access/i.test(raw)) {
+      return res.status(404).json({
+        success: false,
+        error: "Meeting not found or you do not have access to it",
+      });
     }
-
-    res.status(status).json({ success: false, error: userMsg });
+    const { status, message } = sanitizeAiUserError(error, "Failed to generate meeting summary");
+    res.status(status).json({ success: false, error: message });
   }
 }
 
@@ -1196,28 +1182,14 @@ export async function aiReminders(req: AuthenticatedRequest, res: Response) {
   } catch (error: unknown) {
     console.error("[aiReminders]", error);
     const raw = error instanceof Error ? error.message : String(error);
-    let userMsg = "Failed to generate reminders";
-    let status = 500;
-    if (/not found/i.test(raw)) {
-      userMsg = raw;
-      status = 404;
-    } else if (/Select a contact/i.test(raw)) {
-      userMsg = raw;
-      status = 400;
-    } else if (/not properly configured|API key|AI_PROVIDER/i.test(raw)) {
-      userMsg =
-        "AI provider not configured — set a valid GROQ_API_KEY in apps/api/.env and restart the API";
-      status = 503;
-    } else if (/rate limit|429/i.test(raw)) {
-      userMsg = "AI rate limit reached — wait a moment and try again";
-      status = 429;
-    } else if (/json|Invalid AI|parse/i.test(raw)) {
-      userMsg = "Invalid AI response — please retry";
-      status = 502;
-    } else if (process.env.NODE_ENV !== "production" && raw.length < 280) {
-      userMsg = raw;
+    if (/Select a contact/i.test(raw)) {
+      return res.status(400).json({ success: false, error: raw });
     }
-    res.status(status).json({ success: false, error: userMsg });
+    if (/not found/i.test(raw) && !/model_not_found|does not exist or you do not have access/i.test(raw)) {
+      return res.status(404).json({ success: false, error: raw });
+    }
+    const { status, message } = sanitizeAiUserError(error, "Failed to generate reminders");
+    res.status(status).json({ success: false, error: message });
   }
 }
 

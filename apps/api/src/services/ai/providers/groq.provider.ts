@@ -8,7 +8,7 @@ export class GroqProvider implements AIProvider {
   private client: Groq;
   private defaultModel: string;
 
-  constructor(apiKey: string, defaultModel: string = 'llama-3.3-70b-versatile') {
+  constructor(apiKey: string, defaultModel: string = 'openai/gpt-oss-120b') {
     if (!apiKey) {
       throw new Error('Groq API key is required');
     }

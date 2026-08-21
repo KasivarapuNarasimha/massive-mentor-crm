@@ -39,7 +39,8 @@ const envSchema = z.object({
   // AI Configuration
   AI_PROVIDER: z.enum(['groq', 'openai']).default('groq'),
   GROQ_API_KEY: z.string().optional(),
-  GROQ_MODEL: z.string().default('llama-3.3-70b-versatile'),
+  // Groq deprecated llama-3.3-70b-versatile (2026-08-16). Production replacement: openai/gpt-oss-120b
+  GROQ_MODEL: z.string().default('openai/gpt-oss-120b'),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default('gpt-4o-mini'),
 

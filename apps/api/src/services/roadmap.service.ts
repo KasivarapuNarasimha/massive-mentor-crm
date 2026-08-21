@@ -90,12 +90,12 @@ Return ONLY a valid JSON object with this exact structure:
       userId,
       title: roadmapData.title,
       days: roadmapData as unknown as Prisma.InputJsonValue,
-      aiModel: response.usage?.model || "llama-3.3-70b-versatile",
+      aiModel: response.usage?.model || "openai/gpt-oss-120b",
     },
     update: {
       title: roadmapData.title,
       days: roadmapData as unknown as Prisma.InputJsonValue,
-      aiModel: response.usage?.model || "llama-3.3-70b-versatile",
+      aiModel: response.usage?.model || "openai/gpt-oss-120b",
       generatedAt: new Date(),
     },
   });

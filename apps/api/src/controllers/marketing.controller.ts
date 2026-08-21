@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { generateMarketingContent, MarketingInputs } from "../services/marketing.service.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
+import { sanitizeAiUserError } from "../utils/ai-error.js";
 
 export async function generateMarketing(req: AuthenticatedRequest, res: Response) {
   try {
@@ -37,12 +38,21 @@ export async function generateMarketing(req: AuthenticatedRequest, res: Response
   } catch (error: unknown) {
     console.error("Generate marketing content error:", error);
 
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    const status = errorMessage.includes("Business profile") ? 400 : 500;
+    const raw = error instanceof Error ? error.message : String(error);
+    if (/Business profile/i.test(raw)) {
+      return res.status(400).json({
+        success: false,
+        error: raw || "Business profile is required",
+      });
+    }
 
+    const { status, message } = sanitizeAiUserError(
+      error,
+      "AI Marketing is temporarily unavailable. Please try again."
+    );
     res.status(status).json({
       success: false,
-      error: errorMessage || "Failed to generate marketing content",
+      error: message,
     });
   }
 }
