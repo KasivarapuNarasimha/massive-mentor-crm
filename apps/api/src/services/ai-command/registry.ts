@@ -36,6 +36,7 @@ import {
   resolveDealRef,
   resolveInvoiceRef,
   resolveProductRef,
+  pickContactSoftRef,
 } from "./entity-resolver.js";
 import type { ActionDef } from "./types.js";
 
@@ -91,6 +92,8 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       phone: z.any().optional().nullable(),
       email: z.any().optional().nullable(),
       status: z.any().optional().nullable(),
+      // Planner sometimes mistakenly puts the new lead identity in `contact`
+      contact: softRefSchema,
       assignee: softRefSchema,
       assignedTo: z.string().optional().nullable(),
     }),
@@ -103,6 +106,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
         }
         return String(v).trim();
       };
+      const contactHint = asStr(args.contact);
       args = {
         ...args,
         name: asStr(args.name) || null,
@@ -111,6 +115,11 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
         email: asStr(args.email) || null,
         status: asStr(args.status) || null,
       };
+      // If planner only supplied contact soft-ref for a CREATE, reuse its query as name/company.
+      if (!args.name && !args.company && contactHint) {
+        args.company = contactHint;
+        args.name = contactHint;
+      }
       const name = (args.name || args.company || "").trim();
       if (!name) {
         return {
@@ -231,16 +240,25 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
     modules: ["leads", "clients"],
     argsSchema: z.object({
       contact: softRefSchema,
-      status: z.string().optional().nullable(),
-      phone: z.string().optional().nullable(),
-      email: z.string().optional().nullable(),
-      name: z.string().optional().nullable(),
-      company: z.string().optional().nullable(),
+      status: z.any().optional().nullable(),
+      phone: z.any().optional().nullable(),
+      email: z.any().optional().nullable(),
+      name: z.any().optional().nullable(),
+      company: z.any().optional().nullable(),
+      clientName: z.any().optional().nullable(),
+      client: z.any().optional().nullable(),
       assignee: softRefSchema,
       assignedTo: z.string().optional().nullable(),
     }),
     resolveArgs: async (ctx, args) => {
-      const c = await resolveContactRef(ctx, args.contact);
+      // Planner sometimes puts the target company in `company`/`clientName` and omits `contact`.
+      // Do not use `name` as identity here — it is often an update payload field.
+      const contactRef = pickContactSoftRef(args as Record<string, unknown>, [
+        "clientName",
+        "company",
+        "client",
+      ]);
+      const c = await resolveContactRef(ctx, contactRef);
       if (!c.ok) {
         if (c.status === "needs_choice") {
           return { ok: false, status: "needs_choice", message: c.message, choices: c.choices };
@@ -258,6 +276,9 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
         }
         assignedTo = m.id;
       }
+      // If company/name were only used as identity fallbacks (no explicit contact ref),
+      // do not treat them as field updates unless the planner also sent contact.
+      const usedIdentityFallback = !args.contact && Boolean(contactRef);
       return {
         ok: true,
         args: {
@@ -265,6 +286,8 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
           contact: { id: c.id },
           status: args.status != null ? normalizeStatus(args.status) : undefined,
           assignedTo,
+          name: usedIdentityFallback ? undefined : args.name,
+          company: usedIdentityFallback ? undefined : args.company,
           _label: c.label,
         },
       };
@@ -300,9 +323,15 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
     category: "crm",
     risk: "low",
     modules: ["leads", "clients"],
-    argsSchema: z.object({ contact: softRefSchema, assignee: softRefSchema }),
+    argsSchema: z.object({
+      contact: softRefSchema,
+      company: z.any().optional().nullable(),
+      clientName: z.any().optional().nullable(),
+      assignee: softRefSchema,
+    }),
     resolveArgs: async (ctx, args) => {
-      const c = await resolveContactRef(ctx, args.contact);
+      const contactRef = pickContactSoftRef(args as Record<string, unknown>, ["clientName", "company", "client"]);
+      const c = await resolveContactRef(ctx, contactRef);
       if (!c.ok) {
         if (c.status === "needs_choice") {
           return { ok: false, status: "needs_choice", message: c.message, choices: c.choices };
@@ -339,9 +368,14 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
     risk: "destructive",
     modules: ["leads", "clients"],
     roles: ["manager", "admin", "business_admin", "ceo", "owner", "sales_manager"],
-    argsSchema: z.object({ contact: softRefSchema }),
+    argsSchema: z.object({
+      contact: softRefSchema,
+      company: z.any().optional().nullable(),
+      clientName: z.any().optional().nullable(),
+    }),
     resolveArgs: async (ctx, args) => {
-      const c = await resolveContactRef(ctx, args.contact);
+      const contactRef = pickContactSoftRef(args as Record<string, unknown>, ["clientName", "company", "client"]);
+      const c = await resolveContactRef(ctx, contactRef);
       if (!c.ok) {
         if (c.status === "needs_choice") {
           return { ok: false, status: "needs_choice", message: c.message, choices: c.choices };
@@ -878,6 +912,9 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
     argsSchema: z.object({
       contact: softRefSchema,
       clientName: z.any().optional().nullable(),
+      company: z.any().optional().nullable(),
+      client: z.any().optional().nullable(),
+      name: z.any().optional().nullable(),
       amount: z.any(),
       description: z.any().optional().nullable(),
       taxRate: z.any().optional().nullable(),
@@ -896,7 +933,8 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
         return String(v).trim();
       };
       const description = asStr(args.description);
-      const clientNameRaw = asStr(args.clientName);
+      const clientNameRaw =
+        asStr(args.clientName) || asStr(args.company) || asStr(args.client) || asStr(args.name);
       const dueInDays =
         args.dueInDays != null && args.dueInDays !== ""
           ? Number(args.dueInDays)
@@ -907,15 +945,30 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       if (!args.due && !args.dueDate && (dueInDays == null || Number.isNaN(dueInDays))) {
         missing.push("dueDate");
       }
+
+      // Always resolve workspace contact when any identity hint is present
+      // (contact soft-ref OR clientName/company/client/name). Do not invent GST.
+      const contactRef = pickContactSoftRef(args as Record<string, unknown>, [
+        "clientName",
+        "company",
+        "client",
+        "name",
+      ]);
       let contactId: string | null = null;
-      let clientName = clientNameRaw || null;
-      if (args.contact) {
-        const c = await resolveContactRef(ctx, args.contact);
+      let clientName: string | null = clientNameRaw || null;
+      if (contactRef) {
+        const c = await resolveContactRef(ctx, contactRef);
         if (!c.ok) {
           if (c.status === "needs_choice") {
             return { ok: false, status: "needs_choice", message: c.message, choices: c.choices };
           }
-          return { ok: false, status: "not_found", message: c.message };
+          // Soft-ref present but no workspace match — ask rather than invent a client.
+          return {
+            ok: false,
+            status: "needs_input",
+            message: c.message,
+            missingFields: ["client"],
+          };
         }
         contactId = c.id;
         clientName = clientName || c.label;
@@ -1276,9 +1329,15 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
     category: "comms",
     risk: "low",
     modules: ["whatsapp", "leads", "ai_sales"],
-    argsSchema: z.object({ contact: softRefSchema, topic: z.string().optional().nullable() }),
+    argsSchema: z.object({
+      contact: softRefSchema,
+      company: z.any().optional().nullable(),
+      clientName: z.any().optional().nullable(),
+      topic: z.string().optional().nullable(),
+    }),
     resolveArgs: async (ctx, args) => {
-      const c = await resolveContactRef(ctx, args.contact);
+      const contactRef = pickContactSoftRef(args as Record<string, unknown>, ["clientName", "company", "client"]);
+      const c = await resolveContactRef(ctx, contactRef);
       if (!c.ok) {
         if (c.status === "needs_choice") {
           return { ok: false, status: "needs_choice", message: c.message, choices: c.choices };
@@ -1328,3 +1387,4 @@ export function listActionCatalog(): Array<{ name: string; description: string; 
     category: a.category,
   }));
 }
+ 

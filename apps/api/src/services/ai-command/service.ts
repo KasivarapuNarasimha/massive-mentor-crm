@@ -25,6 +25,18 @@ export async function runAiCommand(input: {
     if (step) {
       for (const [field, id] of Object.entries(input.choices)) {
         step.args[field] = { id };
+        // Propagate resolved contact/deal ids to later steps so truncated
+        // soft-ref queries are not re-resolved into a new needs_choice loop.
+        if (field === "contact" || field === "deal") {
+          for (let j = session.pending.stepIndex + 1; j < session.pending.plan.steps.length; j++) {
+            const later = session.pending.plan.steps[j];
+            if (!later?.args) continue;
+            const cur = later.args[field];
+            const hasId =
+              cur && typeof cur === "object" && typeof (cur as { id?: string }).id === "string";
+            if (!hasId) later.args[field] = { id };
+          }
+        }
       }
     }
     const result = await executePlan(ctx, session.pending.plan, {

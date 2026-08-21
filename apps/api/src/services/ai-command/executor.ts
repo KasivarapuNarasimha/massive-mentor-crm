@@ -53,7 +53,24 @@ function coercePlannerArgs(args: Record<string, unknown>): Record<string, unknow
       }
     }
   }
-  // If company is still missing but name is a company-like string, leave as-is
+  // Promote identity hints into contact when planner omitted contact soft-ref.
+  const contactEmpty =
+    out.contact == null ||
+    out.contact === "" ||
+    (typeof out.contact === "object" &&
+      out.contact !== null &&
+      !(out.contact as { id?: string; query?: string; from?: string }).id &&
+      !(out.contact as { query?: string }).query &&
+      !(out.contact as { from?: string }).from);
+  if (contactEmpty) {
+    for (const key of ["clientName", "company", "client"] as const) {
+      const v = out[key];
+      if (typeof v === "string" && v.trim()) {
+        out.contact = { by: "company_or_name", query: v.trim() };
+        break;
+      }
+    }
+  }
   return out;
 }
 

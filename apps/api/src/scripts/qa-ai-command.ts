@@ -114,7 +114,7 @@ async function main() {
     pass("Multi-step deal + note");
   } else fail("Multi-step deal + note", multi.summary);
 
-  // 4) Invoice
+  // 4) Invoice with id + GST 18%
   const inv = await executePlan(
     ctx,
     {
@@ -136,6 +136,130 @@ async function main() {
   );
   if (inv.status === "completed" && inv.steps[0]?.entityId) pass("Create invoice GST 18%", inv.steps[0].label);
   else fail("Create invoice GST 18%", inv.summary);
+
+  // 4b) Invoice resolve by soft-ref query (no id) — no invented GST
+  const invSoft = await executePlan(
+    ctx,
+    {
+      steps: [
+        {
+          id: "s1",
+          action: "create_invoice",
+          args: {
+            contact: { by: "company_or_name", query: `${tag} Co` },
+            amount: 85000,
+            description: "website development soft",
+            due: { days: 15 },
+          },
+        },
+      ],
+    },
+    { sessionId: "qa-soft-inv" }
+  );
+  const softInvId = invSoft.steps[0]?.entityId;
+  if (invSoft.status === "completed" && softInvId) {
+    const listedInv = await listInvoices(userId, { page: 1, pageSize: 50 });
+    const items =
+      (listedInv as { items?: Array<{ id: string; amount?: unknown; taxRate?: unknown; contactId?: string | null; dueDate?: Date | string | null; description?: string | null }> }).items ||
+      [];
+    const hit = items.find((i) => i.id === softInvId);
+    const tax = hit ? Number(hit.taxRate) : -1;
+    const days =
+      hit?.dueDate != null
+        ? Math.round((new Date(hit.dueDate).getTime() - Date.now()) / (24 * 3600 * 1000))
+        : -1;
+    if (hit && Number(hit.amount) === 85000 && tax === 0 && days >= 13 && days <= 16 && hit.contactId === leadId) {
+      pass("Invoice soft-ref query no GST", `${hit.id} due~${days}d tax=${tax}`);
+    } else {
+      fail(
+        "Invoice soft-ref query no GST",
+        JSON.stringify({
+          status: invSoft.status,
+          softInvId,
+          amount: hit?.amount,
+          tax,
+          days,
+          contactId: hit?.contactId,
+          desc: hit?.description,
+        })
+      );
+    }
+  } else fail("Invoice soft-ref query no GST", invSoft.summary);
+
+  // 4c) Invoice identity only in company field (planner flake) — must resolve ABC-like company
+  const invCompanyOnly = await executePlan(
+    ctx,
+    {
+      steps: [
+        {
+          id: "s1",
+          action: "create_invoice",
+          args: {
+            company: `${tag} Co`,
+            amount: 42000,
+            description: "company-field-only invoice",
+            dueInDays: 15,
+          },
+        },
+      ],
+    },
+    { sessionId: "qa-co-inv" }
+  );
+  if (invCompanyOnly.status === "completed" && invCompanyOnly.steps[0]?.entityId) {
+    pass("Invoice company-field fallback resolves client", invCompanyOnly.steps[0].entityId);
+  } else fail("Invoice company-field fallback resolves client", invCompanyOnly.summary);
+
+  // 4d) Lead update via company field only (no contact soft-ref) — 5 deterministic repeats
+  let updateFlakePass = 0;
+  for (let i = 0; i < 5; i++) {
+    const upd = await executePlan(
+      ctx,
+      {
+        steps: [
+          {
+            id: "s1",
+            action: "update_contact",
+            args: {
+              company: `${tag} Co`,
+              status: i % 2 === 0 ? "qualified" : "contacted",
+            },
+          },
+        ],
+      },
+      { sessionId: `qa-upd-${i}` }
+    );
+    const after = await getContactById(userId, leadId);
+    const want = i % 2 === 0 ? "qualified" : "contacted";
+    if (upd.status === "completed" && after && String(after.status).toLowerCase() === want) updateFlakePass++;
+    else fail(`Lead update company-fallback run ${i + 1}`, `${upd.status} status=${after?.status}`);
+  }
+  if (updateFlakePass === 5) pass("Lead update company-fallback 5/5 deterministic");
+  else fail("Lead update company-fallback 5/5 deterministic", `${updateFlakePass}/5`);
+
+  // 4e) Lead update via soft-ref query 5/5
+  let softUpd = 0;
+  for (let i = 0; i < 5; i++) {
+    const upd = await executePlan(
+      ctx,
+      {
+        steps: [
+          {
+            id: "s1",
+            action: "update_contact",
+            args: {
+              contact: { by: "company_or_name", query: `${tag} Co` },
+              status: "qualified",
+            },
+          },
+        ],
+      },
+      { sessionId: `qa-soft-upd-${i}` }
+    );
+    if (upd.status === "completed") softUpd++;
+    else fail(`Lead update soft-ref run ${i + 1}`, upd.summary);
+  }
+  if (softUpd === 5) pass("Lead update soft-ref query 5/5");
+  else fail("Lead update soft-ref query 5/5", `${softUpd}/5`);
 
   // 5) Missing invoice amount → needs_input
   const missing = await executePlan(
@@ -172,7 +296,113 @@ async function main() {
   if (focus.status === "completed") pass("priority_focus_today");
   else fail("priority_focus_today", focus.summary);
 
-  // 8) Delete confirmation token flow
+  // Exact unique match must auto-resolve (before delete)
+  const exact = await executePlan(
+    ctx,
+    {
+      steps: [
+        {
+          id: "s1",
+          action: "update_contact",
+          args: { contact: { by: "company_or_name", query: `${tag} Co` }, status: "negotiation" },
+        },
+      ],
+    },
+    { sessionId: "qa-exact" }
+  );
+  const exactAfter = await getContactById(userId, leadId);
+  if (exact.status === "completed" && exactAfter && String(exactAfter.status).toLowerCase() === "negotiation") {
+    pass("Exact unique company match auto-resolves");
+  } else fail("Exact unique company match auto-resolves", exact.summary);
+
+  // Empty contact must not invent — needs_input/failed with specify message
+  const empty = await executePlan(
+    ctx,
+    { steps: [{ id: "s1", action: "update_contact", args: { contact: {}, status: "won" } }] },
+    { sessionId: "qa-empty" }
+  );
+  if (empty.status === "failed" || empty.status === "needs_input") {
+    pass("Empty contact ref does not invent entity", empty.status);
+  } else fail("Empty contact ref does not invent entity", empty.status);
+
+  // Deal value update
+  const dealUpd = await executePlan(
+    ctx,
+    {
+      steps: [
+        {
+          id: "s1",
+          action: "update_deal",
+          args: { deal: { by: "query", query: `${tag} Deal` }, value: 500000 },
+        },
+      ],
+    },
+    { sessionId: "qa-deal" }
+  );
+  if (dealUpd.status === "completed" || dealUpd.status === "needs_choice") {
+    pass("Deal update path", dealUpd.status);
+  } else fail("Deal update path", dealUpd.summary);
+
+  // WhatsApp draft (no send)
+  const wa = await executePlan(
+    ctx,
+    {
+      steps: [
+        {
+          id: "s1",
+          action: "draft_whatsapp",
+          args: { company: `${tag} Co`, topic: "follow-up" },
+        },
+      ],
+    },
+    { sessionId: "qa-wa" }
+  );
+  if (wa.status === "completed" && wa.steps[0]?.action === "draft_whatsapp") {
+    pass("WhatsApp draft via company fallback");
+  } else fail("WhatsApp draft via company fallback", wa.summary);
+
+  // Low stock list
+  const low = await executePlan(
+    ctx,
+    { steps: [{ id: "s1", action: "list_low_stock", args: {} }] },
+    { sessionId: "qa-low" }
+  );
+  if (low.status === "completed" || low.status === "failed" || low.status === "needs_input") {
+    pass("Low-stock action reachable", low.status);
+  } else fail("Low-stock action reachable", low.status);
+
+  // Ambiguity: multiple exact company matches → needs_choice (no silent write)
+  const twinTag = `TwinCo-${tag}`;
+  await executePlan(
+    ctx,
+    {
+      steps: [
+        { id: "a", action: "create_lead", args: { name: `${tag}-A`, company: twinTag, phone: "9000000001", status: "new" } },
+        { id: "b", action: "create_lead", args: { name: `${tag}-B`, company: twinTag, phone: "9000000002", status: "new" } },
+      ],
+    },
+    { sessionId: "qa" }
+  );
+  const amb = await executePlan(
+    ctx,
+    {
+      steps: [
+        {
+          id: "s1",
+          action: "update_contact",
+          args: { contact: { by: "company_or_name", query: twinTag }, status: "qualified" },
+        },
+      ],
+    },
+    { sessionId: "qa" }
+  );
+  if (amb.status === "needs_choice" && (amb.choices?.length || 0) >= 2) {
+    pass("Ambiguous TwinCo → needs_choice", `choices=${amb.choices?.length}`);
+  } else {
+    fail("Ambiguous TwinCo → needs_choice", `${amb.status} choices=${amb.choices?.length || 0}`);
+  }
+
+  // Delete confirmation token flow (after resolution tests that need the lead)
   const delPlan = await executePlan(
     ctx,
     {
@@ -182,12 +412,7 @@ async function main() {
   );
   if (delPlan.status === "needs_confirmation" && delPlan.confirmToken) {
     pass("Delete requires confirmation token");
-    const conf = await executeConfirmedAction(
-      ctx,
-      "delete_contact",
-      { contact: { id: leadId }, _label: tag }
-    );
-    // Actually need to go through verifyConfirmToken path — test token crypto
+    // Token crypto + replay protection
     const tok = issueConfirmToken({
       userId,
       businessId: ctx.businessId,
@@ -200,7 +425,6 @@ async function main() {
     const v2 = verifyConfirmToken(tok, userId, ctx.businessId);
     if (!v2.ok) pass("Confirm token replay rejected");
     else fail("Confirm token replay rejected");
-    // Soft-delete lead via service for cleanup if still exists
     try {
       await executeConfirmedAction(ctx, "delete_contact", { contact: { id: leadId } });
       pass("Confirmed delete executed");
@@ -211,34 +435,7 @@ async function main() {
     fail("Delete requires confirmation token", delPlan.status);
   }
 
-  // 9) Ambiguity: search without unique match shouldn't invent — create two similar then update
-  await executePlan(
-    ctx,
-    {
-      steps: [
-        { id: "a", action: "create_lead", args: { name: `${tag}-A`, company: "TwinCo", phone: "9000000001", status: "new" } },
-        { id: "b", action: "create_lead", args: { name: `${tag}-B`, company: "TwinCo", phone: "9000000002", status: "new" } },
-      ],
-    },
-    { sessionId: "qa" }
-  );
-  const amb = await executePlan(
-    ctx,
-    {
-      steps: [
-        {
-          id: "s1",
-          action: "update_contact",
-          args: { contact: { by: "company_or_name", query: "TwinCo" }, status: "qualified" },
-        },
-      ],
-    },
-    { sessionId: "qa" }
-  );
-  if (amb.status === "needs_choice") pass("Ambiguous TwinCo → needs_choice");
-  else pass("Ambiguous TwinCo outcome", amb.status); // may be unique score in sparse DB
-
-  // 10) Unsupported payroll not in registry
+  // Unsupported payroll not in registry
   if (!ACTION_REGISTRY.create_payroll) pass("Payroll action not registered");
   else fail("Payroll action not registered");
 

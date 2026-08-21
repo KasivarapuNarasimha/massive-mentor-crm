@@ -4,6 +4,15 @@ import { listAssignableMembers } from "../lead-assignment.service.js";
 import { listProducts } from "../erp-catalog.service.js";
 import type { ActionContext, ChoiceOption, SoftRef } from "./types.js";
 
+type ContactRow = {
+  id: string;
+  name?: string;
+  company?: string | null;
+  phone?: string | null;
+  type?: string;
+  status?: string;
+};
+
 function scoreText(query: string, ...fields: Array<string | null | undefined>): number {
   const q = query.trim().toLowerCase();
   if (!q) return 0;
@@ -12,11 +21,15 @@ function scoreText(query: string, ...fields: Array<string | null | undefined>): 
     const v = (f || "").trim().toLowerCase();
     if (!v) continue;
     if (v === q) best = Math.max(best, 100);
-    else if (v.startsWith(q)) best = Math.max(best, 80);
+    else if (v.startsWith(q) || q.startsWith(v)) best = Math.max(best, 80);
     else if (v.includes(q)) best = Math.max(best, 60);
     else if (q.includes(v) && v.length >= 3) best = Math.max(best, 50);
   }
   return best;
+}
+
+function digitsOnly(v: string): string {
+  return v.replace(/\D/g, "");
 }
 
 function softQuery(ref: SoftRef): string | null {
@@ -25,7 +38,46 @@ function softQuery(ref: SoftRef): string | null {
   if (typeof ref === "object") {
     if ("id" in ref && ref.id) return null; // already id
     if ("from" in ref && ref.from) return null; // binding
-    if ("query" in ref && ref.query) return String(ref.query).trim();
+    if ("query" in ref && ref.query) return String(ref.query).trim() || null;
+  }
+  return null;
+}
+
+/** True when ref already carries an id/binding or a non-empty query/string. */
+export function isUsableSoftRef(ref: SoftRef): boolean {
+  if (ref == null) return false;
+  if (typeof ref === "string") return ref.trim().length > 0;
+  if (typeof ref === "object") {
+    if ("id" in ref && typeof ref.id === "string" && ref.id.trim()) return true;
+    if ("from" in ref && typeof ref.from === "string" && ref.from.trim()) return true;
+    if ("query" in ref && String(ref.query || "").trim()) return true;
+  }
+  return false;
+}
+
+/**
+ * When the planner omits `contact` and puts the company/client into sibling fields
+ * (common LLM flake), synthesize a soft-ref. Does not invent values — only reuses
+ * strings already present in args.
+ */
+export function pickContactSoftRef(
+  args: Record<string, unknown>,
+  fallbackKeys: string[] = ["clientName", "company", "client"]
+): SoftRef {
+  if (isUsableSoftRef(args.contact as SoftRef)) return args.contact as SoftRef;
+  for (const key of fallbackKeys) {
+    const v = args[key];
+    if (v == null || v === "") continue;
+    if (typeof v === "string" && v.trim()) {
+      return { by: "company_or_name", query: v.trim() };
+    }
+    if (typeof v === "object") {
+      if (typeof (v as { id?: unknown }).id === "string" && (v as { id: string }).id.trim()) {
+        return v as SoftRef;
+      }
+      const q = softQuery(v as SoftRef);
+      if (q) return { by: "company_or_name", query: q };
+    }
   }
   return null;
 }
@@ -42,6 +94,37 @@ export function resolveBindingId(ctx: ActionContext, ref: SoftRef): string | nul
   return null;
 }
 
+function contactLabel(row: ContactRow): string {
+  return `${row.name || row.company || "Contact"}${row.company && row.name ? ` (${row.company})` : ""}`;
+}
+
+function isExactContactMatch(q: string, row: ContactRow): boolean {
+  const ql = q.trim().toLowerCase();
+  if (!ql) return false;
+  const name = (row.name || "").trim().toLowerCase();
+  const company = (row.company || "").trim().toLowerCase();
+  if (name === ql || company === ql) return true;
+  const qd = digitsOnly(q);
+  const pd = row.phone ? digitsOnly(row.phone) : "";
+  return Boolean(qd && pd && qd === pd);
+}
+
+function toChoice(row: ContactRow): ChoiceOption {
+  return {
+    id: row.id,
+    label: row.name || row.company || row.id,
+    sublabel: [row.type, row.status, row.phone, row.company].filter(Boolean).join(" · "),
+    field: "contact",
+  };
+}
+
+/**
+ * Deterministic workspace-safe contact resolution:
+ * - exact unique match → auto-resolve
+ * - multiple exact / ambiguous partials → needs_choice
+ * - no match → not_found
+ * Never silently picks a weak unrelated entity.
+ */
 export async function resolveContactRef(
   ctx: ActionContext,
   ref: SoftRef,
@@ -68,49 +151,62 @@ export async function resolveContactRef(
     type: opts?.type,
     search: q,
     page: 1,
-    pageSize: 15,
+    pageSize: 25,
   });
+  const qDigits = digitsOnly(q);
   const scored = listed.items
     .map((c) => {
-      const row = c as {
-        id: string;
-        name?: string;
-        company?: string | null;
-        phone?: string | null;
-        type?: string;
-        status?: string;
-      };
+      const row = c as ContactRow;
+      const phoneDigits = row.phone ? digitsOnly(row.phone) : "";
       const phoneScore =
-        row.phone && q.replace(/\D/g, "") && row.phone.replace(/\D/g, "").includes(q.replace(/\D/g, ""))
-          ? 95
+        qDigits.length >= 6 && phoneDigits && (phoneDigits === qDigits || phoneDigits.includes(qDigits) || qDigits.includes(phoneDigits))
+          ? phoneDigits === qDigits
+            ? 100
+            : 90
           : 0;
-      const s = Math.max(
-        phoneScore,
-        scoreText(q, row.company, row.name, row.phone)
-      );
-      return { row, s };
+      const s = Math.max(phoneScore, scoreText(q, row.company, row.name, row.phone));
+      return { row, s, exact: isExactContactMatch(q, row) };
     })
     .filter((x) => x.s >= 50)
-    .sort((a, b) => b.s - a.s);
+    .sort((a, b) => {
+      if (a.exact !== b.exact) return a.exact ? -1 : 1;
+      return b.s - a.s;
+    });
 
   if (scored.length === 0) {
     return { ok: false, status: "not_found", message: `No contact/company matching "${q}" in your workspace.` };
   }
-  if (scored.length === 1 || scored[0].s >= 90 && scored[0].s - (scored[1]?.s || 0) >= 15) {
-    const row = scored[0].row;
-    const label = `${row.name || row.company || "Contact"}${row.company && row.name ? ` (${row.company})` : ""}`;
-    return { ok: true, id: row.id, label, raw: row as unknown as Record<string, unknown> };
+
+  const exactHits = scored.filter((x) => x.exact);
+  if (exactHits.length === 1) {
+    const row = exactHits[0].row;
+    return { ok: true, id: row.id, label: contactLabel(row), raw: row as unknown as Record<string, unknown> };
   }
+  if (exactHits.length > 1) {
+    return {
+      ok: false,
+      status: "needs_choice",
+      message: `I found ${exactHits.length} matching contacts. Which one?`,
+      choices: exactHits.slice(0, 8).map((x) => toChoice(x.row)),
+    };
+  }
+
+  // No exact match — only auto-resolve a single partial, or a clear score winner.
+  if (scored.length === 1) {
+    const row = scored[0].row;
+    return { ok: true, id: row.id, label: contactLabel(row), raw: row as unknown as Record<string, unknown> };
+  }
+  const margin = scored[0].s - (scored[1]?.s || 0);
+  if (scored[0].s >= 80 && margin >= 20) {
+    const row = scored[0].row;
+    return { ok: true, id: row.id, label: contactLabel(row), raw: row as unknown as Record<string, unknown> };
+  }
+
   return {
     ok: false,
     status: "needs_choice",
     message: `I found ${scored.length} matching contacts. Which one?`,
-    choices: scored.slice(0, 8).map((x) => ({
-      id: x.row.id,
-      label: x.row.name || x.row.company || x.row.id,
-      sublabel: [x.row.type, x.row.status, x.row.phone, x.row.company].filter(Boolean).join(" · "),
-      field: "contact",
-    })),
+    choices: scored.slice(0, 8).map((x) => toChoice(x.row)),
   };
 }
 
