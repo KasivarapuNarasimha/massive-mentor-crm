@@ -8,6 +8,7 @@ import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageLoading } from "@/components/ui/PageLoading";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
+import { NotesPanel } from "@/components/crm/NotesPanel";
 
 interface Meeting {
   id: string;
@@ -287,6 +288,16 @@ export default function MeetingsPage() {
                 </button>
               </div>
             </form>
+            {editingMeeting?.id ? (
+              <div className="mt-4 pt-4 border-t border-border">
+                <NotesPanel
+                  entityType="meeting"
+                  entityId={editingMeeting.id}
+                  compact
+                  title="Attached notes"
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       )}

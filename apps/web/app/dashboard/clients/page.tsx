@@ -10,6 +10,7 @@ import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
 import { PageLoading } from "@/components/ui/PageLoading";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
+import { NotesPanel } from "@/components/crm/NotesPanel";
 import {
   type BusinessConfigDTO,
   type FieldDef,
@@ -526,6 +527,17 @@ export default function ClientsPage() {
                         ? "Add / Update Finance"
                         : "Save Financial Status"}
                   </button>
+                </div>
+              ) : null}
+
+              {editingClient?.id ? (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <NotesPanel
+                    entityType="contact"
+                    entityId={editingClient.id}
+                    compact
+                    title="Attached notes"
+                  />
                 </div>
               ) : null}
             </div>

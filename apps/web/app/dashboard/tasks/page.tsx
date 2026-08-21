@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -8,7 +8,9 @@ import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
 import { toIsoDateTime, toDateInputValue } from "@/lib/date-input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageLoading } from "@/components/ui/PageLoading";
+import { PaginationBar } from "@/components/ui/PaginationBar";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
+import { useDataVersion } from "@/lib/data-events";
 
 interface Task {
   id: string;
@@ -17,37 +19,88 @@ interface Task {
   dueDate?: string;
   status: string;
   priority?: string;
-  contactId?: string;
-  dealId?: string;
+  contactId?: string | null;
+  dealId?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
 
 export default function TasksPage() {
   const { token } = useAuth();
+  const dataVersion = useDataVersion("task");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [formData, setFormData] = useState({ title: "", description: "", status: "todo", priority: "medium", dueDate: "" });
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    status: "todo",
+    priority: "medium",
+    dueDate: "",
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const load = async () => {
-    if (!token) return;
-    setIsLoading(true);
-    const res = await api.getCrmTasks("", token);
-    const data = res.data as { tasks?: Task[] } | undefined;
-    if (res.success && data?.tasks) setTasks(data.tasks);
-    setIsLoading(false);
-  };
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load(); }, [token]);
-
-  const filtered = tasks.filter(t =>
-    (!search || t.title.toLowerCase().includes(search.toLowerCase()))
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!token) return;
+      if (!opts?.silent) setIsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(page));
+        params.set("pageSize", String(pageSize));
+        params.set("sortBy", "createdAt");
+        params.set("sortDir", "desc");
+        if (search.trim()) params.set("search", search.trim());
+        const res = await api.getCrmTasks(`?${params.toString()}`, token);
+        const data = res.data as
+          | {
+              tasks?: Task[];
+              total?: number;
+              page?: number;
+              pageSize?: number;
+              totalPages?: number;
+            }
+          | undefined;
+        if (res.success && data) {
+          setTasks(Array.isArray(data.tasks) ? data.tasks : []);
+          setTotal(typeof data.total === "number" ? data.total : data.tasks?.length || 0);
+          setTotalPages(
+            typeof data.totalPages === "number"
+              ? Math.max(1, data.totalPages)
+              : 1
+          );
+        } else {
+          setTasks([]);
+          setTotal(0);
+          setTotalPages(1);
+          if (!opts?.silent) {
+            toast.error(friendlyError(res.error, "Could not load tasks. Please try again."));
+          }
+        }
+      } catch {
+        setTasks([]);
+        setTotal(0);
+        if (!opts?.silent) toast.error("Could not load tasks. Please try again.");
+      }
+      if (!opts?.silent) setIsLoading(false);
+    },
+    [token, page, pageSize, search]
   );
+
+  useEffect(() => {
+    void load();
+  }, [load, dataVersion]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const openCreate = () => {
     setEditingTask(null);
@@ -94,7 +147,6 @@ export default function TasksPage() {
       description: formData.description.trim() || null,
       status: formData.status,
       priority: formData.priority || null,
-      // Always ISO-8601 for API (never raw dd-mm-yyyy / bare yyyy-mm-dd)
       dueDate: dueDateIso,
     };
     let res;
@@ -109,7 +161,7 @@ export default function TasksPage() {
       const { emitDataChanged } = await import("@/lib/data-events");
       emitDataChanged({ module: "task", action: editingTask ? "update" : "create" });
       emitDataChanged({ module: "notification", action: "create" });
-      load();
+      await load({ silent: true });
     } else toast.error(friendlyError(res.error, "Could not save task. Please try again."));
     setIsSubmitting(false);
   };
@@ -120,7 +172,9 @@ export default function TasksPage() {
     const res = await api.deleteCrmTask(id, token);
     if (res.success) {
       toast.success(SuccessMsg.taskDeleted);
-      load();
+      const { emitDataChanged } = await import("@/lib/data-events");
+      emitDataChanged({ module: "task", action: "delete" });
+      await load({ silent: true });
     } else toast.error(friendlyError(res.error, "Could not delete task. Please try again."));
   };
 
@@ -129,7 +183,9 @@ export default function TasksPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-3xl font-semibold">Tasks</h1>
-          <p className="text-muted-foreground text-sm sm:text-base mt-1">Track follow-ups and action items.</p>
+          <p className="text-muted-foreground text-sm sm:text-base mt-1">
+            Track follow-ups and action items. Newest first.
+          </p>
         </div>
         <button
           type="button"
@@ -155,16 +211,16 @@ export default function TasksPage() {
 
       {isLoading ? (
         <PageLoading variant="cards" rows={5} label="Loading tasks" />
-      ) : filtered.length === 0 ? (
+      ) : tasks.length === 0 ? (
         <EmptyState
-          title={tasks.length === 0 ? "No tasks yet" : "No matching tasks"}
+          title={search.trim() ? "No matching tasks" : "No tasks yet"}
           description={
-            tasks.length === 0
-              ? "Create your first task to track follow-ups and action items."
-              : "Try adjusting your search."
+            search.trim()
+              ? "Try adjusting your search."
+              : "Create a task or schedule a follow-up from Leads — they will appear here."
           }
           action={
-            tasks.length === 0 ? (
+            !search.trim() ? (
               <button
                 type="button"
                 onClick={openCreate}
@@ -176,45 +232,81 @@ export default function TasksPage() {
           }
         />
       ) : (
-        <div className="space-y-3">
-          {filtered.map((task) => (
-            <div
-              key={task.id}
-              className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center"
-            >
-              <div className="min-w-0">
-                <div className="font-medium text-foreground">{task.title}</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {task.priority && `${task.priority}`}
-                  {task.dueDate && ` · Due ${task.dueDate.split("T")[0]}`}
+        <>
+          <div className="space-y-3">
+            {tasks.map((task) => (
+              <div
+                key={task.id}
+                className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium text-foreground">{task.title}</div>
+                  <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-2 gap-y-1">
+                    {task.priority && <span className="capitalize">{task.priority}</span>}
+                    {task.dueDate && (
+                      <span>· Due {String(task.dueDate).split("T")[0]}</span>
+                    )}
+                    {task.contactId && (
+                      <span className="text-emerald-400/90">· Linked to lead/contact</span>
+                    )}
+                    {task.dealId && (
+                      <span className="text-sky-400/90">· Linked to deal</span>
+                    )}
+                  </div>
+                  {task.description ? (
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {task.description}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs px-3 py-1.5 bg-white/5 rounded-full capitalize">
+                    {task.status}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openEdit(task)}
+                    className="min-h-10 px-3 py-2 text-xs bg-white/10 hover:bg-white/20 rounded-xl touch-manipulation"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(task.id, task.title)}
+                    className="min-h-10 px-3 py-2 text-xs text-red-400 hover:bg-red-950/50 rounded-xl touch-manipulation"
+                  >
+                    Del
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs px-3 py-1.5 bg-white/5 rounded-full">{task.status}</span>
-                <button
-                  type="button"
-                  onClick={() => openEdit(task)}
-                  className="min-h-10 px-3 py-2 text-xs bg-white/10 hover:bg-white/20 rounded-xl touch-manipulation"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(task.id, task.title)}
-                  className="min-h-10 px-3 py-2 text-xs text-red-400 hover:bg-red-950/50 rounded-xl touch-manipulation"
-                >
-                  Del
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <PaginationBar
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => {
+              setPageSize(s);
+              setPage(1);
+            }}
+          />
+        </>
       )}
 
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="bg-card border border-border p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
-            <h3 className="font-semibold mb-4 text-lg">{editingTask ? "Edit Task" : "New Task"}</h3>
+            <h3 className="font-semibold mb-4 text-lg">
+              {editingTask ? "Edit Task" : "New Task"}
+            </h3>
+            {editingTask && (editingTask.contactId || editingTask.dealId) ? (
+              <p className="text-xs text-muted-foreground mb-3">
+                {editingTask.contactId ? "Linked to a lead/contact. " : ""}
+                {editingTask.dealId ? "Linked to a deal." : ""}
+              </p>
+            ) : null}
             <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
               <label className="block text-xs text-muted-foreground">
                 <span className="mm-required">Title</span>
@@ -261,13 +353,18 @@ export default function TasksPage() {
                 value={formData.priority}
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                 className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
+                aria-label="Priority"
               >
                 <option value="low">low</option>
                 <option value="medium">medium</option>
                 <option value="high">high</option>
               </select>
               <div className="flex gap-3">
-                <button type="button" onClick={closeModal} className="flex-1 min-h-11 py-2.5 bg-white/10 rounded-xl touch-manipulation">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 min-h-11 py-2.5 bg-white/10 rounded-xl touch-manipulation"
+                >
                   Cancel
                 </button>
                 <button

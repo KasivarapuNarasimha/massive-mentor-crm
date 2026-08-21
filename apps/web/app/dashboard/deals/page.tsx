@@ -14,6 +14,7 @@ import { toIsoDateTime, toDateInputValue } from "@/lib/date-input";
 import { useDataVersion } from "@/lib/data-events";
 import { PageLoading } from "@/components/ui/PageLoading";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
+import { NotesPanel } from "@/components/crm/NotesPanel";
 import {
   normalizePipelineStatus,
   pipelineStatusLabel,
@@ -748,11 +749,12 @@ export default function DealsPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-muted-foreground mb-1">Notes</label>
+                <label className="block text-sm text-muted-foreground mb-1">Deal summary notes</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => handleChange("notes", e.target.value)}
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm h-24"
+                  placeholder="Short notes saved on this deal record"
                 />
               </div>
               <div className="flex gap-3 pt-2">
@@ -762,6 +764,16 @@ export default function DealsPage() {
                 </button>
               </div>
             </form>
+            {editingDeal?.id ? (
+              <div className="mt-4 pt-4 border-t border-border">
+                <NotesPanel
+                  entityType="deal"
+                  entityId={editingDeal.id}
+                  compact
+                  title="Attached notes"
+                />
+              </div>
+            ) : null}
           </div>
         </div>
       )}

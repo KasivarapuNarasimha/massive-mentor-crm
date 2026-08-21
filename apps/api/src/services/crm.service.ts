@@ -1710,20 +1710,27 @@ export async function getTasks(userId: string, filters?: TaskListFilters) {
   }
   const where = andTenant(scope.where, extra) as never;
   const page = filters?.page && filters.page > 0 ? filters.page : 1;
-  const pageSize = filters?.pageSize ? Math.min(200, Math.max(1, filters.pageSize)) : 25;
+  const pageSize = filters?.pageSize ? Math.min(200, Math.max(1, filters.pageSize)) : 50;
+  // Default newest-first so follow-ups created from Leads appear on page 1
+  // (previous dueDate ASC + pageSize 25 hid new tasks behind older/null due dates).
   const sortBy = ["title", "status", "dueDate", "createdAt", "updatedAt", "priority"].includes(
     filters?.sortBy || ""
   )
     ? filters!.sortBy!
-    : "dueDate";
-  const sortDir = filters?.sortDir === "desc" ? "desc" : filters?.sortBy ? filters.sortDir || "asc" : "asc";
+    : "createdAt";
+  const sortDir =
+    filters?.sortDir === "asc" || filters?.sortDir === "desc"
+      ? filters.sortDir
+      : filters?.sortBy
+        ? "asc"
+        : "desc";
   const { skip, take } = skipTake(page, pageSize);
 
   const [total, items] = await Promise.all([
     prisma.task.count({ where }),
     prisma.task.findMany({
       where,
-      orderBy: [{ [sortBy]: sortDir }, { createdAt: "desc" }],
+      orderBy: [{ [sortBy]: sortDir }, { id: "desc" }],
       skip,
       take,
     }),
@@ -1733,16 +1740,14 @@ export async function getTasks(userId: string, filters?: TaskListFilters) {
 
 export async function createTask(userId: string, input: TaskInput) {
   const parsed = taskSchema.parse(input);
-  const membership = await prisma.businessMember.findFirst({
-    where: { userId },
-    orderBy: { createdAt: "asc" },
-    select: { businessId: true },
-  });
+  // Must match getTasks / buildOwnedEntityScope — oldest membership caused
+  // Follow-up tasks to be written to a different workspace than the list scope.
+  const businessId = await getUserBusinessId(userId);
 
   return prisma.task.create({
     data: {
       userId,
-      businessId: membership?.businessId ?? null,
+      businessId: businessId ?? null,
       contactId: parsed.contactId || null,
       dealId: parsed.dealId || null,
       title: parsed.title,
@@ -1847,16 +1852,13 @@ export async function getMeetings(userId: string, filters?: MeetingListFilters) 
 
 export async function createMeeting(userId: string, input: MeetingInput) {
   const parsed = meetingSchema.parse(input);
-  const membership = await prisma.businessMember.findFirst({
-    where: { userId },
-    orderBy: { createdAt: "asc" },
-    select: { businessId: true },
-  });
+  // Align with getMeetings / buildOwnedEntityScope (same as createTask).
+  const businessId = await getUserBusinessId(userId);
 
   return prisma.meeting.create({
     data: {
       userId,
-      businessId: membership?.businessId ?? null,
+      businessId: businessId ?? null,
       contactId: parsed.contactId || null,
       dealId: parsed.dealId || null,
       title: parsed.title,

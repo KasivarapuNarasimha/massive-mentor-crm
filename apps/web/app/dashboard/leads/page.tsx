@@ -40,6 +40,7 @@ import {
 import { parseAmount } from "@/lib/currency";
 import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
+import { NotesPanel } from "@/components/crm/NotesPanel";
 
 interface Contact {
   id: string;
@@ -1358,7 +1359,16 @@ export default function LeadsPage() {
     setBulkBusy(false);
     setBulkProgress(null);
     setFollowUpModalOpen(false);
-    if (ok) toast.success(`Created ${ok} follow-up task(s)`);
+    if (ok) {
+      toast.success(`Created ${ok} follow-up task(s)`);
+      try {
+        const { emitDataChanged } = await import("@/lib/data-events");
+        emitDataChanged({ module: "task", action: "create" });
+        emitDataChanged({ module: "notification", action: "create" });
+      } catch {
+        /* ignore */
+      }
+    }
     if (fail) toast.error(`${fail} follow-up(s) failed`);
     clearSelection();
   };
@@ -2458,6 +2468,16 @@ export default function LeadsPage() {
                 </div>
               )}
             </div>
+            {editingLead?.id ? (
+              <div className="px-6 pb-4 flex-shrink-0 border-t border-border pt-4">
+                <NotesPanel
+                  entityType="contact"
+                  entityId={editingLead.id}
+                  compact
+                  title="Attached notes"
+                />
+              </div>
+            ) : null}
             <div className="p-6 flex-shrink-0 border-t border-border">
               <div className="flex gap-3">
                 <button

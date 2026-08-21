@@ -366,6 +366,12 @@ function AiSalesIntelligencePageInner() {
           )
         );
         toast.success("Task created in CRM");
+        try {
+          const { emitDataChanged } = await import("@/lib/data-events");
+          emitDataChanged({ module: "task", action: "create" });
+        } catch {
+          /* ignore */
+        }
       } else {
         toast.error(res.error || "Could not create task");
       }
@@ -373,6 +379,93 @@ function AiSalesIntelligencePageInner() {
       toast.error("Could not create task");
     }
     setCreatingReminderId(null);
+  };
+
+  /** Create a follow-up task from an AI text suggestion (user-confirmed). */
+  const createFollowUpFromSuggestion = async (suggestion: string) => {
+    if (!token || !selectedContactId) {
+      toast.error("Select a lead/contact first");
+      return;
+    }
+    const lead = leads.find((l) => l.id === selectedContactId);
+    const due = new Date();
+    due.setDate(due.getDate() + 1);
+    const title =
+      suggestion.length > 80
+        ? `Follow up: ${lead?.name || "contact"}`
+        : suggestion;
+    const res = await api.createCrmTask(
+      {
+        contactId: selectedContactId,
+        title,
+        description: [
+          suggestion,
+          lead?.name ? `Lead: ${lead.name}` : null,
+          lead?.phone ? `Phone: ${lead.phone}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        dueDate: due.toISOString(),
+        status: "todo",
+        priority: "medium",
+      },
+      token
+    );
+    if (res.success) {
+      toast.success("Follow-up task created");
+      try {
+        const { emitDataChanged } = await import("@/lib/data-events");
+        emitDataChanged({ module: "task", action: "create" });
+      } catch {
+        /* ignore */
+      }
+    } else {
+      toast.error(res.error || "Could not create follow-up task");
+    }
+  };
+
+  /** Create a task from Next Best Action recommendation. */
+  const createTaskFromNextAction = async () => {
+    if (!token) return;
+    const n = nextActionResult as Record<string, unknown> | null;
+    if (!n) return;
+    if (!selectedContactId && !selectedDealId) {
+      toast.error("Select a contact or deal first");
+      return;
+    }
+    const action = String(n.action || "Next best action");
+    const reason = String(n.reason || "");
+    const priorityRaw = String(n.priority || "medium").toLowerCase();
+    const priority = ["low", "medium", "high"].includes(priorityRaw)
+      ? priorityRaw
+      : "medium";
+    const due = new Date();
+    due.setDate(due.getDate() + 1);
+    const res = await api.createCrmTask(
+      {
+        contactId: selectedContactId || null,
+        dealId: selectedDealId || null,
+        title: action.length > 120 ? action.slice(0, 117) + "…" : action,
+        description: [reason, n.timing ? `Timing: ${String(n.timing)}` : null]
+          .filter(Boolean)
+          .join("\n"),
+        dueDate: due.toISOString(),
+        status: "todo",
+        priority,
+      },
+      token
+    );
+    if (res.success) {
+      toast.success("Task created from recommendation");
+      try {
+        const { emitDataChanged } = await import("@/lib/data-events");
+        emitDataChanged({ module: "task", action: "create" });
+      } catch {
+        /* ignore */
+      }
+    } else {
+      toast.error(res.error || "Could not create task");
+    }
   };
 
   const addReminderToCalendar = (rem: AiReminderItem) => {
@@ -618,10 +711,45 @@ function AiSalesIntelligencePageInner() {
             <div className="mt-3 p-4 bg-background border border-border rounded-xl">
               <div className="text-3xl font-bold tabular-nums text-emerald-400">{(leadScoreResult as {score?: number}).score}</div>
               <p className="text-sm text-muted-foreground mt-1">{(leadScoreResult as {explanation?: string}).explanation}</p>
-              <button onClick={() => {
-                const ls = leadScoreResult as {score?: number, explanation?: string};
-                copyToClipboard(`${ls.score}: ${ls.explanation}`);
-              }} className="text-xs mt-2 underline">Copy</button>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ls = leadScoreResult as {score?: number, explanation?: string};
+                    copyToClipboard(`${ls.score}: ${ls.explanation}`);
+                  }}
+                  className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg border border-white/10"
+                >
+                  Copy
+                </button>
+                {selectedContactId ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ls = leadScoreResult as { score?: number; explanation?: string };
+                      void createFollowUpFromSuggestion(
+                        `Follow up on scored lead (${ls.score ?? "—"}/100): ${ls.explanation || "AI lead score follow-up"}`
+                      );
+                    }}
+                    className="text-xs px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 rounded-lg border border-emerald-500/30"
+                  >
+                    Create Follow-up Task
+                  </button>
+                ) : null}
+                {selectedContactPhone ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      document
+                        .getElementById("ai-whatsapp-generator")
+                        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    className="text-xs px-3 py-1.5 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 rounded-lg border border-sky-500/30"
+                  >
+                    Draft WhatsApp
+                  </button>
+                ) : null}
+              </div>
             </div>
           )}
         </div>
@@ -645,12 +773,33 @@ function AiSalesIntelligencePageInner() {
               </select>
               <button onClick={() => runAi("follow-up", { contactId: selectedContactId }, setFollowUpResult, "Suggestions")} disabled={!selectedContactId || isGenerating} className="px-5 bg-white/10 rounded-xl text-sm">Generate</button>
             </div>
-            {followUpResult && (followUpResult as Record<string, unknown>).suggestions ? <ul className="text-sm space-y-1 text-muted-foreground">{((followUpResult as Record<string, unknown>).suggestions as string[]).map((s: string, i: number) => <li key={i}>• {s}</li>)}</ul> : null}
+            {followUpResult && (followUpResult as Record<string, unknown>).suggestions ? (
+              <ul className="text-sm space-y-2 text-muted-foreground">
+                {((followUpResult as Record<string, unknown>).suggestions as string[]).map(
+                  (s: string, i: number) => (
+                    <li
+                      key={i}
+                      className="flex flex-col sm:flex-row sm:items-start gap-2 rounded-xl border border-border/60 bg-background/50 px-3 py-2"
+                    >
+                      <span className="flex-1 text-foreground">• {s}</span>
+                      <button
+                        type="button"
+                        onClick={() => void createFollowUpFromSuggestion(s)}
+                        disabled={!selectedContactId}
+                        className="shrink-0 text-xs px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 rounded-lg border border-emerald-500/30 disabled:opacity-50"
+                      >
+                        Create Task
+                      </button>
+                    </li>
+                  )
+                )}
+              </ul>
+            ) : null}
           </div>
         </div>
 
         {/* Production Quality AI WhatsApp Generator (Feature 2) */}
-        <div className="bg-card border border-border rounded-2xl p-6">
+        <div id="ai-whatsapp-generator" className="bg-card border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">AI WhatsApp Generator</h3>
               {selectedContactPhone && (
@@ -1134,6 +1283,37 @@ function AiSalesIntelligencePageInner() {
                   <div>
                     <div className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Timing</div>
                     <div className="text-sm text-emerald-400">{String(n.timing || '—')}</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                    <button
+                      type="button"
+                      onClick={() => void createTaskFromNextAction()}
+                      disabled={!selectedContactId && !selectedDealId}
+                      className="text-xs px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 rounded-lg border border-emerald-500/30 disabled:opacity-50"
+                    >
+                      Create Task
+                    </button>
+                    {selectedContactId ? (
+                      <a
+                        href="/dashboard/leads"
+                        className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg border border-white/10"
+                      >
+                        Open Leads
+                      </a>
+                    ) : null}
+                    {selectedContactPhone ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          document
+                            .getElementById("ai-whatsapp-generator")
+                            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }}
+                        className="text-xs px-3 py-1.5 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 rounded-lg border border-sky-500/30"
+                      >
+                        Draft WhatsApp
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               );
