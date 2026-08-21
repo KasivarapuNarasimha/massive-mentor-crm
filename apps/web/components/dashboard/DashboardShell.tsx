@@ -22,6 +22,8 @@ import {
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { canAccessPath, filterNavByModules } from "@/lib/module-permissions";
+import { NAV_HIERARCHY, findActiveSubModuleId, type NavMainKey } from "@/lib/nav-hierarchy";
+import { FeatureSearch } from "@/components/dashboard/FeatureSearch";
 
 /** Layout chrome heights — keep FieldStatusBar at h-12 (3rem) */
 const NAV_H = "3.5rem"; // h-14
@@ -376,6 +378,7 @@ const SETTINGS_HREFS = new Set([
   "/dashboard/team",
   "/dashboard/security",
   "/dashboard/backups",
+  "/dashboard/integrations",
   "/dashboard/settings/appearance",
   APPEARANCE_HREF,
 ]);
@@ -528,8 +531,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [configModules, setConfigModules] = useState<ModuleDef[] | null>(null);
   /** Total media files for sidebar badge */
   const [mediaFileCount, setMediaFileCount] = useState<number | null>(null);
+  /** Manual sub-module expand overrides; cleared on route change (active-only default) */
+  const [manualExpandedSubs, setManualExpandedSubs] = useState<Record<string, boolean>>({});
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  // Reset manual expands when navigating so only the active sub-module stays open
+  useEffect(() => {
+    setManualExpandedSubs({});
+  }, [pathname]);
 
   const isActive = (href: string) => {
     if (href === "/dashboard" || href === "/dashboard/erp") return pathname === href;
@@ -980,23 +990,135 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const renderNavSection = (title: string, items: NavItem[]) => {
-    if (!items.length) return null;
+  /** Permissioned href → NavItem (icons, portal labels, badges) */
+  const allowedNavByHref = (() => {
+    const map = new Map<string, NavItem>();
+    for (const item of [...allSidebarItems, ...settingsSectionNav]) {
+      if (!map.has(item.href)) map.set(item.href, item);
+    }
+    return map;
+  })();
+
+  const activeSubModuleId = findActiveSubModuleId(pathname || "");
+
+  const isSubExpanded = (subId: string) => {
+    if (Object.prototype.hasOwnProperty.call(manualExpandedSubs, subId)) {
+      return !!manualExpandedSubs[subId];
+    }
+    return subId === activeSubModuleId;
+  };
+
+  const toggleSubModule = (subId: string) => {
+    setManualExpandedSubs((prev) => {
+      const currently = Object.prototype.hasOwnProperty.call(prev, subId)
+        ? !!prev[subId]
+        : subId === activeSubModuleId;
+      return { ...prev, [subId]: !currently };
+    });
+  };
+
+  /** RBAC/portal path gate for Feature Search (plan locks still apply via FeatureGate on navigate). */
+  const featureSearchCanAccess = useCallback(
+    (href: string) => canAccessPath(href, moduleKeys, { loaded: true }),
+    [moduleKeys]
+  );
+
+  /** Hierarchical CRM → Sub → Feature (and ERP / Settings). Only existing permissioned routes. */
+  const renderHierarchicalNav = (mainKey: NavMainKey) => {
+    const main = NAV_HIERARCHY.find((m) => m.id === mainKey);
+    if (!main) return null;
+
+    const visibleSubs = main.subModules
+      .map((sub) => {
+        const features = sub.features
+          .map((f) => {
+            const base = f.href.split("?")[0];
+            const allowed = allowedNavByHref.get(base);
+            if (!allowed) return null;
+            return {
+              ...allowed,
+              // Prefer live portal/config label; keep hierarchy href
+              href: allowed.href,
+              label: allowed.label || f.label,
+              key: allowed.key || f.id,
+            } as NavItem;
+          })
+          .filter(Boolean) as NavItem[];
+        if (!features.length) return null;
+        return { sub, features };
+      })
+      .filter(Boolean) as Array<{
+      sub: (typeof main.subModules)[number];
+      features: NavItem[];
+    }>;
+
+    if (!visibleSubs.length) return null;
+
     return (
       <div className="mb-4">
         {!sidebarCollapsed && (
           <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2 px-1">
-            {title}
+            {main.label}
           </div>
         )}
         {sidebarCollapsed && (
           <div
             className="hidden lg:block mx-auto mb-2 h-px w-6 bg-border/80"
             aria-hidden
-            title={title}
+            title={main.label}
           />
         )}
-        <div className="space-y-0.5">{items.map(renderNavLink)}</div>
+        <div className="space-y-1">
+          {visibleSubs.map(({ sub, features }) => {
+            const expanded = isSubExpanded(sub.id);
+            // Collapsed rail: show feature icons flat (no accordion chrome)
+            if (sidebarCollapsed) {
+              return (
+                <div key={sub.id} className="space-y-0.5">
+                  {features.map(renderNavLink)}
+                </div>
+              );
+            }
+            return (
+              <div key={sub.id} className="rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => toggleSubModule(sub.id)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-semibold tracking-wide transition-colors focus-ring ${
+                    expanded || features.some((f) => isActive(f.href))
+                      ? "text-foreground bg-muted/40"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                  }`}
+                  aria-expanded={expanded}
+                >
+                  <svg
+                    className={`w-3 h-3 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                  <span className="flex-1 text-left truncate">{sub.label}</span>
+                  <span className="text-[10px] tabular-nums text-muted-foreground/80">
+                    {features.length}
+                  </span>
+                </button>
+                {expanded && (
+                  <div className="mt-0.5 ml-1 pl-2 border-l border-border/60 space-y-0.5">
+                    {features.map(renderNavLink)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -1498,10 +1620,27 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
               )}
+              {!sidebarCollapsed && (
+                <FeatureSearch
+                  className="mb-3"
+                  canAccess={featureSearchCanAccess}
+                  modules={moduleKeys}
+                  onNavigate={() => setSidebarOpen(false)}
+                />
+              )}
+              {sidebarCollapsed && (
+                <FeatureSearch
+                  className="mb-3 flex justify-center"
+                  compact
+                  canAccess={featureSearchCanAccess}
+                  modules={moduleKeys}
+                  onNavigate={() => setSidebarOpen(false)}
+                />
+              )}
               <nav className="space-y-1" aria-label="Main navigation">
-                {renderNavSection("CRM", crmSectionNav)}
-                {renderNavSection("ERP", erpSectionNav)}
-                {renderNavSection("Settings", settingsSectionNav)}
+                {renderHierarchicalNav("crm")}
+                {renderHierarchicalNav("erp")}
+                {renderHierarchicalNav("settings")}
               </nav>
 
               {portal?.actions && portal.actions.length > 0 && !sidebarCollapsed && (
@@ -1534,7 +1673,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 </>
               )}
 
-              {/* CRM | ERP | Settings rendered above via renderNavSection */}
+              {/* CRM | ERP | Settings rendered above via renderHierarchicalNav */}
             </div>
 
             <div
