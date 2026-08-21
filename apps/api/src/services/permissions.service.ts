@@ -397,7 +397,7 @@ export function moduleKeyForApiPath(apiPath: string): string | null {
     return "__crm_contacts__"; // special: need leads OR clients
   }
   // Generic AI helper — allow if user has any AI module
-  if (p.startsWith("/api/ai")) {
+  if (p.startsWith("/api/ai") || p.startsWith("/api/ai-command")) {
     return "__ai_any__";
   }
   return best?.key || null;

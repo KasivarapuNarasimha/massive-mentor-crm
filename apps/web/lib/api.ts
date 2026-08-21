@@ -1669,6 +1669,51 @@ class ApiClient {
     return this.request<unknown>(`/crm/notes/${id}`, { method: "DELETE", token: token ?? undefined });
   }
 
+  /** Massive Mentor AI Command Center — natural language CRM/ERP actions */
+  async runAiCommand(
+    body: {
+      message: string;
+      sessionId?: string;
+      choices?: Record<string, string>;
+      locale?: string;
+    },
+    token?: string | null
+  ) {
+    return this.request<{
+      status: string;
+      summary: string;
+      steps: unknown[];
+      cards: unknown[];
+      confirmToken?: string;
+      choices?: unknown[];
+      missingFields?: string[];
+      sessionId: string;
+    }>("/ai-command/run", {
+      method: "POST",
+      body: JSON.stringify(body),
+      token: token ?? undefined,
+      timeoutMs: 90_000,
+    });
+  }
+
+  async confirmAiCommand(
+    body: { confirmToken: string; sessionId?: string },
+    token?: string | null
+  ) {
+    return this.request<{
+      status: string;
+      summary: string;
+      steps: unknown[];
+      cards: unknown[];
+      sessionId: string;
+    }>("/ai-command/confirm", {
+      method: "POST",
+      body: JSON.stringify(body),
+      token: token ?? undefined,
+      timeoutMs: 60_000,
+    });
+  }
+
   async getCrmDocuments(query: string = "", token?: string | null) {
     const endpoint = query ? `/crm/documents${query.startsWith("?") ? query : "?" + query}` : "/crm/documents";
     return this.request<unknown>(endpoint, { method: "GET", token: token ?? undefined });

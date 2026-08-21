@@ -16,6 +16,7 @@ export type AiFeature =
   | "meeting_summary"
   | "reminders"
   | "next_action"
+  | "ai_command"
   | "other";
 
 const DEFAULT_DAILY_REQUESTS = Number(process.env.AI_DAILY_REQUEST_LIMIT || 200);

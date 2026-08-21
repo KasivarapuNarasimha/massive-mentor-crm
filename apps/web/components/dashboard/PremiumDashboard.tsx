@@ -11,6 +11,7 @@ import { usePortal } from "@/lib/portal-context";
 import { usePlan } from "@/lib/plan-context";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PremiumKpi, PremiumKpiSkeleton } from "@/components/ui/PremiumKpi";
+import { AiCommandCenter } from "@/components/ai/AiCommandCenter";
 
 const AnalyticsDashboard = lazy(() =>
   import("@/components/dashboard/AnalyticsDashboard").then((m) => ({
@@ -698,6 +699,9 @@ export function PremiumDashboard() {
           </div>
         </div>
       </section>
+
+      {/* Massive Mentor AI Command Center — NL CRM + ERP actions */}
+      <AiCommandCenter />
 
       {/* Quick Actions */}
       <section aria-labelledby="quick-actions-heading">
