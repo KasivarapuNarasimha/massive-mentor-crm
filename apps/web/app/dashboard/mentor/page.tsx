@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { toast } from "sonner";
+import { MarkdownContent } from "@/components/ai/MarkdownContent";
 
 interface Message {
   id: string;
@@ -196,7 +197,11 @@ export default function AIMentorPage() {
                   : "bg-card border border-border text-foreground rounded-bl-none"
               }`}
             >
-              <div className="whitespace-pre-wrap">{message.content}</div>
+              {message.role === "assistant" ? (
+                <MarkdownContent content={message.content} />
+              ) : (
+                <div className="whitespace-pre-wrap">{message.content}</div>
+              )}
               <div
                 className={`text-[10px] mt-1.5 opacity-60 ${
                   message.role === "user" ? "text-foreground" : "text-muted-foreground"
