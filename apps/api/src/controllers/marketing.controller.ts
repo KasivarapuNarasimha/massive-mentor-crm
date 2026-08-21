@@ -48,7 +48,7 @@ export async function generateMarketing(req: AuthenticatedRequest, res: Response
 
     const { status, message } = sanitizeAiUserError(
       error,
-      "AI Marketing is temporarily unavailable. Please try again."
+      "Massive Mentor AI is temporarily unavailable. Please try again."
     );
     res.status(status).json({
       success: false,

@@ -1,5 +1,6 @@
 import { getAIService } from "../ai.service.js";
 import { sanitizePromptInput } from "../../utils/sanitize.js";
+import { sanitizeAiUserError } from "../../utils/ai-error.js";
 import { listActionCatalog } from "./registry.js";
 import { extractHints } from "./i18n-normalize.js";
 import { listAssignableMembers } from "../lead-assignment.service.js";
@@ -101,11 +102,16 @@ Respond with JSON action plan.`;
     }));
     return plan;
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "AI planning failed";
+    // Log raw provider details server-side; never surface Groq/OpenAI/model text to users.
+    console.error("[ai-command] planner:", e);
+    const { message } = sanitizeAiUserError(
+      e,
+      "Massive Mentor AI is temporarily unavailable. Please try again."
+    );
     return {
       intent: "error",
       steps: [],
-      ask: { type: "missing_fields", message: msg, missingFields: [] },
+      ask: { type: "missing_fields", message, missingFields: [] },
     };
   }
 }

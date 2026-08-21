@@ -6,21 +6,41 @@
 const TECHNICAL =
   /internal server error|econnrefused|prisma|sql|stack|undefined is not|cannot read|jwt|token expired|unauthorized|forbidden|status code 5\d\d|500|502|503|504|networkerror|failed to fetch/i;
 
+function scrubAiProviderNames(raw: string): string {
+  return raw
+    .replace(/\bgroq\b/gi, "Massive Mentor AI")
+    .replace(/\bopenai\b/gi, "Massive Mentor AI")
+    .replace(/\bgpt-oss[-\w]*/gi, "AI")
+    .replace(/\btpd\b/gi, "daily limit")
+    .replace(/rate_limit_exceeded/gi, "usage limit reached")
+    .replace(/GROQ_API_KEY|GROQ_MODEL|AI_PROVIDER/gi, "AI configuration");
+}
+
 /** Prefer a calm, actionable message for end users. */
 export function friendlyError(
   error: string | null | undefined,
   fallback = "Something went wrong. Please try again or contact your administrator."
 ): string {
-  const raw = (error || "").trim();
+  const raw = scrubAiProviderNames((error || "").trim());
   if (!raw) return fallback;
+
+  if (/massive mentor ai usage limit reached/i.test(raw)) {
+    return raw;
+  }
+  if (/rate limit|429|daily ai|usage limit reached/i.test(raw)) {
+    return [
+      "Massive Mentor AI usage limit reached",
+      "Please try again after the daily limit resets.",
+    ].join("\n");
+  }
 
   // Already friendly short product messages
   if (
-    /required|invalid|not found|permission|access|denied|offline|timed out|duplicate|select at least|try again/i.test(
+    /required|invalid|not found|permission|access|denied|offline|timed out|duplicate|select at least|try again|massive mentor ai/i.test(
       raw
     ) &&
     !TECHNICAL.test(raw) &&
-    raw.length < 160
+    raw.length < 280
   ) {
     return raw;
   }
@@ -40,7 +60,7 @@ export function friendlyError(
   if (/offline|failed to fetch|network|cannot reach/i.test(raw)) {
     return "We couldn't reach the server. Check your connection and try again.";
   }
-  if (TECHNICAL.test(raw) || raw.length > 180) {
+  if (TECHNICAL.test(raw) || raw.length > 280) {
     return fallback;
   }
   return raw;

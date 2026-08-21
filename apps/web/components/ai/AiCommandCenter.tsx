@@ -54,20 +54,34 @@ export function AiCommandCenter() {
           token
         );
         if (!res.success || !res.data) {
-          toast.error(friendlyError(res.error, "Command failed. Please try again."));
+          const errMsg = friendlyError(
+            typeof res.error === "string" ? res.error : undefined,
+            "Massive Mentor AI could not complete that command. Please try again."
+          );
+          toast.error(errMsg);
+          setResult({
+            status: "failed",
+            summary: errMsg,
+            sessionId: sessionId || "",
+          });
           setBusy(false);
           return;
         }
         const data = res.data as CommandData;
-        setResult(data);
+        const summary = friendlyError(data.summary, data.summary);
+        const normalized = { ...data, summary };
+        setResult(normalized);
         if (data.sessionId) setSessionId(data.sessionId);
-        if (data.status === "completed") toast.success(data.summary);
-        else if (data.status === "partial") toast.message(data.summary);
-        else if (data.status === "failed" || data.status === "unsupported") {
-          toast.error(data.summary);
+        if (data.status === "completed") toast.success(summary);
+        else if (data.status === "partial") toast.message(summary);
+        else if (data.status === "failed" || data.status === "unsupported" || data.status === "needs_input") {
+          if (/usage limit reached/i.test(summary)) toast.error(summary);
+          else if (data.status === "failed" || data.status === "unsupported") toast.error(summary);
         }
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Command failed");
+        toast.error(
+          friendlyError(e instanceof Error ? e.message : undefined, "Massive Mentor AI could not complete that command.")
+        );
       }
       setBusy(false);
     },
@@ -173,7 +187,7 @@ export function AiCommandCenter() {
                     : "border-border bg-background/60"
             }`}
           >
-            <div className="font-medium">{result.summary}</div>
+            <div className="font-medium whitespace-pre-line">{result.summary}</div>
             {result.missingFields?.length ? (
               <p className="text-xs text-muted-foreground mt-1">
                 Still needed: {result.missingFields.join(", ")}

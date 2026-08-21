@@ -1,4 +1,9 @@
 import { AIError, AIRateLimitError } from "../services/ai/errors.js";
+import {
+  formatAiTemporarilyUnavailableMessage,
+  MASSIVE_MENTOR_AI,
+  scrubAiProviderBranding,
+} from "../services/ai-branding.js";
 
 function asError(error: unknown, fallbackMessage: string): Error {
   if (error instanceof Error) return error;
@@ -25,12 +30,23 @@ function extractProviderMessage(error: unknown): string {
 
 /**
  * Map provider/AI failures to clean user-facing copy.
- * Never return raw Groq/OpenAI JSON blobs to the client.
+ * Never return Groq/OpenAI/model names, TPD, or raw provider JSON to the client.
+ * Provider details stay in server logs only.
  */
 export function sanitizeAiUserError(
   error: unknown,
-  fallback = "AI service is temporarily unavailable. Please try again."
+  fallback = `${MASSIVE_MENTOR_AI} is temporarily unavailable. Please try again.`
 ): { status: number; message: string } {
+  if (error instanceof AIRateLimitError) {
+    return {
+      status: 429,
+      message: [
+        `${MASSIVE_MENTOR_AI} usage limit reached`,
+        `Please try again after the daily limit resets.`,
+      ].join("\n"),
+    };
+  }
+
   const raw = extractProviderMessage(error);
   const lower = raw.toLowerCase();
 
@@ -41,15 +57,26 @@ export function sanitizeAiUserError(
   ) {
     return {
       status: 503,
-      message:
-        "AI provider not configured — set a valid GROQ_API_KEY (or OpenAI key) and restart the API",
+      message: `${MASSIVE_MENTOR_AI} is not available right now. Please contact your administrator.`,
     };
   }
-  if (/rate limit|429/i.test(raw)) {
-    return { status: 429, message: "AI rate limit reached — wait a moment and try again" };
+  if (
+    /rate limit|429|tpd|tokens per day|rate_limit_exceeded|usage limit reached/i.test(raw) ||
+    lower.includes("rate_limit")
+  ) {
+    return {
+      status: 429,
+      message: [
+        `${MASSIVE_MENTOR_AI} usage limit reached`,
+        `Please try again after the daily limit resets.`,
+      ].join("\n"),
+    };
   }
   if (/timed out|timeout|etimedout|econnreset/i.test(raw)) {
-    return { status: 504, message: "AI request timed out — try again" };
+    return {
+      status: 504,
+      message: `${MASSIVE_MENTOR_AI} request timed out. Please try again.`,
+    };
   }
   if (
     /model_not_found|does not exist or you do not have access|invalid model/i.test(raw) ||
@@ -57,18 +84,20 @@ export function sanitizeAiUserError(
   ) {
     return {
       status: 503,
-      message:
-        "AI model is unavailable. Update GROQ_MODEL to a supported Groq model and restart the API.",
+      message: formatAiTemporarilyUnavailableMessage(),
     };
   }
   if (/parse json|invalid ai|json_object|json_validate|invalid_request|empty response/i.test(raw)) {
-    return { status: 502, message: "Invalid AI response format — please retry" };
+    return {
+      status: 502,
+      message: `${MASSIVE_MENTOR_AI} returned an unexpected response. Please retry.`,
+    };
   }
   // Strip leaked provider JSON / status prefixes if present
   if (/^\s*\d{3}\s*[\{\[]/.test(raw) || /"error"\s*:\s*\{/.test(raw)) {
-    return { status: 503, message: fallback };
+    return { status: 503, message: scrubAiProviderBranding(fallback) };
   }
-  return { status: 500, message: fallback };
+  return { status: 500, message: scrubAiProviderBranding(fallback) };
 }
 
 /** Normalize unknown provider errors into AIError hierarchy without using `any`. */
@@ -89,6 +118,7 @@ export function rethrowProviderError(
       : undefined;
   const original = asError(error, fallbackMessage);
   if (status === 429) {
+    // Internal error type keeps provider for logs; never send this message to clients.
     throw new AIRateLimitError(provider, original);
   }
   const msg = original.message || fallbackMessage;

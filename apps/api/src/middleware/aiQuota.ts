@@ -16,10 +16,17 @@ export function requireAiQuota(feature: AiFeature | string = "other") {
         if (!check.allowed) {
           return res.status(429).json({
             success: false,
-            error: check.reason || "AI quota exceeded",
+            error: check.reason || "Massive Mentor AI usage limit reached",
             code: "AI_QUOTA_EXCEEDED",
-            usage: check.usage,
-            limits: check.limits,
+            planLabel: check.planLabel,
+            dailyLimit: check.dailyLimit,
+            usage: {
+              dayRequests: check.usage.dayRequests,
+            },
+            limits: {
+              dailyRequests: check.limits.dailyRequests,
+              planLabel: check.limits.planLabel,
+            },
           });
         }
         // Attach for handlers to record usage
@@ -43,7 +50,7 @@ export function requireAiQuota(feature: AiFeature | string = "other") {
         // Fail closed for AI (cost control)
         return res.status(503).json({
           success: false,
-          error: "Unable to verify AI quota",
+          error: "Massive Mentor AI is temporarily unavailable. Please try again.",
           code: "AI_QUOTA_CHECK_FAILED",
         });
       }

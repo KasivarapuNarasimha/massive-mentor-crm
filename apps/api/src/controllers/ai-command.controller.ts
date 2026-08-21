@@ -25,7 +25,7 @@ export async function runAiCommandHandler(req: AuthenticatedRequest, res: Respon
   } catch (error: unknown) {
     console.error("[ai-command] run:", error);
     const friendly = sanitizeAiUserError(error);
-    return res.status(500).json({ success: false, error: friendly });
+    return res.status(friendly.status).json({ success: false, error: friendly.message });
   }
 }
 
@@ -47,6 +47,6 @@ export async function confirmAiCommandHandler(req: AuthenticatedRequest, res: Re
   } catch (error: unknown) {
     console.error("[ai-command] confirm:", error);
     const friendly = sanitizeAiUserError(error);
-    return res.status(500).json({ success: false, error: friendly });
+    return res.status(friendly.status).json({ success: false, error: friendly.message });
   }
 }

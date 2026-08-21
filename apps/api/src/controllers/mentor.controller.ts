@@ -31,7 +31,7 @@ export async function chatWithMentor(req: AuthenticatedRequest, res: Response) {
     console.error("Mentor chat error:", error);
     const { status, message } = sanitizeAiUserError(
       error,
-      "AI Mentor is temporarily unavailable. Please try again."
+      "Massive Mentor AI is temporarily unavailable. Please try again."
     );
     res.status(status).json({
       success: false,
