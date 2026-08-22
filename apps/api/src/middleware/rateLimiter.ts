@@ -31,6 +31,21 @@ export const loginLimiter = rateLimit({
   validate: false,
 });
 
+/** Demo portal enter/login — public demo button; looser than customer login brute-force cap. */
+export const demoAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isDev ? 500 : 60,
+  message: {
+    success: false,
+    error: "Too many demo login attempts from this IP. Please try again in a few minutes.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  store: store("demo-auth"),
+  validate: false,
+});
+
 // Even stricter for registration (prevent account spam)
 export const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -96,6 +111,8 @@ function isAuthEntrypointPath(req: Request): boolean {
     "/auth/forgot-password",
     "/auth/reset-password",
     "/auth/reset-password/validate",
+    "/demo/auth/login",
+    "/demo/auth/enter",
   ]);
   return candidates.some((c) => authPaths.has(c));
 }
