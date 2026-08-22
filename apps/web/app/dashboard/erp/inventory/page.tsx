@@ -8,8 +8,20 @@ import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { PageShell, PageHeader } from "@/components/ui/PageShell";
 import { ERP_BTN, ERP_INPUT, listFrom, num } from "@/lib/erp";
 
-type Product = { id: string; sku: string; name: string; unit?: string | null };
+type Product = {
+  id: string;
+  sku: string;
+  name: string;
+  unit?: string | null;
+  type?: string | null;
+  trackInventory?: boolean | null;
+};
 type Warehouse = { id: string; code: string; name: string };
+
+/** Matches applyStockMovement: services and non-tracking products cannot be posted. */
+function isInventoryTrackingProduct(p: Product): boolean {
+  return p.trackInventory === true && p.type !== "service";
+}
 
 type Balance = {
   id?: string;
@@ -47,6 +59,8 @@ export default function ErpInventoryPage() {
     notes: "",
   });
 
+  const stockableProducts = products.filter(isInventoryTrackingProduct);
+
   const load = useCallback(async () => {
     if (!token) return;
     setLoading(true);
@@ -67,7 +81,17 @@ export default function ErpInventoryPage() {
     } else {
       setMovements([]);
     }
-    if (pRes.success) setProducts(listFrom<Product>(pRes.data, "products", "items"));
+    if (pRes.success) {
+      const next = listFrom<Product>(pRes.data, "products", "items");
+      setProducts(next);
+      setForm((prev) => {
+        if (!prev.productId) return prev;
+        const stillValid = next.some(
+          (p) => p.id === prev.productId && isInventoryTrackingProduct(p)
+        );
+        return stillValid ? prev : { ...prev, productId: "" };
+      });
+    }
     if (wRes.success) setWarehouses(listFrom<Warehouse>(wRes.data, "warehouses", "items"));
     setLoading(false);
   }, [token]);
@@ -123,8 +147,10 @@ export default function ErpInventoryPage() {
           value={form.productId}
           onChange={(e) => setForm({ ...form, productId: e.target.value })}
         >
-          <option value="">Product</option>
-          {products.map((p) => (
+          <option value="">
+            {stockableProducts.length === 0 ? "No inventory-tracking products" : "Product"}
+          </option>
+          {stockableProducts.map((p) => (
             <option key={p.id} value={p.id}>
               {p.sku} · {p.name}
             </option>
