@@ -53,9 +53,15 @@ type PurchaseReturn = {
   createdAt?: string;
 };
 
-type Line = { productId: string; qty: string; unitCost: string };
+type Line = { key: string; productId: string; qty: string; unitCost: string };
 
-const emptyLine = (): Line => ({ productId: "", qty: "", unitCost: "" });
+let lineKeySeq = 0;
+const emptyLine = (): Line => ({
+  key: `line-${Date.now()}-${++lineKeySeq}`,
+  productId: "",
+  qty: "",
+  unitCost: "",
+});
 
 export default function ErpPurchasesPage() {
   const { token } = useAuth();
@@ -244,18 +250,28 @@ export default function ErpPurchasesPage() {
     } else toast.error(res.error || "Failed to post return");
   };
 
+  const updateLine = (
+    lines: Line[],
+    setLines: (next: Line[]) => void,
+    key: string,
+    patch: Partial<Omit<Line, "key">>
+  ) => {
+    setLines(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  };
+
+  const removeLine = (lines: Line[], setLines: (next: Line[]) => void, key: string) => {
+    if (lines.length <= 1) return;
+    setLines(lines.filter((l) => l.key !== key));
+  };
+
   const lineEditor = (lines: Line[], setLines: (next: Line[]) => void) => (
     <div className="sm:col-span-2 space-y-2">
-      {lines.map((line, idx) => (
-        <div key={idx} className="grid grid-cols-1 sm:grid-cols-7 gap-2">
+      {lines.map((line) => (
+        <div key={line.key} className="grid grid-cols-1 sm:grid-cols-8 gap-2 items-center">
           <select
             className={`${ERP_INPUT} sm:col-span-3`}
             value={line.productId}
-            onChange={(e) => {
-              const next = [...lines];
-              next[idx] = { ...next[idx], productId: e.target.value };
-              setLines(next);
-            }}
+            onChange={(e) => updateLine(lines, setLines, line.key, { productId: e.target.value })}
           >
             <option value="">Product</option>
             {products.map((p) => (
@@ -271,11 +287,7 @@ export default function ErpPurchasesPage() {
             step="0.0001"
             placeholder="Qty"
             value={line.qty}
-            onChange={(e) => {
-              const next = [...lines];
-              next[idx] = { ...next[idx], qty: e.target.value };
-              setLines(next);
-            }}
+            onChange={(e) => updateLine(lines, setLines, line.key, { qty: e.target.value })}
           />
           <input
             className={`${ERP_INPUT} sm:col-span-2`}
@@ -284,12 +296,22 @@ export default function ErpPurchasesPage() {
             step="0.01"
             placeholder="Unit cost"
             value={line.unitCost}
-            onChange={(e) => {
-              const next = [...lines];
-              next[idx] = { ...next[idx], unitCost: e.target.value };
-              setLines(next);
-            }}
+            onChange={(e) => updateLine(lines, setLines, line.key, { unitCost: e.target.value })}
           />
+          <button
+            type="button"
+            className={`${ERP_BTN_GHOST} sm:col-span-1 text-red-300 border-red-500/30 disabled:opacity-40`}
+            disabled={lines.length <= 1}
+            title={
+              lines.length <= 1
+                ? "At least one line is required"
+                : "Remove this line from the unsaved form"
+            }
+            aria-label="Remove line"
+            onClick={() => removeLine(lines, setLines, line.key)}
+          >
+            Remove
+          </button>
         </div>
       ))}
       <button

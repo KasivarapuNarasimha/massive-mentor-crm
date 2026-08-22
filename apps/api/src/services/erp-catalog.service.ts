@@ -79,7 +79,10 @@ export async function listProducts(userId: string, opts?: { search?: string }) {
   const products = await prisma.product.findMany({
     where: where as never,
     orderBy: { name: "asc" },
-    include: { category: { select: { id: true, name: true } } },
+    include: {
+      category: { select: { id: true, name: true } },
+      _count: { select: { movements: true } },
+    },
     take: 500,
   });
   return { products };
@@ -163,6 +166,22 @@ export async function updateProduct(
   });
   if (!existing) throw new Error("Product not found");
 
+  if (input.sku !== undefined) {
+    const sku = String(input.sku).trim();
+    if (!sku) throw new Error("SKU is required");
+  }
+  if (input.name !== undefined) {
+    const name = String(input.name).trim();
+    if (!name) throw new Error("Product name is required");
+  }
+
+  if (input.categoryId) {
+    const cat = await prisma.productCategory.findFirst({
+      where: { id: String(input.categoryId), businessId },
+    });
+    if (!cat) throw new Error("Category not found");
+  }
+
   const type =
     input.type !== undefined
       ? input.type === "service"
@@ -176,37 +195,85 @@ export async function updateProduct(
         ? !!input.trackInventory
         : existing.trackInventory;
 
-  const product = await prisma.product.update({
-    where: { id },
-    data: {
-      ...(input.sku !== undefined ? { sku: String(input.sku).trim() } : {}),
-      ...(input.name !== undefined ? { name: String(input.name).trim() } : {}),
-      ...(input.unit !== undefined ? { unit: String(input.unit).trim() || "pcs" } : {}),
-      type,
-      trackInventory,
-      ...(input.sellingPrice !== undefined
-        ? { sellingPrice: input.sellingPrice == null ? null : toDecimal(input.sellingPrice as number) }
-        : {}),
-      ...(input.costPrice !== undefined
-        ? { costPrice: input.costPrice == null ? null : toDecimal(input.costPrice as number) }
-        : {}),
-      ...(input.categoryId !== undefined
-        ? { categoryId: (input.categoryId as string) || null }
-        : {}),
-      ...(input.isActive !== undefined ? { isActive: !!input.isActive } : {}),
-      ...(input.description !== undefined
-        ? { description: (input.description as string) || null }
-        : {}),
-      ...(input.reorderLevel !== undefined
-        ? {
-            reorderLevel:
-              input.reorderLevel == null ? null : toDecimal(input.reorderLevel as number, 4),
-          }
-        : {}),
-    },
-    include: { category: { select: { id: true, name: true } } },
-  });
-  return { product };
+  const typeChanging = type !== existing.type;
+  const trackChanging = trackInventory !== existing.trackInventory;
+  if (typeChanging || trackChanging) {
+    const movementCount = await prisma.stockMovement.count({
+      where: { productId: id, businessId },
+    });
+    if (movementCount > 0) {
+      if (typeChanging) {
+        throw new Error(
+          "Invalid product update: type cannot be changed after stock movements have been recorded"
+        );
+      }
+      throw new Error(
+        "Invalid product update: Track Inventory cannot be changed after stock movements have been recorded"
+      );
+    }
+  }
+
+  try {
+    const product = await prisma.product.update({
+      where: { id },
+      data: {
+        ...(input.sku !== undefined ? { sku: String(input.sku).trim() } : {}),
+        ...(input.name !== undefined ? { name: String(input.name).trim() } : {}),
+        ...(input.unit !== undefined ? { unit: String(input.unit).trim() || "pcs" } : {}),
+        type,
+        trackInventory,
+        ...(input.sellingPrice !== undefined
+          ? {
+              sellingPrice:
+                input.sellingPrice == null || input.sellingPrice === ""
+                  ? null
+                  : toDecimal(input.sellingPrice as number),
+            }
+          : {}),
+        ...(input.costPrice !== undefined
+          ? {
+              costPrice:
+                input.costPrice == null || input.costPrice === ""
+                  ? null
+                  : toDecimal(input.costPrice as number),
+            }
+          : {}),
+        ...(input.categoryId !== undefined
+          ? { categoryId: (input.categoryId as string) || null }
+          : {}),
+        ...(input.isActive !== undefined ? { isActive: !!input.isActive } : {}),
+        ...(input.description !== undefined
+          ? { description: (input.description as string) || null }
+          : {}),
+        ...(input.reorderLevel !== undefined
+          ? {
+              reorderLevel:
+                input.reorderLevel == null || input.reorderLevel === ""
+                  ? null
+                  : toDecimal(input.reorderLevel as number, 4),
+            }
+          : {}),
+      },
+      include: {
+        category: { select: { id: true, name: true } },
+        _count: { select: { movements: true } },
+      },
+    });
+    await recordAudit({
+      businessId,
+      actorUserId: userId,
+      action: "update",
+      entityType: "product",
+      entityId: product.id,
+      metadata: { sku: product.sku, name: product.name },
+    }).catch(() => {});
+    return { product };
+  } catch (e: unknown) {
+    if (String(e).includes("Unique constraint") || String((e as { code?: string })?.code) === "P2002") {
+      throw new Error("SKU already exists for this business");
+    }
+    throw e;
+  }
 }
 
 export async function deleteProduct(userId: string, id: string) {
