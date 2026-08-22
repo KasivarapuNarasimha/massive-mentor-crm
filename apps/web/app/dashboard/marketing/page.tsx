@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { useAiQuotaModalOptional } from "@/lib/ai-quota-modal-context";
+import { friendlyError } from "@/lib/user-messages";
 
 interface ReelIdea {
   title: string;
@@ -39,6 +41,7 @@ interface MarketingResult {
 
 export default function MarketingAIPage() {
   const { token } = useAuth();
+  const quotaModal = useAiQuotaModalOptional();
 
   const [formData, setFormData] = useState({
     businessName: "",
@@ -79,8 +82,10 @@ export default function MarketingAIPage() {
       setResult(response.data.result as MarketingResult);
       setUsedInputs(response.data.inputs);
       toast.success("Marketing content generated successfully!");
-    } else {
-      toast.error(response.error || "Failed to generate marketing content. Please try again.");
+    } else if (!quotaModal?.handleAiQuotaResponse(response)) {
+      toast.error(
+        friendlyError(response.error, "Failed to generate marketing content. Please try again.")
+      );
     }
 
     setIsGenerating(false);

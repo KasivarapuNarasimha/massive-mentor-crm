@@ -6,6 +6,9 @@ export interface ApiResponse<T = unknown> {
   code?: string;
   /** HTTP status when the request failed (e.g. 401, 429, 500) */
   status?: number;
+  /** Present on AI_QUOTA_EXCEEDED responses */
+  planLabel?: string;
+  dailyLimit?: number;
 }
 
 export interface User {

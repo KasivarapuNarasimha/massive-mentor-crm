@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PortalProvider } from "@/lib/portal-context";
 import { PlanProvider } from "@/lib/plan-context";
+import { AiQuotaModalProvider } from "@/lib/ai-quota-modal-context";
 import { ModuleGate } from "@/components/permissions/ModuleGate";
 import { api } from "@/lib/api";
 
@@ -107,9 +108,11 @@ export default function DashboardLayout({
   return (
     <PortalProvider>
       <PlanProvider>
-        <DashboardShell>
-          <ModuleGate>{children}</ModuleGate>
-        </DashboardShell>
+        <AiQuotaModalProvider>
+          <DashboardShell>
+            <ModuleGate>{children}</ModuleGate>
+          </DashboardShell>
+        </AiQuotaModalProvider>
       </PlanProvider>
     </PortalProvider>
   );

@@ -7,6 +7,8 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { toast } from "sonner";
 import { MarkdownContent } from "@/components/ai/MarkdownContent";
+import { useAiQuotaModalOptional } from "@/lib/ai-quota-modal-context";
+import { friendlyError } from "@/lib/user-messages";
 
 interface Message {
   id: string;
@@ -24,6 +26,7 @@ const SUGGESTED_PROMPTS = [
 
 export default function AIMentorPage() {
   const { token } = useAuth();
+  const quotaModal = useAiQuotaModalOptional();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -75,7 +78,11 @@ export default function AIMentorPage() {
       // Add assistant message from server
       setMessages((prev) => [...prev, assistantMessage]);
     } else {
-      toast.error(response.error || "Failed to get response from AI Mentor.");
+      if (!quotaModal?.handleAiQuotaResponse(response)) {
+        toast.error(
+          friendlyError(response.error, "Failed to get response from Massive Mentor AI.")
+        );
+      }
       // Remove the optimistic user message on error
       setMessages((prev) => prev.slice(0, -1));
     }

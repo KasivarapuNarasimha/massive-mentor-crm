@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/user-messages";
+import { useAiQuotaModalOptional } from "@/lib/ai-quota-modal-context";
 
 type Choice = { id: string; label: string; sublabel?: string; field?: string };
 type CardAction = { label: string; href?: string; command?: string; confirmToken?: string };
@@ -37,6 +38,7 @@ const QUICK_COMMANDS = [
 
 export function AiCommandCenter() {
   const { token } = useAuth();
+  const quotaModal = useAiQuotaModalOptional();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -54,6 +56,15 @@ export function AiCommandCenter() {
           token
         );
         if (!res.success || !res.data) {
+          if (quotaModal?.handleAiQuotaResponse(res)) {
+            setResult({
+              status: "failed",
+              summary: typeof res.error === "string" ? res.error : "Massive Mentor AI usage limit reached",
+              sessionId: sessionId || "",
+            });
+            setBusy(false);
+            return;
+          }
           const errMsg = friendlyError(
             typeof res.error === "string" ? res.error : undefined,
             "Massive Mentor AI could not complete that command. Please try again."
@@ -74,9 +85,8 @@ export function AiCommandCenter() {
         if (data.sessionId) setSessionId(data.sessionId);
         if (data.status === "completed") toast.success(summary);
         else if (data.status === "partial") toast.message(summary);
-        else if (data.status === "failed" || data.status === "unsupported" || data.status === "needs_input") {
-          if (/usage limit reached/i.test(summary)) toast.error(summary);
-          else if (data.status === "failed" || data.status === "unsupported") toast.error(summary);
+        else if (data.status === "failed" || data.status === "unsupported") {
+          toast.error(summary);
         }
       } catch (e) {
         toast.error(
@@ -85,7 +95,7 @@ export function AiCommandCenter() {
       }
       setBusy(false);
     },
-    [token, sessionId]
+    [token, sessionId, quotaModal]
   );
 
   const confirm = useCallback(

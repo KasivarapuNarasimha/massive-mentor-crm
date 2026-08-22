@@ -290,6 +290,8 @@ class ApiClient {
           error: (data.error as string) || `Request failed (${response.status})`,
           code: data.code as string | undefined,
           status: response.status,
+          planLabel: typeof data.planLabel === "string" ? data.planLabel : undefined,
+          dailyLimit: typeof data.dailyLimit === "number" ? data.dailyLimit : undefined,
           ...(data.data !== undefined ? { data: data.data as T } : {}),
         };
       }

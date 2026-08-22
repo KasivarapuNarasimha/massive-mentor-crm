@@ -9,6 +9,8 @@ import { parseAmount } from "@/lib/currency";
 import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { LanguageSelector, getLanguageLabel } from "@/components/ai/LanguageSelector";
 import { useDataVersion } from "@/lib/data-events";
+import { useAiQuotaModalOptional } from "@/lib/ai-quota-modal-context";
+import { friendlyError } from "@/lib/user-messages";
 
 /** Safe numeric deal amount — never string-concatenate Decimal/API strings. */
 function dealAmount(value: unknown): number {
@@ -76,6 +78,7 @@ interface KpiData {
 
 function AiSalesIntelligencePageInner() {
   const { token } = useAuth();
+  const quotaModal = useAiQuotaModalOptional();
   const { money } = useBusinessCurrency();
   const dataVersion = useDataVersion();
   const searchParams = useSearchParams();
@@ -277,8 +280,8 @@ function AiSalesIntelligencePageInner() {
       if (res.success) {
         setter(unwrapAiPayload(res));
         toast.success(`${label} generated`);
-      } else {
-        toast.error(res.error || "AI generation failed");
+      } else if (!quotaModal?.handleAiQuotaResponse(res)) {
+        toast.error(friendlyError(res.error, "Massive Mentor AI generation failed"));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "AI call failed";
@@ -321,8 +324,8 @@ function AiSalesIntelligencePageInner() {
             ? `${list.length} reminder suggestion${list.length === 1 ? "" : "s"} ready`
             : "No reminders returned — try again"
         );
-      } else {
-        toast.error(res.error || "Failed to generate reminders");
+      } else if (!quotaModal?.handleAiQuotaResponse(res)) {
+        toast.error(friendlyError(res.error, "Failed to generate reminders"));
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to generate reminders";
@@ -531,7 +534,9 @@ function AiSalesIntelligencePageInner() {
         toast.success("AI Meeting Summary generated successfully.");
       } else {
         setMeetingSummaryStatus(null);
-        toast.error(res.error || "AI generation failed");
+        if (!quotaModal?.handleAiQuotaResponse(res)) {
+          toast.error(friendlyError(res.error, "AI generation failed"));
+        }
       }
     } catch (err) {
       timers.forEach(clearTimeout);
@@ -596,8 +601,8 @@ function AiSalesIntelligencePageInner() {
         toast.success("WhatsApp message generated");
         // Reload history
         await loadWaHistory(selectedContactId);
-      } else {
-        toast.error(res.error || "Failed to generate WhatsApp message");
+      } else if (!quotaModal?.handleAiQuotaResponse(res)) {
+        toast.error(friendlyError(res.error, "Failed to generate WhatsApp message"));
       }
     } catch {
       toast.error("Massive Mentor AI could not generate that message. Please try again.");
