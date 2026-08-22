@@ -1,10 +1,6 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
-import {
-  enterDemoSession,
-  loginDemoUser,
-  loginSchema,
-} from "../services/auth.service.js";
+import { loginDemoUser, loginSchema } from "../services/auth.service.js";
 import {
   ensureDemoWorkspace,
   resetDemoData,
@@ -15,7 +11,12 @@ export async function demoLogin(req: AuthenticatedRequest, res: Response) {
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ success: false, error: parsed.error.errors[0]?.message || "Invalid input" });
+      const msg = parsed.error.errors[0]?.message || "Invalid input";
+      // Empty password must never create a session.
+      if (/password/i.test(msg)) {
+        return res.status(401).json({ success: false, error: "Invalid demo password." });
+      }
+      return res.status(400).json({ success: false, error: msg });
     }
     const result = await loginDemoUser(parsed.data);
     res.json({ success: true, data: result });
@@ -23,22 +24,6 @@ export async function demoLogin(req: AuthenticatedRequest, res: Response) {
     res.status(401).json({
       success: false,
       error: error instanceof Error ? error.message : "Login failed",
-    });
-  }
-}
-
-/**
- * One-click demo entry. Authenticates with server-side DEMO_* env credentials
- * after ensureDemoWorkspace() syncs the bcrypt hash. Does not accept a password body.
- */
-export async function demoEnter(_req: AuthenticatedRequest, res: Response) {
-  try {
-    const result = await enterDemoSession();
-    res.json({ success: true, data: result });
-  } catch (error: unknown) {
-    res.status(401).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Demo entry failed",
     });
   }
 }

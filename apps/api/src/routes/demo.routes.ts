@@ -5,9 +5,9 @@ import * as ctrl from "../controllers/demo.controller.js";
 
 const router: Router = Router();
 
-// Demo-only auth — never production customer login
+// Demo-only auth — never production customer login.
+// Password is required via /auth/login (no passwordless enter endpoint).
 router.post("/auth/login", demoAuthLimiter, ctrl.demoLogin);
-router.post("/auth/enter", demoAuthLimiter, ctrl.demoEnter);
 router.get("/info", ctrl.demoInfo);
 
 router.get("/auth/me", requireDemoAuth, ctrl.demoMe);

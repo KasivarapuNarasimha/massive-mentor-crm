@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { persistDemoSession } from "@/lib/demo-session";
+import { PasswordInput } from "@/components/ui/PasswordInput";
+
+const INPUT_CLASS =
+  "portal-login-input w-full min-h-11 px-4 py-3 bg-background border border-border rounded-xl text-base sm:text-sm text-foreground placeholder:text-muted-foreground";
 
 export default function DemoLandingPage() {
   const router = useRouter();
@@ -12,28 +16,46 @@ export default function DemoLandingPage() {
     features?: string[];
     loginHint?: { email: string };
   } | null>(null);
+  const [email, setEmail] = useState("demo@massivementor.in");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.demoInfo().then((res) => {
-      if (res.success && res.data) setInfo(res.data);
+      if (res.success && res.data) {
+        setInfo(res.data);
+        if (res.data.loginHint?.email) setEmail(res.data.loginHint.email);
+      }
     });
   }, []);
 
-  const enterDemo = async () => {
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const res = await api.demoEnter();
-      if (res.success && res.data?.token) {
-        persistDemoSession({ token: res.data.token, user: res.data.user });
-        router.push("/dashboard");
+      if (!password.trim()) {
+        setError("Invalid demo password.");
+        setBusy(false);
         return;
       }
-      setError(res.error || "Could not start the demo session. Please try again.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start the demo session. Please try again.");
+      const res = await api.demoLogin(email, password);
+      if (res.success && res.data?.token) {
+        persistDemoSession({ token: res.data.token, user: res.data.user });
+        let dest = "/dashboard";
+        try {
+          const next = new URLSearchParams(window.location.search).get("next");
+          if (next && next.startsWith("/dashboard")) dest = next;
+        } catch {
+          /* ignore */
+        }
+        router.push(dest);
+        return;
+      }
+      setError(res.error || "Invalid demo password.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid demo password.");
     } finally {
       setBusy(false);
     }
@@ -63,37 +85,65 @@ export default function DemoLandingPage() {
           )}
         </div>
 
-        <div className="mt-10 flex flex-col sm:flex-row gap-3">
+        <form
+          onSubmit={onSubmit}
+          className="mt-10 rounded-2xl border border-border/80 bg-card/60 p-5 sm:p-6 space-y-4 max-w-md"
+        >
+          <h2 className="text-sm font-semibold">Enter Demo CRM</h2>
+          <div>
+            <label htmlFor="demo-email" className="block text-sm text-muted-foreground mb-2">
+              Demo email
+            </label>
+            <input
+              id="demo-email"
+              type="email"
+              required
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={INPUT_CLASS}
+              placeholder="demo@massivementor.in"
+            />
+          </div>
+          <div>
+            <label htmlFor="demo-password" className="block text-sm text-muted-foreground mb-2">
+              Password
+            </label>
+            <PasswordInput
+              id="demo-password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={INPUT_CLASS}
+              placeholder="Enter demo password"
+            />
+          </div>
           <button
-            type="button"
-            onClick={() => void enterDemo()}
+            type="submit"
             disabled={busy}
-            className="min-h-12 inline-flex items-center justify-center px-6 bg-sky-500 text-white font-semibold rounded-xl disabled:opacity-50 touch-manipulation"
+            className="w-full min-h-12 bg-sky-500 text-white font-semibold rounded-xl disabled:opacity-50 touch-manipulation"
           >
-            {busy ? "Starting demo…" : "Enter demo"}
+            {busy ? "Signing in…" : "Enter Demo CRM"}
           </button>
+          {error ? (
+            <p
+              role="alert"
+              className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200"
+            >
+              {error}
+            </p>
+          ) : null}
+        </form>
+
+        <div className="mt-6">
           <a
             href="https://crm.massivementor.in"
-            className="min-h-12 inline-flex items-center justify-center px-6 bg-white/10 rounded-xl text-sm"
+            className="min-h-11 inline-flex items-center justify-center px-5 bg-white/10 rounded-xl text-sm"
           >
             Customer CRM (production)
           </a>
         </div>
-
-        {error ? (
-          <p
-            role="alert"
-            className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
-          >
-            {error}
-          </p>
-        ) : null}
-
-        {info?.loginHint?.email ? (
-          <p className="mt-8 text-xs text-muted-foreground">
-            Demo workspace account: {info.loginHint.email}
-          </p>
-        ) : null}
       </div>
     </div>
   );

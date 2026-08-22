@@ -402,7 +402,7 @@ export async function loginPlatformAdmin(input: LoginInput): Promise<AuthRespons
   };
 }
 
-/** Demo portal login — sample workspace only */
+/** Demo portal login — sample workspace only; requires configured DEMO_PASSWORD. */
 export async function loginDemoUser(input: LoginInput): Promise<AuthResponse> {
   const { ensureDemoWorkspace, DEMO_EMAIL } = await import("./demo.service.js");
   await ensureDemoWorkspace();
@@ -410,13 +410,23 @@ export async function loginDemoUser(input: LoginInput): Promise<AuthResponse> {
   const email = input.email.toLowerCase().trim();
   const password = normalizeLoginPassword(input.password);
 
+  // Never create a demo session without a password (including empty / whitespace-only).
+  if (!password) {
+    throw new Error("Invalid demo password.");
+  }
+
+  // Demo portal only accepts the configured demo account.
+  if (email !== DEMO_EMAIL) {
+    throw new Error("Invalid demo password.");
+  }
+
   const user = await prisma.user.findUnique({
     where: { email },
   });
-  if (!user) throw new Error("Invalid email or password");
+  if (!user) throw new Error("Invalid demo password.");
 
   const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) throw new Error("Invalid email or password");
+  if (!ok) throw new Error("Invalid demo password.");
   if (user.isDisabled) throw new Error("This account has been disabled.");
 
   // Super Admin never uses demo portal
@@ -444,18 +454,6 @@ export async function loginDemoUser(input: LoginInput): Promise<AuthResponse> {
     businessId: demoMember.businessId,
     demoEmailHint: DEMO_EMAIL,
   });
-}
-
-/**
- * One-click demo entry — server uses configured DEMO_EMAIL / DEMO_PASSWORD.
- * Never requires the client to know or display the password.
- */
-export async function enterDemoSession(): Promise<AuthResponse> {
-  const { ensureDemoWorkspace, DEMO_EMAIL, DEMO_PASSWORD } = await import(
-    "./demo.service.js"
-  );
-  await ensureDemoWorkspace();
-  return loginDemoUser({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
 }
 
 async function issueDemoAuthResponse(opts: {

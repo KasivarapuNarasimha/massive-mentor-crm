@@ -81,6 +81,12 @@ function clearSessionStorage() {
   } catch {
     /* ignore */
   }
+  try {
+    // Dynamic import avoided — cookie clear must be sync on logout.
+    document.cookie = "mm_demo_session=; Path=/; Max-Age=0; SameSite=Lax";
+  } catch {
+    /* ignore SSR */
+  }
 }
 
 function base64UrlToJson(segment: string): Record<string, unknown> | null {

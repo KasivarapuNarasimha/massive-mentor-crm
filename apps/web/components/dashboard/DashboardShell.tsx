@@ -1229,16 +1229,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           className="fixed top-0 left-0 right-0 z-[60] bg-sky-600 text-white text-center text-xs sm:text-sm font-semibold px-3 flex items-center justify-center"
           style={{ height: DEMO_BANNER_H }}
         >
-          DEMO MODE — sample data only · not a production customer workspace ·{" "}
-          <a href="/demo" className="underline ml-1">
-            Demo portal
-          </a>
+          DEMO MODE — Sample data only — Not a production customer workspace
         </div>
       )}
       {/* Non-blocking connectivity alert when backend is down */}
       <div className="fixed left-0 right-0 z-[55]" style={{ top: isDemoMode ? DEMO_BANNER_H : 0 }}>
         <ApiConnectivityBanner />
-        <TrialBanner />
+        {/* Trial / Upgrade Plan is for real customers only — never in Demo Mode */}
+        {!isDemoMode ? <TrialBanner /> : null}
       </div>
       {/* Top Navigation — z-50 above location strip */}
       <nav
@@ -1278,23 +1276,32 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 CRM
               </div>
             )}
-            {/* Live plan / license badge — updates via SSE when Super Admin changes subscription */}
-            <div
-              className={`hidden md:flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border tracking-wide shrink-0 font-semibold capitalize ${
-                isTrial
-                  ? "bg-sky-500/10 text-sky-300 border-sky-500/25"
-                  : planStatus === "suspended" || licenseStatus === "expired"
-                    ? "bg-red-500/10 text-red-300 border-red-500/25"
-                    : "bg-violet-500/10 text-violet-200 border-violet-500/25"
-              }`}
-              data-testid="plan-badge"
-              title={`Plan: ${plan || "—"} · Status: ${planStatus || "—"} · License: ${licenseStatus || "—"}`}
-            >
-              <span>{isTrial ? "Trial" : plan || "Plan"}</span>
-              {licenseStatus ? (
-                <span className="opacity-70 font-normal normal-case">· {licenseStatus}</span>
-              ) : null}
-            </div>
+            {/* Live plan / license badge — real customers only (hidden in Demo Mode) */}
+            {!isDemoMode ? (
+              <div
+                className={`hidden md:flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border tracking-wide shrink-0 font-semibold capitalize ${
+                  isTrial
+                    ? "bg-sky-500/10 text-sky-300 border-sky-500/25"
+                    : planStatus === "suspended" || licenseStatus === "expired"
+                      ? "bg-red-500/10 text-red-300 border-red-500/25"
+                      : "bg-violet-500/10 text-violet-200 border-violet-500/25"
+                }`}
+                data-testid="plan-badge"
+                title={`Plan: ${plan || "—"} · Status: ${planStatus || "—"} · License: ${licenseStatus || "—"}`}
+              >
+                <span>{isTrial ? "Trial" : plan || "Plan"}</span>
+                {licenseStatus ? (
+                  <span className="opacity-70 font-normal normal-case">· {licenseStatus}</span>
+                ) : null}
+              </div>
+            ) : (
+              <div
+                className="hidden md:flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border tracking-wide shrink-0 font-semibold border-sky-500/30 bg-sky-500/10 text-sky-200"
+                data-testid="demo-mode-badge"
+              >
+                Demo
+              </div>
+            )}
           </div>
 
           <div className="relative flex items-center gap-2 sm:gap-3" ref={userMenuRef}>

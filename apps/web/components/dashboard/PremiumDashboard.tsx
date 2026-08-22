@@ -228,6 +228,14 @@ export function PremiumDashboard() {
   const dataVersion = useDataVersion();
   const { portal } = usePortal();
   const { plan, isTrial, tier } = usePlan();
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  useEffect(() => {
+    try {
+      setIsDemoMode(localStorage.getItem("massive_mentor_demo_mode") === "1");
+    } catch {
+      setIsDemoMode(false);
+    }
+  }, []);
 
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<ReportsDash | null>(null);
@@ -654,12 +662,14 @@ export function PremiumDashboard() {
               </span>
               <span
                 className={`mm-dash-hero-chip font-semibold ${
-                  isTrial
-                    ? "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-200"
-                    : "border-emerald-500/35 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
+                  isDemoMode
+                    ? "border-sky-500/35 bg-sky-500/10 text-sky-800 dark:text-sky-200"
+                    : isTrial
+                      ? "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                      : "border-emerald-500/35 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
                 }`}
               >
-                {isTrial ? "Trial" : "Plan"} · {planLabel}
+                {isDemoMode ? "Demo · Sample data" : `${isTrial ? "Trial" : "Plan"} · ${planLabel}`}
               </span>
               <span className="mm-dash-hero-chip tabular-nums">{todayDateLabel}</span>
             </div>

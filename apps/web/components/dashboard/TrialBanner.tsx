@@ -1,15 +1,24 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePlan } from "@/lib/plan-context";
+import { isDemoModeClient } from "@/lib/demo-session";
 
 /**
  * Top trial countdown banner — driven by live PlanProvider (SSE + access).
  * Hides instantly when Super Admin ends trial / activates a paid plan.
+ * Never shown in Demo Mode (sample workspace is not a real trial).
  */
 export function TrialBanner() {
   const { isTrial, trialDaysRemaining, plan, loading } = usePlan();
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
+  useEffect(() => {
+    setIsDemoMode(isDemoModeClient());
+  }, []);
+
+  if (isDemoMode) return null;
   if (loading) return null;
   if (!isTrial || trialDaysRemaining == null) return null;
 

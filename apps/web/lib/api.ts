@@ -2394,18 +2394,6 @@ class ApiClient {
     });
   }
 
-  /** One-click demo session — server authenticates with DEMO_* env (no client password). */
-  async demoEnter() {
-    return this.request<{
-      user: { id: string; email: string; name: string | null; businessId?: string };
-      token: string;
-      portal: "demo";
-    }>("/demo/auth/enter", {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-  }
-
   async demoInfo() {
     return this.get<{
       portal: string;

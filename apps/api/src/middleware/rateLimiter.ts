@@ -112,7 +112,6 @@ function isAuthEntrypointPath(req: Request): boolean {
     "/auth/reset-password",
     "/auth/reset-password/validate",
     "/demo/auth/login",
-    "/demo/auth/enter",
   ]);
   return candidates.some((c) => authPaths.has(c));
 }
