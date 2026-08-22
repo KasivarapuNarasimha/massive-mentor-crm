@@ -45,7 +45,13 @@ export function middleware(request: NextRequest) {
     if (pathname === "/" || pathname === "/login") {
       return NextResponse.redirect(new URL("/demo/login", request.url));
     }
-    if (!pathname.startsWith("/demo")) {
+    // Allow the shared CRM app shell after demo auth (one-click enter → /dashboard).
+    // Keep Super Admin routes blocked on the demo host.
+    const demoAllowedCrm =
+      pathname === "/dashboard" ||
+      pathname.startsWith("/dashboard/") ||
+      pathname === "/subscription-required";
+    if (!pathname.startsWith("/demo") && !demoAllowedCrm) {
       return NextResponse.redirect(new URL("/demo", request.url));
     }
   }

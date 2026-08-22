@@ -1,11 +1,14 @@
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
-import { loginDemoUser, loginSchema } from "../services/auth.service.js";
+import {
+  enterDemoSession,
+  loginDemoUser,
+  loginSchema,
+} from "../services/auth.service.js";
 import {
   ensureDemoWorkspace,
   resetDemoData,
   DEMO_EMAIL,
-  DEMO_PASSWORD,
 } from "../services/demo.service.js";
 
 export async function demoLogin(req: AuthenticatedRequest, res: Response) {
@@ -24,7 +27,23 @@ export async function demoLogin(req: AuthenticatedRequest, res: Response) {
   }
 }
 
-/** Public demo credentials hint (safe — demo only, no production access) */
+/**
+ * One-click demo entry. Authenticates with server-side DEMO_* env credentials
+ * after ensureDemoWorkspace() syncs the bcrypt hash. Does not accept a password body.
+ */
+export async function demoEnter(_req: AuthenticatedRequest, res: Response) {
+  try {
+    const result = await enterDemoSession();
+    res.json({ success: true, data: result });
+  } catch (error: unknown) {
+    res.status(401).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Demo entry failed",
+    });
+  }
+}
+
+/** Public demo portal info — email only (never expose DEMO_PASSWORD to the browser). */
 export async function demoInfo(_req: AuthenticatedRequest, res: Response) {
   try {
     await ensureDemoWorkspace();
@@ -35,7 +54,6 @@ export async function demoInfo(_req: AuthenticatedRequest, res: Response) {
         message: "Product demonstration environment — sample data only. Never production customer data.",
         loginHint: {
           email: DEMO_EMAIL,
-          password: DEMO_PASSWORD,
         },
         features: [
           "Leads",

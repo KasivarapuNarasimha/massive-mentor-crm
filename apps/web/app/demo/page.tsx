@@ -1,21 +1,43 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { persistDemoSession } from "@/lib/demo-session";
 
 export default function DemoLandingPage() {
+  const router = useRouter();
   const [info, setInfo] = useState<{
     message?: string;
     features?: string[];
-    loginHint?: { email: string; password: string };
+    loginHint?: { email: string };
   } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.demoInfo().then((res) => {
       if (res.success && res.data) setInfo(res.data);
     });
   }, []);
+
+  const enterDemo = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.demoEnter();
+      if (res.success && res.data?.token) {
+        persistDemoSession({ token: res.data.token, user: res.data.user });
+        router.push("/dashboard");
+        return;
+      }
+      setError(res.error || "Could not start the demo session. Please try again.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not start the demo session. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -42,12 +64,14 @@ export default function DemoLandingPage() {
         </div>
 
         <div className="mt-10 flex flex-col sm:flex-row gap-3">
-          <Link
-            href="/demo/login"
-            className="min-h-12 inline-flex items-center justify-center px-6 bg-sky-500 text-white font-semibold rounded-xl"
+          <button
+            type="button"
+            onClick={() => void enterDemo()}
+            disabled={busy}
+            className="min-h-12 inline-flex items-center justify-center px-6 bg-sky-500 text-white font-semibold rounded-xl disabled:opacity-50 touch-manipulation"
           >
-            Enter demo
-          </Link>
+            {busy ? "Starting demo…" : "Enter demo"}
+          </button>
           <a
             href="https://crm.massivementor.in"
             className="min-h-12 inline-flex items-center justify-center px-6 bg-white/10 rounded-xl text-sm"
@@ -56,11 +80,20 @@ export default function DemoLandingPage() {
           </a>
         </div>
 
-        {info?.loginHint && (
-          <p className="mt-8 text-xs text-muted-foreground">
-            Demo login: {info.loginHint.email} / {info.loginHint.password}
+        {error ? (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          >
+            {error}
           </p>
-        )}
+        ) : null}
+
+        {info?.loginHint?.email ? (
+          <p className="mt-8 text-xs text-muted-foreground">
+            Demo workspace account: {info.loginHint.email}
+          </p>
+        ) : null}
       </div>
     </div>
   );

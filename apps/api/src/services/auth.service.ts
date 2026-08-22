@@ -439,40 +439,69 @@ export async function loginDemoUser(input: LoginInput): Promise<AuthResponse> {
     );
   }
 
+  return issueDemoAuthResponse({
+    user,
+    businessId: demoMember.businessId,
+    demoEmailHint: DEMO_EMAIL,
+  });
+}
+
+/**
+ * One-click demo entry — server uses configured DEMO_EMAIL / DEMO_PASSWORD.
+ * Never requires the client to know or display the password.
+ */
+export async function enterDemoSession(): Promise<AuthResponse> {
+  const { ensureDemoWorkspace, DEMO_EMAIL, DEMO_PASSWORD } = await import(
+    "./demo.service.js"
+  );
+  await ensureDemoWorkspace();
+  return loginDemoUser({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+}
+
+async function issueDemoAuthResponse(opts: {
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+    role: string | null;
+    platformRole: string | null;
+  };
+  businessId: string;
+  demoEmailHint: string;
+}): Promise<AuthResponse> {
   const { createUserSession } = await import("./session.service.js");
   const created = await createUserSession({
-    userId: user.id,
-    businessId: demoMember.businessId,
+    userId: opts.user.id,
+    businessId: opts.businessId,
     portal: "demo",
     device: {},
     forceNewSession: true,
   });
 
-  // Demo-only: user must not be treated as a normal multi-tenant customer session here
   await recordAudit({
-    businessId: demoMember.businessId,
-    actorUserId: user.id,
+    businessId: opts.businessId,
+    actorUserId: opts.user.id,
     action: "demo_login",
     entityType: "user",
-    entityId: user.id,
+    entityId: opts.user.id,
     metadata: {
-      email: user.email,
+      email: opts.user.email,
       portal: "demo",
-      demoEmailHint: DEMO_EMAIL,
+      demoEmailHint: opts.demoEmailHint,
       sessionId: created.sessionId,
     },
   });
 
-  const token = await issueAuthToken(user.id, "demo", { sid: created.sessionId });
+  const token = await issueAuthToken(opts.user.id, "demo", { sid: created.sessionId });
 
   return {
     user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      platformRole: user.platformRole,
-      businessId: demoMember.businessId,
+      id: opts.user.id,
+      email: opts.user.email,
+      name: opts.user.name,
+      role: opts.user.role || undefined,
+      platformRole: opts.user.platformRole || undefined,
+      businessId: opts.businessId,
     },
     token,
     portal: "demo",

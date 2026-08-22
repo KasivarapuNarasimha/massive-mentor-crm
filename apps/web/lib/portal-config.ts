@@ -52,7 +52,7 @@ export function resolvePortal(host: string, pathname: string): PortalId {
 export const PORTAL_HOME: Record<PortalId, string> = {
   customer: "/dashboard",
   admin: "/admin",
-  demo: "/demo/app",
+  demo: "/dashboard",
 };
 
 export const PORTAL_LOGIN: Record<PortalId, string> = {
