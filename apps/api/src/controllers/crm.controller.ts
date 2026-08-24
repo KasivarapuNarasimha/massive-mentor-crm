@@ -338,9 +338,14 @@ export async function bulkAssignLeadsHandler(req: AuthenticatedRequest, res: Res
         : typeof req.body?.currentAssignedTo === "string"
           ? req.body.currentAssignedTo
           : undefined;
+    const assigneeIdsRaw = req.body?.assigneeIds ?? req.body?.memberIds;
+    const assigneeIds = Array.isArray(assigneeIdsRaw)
+      ? (assigneeIdsRaw as unknown[]).map((id) => String(id || "").trim()).filter(Boolean)
+      : undefined;
     const data = await smartBulkAssignLeads(req.user.id, {
       mode,
       assignedTo: mode === "single" ? assignedTo : undefined,
+      assigneeIds: mode === "all_members" ? assigneeIds : undefined,
       scope,
       ids: Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : undefined,
       limit,

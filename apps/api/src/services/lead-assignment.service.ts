@@ -258,6 +258,12 @@ export type SmartAssignInput = {
   mode: AssignMode;
   /** Target user when mode=single */
   assignedTo?: string;
+  /**
+   * Optional subset for equal distribution (mode=all_members).
+   * Must be active assignable members. Order is preserved for remainder placement.
+   * If omitted, all active members are used. Does not change equalDistribute math.
+   */
+  assigneeIds?: string[];
   scope: AssignScope;
   ids?: string[];
   limit?: number;
@@ -309,7 +315,29 @@ export async function smartBulkAssignLeads(
 
   let assignees: AssignableMember[] = [];
   if (mode === "all_members") {
-    assignees = members;
+    const rawIds = Array.isArray(input.assigneeIds)
+      ? input.assigneeIds.map((id) => String(id || "").trim()).filter(Boolean)
+      : [];
+    if (rawIds.length) {
+      // Preserve caller order (confirm-modal remaining members) for stable remainder.
+      const byId = new Map(members.map((m) => [m.id, m]));
+      const seen = new Set<string>();
+      assignees = [];
+      for (const id of rawIds) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const m = byId.get(id);
+        if (!m) {
+          throw new Error("One or more assignees are not active members of this workspace");
+        }
+        assignees.push(m);
+      }
+      if (!assignees.length) {
+        throw new Error("Select at least one member to assign leads");
+      }
+    } else {
+      assignees = members;
+    }
   } else {
     const targetId = String(input.assignedTo || "").trim();
     if (!targetId) throw new Error("Select a team member to assign");

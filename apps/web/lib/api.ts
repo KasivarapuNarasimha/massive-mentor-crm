@@ -677,6 +677,11 @@ class ApiClient {
       /** single | all_members */
       assignMode?: "single" | "all_members";
       mode?: "single" | "all_members";
+      /**
+       * Optional subset for equal distribution (all_members).
+       * Final confirm-modal remaining member IDs — backend distributes only to these.
+       */
+      assigneeIds?: string[];
       scope: "ids" | "first_n" | "all_filtered" | "reassign";
       ids?: string[];
       limit?: number;

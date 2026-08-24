@@ -221,13 +221,44 @@ export default function LeadsPage() {
   /** "__all__" = equal distribute to all active members */
   const ALL_MEMBERS_VALUE = "__all__";
   const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
+  type AssignDistRow = {
+    userId: string;
+    name: string | null;
+    email: string;
+    count: number;
+  };
   const [assignPreview, setAssignPreview] = useState<{
     total: number;
-    distribution: Array<{ userId: string; name: string | null; email: string; count: number }>;
+    distribution: AssignDistRow[];
     mode: "single" | "all_members";
   } | null>(null);
+  /** Stack of members removed in the confirm modal (for Undo). */
+  const [assignRemovedStack, setAssignRemovedStack] = useState<AssignDistRow[]>([]);
   const [assignNotes, setAssignNotes] = useState("");
   const [mediaSendLead, setMediaSendLead] = useState<Contact | null>(null);
+
+  /**
+   * Equal redistribution for confirm-modal Remove/Undo.
+   * Same fairness rule as backend equalDistribute: |count_i - count_j| ≤ 1;
+   * first members absorb the remainder (+1).
+   * Does not change the selected lead total — only recipient counts.
+   */
+  const redistributeEqualCounts = (
+    total: number,
+    members: Array<{ userId: string; name: string | null; email: string }>
+  ): AssignDistRow[] => {
+    if (!members.length) return [];
+    if (total <= 0) {
+      return members.map((m) => ({ ...m, count: 0 }));
+    }
+    const n = members.length;
+    const base = Math.floor(total / n);
+    const rem = total % n;
+    return members.map((m, i) => ({
+      ...m,
+      count: base + (i < rem ? 1 : 0),
+    }));
+  };
 
   const loadConfig = useCallback(async () => {
     if (!token) return;
@@ -1059,12 +1090,21 @@ export default function LeadsPage() {
     return null;
   }, [assignScope, assignFirstPreset, assignCustomCount, serverTotal]);
 
-  const buildAssignBody = (dryRun: boolean) => {
+  const buildAssignBody = (
+    dryRun: boolean,
+    opts?: { assigneeIds?: string[] }
+  ) => {
     const isAll = assignValue === ALL_MEMBERS_VALUE;
     const member = isAll ? null : teamMembers.find((t) => t.id === assignValue.trim());
+    // Final remaining members from confirm modal are the source of truth for equal dist.
+    const assigneeIds =
+      isAll && opts?.assigneeIds && opts.assigneeIds.length > 0
+        ? opts.assigneeIds
+        : undefined;
     const base = {
       assignMode: (isAll ? "all_members" : "single") as "all_members" | "single",
       assignedTo: isAll ? undefined : member?.id,
+      assigneeIds,
       notes: assignNotes.trim() || undefined,
       dryRun,
     };
@@ -1126,6 +1166,7 @@ export default function LeadsPage() {
       const res = await api.bulkAssignLeads(buildAssignBody(true), token);
       if (res.success && res.data?.distribution) {
         const total = res.data.distribution.reduce((s, d) => s + d.count, 0);
+        setAssignRemovedStack([]);
         setAssignPreview({
           total: total || res.data.requested || 0,
           distribution: res.data.distribution,
@@ -1141,9 +1182,9 @@ export default function LeadsPage() {
     }
   };
 
-  /** Step 2: confirmed execute */
+  /** Step 2: confirmed execute — uses final remaining members from confirm modal. */
   const runBulkAssign = async () => {
-    if (!token) return;
+    if (!token || !assignPreview) return;
     const err = validateAssignForm();
     if (err) {
       toast.error(err);
@@ -1151,9 +1192,16 @@ export default function LeadsPage() {
     }
 
     const isAll = assignValue === ALL_MEMBERS_VALUE;
+    // Source of truth: current confirm-modal distribution (after any Remove actions).
+    const finalMemberIds = assignPreview.distribution.map((d) => d.userId);
+    if (isAll && finalMemberIds.length === 0) {
+      toast.error("Select at least one member to continue assignment");
+      return;
+    }
+
     const member = isAll ? null : teamMembers.find((t) => t.id === assignValue.trim());
     const label = isAll
-      ? `All members (${teamMembers.length})`
+      ? `Equal distribution (${finalMemberIds.length} member${finalMemberIds.length === 1 ? "" : "s"})`
       : member?.name?.trim() || member?.email || "member";
 
     const progressHint =
@@ -1167,7 +1215,12 @@ export default function LeadsPage() {
     setBulkProgress(progressHint);
 
     try {
-      const res = await api.bulkAssignLeads(buildAssignBody(false), token);
+      const res = await api.bulkAssignLeads(
+        buildAssignBody(false, {
+          assigneeIds: isAll ? finalMemberIds : undefined,
+        }),
+        token
+      );
       if (res.success && res.data) {
         const n = res.data.assigned;
         let msg = `Successfully assigned ${n.toLocaleString()} leads.`;
@@ -1177,7 +1230,7 @@ export default function LeadsPage() {
           msg = `Successfully assigned all ${n.toLocaleString()} filtered leads.`;
         }
         if (res.data.mode === "all_members" || isAll) {
-          msg = `Successfully distributed ${n.toLocaleString()} leads equally among ${res.data.distribution?.length ?? teamMembers.length} members.`;
+          msg = `Successfully distributed ${n.toLocaleString()} leads equally among ${res.data.distribution?.length ?? finalMemberIds.length} members.`;
         }
         const seq =
           res.data.sequence != null ? `Assignment #${res.data.sequence}` : "Saved to history";
@@ -1186,6 +1239,7 @@ export default function LeadsPage() {
         });
         setAssignConfirmOpen(false);
         setAssignPreview(null);
+        setAssignRemovedStack([]);
         setAssignModalOpen(false);
         setAssignValue("");
         setTeamSearch("");
@@ -1203,6 +1257,41 @@ export default function LeadsPage() {
       setBulkBusy(false);
       setBulkProgress(null);
     }
+  };
+
+  const removeAssignPreviewMember = (userId: string) => {
+    if (!assignPreview || assignPreview.mode !== "all_members") return;
+    const row = assignPreview.distribution.find((d) => d.userId === userId);
+    if (!row) return;
+    const remaining = assignPreview.distribution.filter((d) => d.userId !== userId);
+    setAssignRemovedStack((stack) => [...stack, { ...row, count: 0 }]);
+    setAssignPreview({
+      ...assignPreview,
+      // total lead count stays fixed; only recipients change
+      distribution: redistributeEqualCounts(
+        assignPreview.total,
+        remaining.map((m) => ({ userId: m.userId, name: m.name, email: m.email }))
+      ),
+    });
+  };
+
+  const undoAssignPreviewRemove = () => {
+    if (!assignPreview || assignPreview.mode !== "all_members") return;
+    if (assignRemovedStack.length === 0) return;
+    const restored = assignRemovedStack[assignRemovedStack.length - 1]!;
+    setAssignRemovedStack((stack) => stack.slice(0, -1));
+    const nextMembers = [
+      ...assignPreview.distribution.map((m) => ({
+        userId: m.userId,
+        name: m.name,
+        email: m.email,
+      })),
+      { userId: restored.userId, name: restored.name, email: restored.email },
+    ];
+    setAssignPreview({
+      ...assignPreview,
+      distribution: redistributeEqualCounts(assignPreview.total, nextMembers),
+    });
   };
 
   const runBulkAiScore = async () => {
@@ -2777,7 +2866,18 @@ export default function LeadsPage() {
                 {assignPreview.total.toLocaleString()}
               </span>{" "}
               lead{assignPreview.total === 1 ? "" : "s"}
-              {assignPreview.mode === "all_members" ? " with equal distribution." : "."}
+              {assignPreview.mode === "all_members" ? (
+                <>
+                  {" "}
+                  with equal distribution among{" "}
+                  <span className="text-foreground font-semibold tabular-nums">
+                    {assignPreview.distribution.length}
+                  </span>{" "}
+                  member{assignPreview.distribution.length === 1 ? "" : "s"}.
+                </>
+              ) : (
+                "."
+              )}
             </p>
             <div className="rounded-xl border border-border bg-muted/30 max-h-56 overflow-y-auto">
               <table className="w-full text-sm">
@@ -2785,24 +2885,75 @@ export default function LeadsPage() {
                   <tr className="text-left text-xs text-muted-foreground border-b border-border">
                     <th className="px-3 py-2 font-medium">Member</th>
                     <th className="px-3 py-2 font-medium text-right">Leads</th>
+                    {assignPreview.mode === "all_members" ? (
+                      <th className="px-3 py-2 font-medium text-right w-14">Action</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {assignPreview.distribution.map((d) => (
-                    <tr key={d.userId} className="border-b border-border/60 last:border-0">
-                      <td className="px-3 py-2">
-                        <div className="font-medium text-foreground">{d.name?.trim() || d.email}</div>
-                        <div className="text-[11px] text-muted-foreground">{d.email}</div>
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums font-semibold">
-                        {d.count.toLocaleString()}
+                  {assignPreview.distribution.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={assignPreview.mode === "all_members" ? 3 : 2}
+                        className="px-3 py-4 text-sm text-amber-300"
+                      >
+                        No members remaining. Undo a removal or go back and select members.
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    assignPreview.distribution.map((d) => (
+                      <tr key={d.userId} className="border-b border-border/60 last:border-0">
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-foreground">
+                            {d.name?.trim() || d.email}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">{d.email}</div>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                          {d.count.toLocaleString()}
+                        </td>
+                        {assignPreview.mode === "all_members" ? (
+                          <td className="px-2 py-2 text-right">
+                            <button
+                              type="button"
+                              disabled={bulkBusy}
+                              title={`Remove ${d.name?.trim() || d.email} from this assignment`}
+                              aria-label={`Remove ${d.name?.trim() || d.email}`}
+                              onClick={() => removeAssignPreviewMember(d.userId)}
+                              className="inline-flex items-center justify-center min-h-9 min-w-9 rounded-lg text-muted-foreground hover:text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-muted-foreground mt-3">Continue?</p>
+            {assignPreview.mode === "all_members" && assignRemovedStack.length > 0 ? (
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Removed {assignRemovedStack.length} member
+                  {assignRemovedStack.length === 1 ? "" : "s"} from this assignment.
+                </p>
+                <button
+                  type="button"
+                  disabled={bulkBusy}
+                  onClick={() => undoAssignPreviewRemove()}
+                  className="text-xs font-medium text-sky-300 hover:text-sky-200 underline disabled:opacity-40"
+                >
+                  Undo
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-3">
+                {assignPreview.mode === "all_members"
+                  ? "Remove a member to redistribute their leads among the rest."
+                  : "Continue?"}
+              </p>
+            )}
             <div className="flex gap-3 mt-4">
               <button
                 type="button"
@@ -2810,6 +2961,7 @@ export default function LeadsPage() {
                 onClick={() => {
                   setAssignConfirmOpen(false);
                   setAssignPreview(null);
+                  setAssignRemovedStack([]);
                 }}
                 className="flex-1 min-h-11 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
               >
@@ -2817,7 +2969,11 @@ export default function LeadsPage() {
               </button>
               <button
                 type="button"
-                disabled={bulkBusy}
+                disabled={
+                  bulkBusy ||
+                  (assignPreview.mode === "all_members" &&
+                    assignPreview.distribution.length === 0)
+                }
                 onClick={() => void runBulkAssign()}
                 className="flex-1 min-h-11 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold disabled:opacity-50"
               >
