@@ -124,6 +124,27 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
+/** Browser-persisted Leads desktop column visibility (v2: hydrate after fields load) */
+const LEADS_COLS_STORAGE_KEY = "mm.leads.table.hiddenCols.v2";
+
+function fieldColId(key: string) {
+  return `field:${key}`;
+}
+
+function isNameField(f: FieldDef): boolean {
+  const k = (f.coreMap || f.key || "").toLowerCase();
+  return k === "name";
+}
+
+/** Secondary fields hidden by default (still available via Columns) */
+function isSecondaryListField(f: FieldDef): boolean {
+  const k = (f.coreMap || f.key || "").toLowerCase();
+  if (k === "email") return true;
+  if (k === "service" || k === "service_type" || k === "product" || k === "course") return true;
+  if (k.includes("service")) return true;
+  return false;
+}
+
 export default function LeadsPage() {
   const { token, role } = useAuth();
   const { money } = useBusinessCurrency();
@@ -194,6 +215,9 @@ export default function LeadsPage() {
   const [emailBody, setEmailBody] = useState("");
   const [emailContactIds, setEmailContactIds] = useState<string[]>([]);
   const [emailSending, setEmailSending] = useState(false);
+  /** Desktop table column visibility (null until localStorage hydrate) */
+  const [hiddenTableCols, setHiddenTableCols] = useState<Set<string> | null>(null);
+  const [colsMenuOpen, setColsMenuOpen] = useState(false);
   const [bulkEditForm, setBulkEditForm] = useState({
     status: "",
     assignedTo: "",
@@ -490,6 +514,71 @@ export default function LeadsPage() {
   const tableFields = useMemo(
     () => leadListColumns(fieldDefs, templateSlug, 6),
     [fieldDefs, templateSlug]
+  );
+
+  const defaultHiddenTableCols = useMemo(() => {
+    const s = new Set<string>();
+    for (const f of tableFields) {
+      if (isSecondaryListField(f)) s.add(fieldColId(f.key));
+    }
+    return s;
+  }, [tableFields]);
+
+  // Hydrate once fields are known — avoids writing empty defaults before config loads
+  useEffect(() => {
+    if (hiddenTableCols !== null) return;
+    if (tableFields.length === 0) return;
+    try {
+      const raw = localStorage.getItem(LEADS_COLS_STORAGE_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw) as unknown;
+        if (Array.isArray(arr) && arr.every((x) => typeof x === "string")) {
+          setHiddenTableCols(new Set(arr as string[]));
+          return;
+        }
+      }
+    } catch {
+      /* ignore corrupt storage */
+    }
+    setHiddenTableCols(new Set(defaultHiddenTableCols));
+  }, [hiddenTableCols, defaultHiddenTableCols, tableFields.length]);
+
+  useEffect(() => {
+    if (hiddenTableCols === null) return;
+    if (tableFields.length === 0) return;
+    try {
+      localStorage.setItem(LEADS_COLS_STORAGE_KEY, JSON.stringify([...hiddenTableCols]));
+    } catch {
+      /* quota / private mode */
+    }
+  }, [hiddenTableCols, tableFields.length]);
+
+  const effectiveHiddenCols = hiddenTableCols ?? defaultHiddenTableCols;
+
+  const isColVisible = useCallback(
+    (id: string) => !effectiveHiddenCols.has(id),
+    [effectiveHiddenCols]
+  );
+
+  const toggleTableCol = useCallback((id: string) => {
+    // Name + Actions always remain visible
+    if (id === "name" || id === "actions") return;
+    setHiddenTableCols((prev) => {
+      const base = prev ?? new Set<string>();
+      const next = new Set(base);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const visibleTableFields = useMemo(
+    () =>
+      tableFields.filter((f) => {
+        if (isNameField(f)) return true;
+        return isColVisible(fieldColId(f.key));
+      }),
+    [tableFields, isColVisible]
   );
 
   const filterableFields = useMemo(
@@ -2212,12 +2301,89 @@ export default function LeadsPage() {
             ))}
           </div>
 
-          {/* Desktop table — sticky header, hover rows, premium shell */}
-          <div className="hidden md:block mm-table-wrap max-w-full overflow-y-visible">
-            <table className="mm-table min-w-[900px]">
+          {/* Desktop table toolbar — column visibility */}
+          <div className="hidden md:flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-card">
+            <p className="text-[11px] text-muted-foreground">
+              Scroll sideways for secondary fields · Name and Actions stay pinned
+            </p>
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                className="mm-btn mm-btn-secondary px-3 text-xs focus-ring min-h-8"
+                onClick={() => setColsMenuOpen((o) => !o)}
+                aria-expanded={colsMenuOpen}
+                aria-haspopup="true"
+                aria-label="Toggle column visibility"
+              >
+                Columns
+              </button>
+              {colsMenuOpen && (
+                <>
+                  <button
+                    type="button"
+                    className="fixed inset-0 z-20 cursor-default"
+                    aria-label="Close columns menu"
+                    onClick={() => setColsMenuOpen(false)}
+                  />
+                  <div
+                    className="absolute right-0 z-30 mt-1 w-52 rounded-md border border-border bg-card p-1.5 shadow-md"
+                    role="menu"
+                  >
+                    {/* Locked identity column */}
+                    <label className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground opacity-70">
+                      <input type="checkbox" checked readOnly disabled className="rounded border-border" />
+                      Name
+                    </label>
+                    {tableFields
+                      .filter((f) => !isNameField(f))
+                      .map((f) => (
+                        <label
+                          key={f.key}
+                          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isColVisible(fieldColId(f.key))}
+                            onChange={() => toggleTableCol(fieldColId(f.key))}
+                            className="rounded border-border"
+                          />
+                          {f.label}
+                        </label>
+                      ))}
+                    <label className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isColVisible("assignedTo")}
+                        onChange={() => toggleTableCol("assignedTo")}
+                        className="rounded border-border"
+                      />
+                      Assigned To
+                    </label>
+                    <label className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isColVisible("score")}
+                        onChange={() => toggleTableCol("score")}
+                        className="rounded border-border"
+                      />
+                      {prefersFeedbackCol ? "Feedback" : "AI Score"}
+                    </label>
+                    <label className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground opacity-70">
+                      <input type="checkbox" checked readOnly disabled className="rounded border-border" />
+                      Actions
+                    </label>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop table — sticky Name (left) + Actions (right), dense enterprise shell */}
+          <div className="hidden md:block mm-table-wrap max-w-full">
+            <table className="mm-table mm-table-dense w-full min-w-[640px]">
               <thead>
                 <tr>
-                  <th className="w-10">
+                  <th className="mm-sticky-left w-10 !px-2">
                     <input
                       type="checkbox"
                       checked={allPageSelected}
@@ -2229,14 +2395,26 @@ export default function LeadsPage() {
                       aria-label="Select all on page"
                     />
                   </th>
-                  {tableFields.map((f) => (
-                    <th key={f.key} className="max-w-[180px]">
-                      {f.label}
+                  {visibleTableFields.map((f) => {
+                    const isName = isNameField(f);
+                    return (
+                      <th
+                        key={f.key}
+                        className={`${isName ? "mm-sticky-left-2 min-w-[9.5rem] max-w-[14rem]" : "max-w-[9rem]"}`}
+                      >
+                        {f.label}
+                      </th>
+                    );
+                  })}
+                  {isColVisible("assignedTo") && (
+                    <th className="min-w-[6.5rem] max-w-[8rem]">Assigned To</th>
+                  )}
+                  {isColVisible("score") && (
+                    <th className="min-w-[5.5rem] max-w-[8rem]">
+                      {prefersFeedbackCol ? "Feedback" : "AI Score"}
                     </th>
-                  ))}
-                  <th>Assigned To</th>
-                  <th>{prefersFeedbackCol ? "Feedback" : "AI Score"}</th>
-                  <th className="text-right">Actions</th>
+                  )}
+                  <th className="mm-sticky-right text-right min-w-[13.5rem]">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -2245,7 +2423,7 @@ export default function LeadsPage() {
                     key={lead.id}
                     data-selected={selectedIds.has(lead.id) ? "true" : undefined}
                   >
-                    <td className="p-3">
+                    <td className="mm-sticky-left !px-2">
                       <input
                         type="checkbox"
                         checked={selectedIds.has(lead.id)}
@@ -2254,7 +2432,7 @@ export default function LeadsPage() {
                         aria-label={`Select ${lead.name}`}
                       />
                     </td>
-                    {tableFields.map((f) => {
+                    {visibleTableFields.map((f) => {
                       const raw = getContactFieldValue(lead as Record<string, unknown>, f);
                       const isMoney =
                         f.type === "currency" ||
@@ -2272,32 +2450,39 @@ export default function LeadsPage() {
                               : "—"
                             : String(raw);
                       const isStatus = f.coreMap === "status" || f.key === "status";
-                      const isName = f.coreMap === "name" || f.key === "name";
+                      const isName = isNameField(f);
                       const showEmailUnderName =
                         !templateHidesEmailInLeadList(templateSlug) &&
-                        !tableFields.some(
+                        !visibleTableFields.some(
                           (tf) =>
                             tf.key === "email" ||
                             tf.coreMap === "email"
                         );
                       return (
-                        <td key={f.key} className="p-3 max-w-[180px]">
+                        <td
+                          key={f.key}
+                          className={
+                            isName
+                              ? "mm-sticky-left-2 min-w-[9.5rem] max-w-[14rem]"
+                              : "max-w-[9rem]"
+                          }
+                        >
                           {isStatus ? (
-                            <span className="inline-block px-2.5 py-0.5 text-xs rounded-full bg-muted text-foreground border border-border capitalize">
+                            <span className="inline-block px-2 py-0.5 text-[11px] rounded-full bg-muted text-foreground border border-border capitalize">
                               {display}
                             </span>
                           ) : isName ? (
-                            <div>
+                            <div className="min-w-0">
                               <div className="font-medium text-foreground truncate" title={display}>
                                 {display}
                               </div>
                               {showEmailUnderName && lead.email ? (
-                                <div className="text-xs text-muted-foreground truncate" title={String(lead.email)}>
+                                <div className="text-[11px] text-muted-foreground truncate" title={String(lead.email)}>
                                   {String(lead.email)}
                                 </div>
                               ) : null}
                               {aiRecMap[lead.id] ? (
-                                <div className="mt-1.5 max-w-xs">
+                                <div className="mt-1 max-w-[13rem]">
                                   <AiLeadRecommendationBadge
                                     rec={aiRecMap[lead.id]}
                                     token={token}
@@ -2317,95 +2502,101 @@ export default function LeadsPage() {
                         </td>
                       );
                     })}
-                    <td className="p-3">
-                      <span
-                        className={`text-xs font-medium ${
-                          lead.assignedTo ? "text-foreground" : "text-muted-foreground italic"
-                        }`}
-                        title={
-                          lead.assignedTo
-                            ? `Assigned To: ${assigneeLabel(lead.assignedTo)}`
-                            : "Unassigned"
-                        }
-                      >
-                        {assigneeLabel(lead.assignedTo)}
-                      </span>
-                    </td>
-                    <td className="p-3 max-w-[200px]">
-                      {prefersFeedbackCol ? (
-                        (() => {
-                          const fb = getLeadFeedbackText(lead as Record<string, unknown>);
-                          if (!fb) {
-                            return (
-                              <span className="text-xs text-muted-foreground italic">—</span>
-                            );
+                    {isColVisible("assignedTo") && (
+                      <td className="min-w-[6.5rem] max-w-[8rem]">
+                        <span
+                          className={`text-xs font-medium truncate block ${
+                            lead.assignedTo ? "text-foreground" : "text-muted-foreground italic"
+                          }`}
+                          title={
+                            lead.assignedTo
+                              ? `Assigned To: ${assigneeLabel(lead.assignedTo)}`
+                              : "Unassigned"
                           }
-                          const short =
-                            fb.length > 80 ? `${fb.slice(0, 77).trimEnd()}…` : fb;
-                          return (
-                            <span
-                              className="text-xs text-foreground line-clamp-2 break-words"
-                              title={fb}
-                            >
-                              {short}
-                            </span>
-                          );
-                        })()
-                      ) : lead.aiScore != null ? (
+                        >
+                          {assigneeLabel(lead.assignedTo)}
+                        </span>
+                      </td>
+                    )}
+                    {isColVisible("score") && (
+                      <td className="min-w-[5.5rem] max-w-[8rem]">
+                        {prefersFeedbackCol ? (
+                          (() => {
+                            const fb = getLeadFeedbackText(lead as Record<string, unknown>);
+                            if (!fb) {
+                              return (
+                                <span className="text-xs text-muted-foreground italic">—</span>
+                              );
+                            }
+                            const short =
+                              fb.length > 80 ? `${fb.slice(0, 77).trimEnd()}…` : fb;
+                            return (
+                              <span
+                                className="text-xs text-foreground line-clamp-2 break-words"
+                                title={fb}
+                              >
+                                {short}
+                              </span>
+                            );
+                          })()
+                        ) : lead.aiScore != null ? (
+                          <button
+                            type="button"
+                            onClick={() => scoreLead(lead)}
+                            disabled={isSubmitting || bulkBusy}
+                            className="hover:opacity-80 transition-opacity"
+                            title="Re-score"
+                          >
+                            <ScoreBadge score={lead.aiScore} />
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    )}
+                    <td className="mm-sticky-right text-right whitespace-nowrap">
+                      <div className="inline-flex items-center justify-end gap-1">
                         <button
                           type="button"
                           onClick={() => scoreLead(lead)}
                           disabled={isSubmitting || bulkBusy}
-                          className="hover:opacity-80 transition-opacity"
-                          title="Re-score"
+                          className="px-2 py-0.5 text-[11px] bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-md border border-emerald-200 dark:border-emerald-500/30 disabled:opacity-50"
                         >
-                          <ScoreBadge score={lead.aiScore} />
+                          Score
                         </button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="p-3 text-right whitespace-nowrap space-x-1.5">
-                      <button
-                        type="button"
-                        onClick={() => scoreLead(lead)}
-                        disabled={isSubmitting || bulkBusy}
-                        className="px-2.5 py-1 text-xs bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/30 disabled:opacity-50"
-                      >
-                        Score
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMediaSendLead(lead)}
-                        className="px-2.5 py-1 text-xs bg-emerald-50 dark:bg-emerald-600/15 hover:bg-emerald-100 dark:hover:bg-emerald-600/25 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/40"
-                      >
-                        Media
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEmailCompose([lead])}
-                        disabled={bulkBusy || !lead.email}
-                        title={lead.email ? `Email ${lead.email}` : "No email on this lead"}
-                        className="px-2.5 py-1 text-xs bg-sky-50 dark:bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-400 rounded-lg border border-primary/40/30 disabled:opacity-50"
-                      >
-                        Email
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openEdit(lead)}
-                        className="px-2.5 py-1 text-xs bg-muted hover:bg-white/20 rounded-lg border border-border"
-                      >
-                        Edit
-                      </button>
-                      {(role === "manager" || role === "admin") && (
                         <button
                           type="button"
-                          onClick={() => handleDelete(lead.id, lead.name)}
-                          className="px-2.5 py-1 text-xs text-red-400 hover:bg-red-950/50 rounded-lg border border-red-900/50"
+                          onClick={() => setMediaSendLead(lead)}
+                          className="px-2 py-0.5 text-[11px] bg-emerald-50 dark:bg-emerald-600/15 hover:bg-emerald-100 dark:hover:bg-emerald-600/25 text-emerald-700 dark:text-emerald-400 rounded-md border border-emerald-200 dark:border-emerald-500/40"
                         >
-                          Delete
+                          Media
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => openEmailCompose([lead])}
+                          disabled={bulkBusy || !lead.email}
+                          title={lead.email ? `Email ${lead.email}` : "No email on this lead"}
+                          className="px-2 py-0.5 text-[11px] bg-sky-50 dark:bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-400 rounded-md border border-primary/40/30 disabled:opacity-50"
+                        >
+                          Email
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(lead)}
+                          className="px-2 py-0.5 text-[11px] bg-muted hover:bg-muted/80 rounded-md border border-border font-medium"
+                        >
+                          Edit
+                        </button>
+                        {(role === "manager" || role === "admin") && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(lead.id, lead.name)}
+                            className="px-2 py-0.5 text-[11px] text-red-400 hover:bg-red-950/50 rounded-md border border-red-900/50"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

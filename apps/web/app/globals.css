@@ -855,6 +855,72 @@ textarea.mm-input {
   border-bottom: none;
 }
 
+/* Dense enterprise table (Leads and similar CRM lists) */
+.mm-table.mm-table-dense {
+  font-size: 0.75rem; /* 12px */
+}
+.mm-table.mm-table-dense thead th {
+  height: 2.25rem; /* 36px */
+  padding: 0 0.5rem;
+  font-size: 0.6875rem; /* 11px */
+  letter-spacing: 0.03em;
+}
+.mm-table.mm-table-dense tbody td {
+  height: 2.5rem; /* 40px */
+  padding: 0.25rem 0.5rem;
+}
+
+/* Horizontal sticky columns — keep identity + actions visible while scrolling */
+.mm-table th.mm-sticky-left,
+.mm-table td.mm-sticky-left {
+  position: sticky;
+  left: 0;
+  z-index: 12;
+  background: var(--card);
+}
+.mm-table th.mm-sticky-left-2,
+.mm-table td.mm-sticky-left-2 {
+  position: sticky;
+  left: 2.5rem; /* checkbox column width */
+  z-index: 12;
+  background: var(--card);
+  box-shadow: 1px 0 0 var(--border);
+}
+.mm-table th.mm-sticky-right,
+.mm-table td.mm-sticky-right {
+  position: sticky;
+  right: 0;
+  z-index: 12;
+  background: var(--card);
+  box-shadow: -1px 0 0 var(--border);
+}
+.mm-table thead th.mm-sticky-left,
+.mm-table thead th.mm-sticky-left-2,
+.mm-table thead th.mm-sticky-right {
+  z-index: 22; /* above body sticky + header scroll */
+  background: #f9fafb;
+}
+.dark .mm-table thead th.mm-sticky-left,
+.dark .mm-table thead th.mm-sticky-left-2,
+.dark .mm-table thead th.mm-sticky-right {
+  background: var(--background-secondary);
+}
+.mm-table tbody tr:hover td.mm-sticky-left,
+.mm-table tbody tr:hover td.mm-sticky-left-2,
+.mm-table tbody tr:hover td.mm-sticky-right {
+  background: #f9fafb;
+}
+.dark .mm-table tbody tr:hover td.mm-sticky-left,
+.dark .mm-table tbody tr:hover td.mm-sticky-left-2,
+.dark .mm-table tbody tr:hover td.mm-sticky-right {
+  background: var(--muted);
+}
+.mm-table tbody tr[data-selected="true"] td.mm-sticky-left,
+.mm-table tbody tr[data-selected="true"] td.mm-sticky-left-2,
+.mm-table tbody tr[data-selected="true"] td.mm-sticky-right {
+  background: var(--accent);
+}
+
 /* ═══════════════════════════════════════════════════════════
    Empty states & skeletons
    ═══════════════════════════════════════════════════════════ */
