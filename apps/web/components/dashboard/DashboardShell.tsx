@@ -1559,12 +1559,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         style={{ minHeight: `calc(100dvh - ${contentOffset})` }}
       >
         {/*
-          Sidebar behaviour (automatic, no mode switch):
+          Sidebar behaviour:
           - Mobile (<lg): off-canvas drawer via hamburger
-          - Desktop (≥lg): permanent full sidebar
+          - Desktop (≥lg): FIXED under header (does not scroll away with main content)
+          - Nav list scrolls inside the sidebar if taller than the viewport
         */}
+        {/* Desktop width reserve so fixed sidebar does not cover main content */}
+        <div
+          className={`hidden lg:block shrink-0 transition-[width] duration-200 ${
+            sidebarCollapsed ? "w-[3.5rem]" : "w-[14.5rem]"
+          }`}
+          aria-hidden
+        />
         <aside
-          className={`fixed lg:sticky lg:self-start left-0 z-30 border-r border-border bg-white dark:bg-sidebar transform transition-all duration-200 ease-out lg:translate-x-0 overflow-y-auto overscroll-contain ${
+          className={`fixed left-0 z-30 border-r border-border bg-white dark:bg-sidebar transform transition-all duration-200 ease-out lg:translate-x-0 overflow-hidden flex flex-col ${
             sidebarOpen ? "translate-x-0 shadow-md" : "-translate-x-full"
           } w-[min(100vw-3rem,14.5rem)] ${
             sidebarCollapsed ? "lg:w-[3.5rem]" : "md:w-[14.5rem] lg:w-[14.5rem]"
@@ -1575,8 +1583,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           }}
           aria-label="Sidebar"
         >
-          <div className="h-full flex flex-col p-2.5 sm:p-3">
-            <div className={`pt-0.5 pb-3 ${sidebarCollapsed ? "lg:px-0" : "px-0.5"}`}>
+          <div className="h-full min-h-0 flex flex-col p-2.5 sm:p-3">
+            <div className={`pt-0.5 pb-3 shrink-0 ${sidebarCollapsed ? "lg:px-0" : "px-0.5"}`}>
               <div className={`flex items-center justify-between gap-2 mb-2 ${sidebarCollapsed ? "lg:justify-center" : ""}`}>
                 <div
                   className={`text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold ${
@@ -1646,6 +1654,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   onNavigate={() => setSidebarOpen(false)}
                 />
               )}
+            </div>
+
+            {/* Scrollable nav region — sidebar shell stays fixed while this scrolls */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5">
               <nav className="space-y-1" aria-label="Main navigation">
                 {renderHierarchicalNav("crm")}
                 {renderHierarchicalNav("erp")}
@@ -1681,12 +1693,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   </div>
                 </>
               )}
-
-              {/* CRM | ERP | Settings rendered above via renderHierarchicalNav */}
             </div>
 
             <div
-              className={`mt-auto text-[10px] text-muted-foreground border-t border-border pt-2.5 ${
+              className={`shrink-0 text-[10px] text-muted-foreground border-t border-border pt-2.5 ${
                 sidebarCollapsed ? "lg:text-center lg:px-0" : "px-1.5"
               }`}
             >

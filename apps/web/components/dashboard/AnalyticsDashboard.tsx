@@ -291,18 +291,18 @@ export function AnalyticsDashboard() {
         ))}
       </div>
 
-      {/* Chart grid — dense professional CRM layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+      {/* Compact analytics cards — side-by-side grid, KPIs remain primary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5 sm:gap-3">
         <GlassCard
           title="Revenue trend"
-          subtitle="Pipeline value created by month"
+          subtitle="Pipeline value by month"
           chartRef={refRevenue}
-          className="xl:col-span-2 min-h-[240px]"
         >
           <InteractiveAreaChart
             series={revenueTrend}
             currency={currency}
             valueIsMoney
+            height={128}
             onDrill={(p) => drill(p, "revenue")}
           />
         </GlassCard>
@@ -333,18 +333,20 @@ export function AnalyticsDashboard() {
             series={monthlySales}
             currency={currency}
             valueIsMoney
+            height={128}
             onDrill={(p) => drill(p, "sales")}
           />
         </GlassCard>
 
         <GlassCard
           title="Leads by status"
-          subtitle="Full pipeline status mix"
+          subtitle="Pipeline status mix"
           chartRef={refStatus}
         >
           <InteractiveBarChart
             series={leadsByStatus}
             currency={currency}
+            height={128}
             onDrill={(p) => drill(p, "status")}
           />
         </GlassCard>
@@ -357,6 +359,7 @@ export function AnalyticsDashboard() {
           <InteractiveBarChart
             series={dealsByStage}
             currency={currency}
+            height={128}
             onDrill={(p) => drill(p, "stage")}
           />
         </GlassCard>
@@ -378,12 +381,12 @@ export function AnalyticsDashboard() {
           title="Daily lead creation"
           subtitle="Last 14 days"
           chartRef={refDaily}
-          className="xl:col-span-2 min-h-[220px]"
         >
           <InteractiveAreaChart
             series={dailyLeadTrend}
             currency={currency}
             valueIsMoney={false}
+            height={128}
             onDrill={(p) => drill(p, "daily")}
           />
         </GlassCard>

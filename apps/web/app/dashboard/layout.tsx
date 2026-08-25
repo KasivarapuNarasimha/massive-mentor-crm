@@ -27,6 +27,12 @@ export default function DashboardLayout({
     return () => window.clearTimeout(t);
   }, []);
 
+  // Fail-safe: never leave the restore splash forever if billing check stalls
+  useEffect(() => {
+    const t = window.setTimeout(() => setBillingChecked(true), 8000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     if ((!isLoading || forceReady) && !isAuthenticated) {
       router.replace("/login");

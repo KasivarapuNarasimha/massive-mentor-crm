@@ -241,16 +241,16 @@ export function GlassCard({
       className={[
         "group/card relative overflow-hidden rounded-md border border-border",
         "bg-card shadow-none",
-        "p-3.5 sm:p-4",
+        "p-2.5 sm:p-3",
         "min-w-0",
         className,
       ].join(" ")}
     >
-      <div className="relative flex items-start justify-between gap-2 mb-2.5">
+      <div className="relative flex items-start justify-between gap-2 mb-1.5">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-foreground tracking-tight">{title}</h3>
+          <h3 className="text-[13px] font-semibold text-foreground tracking-tight">{title}</h3>
           {subtitle && (
-            <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{subtitle}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{subtitle}</p>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -379,9 +379,9 @@ function ExportButtons({
 
 export function EmptyChart({ label = "No Data Available" }: { label?: string }) {
   return (
-    <div className="flex min-h-[180px] flex-col items-center justify-center text-center px-4 py-6">
-      <div className="mb-3 h-10 w-10 rounded-md bg-muted border border-border flex items-center justify-center text-muted-foreground">
-        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+    <div className="flex min-h-[120px] flex-col items-center justify-center text-center px-3 py-4">
+      <div className="mb-2 h-8 w-8 rounded-md bg-muted border border-border flex items-center justify-center text-muted-foreground">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -408,7 +408,7 @@ type CommonProps = {
 
 export function InteractiveAreaChart({
   series,
-  height = 200,
+  height = 132,
   currency = "INR",
   onDrill,
   valueIsMoney = true,
@@ -529,7 +529,7 @@ export function InteractiveAreaChart({
 
 export function InteractiveBarChart({
   series,
-  height = 200,
+  height = 132,
   currency = "INR",
   onDrill,
   valueIsMoney: _valueIsMoney = false,
@@ -629,8 +629,8 @@ export function InteractiveDonutChart({
     return <EmptyChart label="No Data Available" />;
   }
   const total = series.reduce((s, p) => s + p.value, 0) || 1;
-  const r = 68;
-  const stroke = 18;
+  const r = 48;
+  const stroke = 14;
   const c = 2 * Math.PI * r;
   let offset = 0;
   const slices = series.map((s, i) => {
@@ -647,10 +647,10 @@ export function InteractiveDonutChart({
 
   return (
     <div
-      className="relative flex flex-col sm:flex-row items-center gap-4 sm:gap-5 min-h-[180px]"
+      className="relative flex flex-col sm:flex-row items-center gap-3 sm:gap-4 min-h-[132px]"
       data-chart-surface
     >
-      <div className="relative shrink-0 w-[168px] h-[168px] sm:w-[180px] sm:h-[180px]">
+      <div className="relative shrink-0 w-[112px] h-[112px] sm:w-[124px] sm:h-[124px]">
         <svg viewBox="0 0 180 180" className="w-full h-full -rotate-90">
           <circle
             cx="90"
@@ -703,15 +703,15 @@ export function InteractiveDonutChart({
           ))}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-xl font-semibold tabular-nums text-foreground tracking-tight">
+          <span className="text-base font-semibold tabular-nums text-foreground tracking-tight">
             {fmtNum(total)}
           </span>
-          <span className="text-[10px] text-muted-foreground font-medium mt-0.5">
+          <span className="text-[9px] text-muted-foreground font-medium mt-0.5">
             {centerLabel || "total"}
           </span>
         </div>
       </div>
-      <ul className="flex-1 space-y-1 min-w-0 w-full max-h-48 overflow-y-auto pr-1">
+      <ul className="flex-1 space-y-0.5 min-w-0 w-full max-h-36 overflow-y-auto pr-1">
         {slices.map((s) => (
           <li key={s.name}>
             <button
@@ -749,8 +749,8 @@ export function InteractiveFunnelChart({
   const max = Math.max(...series.map((s) => s.value), 1);
   const funnelBase = series[0]?.value || 1;
   const W = 320;
-  const stageH = 34;
-  const gap = 3;
+  const stageH = 26;
+  const gap = 2;
   const minW = W * 0.28;
   const n = series.length;
   const H = n * stageH + Math.max(0, n - 1) * gap;
@@ -763,10 +763,10 @@ export function InteractiveFunnelChart({
   };
 
   return (
-    <div className="relative w-full py-1" data-chart-surface>
+    <div className="relative w-full py-0.5" data-chart-surface>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-auto max-h-[280px]"
+        className="w-full h-auto max-h-[168px]"
         role="img"
         aria-label="Conversion funnel"
       >
@@ -818,7 +818,7 @@ export function InteractiveFunnelChart({
                 y={labelY}
                 textAnchor="middle"
                 className="pointer-events-none"
-                style={{ fontSize: 11, fontWeight: 600, fill: "#ffffff" }}
+                style={{ fontSize: 10, fontWeight: 600, fill: "#ffffff" }}
               >
                 {s.name.length > 28 ? `${s.name.slice(0, 26)}…` : s.name}
                 {`  ·  ${fmtNum(s.value)}`}
@@ -846,7 +846,7 @@ export function InteractiveHorizontalBar({
   const total = series.reduce((s, p) => s + p.value, 0) || 1;
 
   return (
-    <div className="relative space-y-2.5" data-chart-surface>
+    <div className="relative space-y-1.5 max-h-[148px] overflow-y-auto pr-0.5" data-chart-surface>
       {series.map((s, i) => {
         const color = PALETTE[i % PALETTE.length];
         const w = (s.value / max) * 100;
@@ -854,7 +854,7 @@ export function InteractiveHorizontalBar({
           <button
             type="button"
             key={s.name + i}
-            className="w-full text-left group focus-ring rounded-lg"
+            className="w-full text-left group focus-ring rounded-md"
             onMouseEnter={(e) => {
               setTip(
                 tipFromEvent(e, {
@@ -882,13 +882,13 @@ export function InteractiveHorizontalBar({
             onMouseLeave={() => setTip(null)}
             onClick={() => onDrill?.(s)}
           >
-            <div className="flex justify-between text-[11px] mb-1 gap-2">
+            <div className="flex justify-between text-[10px] mb-0.5 gap-2">
               <span className="text-muted-foreground truncate font-medium">{s.name}</span>
               <span className="tabular-nums text-muted-foreground shrink-0">
                 {valueIsMoney ? fmtMoney(s.value, currency) : fmtNum(s.value)}
               </span>
             </div>
-            <div className="h-2 rounded-sm bg-muted overflow-hidden border border-border/60">
+            <div className="h-1.5 rounded-sm bg-muted overflow-hidden border border-border/60">
               <div
                 className="h-full rounded-sm transition-[width] duration-300 ease-out group-hover:opacity-90"
                 style={{

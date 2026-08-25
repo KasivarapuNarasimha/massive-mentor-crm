@@ -315,13 +315,12 @@ export default function ErpDashboardPage() {
               title="Cash inflow"
               subtitle="Paid receipts by month"
               chartRef={refInflow}
-              className="xl:col-span-1 min-h-[220px]"
             >
               <InteractiveBarChart
                 series={inflowSeries}
                 currency={currency}
                 valueIsMoney
-                height={180}
+                height={128}
               />
             </GlassCard>
 
@@ -329,13 +328,12 @@ export default function ErpDashboardPage() {
               title="Cash outflow"
               subtitle="Expenses by month"
               chartRef={refOutflow}
-              className="min-h-[220px]"
             >
               <InteractiveBarChart
                 series={outflowSeries}
                 currency={currency}
                 valueIsMoney
-                height={180}
+                height={128}
               />
             </GlassCard>
 
@@ -343,13 +341,12 @@ export default function ErpDashboardPage() {
               title="Net cash flow"
               subtitle="Inflow − outflow trend"
               chartRef={refNet}
-              className="min-h-[220px]"
             >
               <InteractiveAreaChart
                 series={netSeries}
                 currency={currency}
                 valueIsMoney
-                height={180}
+                height={128}
               />
             </GlassCard>
 
@@ -357,7 +354,6 @@ export default function ErpDashboardPage() {
               title="Profit & Loss"
               subtitle="Revenue vs expenses snapshot"
               chartRef={refPnl}
-              className="min-h-[220px]"
             >
               <InteractiveDonutChart
                 series={pnlSeries}
@@ -370,7 +366,6 @@ export default function ErpDashboardPage() {
               title="Invoice status"
               subtitle="Paid · open · overdue counts"
               chartRef={refInvoices}
-              className="min-h-[220px]"
             >
               <InteractiveDonutChart
                 series={invoiceMix}
@@ -383,7 +378,6 @@ export default function ErpDashboardPage() {
               title="Operations snapshot"
               subtitle="Catalog · vendors · purchasing · stock"
               chartRef={refOps}
-              className="min-h-[220px]"
             >
               <InteractiveHorizontalBar
                 series={opsSeries}
