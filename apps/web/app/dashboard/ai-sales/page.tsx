@@ -179,8 +179,18 @@ function AiSalesIntelligencePageInner() {
 
       // Prefer server aggregates; fall back to safe numeric sum of loaded deals only
       const fallbackTotal = dealRows.reduce((sum, d) => sum + dealAmount(d.value), 0);
+      // Unified pipeline stages: won/lost (legacy closed_* still excluded from open pipeline)
+      const isClosedStage = (stage?: string) => {
+        const s = String(stage || "").toLowerCase();
+        return s === "won" || s === "lost" || s === "closed_won" || s === "closed_lost";
+      };
+      const isWonStage = (stage?: string) => {
+        const s = String(stage || "").toLowerCase();
+        return s === "won" || s === "closed_won";
+      };
+
       const fallbackPipeline = dealRows
-        .filter((d) => !["closed_won", "closed_lost"].includes(d.stage))
+        .filter((d) => !isClosedStage(d.stage))
         .reduce((sum, d) => sum + dealAmount(d.value), 0);
 
       const totalDealsValue =
@@ -196,10 +206,8 @@ function AiSalesIntelligencePageInner() {
       if (reports && typeof reports.conversionRate === "number") {
         conversionRate = reports.conversionRate;
       } else {
-        const wonDeals = dealRows.filter((d) => d.stage === "closed_won").length;
-        const closedDeals = dealRows.filter((d) =>
-          ["closed_won", "closed_lost"].includes(d.stage)
-        ).length;
+        const wonDeals = dealRows.filter((d) => isWonStage(d.stage)).length;
+        const closedDeals = dealRows.filter((d) => isClosedStage(d.stage)).length;
         conversionRate = closedDeals > 0 ? Math.round((wonDeals / closedDeals) * 100) : 0;
       }
 
@@ -660,18 +668,18 @@ function AiSalesIntelligencePageInner() {
   }, [selectedContactId, leads, token]);
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">AI Sales Intelligence</h1>
-        <p className="text-muted-foreground mt-2">AI-powered tools for your CRM, powered by Massive Mentor AI.</p>
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-5 md:px-6 lg:px-8 py-4 sm:py-5 overflow-x-hidden pb-20 md:pb-6">
+      <div className="mb-4">
+        <h1 className="mm-page-title">AI Sales Intelligence</h1>
+        <p className="mm-secondary mt-1">AI-powered tools for your CRM, powered by Massive Mentor AI.</p>
       </div>
 
       {/* CRM Dashboard KPIs */}
-      <div className="mb-10">
-        <h2 className="text-xl font-semibold mb-4 tracking-tight">CRM Dashboard</h2>
+      <div className="mb-6">
+        <h2 className="mm-section-title mb-3">CRM Dashboard</h2>
         {isLoading ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[...Array(7)].map((_, i) => <div key={i} className="h-24 bg-card border border-border rounded-2xl animate-pulse" />)}
+            {[...Array(7)].map((_, i) => <div key={i} className="h-24 bg-card border border-border rounded-lg animate-pulse" />)}
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
@@ -687,15 +695,15 @@ function AiSalesIntelligencePageInner() {
       </div>
 
       {/* AI Tools */}
-      <div className="space-y-8">
+      <div className="space-y-5">
         {/* Lead Scoring */}
-        <div className="bg-card border border-border rounded-2xl p-6">
+        <div className="mm-card p-4 sm:p-5">
           <h3 className="font-semibold mb-4">AI Lead Scoring (0-100)</h3>
           <div className="flex flex-col md:flex-row gap-3 mb-4">
             <select
               value={selectedContactId}
               onChange={(e) => setSelectedContactId(e.target.value)}
-              className="flex-1 min-w-[160px] bg-background border border-border rounded-xl px-4 py-2.5 text-foreground focus:outline-none focus:border-border"
+              className="mm-input flex-1 min-w-[160px]"
               title="Select a lead"
             >
               <option value="">Select a Lead</option>
@@ -707,14 +715,14 @@ function AiSalesIntelligencePageInner() {
             <button
               onClick={() => runAi("lead-score", { contactId: selectedContactId }, setLeadScoreResult, "Lead Score")}
               disabled={!selectedContactId || isGenerating}
-              className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium disabled:opacity-50"
+              className="mm-btn mm-btn-primary disabled:opacity-50"
             >
               Score Lead
             </button>
           </div>
           {!!leadScoreResult && (
-            <div className="mt-3 p-4 bg-background border border-border rounded-xl">
-              <div className="text-3xl font-bold tabular-nums text-emerald-400">{(leadScoreResult as {score?: number}).score}</div>
+            <div className="mt-3 p-4 bg-background border border-border rounded-md">
+              <div className="text-3xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">{(leadScoreResult as {score?: number}).score}</div>
               <p className="text-sm text-muted-foreground mt-1">{(leadScoreResult as {explanation?: string}).explanation}</p>
               <div className="flex flex-wrap gap-2 mt-3">
                 <button
@@ -723,7 +731,7 @@ function AiSalesIntelligencePageInner() {
                     const ls = leadScoreResult as {score?: number, explanation?: string};
                     copyToClipboard(`${ls.score}: ${ls.explanation}`);
                   }}
-                  className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg border border-white/10"
+                  className="text-xs px-3 py-1.5 bg-muted hover:bg-muted rounded-lg border border-border"
                 >
                   Copy
                 </button>
@@ -736,7 +744,7 @@ function AiSalesIntelligencePageInner() {
                         `Follow up on scored lead (${ls.score ?? "—"}/100): ${ls.explanation || "AI lead score follow-up"}`
                       );
                     }}
-                    className="text-xs px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 rounded-lg border border-emerald-500/30"
+                    className="text-xs px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/30"
                   >
                     Create Follow-up Task
                   </button>
@@ -749,7 +757,7 @@ function AiSalesIntelligencePageInner() {
                         .getElementById("ai-whatsapp-generator")
                         ?.scrollIntoView({ behavior: "smooth", block: "start" });
                     }}
-                    className="text-xs px-3 py-1.5 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 rounded-lg border border-sky-500/30"
+                    className="text-xs px-3 py-1.5 bg-sky-50 dark:bg-sky-500/15 hover:bg-sky-100 dark:hover:bg-sky-500/25 text-sky-700 dark:text-sky-300 rounded-lg border border-sky-200 dark:border-sky-500/30"
                   >
                     Draft WhatsApp
                   </button>
@@ -761,13 +769,13 @@ function AiSalesIntelligencePageInner() {
 
         {/* Follow-up Suggestions (kept compact) */}
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-card border border-border rounded-2xl p-6">
+          <div className="mm-card p-4 sm:p-5">
             <h3 className="font-semibold mb-4">AI Follow-up Suggestions</h3>
             <div className="flex gap-3 mb-4">
               <select 
                 value={selectedContactId} 
                 onChange={e=>setSelectedContactId(e.target.value)} 
-                className="flex-1 min-w-[140px] bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-border"
+                className="flex-1 min-w-[140px] bg-background border border-border rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-border"
                 title="Select Lead/Client"
               >
                 <option value="">Select Lead/Client</option>
@@ -776,7 +784,7 @@ function AiSalesIntelligencePageInner() {
                   return <option key={l.id} value={l.id} title={full}>{full.length > 40 ? full.slice(0,37)+'...' : full}</option>;
                 })}
               </select>
-              <button onClick={() => runAi("follow-up", { contactId: selectedContactId }, setFollowUpResult, "Suggestions")} disabled={!selectedContactId || isGenerating} className="px-5 bg-white/10 rounded-xl text-sm">Generate</button>
+              <button onClick={() => runAi("follow-up", { contactId: selectedContactId }, setFollowUpResult, "Suggestions")} disabled={!selectedContactId || isGenerating} className="mm-btn mm-btn-secondary text-sm">Generate</button>
             </div>
             {followUpResult && (followUpResult as Record<string, unknown>).suggestions ? (
               <ul className="text-sm space-y-2 text-muted-foreground">
@@ -784,14 +792,14 @@ function AiSalesIntelligencePageInner() {
                   (s: string, i: number) => (
                     <li
                       key={i}
-                      className="flex flex-col sm:flex-row sm:items-start gap-2 rounded-xl border border-border/60 bg-background/50 px-3 py-2"
+                      className="flex flex-col sm:flex-row sm:items-start gap-2 rounded-md border border-border/60 bg-background/50 px-3 py-2"
                     >
                       <span className="flex-1 text-foreground">• {s}</span>
                       <button
                         type="button"
                         onClick={() => void createFollowUpFromSuggestion(s)}
                         disabled={!selectedContactId}
-                        className="shrink-0 text-xs px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 rounded-lg border border-emerald-500/30 disabled:opacity-50"
+                        className="shrink-0 text-xs px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/30 disabled:opacity-50"
                       >
                         Create Task
                       </button>
@@ -804,11 +812,11 @@ function AiSalesIntelligencePageInner() {
         </div>
 
         {/* Production Quality AI WhatsApp Generator (Feature 2) */}
-        <div id="ai-whatsapp-generator" className="bg-card border border-border rounded-2xl p-6">
+        <div id="ai-whatsapp-generator" className="mm-card p-4 sm:p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold">AI WhatsApp Generator</h3>
               {selectedContactPhone && (
-                <span className="text-xs text-emerald-400">Phone ready for WhatsApp</span>
+                <span className="text-xs text-emerald-700 dark:text-emerald-400">Phone ready for WhatsApp</span>
               )}
             </div>
 
@@ -817,7 +825,7 @@ function AiSalesIntelligencePageInner() {
               <select
                 value={selectedContactId}
                 onChange={(e) => setSelectedContactId(e.target.value)}
-                className="flex-1 min-w-[160px] bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm focus:outline-none focus:border-border"
+                className="flex-1 min-w-[160px] bg-background border border-border rounded-md px-4 py-2.5 text-foreground text-sm focus:outline-none focus:border-border"
                 title="Select Lead / Contact"
               >
                 <option value="">Select Lead / Contact</option>
@@ -832,7 +840,7 @@ function AiSalesIntelligencePageInner() {
               </select>
 
               {/* Tone Selector */}
-              <div className="flex rounded-xl overflow-hidden border border-border">
+              <div className="flex rounded-md overflow-hidden border border-border">
                 {(["Professional", "Friendly", "Sales"] as const).map((t) => (
                   <button
                     key={t}
@@ -860,7 +868,7 @@ function AiSalesIntelligencePageInner() {
               <button
                 onClick={generateWhatsApp}
                 disabled={!selectedContactId || isGenerating}
-                className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium disabled:opacity-50 hover:bg-primary-hover"
+                className="px-6 py-2.5 bg-primary text-primary-foreground rounded-md font-medium disabled:opacity-50 hover:bg-primary-hover"
               >
                 {isGenerating ? "Generating..." : "Generate Message"}
               </button>
@@ -868,7 +876,7 @@ function AiSalesIntelligencePageInner() {
 
             {/* Generated Message Display */}
             {waMessage && (
-              <div className="mt-4 p-4 bg-background border border-border rounded-xl">
+              <div className="mt-4 p-4 bg-background border border-border rounded-md">
                 <div className="flex items-center justify-between mb-2 text-xs uppercase tracking-widest text-muted-foreground">
                   <span>
                     {waTone} • {getLanguageLabel(waLanguage)}
@@ -881,13 +889,13 @@ function AiSalesIntelligencePageInner() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => copyWaMessage(waMessage)}
-                    className="px-4 py-1.5 text-sm bg-white/10 hover:bg-white/20 rounded-lg border border-white/20"
+                    className="px-4 py-1.5 text-sm bg-muted hover:bg-muted rounded-lg border border-border"
                   >
                     📋 Copy
                   </button>
                   <button
                     onClick={() => openInWhatsApp(waMessage)}
-                    className="px-4 py-1.5 text-sm bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30"
+                    className="px-4 py-1.5 text-sm bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/30"
                   >
                     💬 Open in WhatsApp
                   </button>
@@ -906,7 +914,7 @@ function AiSalesIntelligencePageInner() {
               ) : (
                 <div className="space-y-3 max-h-72 overflow-auto pr-1">
                   {waHistory.map((item, idx) => (
-                    <div key={idx} className="p-3 bg-background border border-border rounded-xl text-sm">
+                    <div key={idx} className="p-3 bg-background border border-border rounded-md text-sm">
                       <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1.5">
                         <span>
                           {item.createdAt
@@ -921,13 +929,13 @@ function AiSalesIntelligencePageInner() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => copyWaMessage(String(item.content || item.body || ""))}
-                          className="text-xs px-3 py-0.5 bg-white/5 hover:bg-white/10 rounded border border-white/10"
+                          className="text-xs px-3 py-0.5 bg-muted hover:bg-muted rounded border border-border"
                         >
                           Copy
                         </button>
                         <button
                           onClick={() => openInWhatsApp(String(item.content || item.body || ""))}
-                          className="text-xs px-3 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded border border-emerald-500/20"
+                          className="text-xs px-3 py-0.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded border border-emerald-500/20"
                         >
                           Open WhatsApp
                         </button>
@@ -942,12 +950,12 @@ function AiSalesIntelligencePageInner() {
 
         {/* Proposal, Forecast, Next Best Action */}
         <div className="grid md:grid-cols-3 gap-6">
-          <div className="bg-card border border-border rounded-2xl p-6">
+          <div className="mm-card p-4 sm:p-5">
             <h3 className="font-semibold mb-4">AI Proposal Generator</h3>
             <select 
               value={selectedDealId} 
               onChange={e=>setSelectedDealId(e.target.value)} 
-              className="w-full mb-3 bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-border"
+              className="w-full mb-3 bg-background border border-border rounded-md px-4 py-2.5 text-sm focus:outline-none focus:border-border"
               title="Select a deal"
             >
               <option value="">Select Deal</option>
@@ -956,7 +964,7 @@ function AiSalesIntelligencePageInner() {
                 return <option key={d.id} value={d.id} title={full}>{full.length > 45 ? full.slice(0,42) + '...' : full}</option>;
               })}
             </select>
-            <button onClick={() => runAi("proposal", { dealId: selectedDealId }, setProposalResult, "Proposal")} disabled={!selectedDealId || isGenerating} className="w-full py-2 bg-white/10 rounded-xl text-sm mb-3">Generate Proposal</button>
+            <button onClick={() => runAi("proposal", { dealId: selectedDealId }, setProposalResult, "Proposal")} disabled={!selectedDealId || isGenerating} className="mm-btn mm-btn-secondary w-full mb-3">Generate Proposal</button>
             {!!proposalResult ? (() => {
               const p = proposalResult as Record<string, unknown>;
 
@@ -1042,7 +1050,7 @@ function AiSalesIntelligencePageInner() {
                       {pObj.totalPrice ? (
                         <div>
                           <span className="text-xs text-muted-foreground uppercase tracking-wider">Total Price: </span>
-                          <span className="font-medium text-emerald-400">{String(pObj.totalPrice)}</span>
+                          <span className="font-medium text-emerald-700 dark:text-emerald-400">{String(pObj.totalPrice)}</span>
                         </div>
                       ) : null}
                       {pObj.breakdown ? (
@@ -1164,7 +1172,7 @@ function AiSalesIntelligencePageInner() {
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
                     <button
                       onClick={() => copyToClipboard(formatProposalText(p))}
-                      className="text-xs px-3 py-1 bg-white/10 hover:bg-white/20 rounded border border-white/10"
+                      className="text-xs px-3 py-1 bg-muted hover:bg-muted rounded border border-border"
                     >
                       📋 Copy Proposal
                     </button>
@@ -1179,7 +1187,7 @@ function AiSalesIntelligencePageInner() {
                         a.click();
                         URL.revokeObjectURL(url);
                       }}
-                      className="text-xs px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded border border-emerald-500/20"
+                      className="text-xs px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded border border-emerald-500/20"
                     >
                       📄 Download PDF
                     </button>
@@ -1204,9 +1212,9 @@ function AiSalesIntelligencePageInner() {
             })() : null}
           </div>
 
-          <div className="bg-card border border-border rounded-2xl p-6">
+          <div className="mm-card p-4 sm:p-5">
             <h3 className="font-semibold mb-4">AI Sales Forecast</h3>
-            <button onClick={() => runAi("forecast", {}, setForecastResult, "Forecast")} disabled={isGenerating} className="w-full py-2 bg-white/10 rounded-xl text-sm mb-3">Generate Forecast</button>
+            <button onClick={() => runAi("forecast", {}, setForecastResult, "Forecast")} disabled={isGenerating} className="mm-btn mm-btn-secondary w-full mb-3">Generate Forecast</button>
             {!!forecastResult ? (() => {
               const f = forecastResult as Record<string, unknown>;
               const revenue = f.forecastRevenue as number | undefined;
@@ -1215,17 +1223,17 @@ function AiSalesIntelligencePageInner() {
               return (
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-background border border-border rounded-xl p-3">
+                    <div className="bg-background border border-border rounded-md p-3">
                       <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Expected Revenue</div>
-                      <div className="text-lg font-semibold text-emerald-400 tabular-nums">{money(revenue)}</div>
+                      <div className="text-lg font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{money(revenue)}</div>
                     </div>
-                    <div className="bg-background border border-border rounded-xl p-3">
+                    <div className="bg-background border border-border rounded-md p-3">
                       <div className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Win Rate</div>
                       <div className="text-lg font-semibold text-foreground tabular-nums">{winRate != null ? `${winRate}%` : '—'}</div>
                     </div>
                   </div>
                   {insights.length > 0 && (
-                    <div className="bg-background border border-border rounded-xl p-3">
+                    <div className="bg-background border border-border rounded-md p-3">
                       <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Insights</div>
                       <ul className="text-sm text-foreground space-y-1 list-disc list-inside">
                         {insights.map((ins: string, i: number) => <li key={i}>{ins}</li>)}
@@ -1237,13 +1245,13 @@ function AiSalesIntelligencePageInner() {
             })() : null}
           </div>
 
-          <div className="bg-card border border-border rounded-2xl p-6">
+          <div className="mm-card p-4 sm:p-5">
             <h3 className="font-semibold mb-4">AI Next Best Action</h3>
             <div className="flex flex-col sm:flex-row gap-2 mb-3">
               <select 
                 value={selectedContactId} 
                 onChange={e=>setSelectedContactId(e.target.value)} 
-                className="flex-1 min-w-[140px] bg-background border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-border"
+                className="flex-1 min-w-[140px] bg-background border border-border rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-border"
                 title="Select contact"
               >
                 <option value="">Contact</option>
@@ -1255,7 +1263,7 @@ function AiSalesIntelligencePageInner() {
               <select 
                 value={selectedDealId} 
                 onChange={e=>setSelectedDealId(e.target.value)} 
-                className="flex-1 min-w-[140px] bg-background border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-border"
+                className="flex-1 min-w-[140px] bg-background border border-border rounded-md px-3 py-2.5 text-sm focus:outline-none focus:border-border"
                 title="Select deal"
               >
                 <option value="">Deal</option>
@@ -1268,11 +1276,11 @@ function AiSalesIntelligencePageInner() {
             <button onClick={() => {
               if (selectedContactId) runAi("next-action", { entityType: "contact", entityId: selectedContactId }, setNextActionResult, "Action");
               else if (selectedDealId) runAi("next-action", { entityType: "deal", entityId: selectedDealId }, setNextActionResult, "Action");
-            }} disabled={isGenerating} className="w-full py-2 bg-white/10 rounded-xl text-sm">Get Next Best Action</button>
+            }} disabled={isGenerating} className="mm-btn mm-btn-secondary w-full">Get Next Best Action</button>
             {!!nextActionResult ? (() => {
               const n = nextActionResult as Record<string, unknown>;
               return (
-                <div className="mt-2 bg-background border border-border rounded-xl p-4 space-y-2">
+                <div className="mt-2 bg-background border border-border rounded-md p-4 space-y-2">
                   <div>
                     <div className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Recommended Action</div>
                     <div className="text-foreground font-medium">{String(n.action || '—')}</div>
@@ -1283,25 +1291,25 @@ function AiSalesIntelligencePageInner() {
                   </div>
                   <div>
                     <div className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Priority</div>
-                    <div className="text-sm text-emerald-400">{String(n.priority || '—')}</div>
+                    <div className="text-sm text-emerald-700 dark:text-emerald-400">{String(n.priority || '—')}</div>
                   </div>
                   <div>
                     <div className="text-xs uppercase tracking-widest text-muted-foreground mb-0.5">Timing</div>
-                    <div className="text-sm text-emerald-400">{String(n.timing || '—')}</div>
+                    <div className="text-sm text-emerald-700 dark:text-emerald-400">{String(n.timing || '—')}</div>
                   </div>
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
                     <button
                       type="button"
                       onClick={() => void createTaskFromNextAction()}
                       disabled={!selectedContactId && !selectedDealId}
-                      className="text-xs px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 rounded-lg border border-emerald-500/30 disabled:opacity-50"
+                      className="text-xs px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/15 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/30 disabled:opacity-50"
                     >
                       Create Task
                     </button>
                     {selectedContactId ? (
                       <a
                         href="/dashboard/leads"
-                        className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg border border-white/10"
+                        className="text-xs px-3 py-1.5 bg-muted hover:bg-muted rounded-lg border border-border"
                       >
                         Open Leads
                       </a>
@@ -1314,7 +1322,7 @@ function AiSalesIntelligencePageInner() {
                             .getElementById("ai-whatsapp-generator")
                             ?.scrollIntoView({ behavior: "smooth", block: "start" });
                         }}
-                        className="text-xs px-3 py-1.5 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 rounded-lg border border-sky-500/30"
+                        className="text-xs px-3 py-1.5 bg-sky-50 dark:bg-sky-500/15 hover:bg-sky-100 dark:hover:bg-sky-500/25 text-sky-700 dark:text-sky-300 rounded-lg border border-sky-200 dark:border-sky-500/30"
                       >
                         Draft WhatsApp
                       </button>
@@ -1328,7 +1336,7 @@ function AiSalesIntelligencePageInner() {
 
         {/* Meeting Summary + Reminders */}
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-card border border-border rounded-2xl p-6">
+          <div className="mm-card p-4 sm:p-5">
             <h3 className="font-semibold mb-1">AI Meeting Summary</h3>
             <p className="text-xs text-muted-foreground mb-4">
               Pick a meeting by title — no internal IDs. AI reads notes, discussion, and outcome.
@@ -1340,7 +1348,7 @@ function AiSalesIntelligencePageInner() {
               value={meetingSearch}
               onChange={(e) => setMeetingSearch(e.target.value)}
               placeholder="Search by title, client, date…"
-              className="w-full mb-3 bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground min-h-11"
+              className="mm-input mb-3"
             />
 
             <label className="block text-xs text-muted-foreground mb-1.5">Meeting</label>
@@ -1351,7 +1359,7 @@ function AiSalesIntelligencePageInner() {
                 setMeetingSummaryResult(null);
                 setMeetingSummaryStatus(null);
               }}
-              className="w-full mb-3 bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-foreground min-h-11"
+              className="mm-input mb-3"
               aria-label="Select meeting to summarize"
             >
               <option value="">Select a meeting…</option>
@@ -1395,7 +1403,7 @@ function AiSalesIntelligencePageInner() {
               const m = meetings.find((x) => x.id === selectedMeetingId);
               if (!m) return null;
               return (
-                <div className="mb-3 rounded-xl border border-border bg-background/80 p-3 text-xs text-muted-foreground space-y-1">
+                <div className="mb-3 rounded-md border border-border bg-background/80 p-3 text-xs text-muted-foreground space-y-1">
                   <div className="text-sm text-foreground font-medium">{m.title}</div>
                   <div>
                     {m.scheduledAt
@@ -1432,7 +1440,7 @@ function AiSalesIntelligencePageInner() {
               type="button"
               onClick={() => void generateMeetingSummary()}
               disabled={isGenerating || !selectedMeetingId}
-              className="w-full min-h-11 py-2.5 bg-primary text-primary-foreground font-medium rounded-xl text-sm disabled:opacity-50"
+              className="mm-btn mm-btn-primary w-full disabled:opacity-50"
               aria-busy={!!meetingSummaryStatus}
             >
               {meetingSummaryStatus ? "Working…" : "Generate AI Summary"}
@@ -1440,27 +1448,27 @@ function AiSalesIntelligencePageInner() {
 
             {meetingSummaryStatus && (
               <div
-                className="mt-4 rounded-xl border border-violet-500/30 bg-violet-950/40 px-4 py-3 space-y-2"
+                className="mt-4 rounded-md border border-border bg-accent px-4 py-3 space-y-2"
                 role="status"
                 aria-live="polite"
                 data-testid="meeting-summary-loading"
               >
                 <div className="flex items-center gap-3">
                   <span
-                    className="inline-block h-5 w-5 shrink-0 rounded-full border-2 border-violet-400/30 border-t-violet-300 animate-spin"
+                    className="inline-block h-5 w-5 shrink-0 rounded-full border-2 border-primary/30 border-t-primary animate-spin"
                     aria-hidden
                   />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-violet-100">
+                    <p className="text-sm font-medium text-foreground">
                       {meetingSummaryStatus}
                     </p>
-                    <p className="text-[11px] text-violet-300/70 mt-0.5">
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
                       This usually takes a few seconds — keep this tab open.
                     </p>
                   </div>
                 </div>
-                <div className="h-1 w-full rounded-full bg-violet-950 overflow-hidden">
-                  <div className="h-full w-1/3 rounded-full bg-violet-400/80 animate-pulse" />
+                <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+                  <div className="h-full w-1/3 rounded-full bg-primary animate-pulse" />
                 </div>
               </div>
             )}
@@ -1511,18 +1519,18 @@ function AiSalesIntelligencePageInner() {
                     <button
                       type="button"
                       onClick={copyAll}
-                      className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+                      className="text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-300 underline"
                     >
                       Copy all
                     </button>
                   </div>
-                  <div className="rounded-xl border border-border bg-background p-3">
+                  <div className="rounded-md border border-border bg-background p-3">
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                       Executive Summary
                     </div>
                     <p className="text-foreground leading-relaxed">{exec || "—"}</p>
                   </div>
-                  <div className="rounded-xl border border-border bg-background p-3">
+                  <div className="rounded-md border border-border bg-background p-3">
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                       Key Discussion Points
                     </div>
@@ -1536,7 +1544,7 @@ function AiSalesIntelligencePageInner() {
                       <p className="text-muted-foreground">—</p>
                     )}
                   </div>
-                  <div className="rounded-xl border border-border bg-background p-3">
+                  <div className="rounded-md border border-border bg-background p-3">
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                       Action Items
                     </div>
@@ -1550,7 +1558,7 @@ function AiSalesIntelligencePageInner() {
                       <p className="text-muted-foreground">—</p>
                     )}
                   </div>
-                  <div className="rounded-xl border border-border bg-background p-3">
+                  <div className="rounded-md border border-border bg-background p-3">
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                       Follow-up Tasks
                     </div>
@@ -1564,7 +1572,7 @@ function AiSalesIntelligencePageInner() {
                       <p className="text-muted-foreground">—</p>
                     )}
                   </div>
-                  <div className="rounded-xl border border-border bg-background p-3">
+                  <div className="rounded-md border border-border bg-background p-3">
                     <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
                       Next Meeting Recommendation
                     </div>
@@ -1575,7 +1583,7 @@ function AiSalesIntelligencePageInner() {
             })()}
           </div>
 
-          <div className="bg-card border border-border rounded-2xl p-6">
+          <div className="mm-card p-4 sm:p-5">
             <h3 className="font-semibold mb-1">AI Reminder Suggestions</h3>
             <p className="text-xs text-muted-foreground mb-4">
               Built from the selected lead/client, deal, and/or meeting — dates are relative to
@@ -1611,18 +1619,18 @@ function AiSalesIntelligencePageInner() {
                 remindersLoading ||
                 (!selectedContactId && !selectedDealId && !selectedMeetingId)
               }
-              className="w-full min-h-11 py-2.5 bg-white/10 rounded-xl text-sm disabled:opacity-50"
+              className="mm-btn mm-btn-secondary w-full disabled:opacity-50"
             >
               {remindersLoading ? "Generating reminders…" : "Get Reminders"}
             </button>
 
             {remindersLoading && (
               <div
-                className="mt-4 rounded-xl border border-sky-500/30 bg-sky-950/30 px-4 py-3 flex items-center gap-3"
+                className="mt-4 rounded-md border border-sky-200 dark:border-sky-500/30 bg-sky-950/30 px-4 py-3 flex items-center gap-3"
                 role="status"
                 aria-live="polite"
               >
-                <span className="inline-block h-5 w-5 rounded-full border-2 border-sky-400/30 border-t-sky-300 animate-spin" />
+                <span className="inline-block h-5 w-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
                 <p className="text-sm text-sky-100">
                   Analyzing CRM context and scheduling real follow-ups…
                 </p>
@@ -1652,7 +1660,7 @@ function AiSalesIntelligencePageInner() {
                   return (
                     <li
                       key={rem.id}
-                      className="rounded-xl border border-border bg-background p-3 space-y-2"
+                      className="rounded-md border border-border bg-background p-3 space-y-2"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -1699,7 +1707,7 @@ function AiSalesIntelligencePageInner() {
                         <button
                           type="button"
                           onClick={() => addReminderToCalendar(rem)}
-                          className="min-h-9 px-3 rounded-lg text-xs font-medium bg-white/10 text-foreground border border-border hover:bg-white/15"
+                          className="min-h-9 px-3 rounded-lg text-xs font-medium bg-muted text-foreground border border-border hover:bg-muted"
                         >
                           Add to Calendar
                         </button>
@@ -1720,9 +1728,9 @@ function AiSalesIntelligencePageInner() {
 
 function KpiCard({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="bg-card border border-border rounded-2xl p-4">
-      <div className="text-xs text-muted-foreground mb-1 tracking-widest">{label.toUpperCase()}</div>
-      <div className="text-2xl font-semibold tabular-nums">{value}</div>
+    <div className="mm-kpi-card">
+      <div className="mm-kpi-label">{label}</div>
+      <div className="mm-kpi-value">{value}</div>
     </div>
   );
 }

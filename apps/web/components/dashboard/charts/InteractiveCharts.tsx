@@ -235,25 +235,18 @@ export function GlassCard({
     <article
       data-chart-surface="card"
       className={[
-        "group/card relative overflow-hidden rounded-3xl border border-border",
-        "bg-gradient-to-br from-card via-card to-background-secondary",
-        "dark:from-white/[0.07] dark:via-card/65 dark:to-background/85",
-        "backdrop-blur-xl shadow-lg dark:shadow-xl dark:shadow-black/25",
-        "p-4 sm:p-5 transition-all duration-300 hover:border-primary/25 dark:hover:border-white/18",
+        "group/card relative overflow-hidden rounded-lg border border-border",
+        "bg-card shadow-sm",
+        "p-4",
         "min-w-0 mm-card-hover",
         className,
       ].join(" ")}
     >
-      <div
-        className="pointer-events-none absolute -top-16 -right-12 h-36 w-36 rounded-full bg-primary/10 dark:bg-violet-500/12 blur-3xl group-hover/card:bg-primary/15 dark:group-hover/card:bg-violet-500/18 transition-colors"
-        aria-hidden
-      />
-      <div className="pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-sky-500/8 blur-3xl" aria-hidden />
-      <div className="relative flex items-start justify-between gap-2 mb-4">
+      <div className="relative flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-foreground tracking-tight">{title}</h3>
+          <h3 className="text-[15px] font-semibold text-foreground tracking-tight">{title}</h3>
           {subtitle && (
-            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{subtitle}</p>
+            <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">{subtitle}</p>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -382,7 +375,7 @@ function ExportButtons({
 export function EmptyChart({ label = "No Data Available" }: { label?: string }) {
   return (
     <div className="flex min-h-[180px] flex-col items-center justify-center text-center px-4 py-6">
-      <div className="mb-3 h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500/10 to-sky-500/5 border border-white/10 flex items-center justify-center text-muted-foreground">
+      <div className="mb-3 h-10 w-10 rounded-md bg-muted border border-border flex items-center justify-center text-muted-foreground">
         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
           <path
             strokeLinecap="round"

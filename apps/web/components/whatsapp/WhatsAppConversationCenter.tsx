@@ -65,12 +65,12 @@ const STATUSES = [
 
 function statusBadge(status: string) {
   const map: Record<string, string> = {
-    open: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-    pending: "bg-amber-500/15 text-amber-200 border-amber-500/30",
-    follow_up: "bg-sky-500/15 text-sky-200 border-sky-500/30",
-    won: "bg-violet-500/15 text-violet-200 border-violet-500/30",
-    lost: "bg-red-500/15 text-red-300 border-red-500/30",
-    closed: "bg-white/10 text-muted-foreground border-border",
+    open: "mm-badge mm-badge-success",
+    pending: "mm-badge mm-badge-warning",
+    follow_up: "mm-badge mm-badge-primary",
+    won: "mm-badge mm-badge-primary",
+    lost: "mm-badge mm-badge-danger",
+    closed: "mm-badge",
   };
   return map[status] || map.open;
 }
@@ -282,14 +282,14 @@ export function WhatsAppConversationCenter() {
   const conv = detail?.conversation;
 
   return (
-    <div className="h-full rounded-2xl border border-border bg-card/30 overflow-hidden flex flex-col">
+    <div className="h-full mm-card overflow-hidden flex flex-col rounded-lg">
       {/* Mini dashboard strip */}
       {dash && (
-        <div className="border-b border-border px-3 py-2 flex flex-wrap gap-2 items-center bg-card/50">
+        <div className="border-b border-border px-3 py-2 flex flex-wrap gap-2 items-center bg-card">
           <button
             type="button"
             onClick={() => setShowDash((v) => !v)}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground"
+            className="mm-btn mm-btn-ghost h-9 px-2 text-xs"
           >
             {showDash ? "Hide stats" : "Show stats"}
           </button>
@@ -366,7 +366,7 @@ export function WhatsAppConversationCenter() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="mm-input text-[11px] min-h-8 py-0 flex-1"
+                className="mm-input text-[11px] min-h-9 h-9 py-0 flex-1"
               >
                 <option value="">All statuses</option>
                 {STATUSES.map((s) => (
@@ -378,7 +378,7 @@ export function WhatsAppConversationCenter() {
               <select
                 value={labelFilter}
                 onChange={(e) => setLabelFilter(e.target.value)}
-                className="mm-input text-[11px] min-h-8 py-0 flex-1"
+                className="mm-input text-[11px] min-h-9 h-9 py-0 flex-1"
               >
                 <option value="">All labels</option>
                 {presetLabels.map((l) => (
@@ -398,7 +398,7 @@ export function WhatsAppConversationCenter() {
               <button
                 type="button"
                 onClick={() => void loadList()}
-                className="text-[11px] px-2 rounded-lg border border-border"
+                className="mm-btn mm-btn-secondary h-9 px-2.5 text-[11px]"
               >
                 Go
               </button>
@@ -407,7 +407,7 @@ export function WhatsAppConversationCenter() {
                   <button
                     type="button"
                     onClick={() => setBroadcastOpen(true)}
-                    className="text-[11px] px-2 rounded-lg border border-violet-500/40 text-violet-200"
+                    className="mm-btn mm-btn-secondary h-9 px-2.5 text-[11px]"
                   >
                     Broadcast
                   </button>
@@ -426,7 +426,7 @@ export function WhatsAppConversationCenter() {
                         );
                       }
                     }}
-                    className="text-[11px] px-2 rounded-lg border border-border"
+                    className="mm-btn mm-btn-secondary h-9 px-2.5 text-[11px]"
                   >
                     SLA & Rules
                   </button>
@@ -438,13 +438,13 @@ export function WhatsAppConversationCenter() {
             {loadingList ? (
               <div className="p-3 space-y-2" aria-busy="true" aria-label="Loading conversations">
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <div key={i} className="mm-skeleton h-14 w-full rounded-xl" />
+                  <div key={i} className="mm-skeleton h-12 w-full rounded-lg" />
                 ))}
               </div>
             ) : conversations.length === 0 ? (
               <div className="p-6 text-center" role="status">
                 <p className="text-sm font-medium text-foreground mb-1">No conversations yet</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="mm-secondary leading-relaxed">
                   Send a WhatsApp message from a lead to start a thread.
                 </p>
               </div>
@@ -454,8 +454,8 @@ export function WhatsAppConversationCenter() {
                   key={c.id}
                   type="button"
                   onClick={() => setSelectedId(c.id)}
-                  className={`w-full text-left px-3 py-2.5 border-b border-border/50 hover:bg-white/5 ${
-                    selectedId === c.id ? "bg-primary/10 border-l-2 border-l-primary" : ""
+                  className={`w-full text-left px-3 py-2 min-h-[48px] border-b border-border hover:bg-muted/50 ${
+                    selectedId === c.id ? "bg-accent border-l-2 border-l-primary" : ""
                   }`}
                 >
                   <div className="flex justify-between gap-2">
@@ -464,7 +464,7 @@ export function WhatsAppConversationCenter() {
                       {c.contactName}
                     </span>
                     {c.unreadCount > 0 && (
-                      <span className="shrink-0 text-[10px] font-semibold bg-emerald-600 text-white rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
+                      <span className="shrink-0 text-[10px] font-semibold bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
                         {c.unreadCount}
                       </span>
                     )}
@@ -477,15 +477,15 @@ export function WhatsAppConversationCenter() {
                       {(c.labels || []).slice(0, 3).map((l) => (
                         <span
                           key={l}
-                          className="text-[9px] px-1 rounded bg-white/5 border border-border"
+                          className="mm-badge text-[9px] px-1.5 py-0"
                         >
                           {l}
                         </span>
                       ))}
                     </div>
                   )}
-                  <div className="flex justify-between mt-1">
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded border ${statusBadge(c.status)}`}>
+                  <div className="flex justify-between mt-1 items-center gap-2">
+                    <span className={statusBadge(c.status)}>
                       {c.status}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
@@ -501,17 +501,17 @@ export function WhatsAppConversationCenter() {
         {/* Center: thread */}
         <section className="lg:col-span-5 flex flex-col min-h-0 border-r border-border">
           {!selectedId ? (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm p-6">
+            <div className="flex-1 flex items-center justify-center mm-secondary p-6">
               Select a conversation to start chatting
             </div>
           ) : (
             <>
-              <div className="px-3 py-2 border-b border-border flex flex-wrap items-center gap-2 bg-card/40">
+              <div className="px-3 py-2 border-b border-border flex flex-wrap items-center gap-2 bg-card">
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-sm truncate">
                     {String(conv?.contactName || "…")}
                   </div>
-                  <div className="text-[11px] text-muted-foreground truncate">
+                  <div className="mm-secondary truncate">
                     {String(conv?.phone || "")}
                   </div>
                 </div>
@@ -530,7 +530,7 @@ export function WhatsAppConversationCenter() {
                       await loadList();
                     } else toast.error(res.error || "Failed");
                   }}
-                  className="mm-input text-[11px] min-h-8 py-0 w-28"
+                  className="mm-input text-[11px] min-h-9 h-9 py-0 w-28"
                 >
                   {STATUSES.map((s) => (
                     <option key={s.key} value={s.key}>
@@ -554,7 +554,7 @@ export function WhatsAppConversationCenter() {
                         await loadList();
                       } else toast.error(res.error || "Failed");
                     }}
-                    className="mm-input text-[11px] min-h-8 py-0 max-w-[140px]"
+                    className="mm-input text-[11px] min-h-9 h-9 py-0 max-w-[140px]"
                   >
                     <option value="">Assign…</option>
                     {agents.map((a) => (
@@ -567,7 +567,7 @@ export function WhatsAppConversationCenter() {
                 <button
                   type="button"
                   title="Pin (max 10)"
-                  className="text-xs px-2 py-1 rounded-lg border border-border"
+                  className="mm-btn mm-btn-secondary h-9 px-2 text-xs"
                   onClick={async () => {
                     if (!token || !selectedId) return;
                     const res = await api.waTogglePin(selectedId, token);
@@ -584,7 +584,7 @@ export function WhatsAppConversationCenter() {
                   📌
                 </button>
                 <select
-                  className="mm-input text-[11px] min-h-8 py-0 w-auto"
+                  className="mm-input text-[11px] min-h-9 h-9 py-0 w-auto"
                   defaultValue=""
                   onChange={async (e) => {
                     if (!token || !selectedId || !e.target.value) return;
@@ -632,7 +632,7 @@ export function WhatsAppConversationCenter() {
                   <option value="custom">Custom Date & Time</option>
                 </select>
                 <select
-                  className="mm-input text-[11px] min-h-8 py-0 w-auto max-w-[130px]"
+                  className="mm-input text-[11px] min-h-9 h-9 py-0 w-auto max-w-[130px]"
                   defaultValue=""
                   onChange={async (e) => {
                     if (!token || !selectedId || !e.target.value) return;
@@ -654,7 +654,7 @@ export function WhatsAppConversationCenter() {
                   ))}
                 </select>
                 <select
-                  className="mm-input text-[11px] min-h-8 py-0 w-auto"
+                  className="mm-input text-[11px] min-h-9 h-9 py-0 w-auto"
                   defaultValue=""
                   onChange={async (e) => {
                     if (!token || !selectedId || !e.target.value) return;
@@ -684,7 +684,7 @@ export function WhatsAppConversationCenter() {
                 </select>
                 <button
                   type="button"
-                  className="text-[11px] px-2 py-1 rounded-lg border border-red-500/30 text-red-300"
+                  className="mm-btn mm-btn-danger h-9 px-2.5 text-[11px]"
                   onClick={async () => {
                     if (!token || !selectedId) return;
                     if (!confirm("Mark as spam and close?")) return;
@@ -701,7 +701,7 @@ export function WhatsAppConversationCenter() {
                 {canAssign && (
                   <button
                     type="button"
-                    className="text-[11px] px-2 py-1 rounded-lg border border-border"
+                    className="mm-btn mm-btn-secondary h-9 px-2.5 text-[11px]"
                     title="Merge another conversation into this one"
                     onClick={async () => {
                       if (!token || !selectedId) return;
@@ -734,7 +734,7 @@ export function WhatsAppConversationCenter() {
 
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {loadingThread ? (
-                  <p className="text-sm text-muted-foreground">Loading messages…</p>
+                  <p className="mm-secondary">Loading messages…</p>
                 ) : (
                   messages.map((m) => {
                     const isNote = m.isInternal || m.direction === "internal";
@@ -745,29 +745,29 @@ export function WhatsAppConversationCenter() {
                         className={`flex ${isIn ? "justify-start" : "justify-end"}`}
                       >
                         <div
-                          className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                          className={`max-w-[85%] rounded-lg px-3 py-2 text-sm border ${
                             isNote
-                              ? "bg-amber-500/10 border border-amber-500/30 text-amber-50"
+                              ? "bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-100"
                               : isIn
-                                ? "bg-white/10 border border-border"
-                                : "bg-emerald-600/25 border border-emerald-500/30"
+                                ? "bg-muted border-border text-foreground"
+                                : "bg-primary/10 border-primary/20 text-foreground"
                           }`}
                         >
                           {isNote && (
-                            <div className="text-[10px] uppercase text-amber-300/90 mb-0.5">
+                            <div className="text-[10px] uppercase text-amber-700 dark:text-amber-300 mb-0.5 font-medium">
                               Private note
                             </div>
                           )}
                           <div className="whitespace-pre-wrap break-words">{m.body}</div>
                           {m.transcript && (
-                            <div className="mt-1 text-[11px] text-muted-foreground border-t border-white/10 pt-1">
+                            <div className="mt-1 text-[11px] text-muted-foreground border-t border-border pt-1">
                               🎙 {m.transcript}
                             </div>
                           )}
                           {m.messageType === "audio" && !m.transcript && token && (
                             <button
                               type="button"
-                              className="text-[10px] text-violet-300 mt-1 underline"
+                              className="text-[10px] text-primary mt-1 underline"
                               onClick={async () => {
                                 const res = await api.waTranscribe(m.id, token);
                                 if (res.success) {
@@ -812,10 +812,12 @@ export function WhatsAppConversationCenter() {
                               <span
                                 className={
                                   m.status === "read"
-                                    ? "text-sky-400"
-                                    : m.status === "failed"
-                                      ? "text-red-400"
-                                      : ""
+                                    ? "text-emerald-600"
+                                    : m.status === "delivered"
+                                      ? "text-emerald-600/70"
+                                      : m.status === "failed"
+                                        ? "text-destructive"
+                                        : ""
                                 }
                                 title={m.status}
                               >
@@ -838,8 +840,8 @@ export function WhatsAppConversationCenter() {
 
               {/* AI suggestions */}
               {aiSuggestions.length > 0 && !noteMode && (
-                <div className="px-3 py-2 border-t border-border bg-violet-500/5 space-y-1">
-                  <div className="text-[10px] font-semibold uppercase text-violet-300">
+                <div className="px-3 py-2 border-t border-border bg-muted/40 space-y-1">
+                  <div className="text-[10px] font-semibold uppercase text-muted-foreground">
                     AI reply suggestions
                   </div>
                   <div className="flex flex-col gap-1">
@@ -848,7 +850,7 @@ export function WhatsAppConversationCenter() {
                         key={i}
                         type="button"
                         onClick={() => setComposer(s)}
-                        className="text-left text-xs px-2 py-1.5 rounded-lg border border-violet-500/20 hover:bg-violet-500/10"
+                        className="text-left text-xs px-2 py-1.5 rounded-lg border border-border bg-card hover:bg-muted/60"
                       >
                         {s}
                       </button>
@@ -858,13 +860,13 @@ export function WhatsAppConversationCenter() {
               )}
 
               {/* Composer */}
-              <div className="p-2.5 border-t border-border space-y-2 bg-card/40">
+              <div className="p-2.5 border-t border-border space-y-2 bg-card">
                 <div className="flex gap-2 text-[11px]">
                   <button
                     type="button"
                     onClick={() => setNoteMode(false)}
-                    className={`px-2 py-1 rounded-lg border ${
-                      !noteMode ? "border-primary bg-primary/10" : "border-border"
+                    className={`mm-btn h-9 px-2.5 text-[11px] ${
+                      !noteMode ? "mm-btn-primary" : "mm-btn-secondary"
                     }`}
                   >
                     Message
@@ -872,15 +874,17 @@ export function WhatsAppConversationCenter() {
                   <button
                     type="button"
                     onClick={() => setNoteMode(true)}
-                    className={`px-2 py-1 rounded-lg border ${
-                      noteMode ? "border-amber-500/50 bg-amber-500/10" : "border-border"
+                    className={`mm-btn h-9 px-2.5 text-[11px] ${
+                      noteMode
+                        ? "border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+                        : "mm-btn-secondary"
                     }`}
                   >
                     Private note
                   </button>
                   <button
                     type="button"
-                    className="px-2 py-1 rounded-lg border border-border ml-auto"
+                    className="mm-btn mm-btn-secondary h-9 px-2.5 text-[11px] ml-auto"
                     onClick={async () => {
                       if (!token || !selectedId) return;
                       const tomorrow = new Date();
@@ -909,7 +913,7 @@ export function WhatsAppConversationCenter() {
                         ? "Private note (customer will never see this)…"
                         : "Type a WhatsApp message…"
                     }
-                    className="mm-input flex-1 text-sm resize-none min-h-[56px]"
+                    className="mm-input flex-1 text-sm resize-none min-h-[52px]"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -921,7 +925,7 @@ export function WhatsAppConversationCenter() {
                     type="button"
                     disabled={sending || !composer.trim()}
                     onClick={() => void send()}
-                    className="px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50 self-end min-h-11"
+                    className="mm-btn mm-btn-primary self-end h-9 px-4 text-sm disabled:opacity-50"
                   >
                     {sending ? "…" : noteMode ? "Save" : "Send"}
                   </button>
@@ -932,8 +936,8 @@ export function WhatsAppConversationCenter() {
         </section>
 
         {/* Right: profile / media / timeline / summary */}
-        <aside className="lg:col-span-4 flex flex-col min-h-0 max-h-[40vh] lg:max-h-none">
-          <div className="flex border-b border-border text-[11px]">
+        <aside className="lg:col-span-4 flex flex-col min-h-0 max-h-[40vh] lg:max-h-none bg-card">
+          <div className="mm-tabs text-[11px]" role="tablist">
             {(
               [
                 ["profile", "Profile"],
@@ -945,12 +949,11 @@ export function WhatsAppConversationCenter() {
               <button
                 key={k}
                 type="button"
+                role="tab"
+                aria-selected={rightTab === k}
+                data-active={rightTab === k ? "true" : undefined}
                 onClick={() => setRightTab(k)}
-                className={`flex-1 px-2 py-2 ${
-                  rightTab === k
-                    ? "border-b-2 border-primary text-foreground font-medium"
-                    : "text-muted-foreground"
-                }`}
+                className="mm-tab flex-1 justify-center px-2 py-2 text-[11px]"
               >
                 {label}
               </button>
@@ -958,7 +961,7 @@ export function WhatsAppConversationCenter() {
           </div>
           <div className="flex-1 overflow-y-auto p-3 text-sm">
             {!selectedId ? (
-              <p className="text-muted-foreground text-xs">Select a conversation</p>
+              <p className="mm-secondary">Select a conversation</p>
             ) : rightTab === "profile" ? (
               <div className="space-y-2">
                 <Field label="Name" value={String(contact?.name || conv?.contactName || "—")} />
@@ -1013,14 +1016,14 @@ export function WhatsAppConversationCenter() {
                   .length === 0 &&
                 ((mediaData?.messages as Array<Record<string, unknown>>) || []).length ===
                   0 ? (
-                  <p className="text-xs text-muted-foreground">No media in this conversation yet.</p>
+                  <p className="mm-secondary">No media in this conversation yet.</p>
                 ) : (
                   <>
                     {((mediaData?.sentFromLibrary as Array<Record<string, unknown>>) || []).map(
                       (f) => (
                         <div
                           key={String(f.id)}
-                          className="rounded-lg border border-border px-2 py-1.5 text-xs"
+                          className="mm-card rounded-lg px-2 py-1.5 text-xs"
                         >
                           📄 {String(f.assetName)} · {String(f.status)}
                         </div>
@@ -1029,7 +1032,7 @@ export function WhatsAppConversationCenter() {
                     {((mediaData?.messages as Array<Record<string, unknown>>) || []).map((f) => (
                       <div
                         key={String(f.id)}
-                        className="rounded-lg border border-border px-2 py-1.5 text-xs"
+                        className="mm-card rounded-lg px-2 py-1.5 text-xs"
                       >
                         {String(f.messageType || "file")}: {String(f.body || f.mediaName || "")}
                       </div>
@@ -1040,7 +1043,7 @@ export function WhatsAppConversationCenter() {
             ) : rightTab === "timeline" ? (
               <ol className="space-y-2">
                 {timeline.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No timeline events</p>
+                  <p className="mm-secondary">No timeline events</p>
                 ) : (
                   timeline.map((ev) => (
                     <li
@@ -1062,7 +1065,7 @@ export function WhatsAppConversationCenter() {
               <div className="space-y-3">
                 <button
                   type="button"
-                  className="w-full min-h-9 rounded-xl border border-violet-500/40 bg-violet-500/10 text-xs font-medium"
+                  className="mm-btn mm-btn-secondary w-full min-h-9 h-9 text-xs font-medium"
                   onClick={async () => {
                     if (!token || !selectedId) return;
                     toast.message("Generating summary…");
@@ -1087,7 +1090,7 @@ export function WhatsAppConversationCenter() {
                     />
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="mm-secondary">
                     Click to generate AI summary of this chat.
                   </p>
                 )}
@@ -1098,10 +1101,10 @@ export function WhatsAppConversationCenter() {
       </div>
 
       {automationOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 space-y-3 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-semibold">SLA & auto-assignment</h3>
-            <p className="text-xs text-muted-foreground">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="mm-card rounded-lg w-full max-w-md p-5 space-y-3 max-h-[90vh] overflow-y-auto">
+            <h3 className="font-semibold text-sm">SLA & auto-assignment</h3>
+            <p className="mm-secondary">
               Escalate unanswered chats automatically. New WhatsApp threads match rules by industry/location.
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -1128,7 +1131,7 @@ export function WhatsAppConversationCenter() {
             </div>
             <button
               type="button"
-              className="w-full min-h-9 rounded-xl border border-border text-sm"
+              className="mm-btn mm-btn-secondary w-full min-h-9 h-9 text-sm"
               onClick={async () => {
                 if (!token) return;
                 const res = await api.waUpdateSla(
@@ -1180,14 +1183,14 @@ export function WhatsAppConversationCenter() {
             <div className="flex gap-2">
               <button
                 type="button"
-                className="flex-1 min-h-10 rounded-xl border border-border"
+                className="mm-btn mm-btn-secondary flex-1 min-h-9 h-9"
                 onClick={() => setAutomationOpen(false)}
               >
                 Close
               </button>
               <button
                 type="button"
-                className="flex-1 min-h-10 rounded-xl bg-emerald-600 text-white font-medium text-sm"
+                className="mm-btn mm-btn-primary flex-1 min-h-9 h-9 text-sm"
                 onClick={async () => {
                   if (!token) return;
                   if (!ruleName.trim() || !ruleAssignee) {
@@ -1223,14 +1226,14 @@ export function WhatsAppConversationCenter() {
       )}
 
       {broadcastOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 space-y-3">
-            <h3 className="font-semibold">Broadcast campaign</h3>
-            <p className="text-xs text-muted-foreground">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="mm-card rounded-lg w-full max-w-md p-5 space-y-3">
+            <h3 className="font-semibold text-sm">Broadcast campaign</h3>
+            <p className="mm-secondary">
               Sends approved free-text (or Meta template name) to filtered leads. Track delivery in history.
             </p>
             <input
-              className="mm-input w-full text-sm min-h-10"
+              className="mm-input w-full text-sm min-h-9"
               value={broadcastName}
               onChange={(e) => setBroadcastName(e.target.value)}
               placeholder="Campaign name"
@@ -1244,14 +1247,14 @@ export function WhatsAppConversationCenter() {
             <div className="flex gap-2">
               <button
                 type="button"
-                className="flex-1 min-h-10 rounded-xl border border-border"
+                className="mm-btn mm-btn-secondary flex-1 min-h-9 h-9"
                 onClick={() => setBroadcastOpen(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="flex-1 min-h-10 rounded-xl bg-violet-600 text-white font-medium"
+                className="mm-btn mm-btn-primary flex-1 min-h-9 h-9 text-sm"
                 onClick={async () => {
                   if (!token) return;
                   const res = await api.waCreateBroadcast(
@@ -1281,18 +1284,18 @@ export function WhatsAppConversationCenter() {
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
-      <div className="font-medium break-words">{value}</div>
+    <div className="rounded-lg border border-border px-2.5 py-1.5 bg-card">
+      <div className="mm-secondary uppercase tracking-wide">{label}</div>
+      <div className="font-medium text-sm break-words mt-0.5">{value}</div>
     </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-border px-2 py-1">
-      <span className="text-muted-foreground">{label}: </span>
-      <span className="font-semibold tabular-nums">{value}</span>
+    <div className="rounded-lg border border-border bg-card px-2 py-1">
+      <span className="mm-secondary">{label}: </span>
+      <span className="font-semibold tabular-nums text-sm">{value}</span>
     </div>
   );
 }

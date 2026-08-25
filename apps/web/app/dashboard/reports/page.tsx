@@ -199,98 +199,97 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <h1 className="text-2xl sm:text-3xl font-semibold mb-2">Reports & Analytics</h1>
-      <p className="text-sm text-muted-foreground mb-6">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6 overflow-x-hidden pb-20 md:pb-6">
+      <h1 className="mm-page-title mb-1">Reports & Analytics</h1>
+      <p className="mm-secondary mb-4">
         Live charts for your workspace — never raw JSON. Empty series show &quot;No Data Available&quot;.
       </p>
 
-      {/* Interactive charts (same engine as Overview analytics) */}
-      <div className="mb-8" key={chartKey}>
+      <div className="mb-4" key={chartKey}>
         <AnalyticsDashboard />
       </div>
 
-      <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 mb-6">
-        <h3 className="font-semibold mb-4">Export</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 sm:gap-3">
+      <div className="mm-card p-4 sm:p-5 mb-4">
+        <h3 className="text-sm font-semibold mb-3">Export</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2">
           <button
             type="button"
             onClick={() => exportCsv("lead")}
-            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+            className="mm-btn mm-btn-secondary h-9 touch-manipulation"
           >
             Export Leads CSV
           </button>
           <button
             type="button"
             onClick={() => exportCsv("client")}
-            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+            className="mm-btn mm-btn-secondary h-9 touch-manipulation"
           >
             Export Clients CSV
           </button>
           <button
             type="button"
             onClick={() => exportCsv("deal")}
-            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+            className="mm-btn mm-btn-secondary h-9 touch-manipulation"
           >
             Export Deals CSV
           </button>
           <button
             type="button"
             onClick={() => exportCsv()}
-            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+            className="mm-btn mm-btn-secondary h-9 touch-manipulation"
           >
             Export All CSV
           </button>
           <button
             type="button"
             onClick={() => exportPdf("lead")}
-            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+            className="mm-btn mm-btn-secondary h-9 touch-manipulation"
           >
             Export Leads PDF
           </button>
           <button
             type="button"
             onClick={() => exportPdf("client")}
-            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+            className="mm-btn mm-btn-secondary h-9 touch-manipulation"
           >
             Export Clients PDF
           </button>
           <button
             type="button"
             onClick={() => exportPdf("deal")}
-            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+            className="mm-btn mm-btn-secondary h-9 touch-manipulation"
           >
             Export Deals PDF
           </button>
           <button
             type="button"
             onClick={() => exportPdf()}
-            className="min-h-11 px-5 py-2.5 bg-white/10 rounded-xl text-sm touch-manipulation"
+            className="mm-btn mm-btn-secondary h-9 touch-manipulation"
           >
             Export All PDF
           </button>
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 mb-6">
-        <h3 className="font-semibold mb-4">Import Leads / Clients (CSV or Excel)</h3>
+      <div className="mm-card p-4 sm:p-5 mb-4">
+        <h3 className="text-sm font-semibold mb-3">Import Leads / Clients (CSV or Excel)</h3>
         <textarea
           value={importCsvText}
           onChange={(e) => setImportCsvText(e.target.value)}
           placeholder="Paste CSV here (header row required: name, phone, email, company…)"
-          className="w-full h-32 bg-background border border-border rounded-xl p-3 mb-3 font-mono text-xs"
+          className="mm-input h-32 mb-3 font-mono text-xs"
         />
-        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-wrap">
+        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center flex-wrap">
           <button
             type="button"
             onClick={importCsv}
             disabled={importing || !importCsvText}
-            className="min-h-11 px-6 py-2.5 bg-primary text-primary-foreground rounded-xl disabled:opacity-50 touch-manipulation"
+            className={`mm-btn mm-btn-primary h-9 touch-manipulation ${importing ? "mm-btn-loading" : ""}`}
           >
             {importing ? "Importing…" : "Import Text"}
           </button>
           <label
-            className={`min-h-11 px-6 py-2.5 bg-white/10 rounded-xl cursor-pointer text-center flex items-center justify-center touch-manipulation ${importing ? "opacity-50 pointer-events-none" : ""}`}
+            className={`mm-btn mm-btn-secondary h-9 cursor-pointer touch-manipulation ${importing ? "opacity-50 pointer-events-none" : ""}`}
           >
             Import File (CSV / Excel)
             <input
@@ -302,20 +301,20 @@ export default function ReportsPage() {
             />
           </label>
         </div>
-        <p className="text-xs mt-2 text-muted-foreground">
-          Prefer <span className="text-muted-foreground">Leads → Import</span> for the column-mapping wizard on
+        <p className="mm-secondary mt-2">
+          Prefer <span className="text-foreground">Leads → Import</span> for the column-mapping wizard on
           large files. Large imports can take a few minutes.
         </p>
 
         {importReport && (
-          <div className="mt-5 border border-border rounded-xl p-4 bg-background">
+          <div className="mt-4 rounded-lg border border-border p-3.5 bg-muted/40">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-semibold">Import Report</h4>
+              <h4 className="text-sm font-semibold">Import Report</h4>
               {importReport.report && (
                 <button
                   type="button"
                   onClick={downloadReport}
-                  className="text-xs px-3 py-1 bg-white/10 rounded-lg"
+                  className="mm-btn mm-btn-ghost h-8 min-h-8 px-2.5 text-xs"
                 >
                   Download report
                 </button>
@@ -323,32 +322,32 @@ export default function ReportsPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm mb-3">
               <div>
-                <div className="text-muted-foreground text-xs">Parsed rows</div>
-                <div className="text-xl font-semibold">{importReport.parsedRows}</div>
+                <div className="mm-secondary">Parsed rows</div>
+                <div className="text-lg font-semibold tabular-nums">{importReport.parsedRows}</div>
               </div>
               <div>
-                <div className="text-muted-foreground text-xs">Imported</div>
-                <div className="text-xl font-semibold text-emerald-400">{importReport.imported}</div>
+                <div className="mm-secondary">Imported</div>
+                <div className="text-lg font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{importReport.imported}</div>
               </div>
               <div>
-                <div className="text-muted-foreground text-xs">Updated</div>
-                <div className="text-xl font-semibold text-sky-400">{importReport.updated ?? 0}</div>
+                <div className="mm-secondary">Updated</div>
+                <div className="text-lg font-semibold tabular-nums text-foreground">{importReport.updated ?? 0}</div>
               </div>
               <div>
-                <div className="text-muted-foreground text-xs">Duplicates</div>
-                <div className="text-xl font-semibold text-amber-400">
+                <div className="mm-secondary">Duplicates</div>
+                <div className="text-lg font-semibold tabular-nums text-amber-600 dark:text-amber-400">
                   {importReport.skippedDuplicates}
                 </div>
               </div>
               <div>
-                <div className="text-muted-foreground text-xs">Failed</div>
-                <div className="text-xl font-semibold text-red-400">{importReport.failed}</div>
+                <div className="mm-secondary">Failed</div>
+                <div className="text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">{importReport.failed}</div>
               </div>
             </div>
             {importReport.errors && importReport.errors.length > 0 && (
-              <ul className="mb-3 max-h-48 overflow-auto space-y-1.5 text-sm font-mono bg-card border border-border rounded-lg p-3">
+              <ul className="mb-1 max-h-48 overflow-auto space-y-1.5 text-xs font-mono bg-card border border-border rounded-lg p-3">
                 {importReport.errors.map((e, i) => (
-                  <li key={`${e.row}-${i}`} className="text-red-300/90">
+                  <li key={`${e.row}-${i}`} className="text-red-600 dark:text-red-400">
                     {formatImportError(e)}
                   </li>
                 ))}

@@ -13,9 +13,7 @@ type Props = {
 
 /**
  * Consistent adaptive page container.
- * - Mobile: compact padding, full width, safe-area
- * - Tablet: medium padding
- * - Desktop: generous padding + max width
+ * Enterprise density: ~24–32px desktop padding, compact type.
  */
 export function PageShell({
   children,
@@ -27,10 +25,10 @@ export function PageShell({
     <div
       className={[
         "mm-page-enter w-full min-w-0 mx-auto",
-        "px-3 sm:px-5 md:px-6 lg:px-8",
-        "py-4 sm:py-6 lg:py-8",
+        "px-4 sm:px-5 md:px-6 lg:px-8",
+        "py-4 sm:py-5 lg:py-6",
         wide ? "max-w-[1400px]" : "max-w-5xl",
-        mobileNavPad ? "pb-24 md:pb-8" : "",
+        mobileNavPad ? "pb-20 md:pb-6" : "",
         "overflow-x-hidden",
         className,
       ]
@@ -42,7 +40,7 @@ export function PageShell({
   );
 }
 
-/** Page title block that stacks cleanly on mobile */
+/** Page title block — compact enterprise hierarchy */
 export function PageHeader({
   title,
   description,
@@ -55,20 +53,20 @@ export function PageHeader({
   eyebrow?: string;
 }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
+    <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-5">
       <div className="min-w-0">
-        {eyebrow ? <p className="mm-section-label mb-1.5">{eyebrow}</p> : null}
-        <h1 className="text-2xl sm:text-[1.75rem] font-semibold tracking-tight text-foreground leading-tight">
+        {eyebrow ? <p className="mm-section-label mb-1">{eyebrow}</p> : null}
+        <h1 className="mm-page-title">
           {title}
         </h1>
         {description ? (
-          <p className="text-muted-foreground mt-1.5 text-sm sm:text-[0.9375rem] leading-relaxed max-w-2xl">
+          <p className="mm-secondary mt-1 max-w-2xl">
             {description}
           </p>
         ) : null}
       </div>
       {actions ? (
-        <div className="flex flex-wrap gap-2 shrink-0 w-full sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none [&>button]:min-h-11 [&>a]:min-h-11 [&>label]:min-h-11">
+        <div className="flex flex-wrap gap-2 shrink-0 w-full sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none [&>button]:min-h-9 [&>a]:min-h-9 [&>label]:min-h-9">
           {actions}
         </div>
       ) : null}
@@ -100,35 +98,35 @@ export function ResponsiveModal({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/40 dark:bg-black/60"
         aria-label="Close"
         onClick={onClose}
       />
       <div
         className={[
-          "relative z-10 w-full bg-card/95 border border-border shadow-2xl",
-          "rounded-t-3xl sm:rounded-2xl",
+          "relative z-10 w-full bg-card border border-border shadow-lg",
+          "rounded-t-xl sm:rounded-lg",
           "max-h-[92dvh] sm:max-h-[90vh] flex flex-col",
           "sm:max-w-lg",
           "safe-bottom mm-fade-up",
         ].join(" ")}
       >
-        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border shrink-0">
-          <h2 id="mm-modal-title" className="text-lg font-semibold text-foreground tracking-tight">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border shrink-0">
+          <h2 id="mm-modal-title" className="text-base font-semibold text-foreground tracking-tight">
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 -mr-1 text-muted-foreground hover:text-foreground rounded-lg min-w-11 min-h-11 focus-ring"
+            className="p-1.5 -mr-1 text-muted-foreground hover:text-foreground rounded-md min-w-9 min-h-9 focus-ring"
             aria-label="Close dialog"
           >
             ×
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4">{children}</div>
         {footer ? (
-          <div className="shrink-0 border-t border-border px-4 sm:px-6 py-3 safe-bottom bg-background/40">
+          <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60">
             {footer}
           </div>
         ) : null}

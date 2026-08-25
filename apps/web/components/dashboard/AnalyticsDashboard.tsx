@@ -247,27 +247,27 @@ export function AnalyticsDashboard() {
           {
             label: "Total leads",
             value: d?.totalLeads ?? 0,
-            tone: "from-sky-500/25 via-sky-500/5 to-transparent border-sky-500/30",
+            tone: "border-border bg-card",
             href: "/dashboard/leads",
           },
           {
             label: "Pipeline value",
             value: d?.pipelineValue ?? 0,
             money: true,
-            tone: "from-violet-500/25 via-fuchsia-500/5 to-transparent border-violet-500/30",
+            tone: "border-border bg-card",
             href: "/dashboard/deals",
           },
           {
             label: "Won deals",
             value: d?.wonDeals ?? 0,
-            tone: "from-emerald-500/25 via-teal-500/5 to-transparent border-emerald-500/30",
+            tone: "border-border bg-card",
             href: "/dashboard/deals?stage=closed_won",
           },
           {
             label: "Win rate",
             value: d?.conversionRate ?? 0,
             suffix: "%",
-            tone: "from-amber-500/25 via-orange-500/5 to-transparent border-amber-500/30",
+            tone: "border-border bg-card",
             href: "/dashboard/deals",
           },
         ].map((k) => (
@@ -275,12 +275,12 @@ export function AnalyticsDashboard() {
             key={k.label}
             type="button"
             onClick={() => router.push(k.href)}
-            className={`group text-left rounded-3xl border bg-gradient-to-br ${k.tone} backdrop-blur-xl p-4 sm:p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-violet-950/30 focus-ring min-h-[104px]`}
+            className={`group text-left rounded-lg border ${k.tone} p-3.5 sm:p-4 focus-ring min-h-[88px] shadow-sm`}
           >
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground group-hover:text-muted-foreground">
+            <div className="text-[11px] font-medium text-muted-foreground group-hover:text-muted-foreground">
               {k.label}
             </div>
-            <div className="mt-2.5 text-2xl sm:text-3xl font-bold text-foreground tracking-tight tabular-nums">
+            <div className="mt-2 text-xl sm:text-[1.375rem] font-semibold text-foreground tracking-tight tabular-nums">
               {k.money ? (
                 <span key={k.value}>{fmtMoney(k.value, currency)}</span>
               ) : (

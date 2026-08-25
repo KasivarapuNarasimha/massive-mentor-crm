@@ -183,7 +183,7 @@ export function ExportFiltersBar({
 
   return (
     <div
-      className={`flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end bg-card/60 border border-border rounded-xl p-3 ${className}`}
+      className={`flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end mm-filter-bar ${className}`}
     >
       <div className="flex-1 min-w-[140px]">
         <label className="block text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Search</label>
@@ -244,7 +244,7 @@ export function ExportFiltersBar({
       <button
         type="button"
         onClick={apply}
-        className="px-3 py-1.5 text-xs rounded-lg mm-soft-control"
+        className="mm-btn mm-btn-secondary h-8 min-h-8 px-3 text-xs"
       >
         Apply filters
       </button>
@@ -255,7 +255,7 @@ export function ExportFiltersBar({
             type="button"
             disabled={!!busy}
             onClick={() => download(fmt)}
-            className="px-3 py-1.5 text-xs rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 disabled:opacity-50 uppercase"
+            className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs uppercase disabled:opacity-50"
           >
             {busy === fmt ? "…" : fmt}
           </button>

@@ -78,10 +78,10 @@ type Insights = {
 };
 
 const STATUS_STYLE: Record<string, string> = {
-  online: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  in_field: "bg-sky-500/15 text-sky-400 border-sky-500/30",
-  meeting: "bg-violet-500/15 text-violet-300 border-violet-500/30",
-  offline: "bg-muted/40 text-muted-foreground border-border",
+  online: "mm-badge-success",
+  in_field: "mm-badge-primary",
+  meeting: "mm-badge-primary",
+  offline: "mm-badge",
 };
 
 function statusLabel(s: string) {
@@ -133,15 +133,15 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-2xl border bg-gradient-to-br from-white/[0.04] to-background/80 p-4 sm:p-5 ${tone} min-h-[110px] flex flex-col`}
+      className={`mm-kpi-card ${tone} min-h-[88px] flex flex-col`}
     >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="mm-kpi-label">
         {label}
       </div>
-      <div className="mt-2 text-xl sm:text-2xl font-semibold tabular-nums text-foreground tracking-tight">
+      <div className="mm-kpi-value">
         {value}
       </div>
-      {sub ? <div className="mt-auto pt-2 text-xs text-muted-foreground leading-relaxed">{sub}</div> : null}
+      {sub ? <div className="mm-kpi-meta mt-auto pt-1.5 leading-snug">{sub}</div> : null}
     </div>
   );
 }
@@ -479,18 +479,18 @@ export default function FieldSalesPage() {
               type="button"
               disabled={busy}
               onClick={startField}
-              className="mm-btn mm-btn-primary min-h-11 px-5 bg-sky-500 border-0 text-foreground hover:bg-sky-400"
+              className="mm-btn mm-btn-primary"
             >
-              {busy ? "Getting GPS…" : "▶ Start Field Work"}
+              {busy ? "Getting GPS…" : "Start Field Work"}
             </button>
           ) : (
             <button
               type="button"
               disabled={busy}
               onClick={endField}
-              className="mm-btn min-h-11 px-5 bg-amber-500 text-white border-0 hover:bg-amber-400"
+              className="mm-btn mm-btn-secondary border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/15 dark:text-amber-200 dark:border-amber-500/30"
             >
-              {busy ? "Saving…" : "■ End Field Work"}
+              {busy ? "Saving…" : "End Field Work"}
             </button>
           )
         }
@@ -498,22 +498,22 @@ export default function FieldSalesPage() {
 
       {!isGeoSecureContext() && (
         <div
-          className="mb-5 rounded-2xl border border-amber-500/50 bg-amber-500/10 px-4 py-4 text-sm text-amber-100"
+          className="mb-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
           role="alert"
         >
-          <div className="font-semibold text-amber-50 mb-1">
+          <div className="font-semibold mb-1">
             GPS blocked: HTTPS required
           </div>
-          <p className="text-amber-100/90 leading-relaxed">
-            You are on <code className="text-amber-50">{typeof window !== "undefined" ? window.location.origin : "HTTP"}</code>.
+          <p className="leading-relaxed text-[13px]">
+            You are on <code>{typeof window !== "undefined" ? window.location.origin : "HTTP"}</code>.
             Browsers only allow the Geolocation API on <strong>HTTPS</strong> (or{" "}
-            <code className="text-amber-50">localhost</code>). On plain{" "}
-            <code className="text-amber-50">http://public-ip:3000</code>,{" "}
-            <code className="text-amber-50">getCurrentPosition</code> /{" "}
-            <code className="text-amber-50">watchPosition</code> fail → no coordinates reach the
+            <code>localhost</code>). On plain{" "}
+            <code>http://public-ip:3000</code>,{" "}
+            <code>getCurrentPosition</code> /{" "}
+            <code>watchPosition</code> fail → no coordinates reach the
             API → history shows no GPS and travel stays 0 km.
           </p>
-          <p className="mt-2 text-xs text-amber-200/80">
+          <p className="mt-2 text-xs text-amber-800/80 dark:text-amber-200/80">
             Fix: put Nginx/Caddy TLS in front of the web app (e.g.{" "}
             <code>https://200.141.0.25</code> or a domain with Let&apos;s Encrypt), then allow
             location again.
@@ -522,17 +522,17 @@ export default function FieldSalesPage() {
       )}
 
       {gpsError && isGeoSecureContext() && (
-        <div className="mb-5 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 dark:border-red-500/40 dark:bg-red-500/10 px-4 py-3 text-sm text-red-800 dark:text-red-100">
           <strong>GPS diagnostic:</strong> {gpsError}
         </div>
       )}
 
       {myStatus?.activeField && (
-        <div className="mb-5 rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 flex flex-wrap items-center gap-3">
-          <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-sky-500 text-white">
+        <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 dark:border-sky-500/40 dark:bg-sky-500/10 px-4 py-2.5 flex flex-wrap items-center gap-2.5">
+          <span className="mm-badge-primary">
             Live GPS
           </span>
-          <span className="text-sm text-sky-100">
+          <span className="text-[13px] text-sky-900 dark:text-sky-100">
             Field session since {new Date(myStatus.activeField.startedAt).toLocaleTimeString()}
             {gpsError ? ` · ${gpsError}` : " · Watching position…"}
           </span>
@@ -540,18 +540,18 @@ export default function FieldSalesPage() {
       )}
 
       {/* Professional KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3 mb-5">
         <StatCard
           label="Current location"
           value={
-            <span className="text-base sm:text-lg line-clamp-2 leading-snug">
+            <span className="text-base line-clamp-2 leading-snug font-semibold">
               {displayLat != null
                 ? `${displayLat.toFixed(5)}, ${displayLng?.toFixed(5)}`
                 : "—"}
             </span>
           }
           sub={displayAddress}
-          tone="border-sky-500/25"
+          tone="border-border"
         />
         <StatCard
           label="GPS status"
@@ -561,9 +561,7 @@ export default function FieldSalesPage() {
               ? `Work status: ${statusLabel(myStatus.state.status)}`
               : "Enable browser location"
           }
-          tone={
-            displayLat != null ? "border-emerald-500/25" : "border-amber-500/30"
-          }
+          tone="border-border"
         />
         <StatCard
           label="Travel today"
@@ -574,7 +572,7 @@ export default function FieldSalesPage() {
             </>
           }
           sub={`Visits: ${insights?.visits?.length ?? 0} · Stay ${insights?.totalStayMin ?? 0} min`}
-          tone="border-violet-500/25"
+          tone="border-border"
         />
         <StatCard
           label="Distance from office"
@@ -593,7 +591,7 @@ export default function FieldSalesPage() {
               ? `~${insights.officeInsight.travelMinutes ?? "—"} min · ${insights.officeInsight.officeLabel}`
               : "Set office coordinates below"
           }
-          tone="border-fuchsia-500/20"
+          tone="border-border"
         />
         <StatCard
           label="Speed / movement"
@@ -607,7 +605,7 @@ export default function FieldSalesPage() {
             )
           }
           sub={`Status: ${movement}`}
-          tone="border-cyan-500/20"
+          tone="border-border"
         />
         <StatCard
           label="Accuracy · last sync"
@@ -627,29 +625,29 @@ export default function FieldSalesPage() {
       </div>
 
       {/* Address detail card */}
-      <div className="mm-panel p-4 sm:p-5 mb-6">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2">
+      <div className="mm-card p-4 mb-5">
+        <div className="mm-section-label mb-2">
           Full address
         </div>
-        <p className="text-sm sm:text-base text-foreground leading-relaxed">{displayAddress}</p>
-        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+        <p className="text-[13px] text-foreground leading-relaxed">{displayAddress}</p>
+        <div className="mt-2.5 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
           {gpsLive?.pincode || insights?.currentPincode || myStatus?.state?.lastPincode ? (
-            <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+            <span className="mm-badge">
               PIN {gpsLive?.pincode || insights?.currentPincode || myStatus?.state?.lastPincode}
             </span>
           ) : null}
           {(gpsLive?.city || insights?.currentCity || myStatus?.state?.lastCity) && (
-            <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+            <span className="mm-badge">
               {gpsLive?.city || insights?.currentCity || myStatus?.state?.lastCity}
             </span>
           )}
           {(gpsLive?.state || insights?.currentState || myStatus?.state?.lastState) && (
-            <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+            <span className="mm-badge">
               {gpsLive?.state || insights?.currentState || myStatus?.state?.lastState}
             </span>
           )}
           {(gpsLive?.country || insights?.currentCountry) && (
-            <span className="px-2 py-1 rounded-lg bg-white/5 border border-white/10">
+            <span className="mm-badge">
               {gpsLive?.country || insights?.currentCountry}
             </span>
           )}
@@ -658,14 +656,14 @@ export default function FieldSalesPage() {
 
       {/* Manager live + map */}
       {isManager && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 items-stretch">
-          <div className="mm-panel p-4 sm:p-5 flex flex-col min-h-[340px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-5 items-stretch">
+          <div className="mm-card p-4 flex flex-col min-h-[320px]">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-foreground">Team live location</h2>
+              <h2 className="mm-section-title">Team live location</h2>
               <button
                 type="button"
                 onClick={() => void load()}
-                className="text-xs px-2.5 py-1 rounded-lg border border-white/10 text-muted-foreground hover:text-foreground"
+                className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs"
               >
                 Refresh
               </button>
@@ -718,7 +716,7 @@ export default function FieldSalesPage() {
               )}
             </div>
           </div>
-          <div className="mm-panel overflow-hidden flex flex-col min-h-[340px]">
+          <div className="mm-card overflow-hidden flex flex-col min-h-[340px]">
             <iframe
               title="Field map"
               className="w-full flex-1 min-h-[280px] border-0"
@@ -745,7 +743,7 @@ export default function FieldSalesPage() {
       {/* Office + reports for managers */}
       {isManager &&
         ["ceo", "owner", "business_admin", "admin", "super_admin"].includes(role) && (
-          <div className="mm-panel p-4 sm:p-5 mb-6">
+          <div className="mm-card p-4 sm:p-5 mb-6">
             <h2 className="text-sm font-semibold text-foreground mb-3">Office location</h2>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <input
@@ -774,7 +772,7 @@ export default function FieldSalesPage() {
         )}
 
       {isManager && (
-        <div className="mm-panel p-4 sm:p-5 mb-6">
+        <div className="mm-card p-4 sm:p-5 mb-6">
           <h2 className="text-sm font-semibold text-foreground mb-3">Reports</h2>
           <div className="flex flex-wrap gap-2">
             {(
@@ -799,7 +797,7 @@ export default function FieldSalesPage() {
       )}
 
       {/* History */}
-      <div className="mm-panel p-4 sm:p-5">
+      <div className="mm-card p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-foreground">
             Location history{selectedUserId ? " (selected)" : ""}

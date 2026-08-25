@@ -76,79 +76,99 @@ export default function SWOTPage() {
 
   const getColorClasses = (color: string) => {
     const colors: Record<string, { bg: string; border: string; text: string; accent: string }> = {
-      emerald: { bg: "bg-emerald-950/50", border: "border-emerald-800", text: "text-emerald-400", accent: "bg-emerald-500" },
-      rose: { bg: "bg-rose-950/50", border: "border-rose-800", text: "text-rose-400", accent: "bg-rose-500" },
-      blue: { bg: "bg-blue-950/50", border: "border-blue-800", text: "text-blue-400", accent: "bg-blue-500" },
-      amber: { bg: "bg-amber-950/50", border: "border-amber-800", text: "text-amber-400", accent: "bg-amber-500" },
+      emerald: {
+        bg: "bg-emerald-50 dark:bg-emerald-950/30",
+        border: "border-emerald-200 dark:border-emerald-800",
+        text: "text-emerald-700 dark:text-emerald-400",
+        accent: "bg-emerald-500",
+      },
+      rose: {
+        bg: "bg-rose-50 dark:bg-rose-950/30",
+        border: "border-rose-200 dark:border-rose-800",
+        text: "text-rose-700 dark:text-rose-400",
+        accent: "bg-rose-500",
+      },
+      blue: {
+        bg: "bg-blue-50 dark:bg-blue-950/30",
+        border: "border-blue-200 dark:border-blue-800",
+        text: "text-blue-700 dark:text-blue-400",
+        accent: "bg-blue-500",
+      },
+      amber: {
+        bg: "bg-amber-50 dark:bg-amber-950/30",
+        border: "border-amber-200 dark:border-amber-800",
+        text: "text-amber-700 dark:text-amber-400",
+        accent: "bg-amber-500",
+      },
     };
     return colors[color];
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 overflow-x-hidden pb-24 md:pb-8">
+      <div className="flex items-center justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">SWOT Analysis</h1>
-          <p className="text-muted-foreground mt-1">Strategic analysis powered by AI</p>
+          <h1 className="mm-page-title">SWOT Analysis</h1>
+          <p className="mm-secondary mt-0.5">Strategic analysis powered by AI</p>
         </div>
 
         <button
           onClick={handleGenerate}
           disabled={isGenerating || isLoading}
-          className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+          className="mm-btn mm-btn-primary focus-ring shrink-0"
         >
           {isGenerating ? "Generating..." : swot ? "Regenerate SWOT" : "Generate SWOT"}
         </button>
       </div>
 
       {isLoading ? (
-        <div className="animate-pulse space-y-6">
-          <div className="h-24 bg-card border border-border rounded-2xl" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-20 mm-card" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-64 bg-card border border-border rounded-2xl" />
+              <div key={i} className="h-52 mm-card" />
             ))}
           </div>
         </div>
       ) : swot ? (
-        <div className="space-y-8">
+        <div className="space-y-4">
           {/* Summary */}
-          <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-medium text-muted-foreground tracking-widest">EXECUTIVE SUMMARY</div>
-              <div className="text-xs text-muted-foreground">
+          <div className="mm-card p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3">
+              <div className="mm-secondary font-medium tracking-wider uppercase">Executive summary</div>
+              <div className="mm-secondary">
                 Generated on {formatDate(swot.createdAt)} • {swot.aiModel}
               </div>
             </div>
-            <p className="text-lg leading-relaxed text-foreground">{swot.summary}</p>
+            <p className="text-[13px] leading-relaxed text-foreground">{swot.summary}</p>
           </div>
 
           {/* 2x2 SWOT Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {SWOT_CATEGORIES.map(({ key, label, color, description }) => {
               const items = swot[key];
               const colors = getColorClasses(color);
 
               return (
-                <div key={key} className={`${colors.bg} border ${colors.border} rounded-2xl p-6 sm:p-7`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-3 h-3 rounded-full ${colors.accent}`} />
+                <div key={key} className={`${colors.bg} border ${colors.border} rounded-lg p-4`}>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className={`w-2.5 h-2.5 rounded-full ${colors.accent}`} />
                     <div>
-                      <div className={`text-xl font-semibold ${colors.text}`}>{label}</div>
-                      <div className="text-xs text-muted-foreground">{description}</div>
+                      <div className={`text-sm font-semibold ${colors.text}`}>{label}</div>
+                      <div className="mm-secondary">{description}</div>
                     </div>
                   </div>
 
-                  <ul className="space-y-3 mt-5">
+                  <ul className="space-y-2 mt-3">
                     {items.length > 0 ? (
                       items.map((item, index) => (
-                        <li key={index} className="flex gap-3 text-sm leading-relaxed text-foreground">
-                          <span className={`${colors.text} mt-1.5 block text-lg leading-none`}>•</span>
+                        <li key={index} className="flex gap-2 text-[13px] leading-relaxed text-foreground">
+                          <span className={`${colors.text} mt-1 block leading-none`}>•</span>
                           <span>{item}</span>
                         </li>
                       ))
                     ) : (
-                      <li className="text-sm text-muted-foreground italic">No items generated</li>
+                      <li className="text-[13px] text-muted-foreground italic">No items generated</li>
                     )}
                   </ul>
                 </div>
@@ -156,27 +176,27 @@ export default function SWOTPage() {
             })}
           </div>
 
-          <div className="text-xs text-muted-foreground text-center pt-4">
+          <div className="mm-secondary text-center pt-2">
             This analysis was generated using AI based on your current business profile. Regenerate after updating your profile for more accurate insights.
           </div>
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-2xl p-8 sm:p-12 text-center">
-          <div className="mx-auto w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6">
-            <span className="text-3xl">📊</span>
+        <div className="mm-card p-6 sm:p-8 text-center">
+          <div className="mx-auto w-10 h-10 bg-muted rounded-lg flex items-center justify-center mb-3">
+            <span className="text-lg">📊</span>
           </div>
-          <h3 className="text-2xl font-semibold mb-3">No SWOT Analysis Yet</h3>
-          <p className="text-muted-foreground max-w-md mx-auto mb-8">
+          <h3 className="text-base font-semibold mb-1.5">No SWOT Analysis Yet</h3>
+          <p className="mm-secondary max-w-md mx-auto mb-5">
             Generate your first AI-powered SWOT analysis using the data from your business profile.
           </p>
           <button
             onClick={handleGenerate}
             disabled={isGenerating}
-            className="px-8 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active transition-colors disabled:opacity-60"
+            className="mm-btn mm-btn-primary focus-ring"
           >
             {isGenerating ? "Generating SWOT..." : "Generate SWOT Analysis"}
           </button>
-          <p className="text-xs text-muted-foreground mt-6">
+          <p className="mm-secondary mt-4">
             Make sure your Business Profile is complete for the best results.
           </p>
         </div>

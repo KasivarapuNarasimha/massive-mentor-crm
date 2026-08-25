@@ -182,7 +182,7 @@ function ErpSalesOrdersPageInner() {
 
       <form
         onSubmit={create}
-        className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6"
+        className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6"
       >
         <h2 className="sm:col-span-2 lg:col-span-3 text-sm font-semibold">Create sales order</h2>
         <div>
@@ -278,7 +278,7 @@ function ErpSalesOrdersPageInner() {
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <div className="rounded-2xl border border-border/80 overflow-hidden">
+        <div className="rounded-lg border border-border overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
@@ -292,7 +292,7 @@ function ErpSalesOrdersPageInner() {
             </thead>
             <tbody>
               {orders.map((o) => (
-                <tr key={o.id} className="border-t border-border/60">
+                <tr key={o.id} className="border-t border-border">
                   <td className="px-3 py-2 font-medium">{o.number}</td>
                   <td className="px-3 py-2">{o.status}</td>
                   <td className="px-3 py-2 text-muted-foreground">

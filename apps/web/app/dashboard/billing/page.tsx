@@ -204,15 +204,14 @@ function ProgressBar({
   tone?: "violet" | "sky" | "amber";
 }) {
   const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+  // tone kept for API compat; fill uses primary / warning semantic only
   const bar =
-    tone === "sky"
-      ? "from-sky-500 to-cyan-400"
-      : tone === "amber"
-        ? "from-amber-500 to-orange-400"
-        : "from-violet-500 to-fuchsia-400";
+    tone === "amber"
+      ? "bg-amber-500"
+      : "bg-primary";
   return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2 text-sm">
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2 text-[13px]">
         <span className="font-medium text-foreground">{label}</span>
         <span className="tabular-nums text-muted-foreground">
           {used}
@@ -221,7 +220,7 @@ function ProgressBar({
         </span>
       </div>
       <div
-        className="h-2.5 rounded-full bg-muted/90 overflow-hidden ring-1 ring-inset ring-border/50"
+        className="h-2 rounded-full bg-muted overflow-hidden border border-border"
         role="progressbar"
         aria-valuenow={pct}
         aria-valuemin={0}
@@ -229,7 +228,7 @@ function ProgressBar({
         aria-label={`${label}: ${used} of ${total}${unit ? " " + unit : ""}`}
       >
         <div
-          className={`h-full rounded-full bg-gradient-to-r ${bar} transition-all duration-500 ease-out`}
+          className={`h-full rounded-full ${bar} transition-all duration-300 ease-out`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -524,7 +523,7 @@ export default function BillingPage() {
     biz?.isLocked || biz?.planStatus === "expired"
       ? "text-red-300 bg-red-500/10 border-red-500/30"
       : access?.isTrial
-        ? "text-sky-200 bg-sky-500/10 border-sky-500/30"
+        ? "text-sky-700 dark:text-sky-800 bg-sky-50 border-sky-200 dark:text-sky-200 dark:bg-sky-500/10 dark:border-sky-500/30"
         : "text-emerald-300 bg-emerald-500/10 border-emerald-500/30";
 
   const renewalDisplay = biz?.renewalDate
@@ -605,10 +604,10 @@ export default function BillingPage() {
     return (
       <PageShell wide>
         <div className="space-y-5 animate-pulse" aria-busy="true" aria-label="Loading billing">
-          <div className="h-44 rounded-3xl bg-card border border-border" />
+          <div className="h-44 rounded-lg bg-card border border-border" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-96 rounded-3xl bg-card border border-border" />
+              <div key={i} className="h-96 rounded-lg bg-card border border-border" />
             ))}
           </div>
         </div>
@@ -622,7 +621,7 @@ export default function BillingPage() {
       <PageShell wide>
         <div className="mx-auto max-w-lg py-10 sm:py-16 mm-success-pop text-center">
           <div
-            className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/40"
+            className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/40"
             aria-hidden
           >
             <span className="text-4xl">🎉</span>
@@ -636,7 +635,7 @@ export default function BillingPage() {
           <p className="mt-3 text-sm sm:text-base text-muted-foreground leading-relaxed">
             Thank you for choosing Massive Mentor CRM. Your workspace is unlocked and ready.
           </p>
-          <dl className="mt-8 rounded-2xl border border-border bg-card/70 text-left divide-y divide-border">
+          <dl className="mt-8 rounded-lg border border-border bg-card/70 text-left divide-y divide-border">
             {[
               { k: "Plan", v: success.planName },
               {
@@ -655,14 +654,14 @@ export default function BillingPage() {
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <Link
               href="/dashboard"
-              className="flex-1 min-h-12 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-foreground shadow-lg shadow-violet-900/30 focus-ring button-active"
+              className="flex-1 min-h-9 inline-flex items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground  focus-ring button-active"
             >
               Go to Dashboard
             </Link>
             <button
               type="button"
               onClick={() => void downloadInvoice(success.paymentId, success.invoiceNumber)}
-              className="flex-1 min-h-12 rounded-2xl border border-border bg-card text-sm font-semibold text-foreground hover:bg-muted focus-ring button-active"
+              className="flex-1 min-h-9 rounded-lg border border-border bg-card text-sm font-semibold text-foreground hover:bg-muted focus-ring button-active"
             >
               Download Invoice
             </button>
@@ -717,14 +716,14 @@ export default function BillingPage() {
                   if (p) setConfirm({ plan: p, purpose: failure.purpose || "checkout" });
                   else setFailure(null);
                 }}
-                className="flex-1 min-h-12 rounded-2xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-foreground focus-ring button-active"
+                className="flex-1 min-h-9 rounded-lg bg-primary text-sm font-semibold text-primary-foreground focus-ring button-active"
               >
                 Retry payment
               </button>
             )}
             <a
               href={`mailto:${SALES_EMAIL}?subject=${encodeURIComponent("Billing support")}`}
-              className="flex-1 min-h-12 inline-flex items-center justify-center rounded-2xl border border-border bg-card text-sm font-semibold text-foreground hover:bg-muted focus-ring"
+              className="flex-1 min-h-9 inline-flex items-center justify-center rounded-lg border border-border bg-card text-sm font-semibold text-foreground hover:bg-muted focus-ring"
             >
               Contact Support
             </a>
@@ -751,54 +750,46 @@ export default function BillingPage() {
 
       {/* Hero */}
       <section
-        className="mm-fade-up relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-violet-950/90 via-zinc-950 to-sky-950/60 p-6 sm:p-8 mb-8"
+        className="mm-fade-up mm-card p-4 sm:p-5 mb-5"
         aria-labelledby="billing-hero-title"
       >
-        <div
-          className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-violet-600/20 blur-3xl"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-sky-500/15 blur-3xl"
-          aria-hidden
-        />
-        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-300/90">
+            <p className="mm-section-label">
               Massive Mentor CRM
             </p>
             <h1
               id="billing-hero-title"
-              className="mt-2 text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-foreground"
+              className="mt-1 mm-page-title"
             >
               {displayPlanTitle} Plan
             </h1>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
               <span
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${statusTone}`}
+                className={`mm-badge ${statusTone}`}
               >
-                {biz?.isLocked ? "⚠" : "✅"} {statusLabel}
+                {biz?.isLocked ? "⚠" : "✓"} {statusLabel}
               </span>
               {access?.isTrial && trialDaysLeft != null && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-100">
-                  ⏱ {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} trial remaining
+                <span className="mm-badge-warning">
+                  {trialDaysLeft} day{trialDaysLeft === 1 ? "" : "s"} trial remaining
                 </span>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/60 px-3 py-1 text-xs font-medium text-muted-foreground">
-                📅 Renewal {renewalDisplay}
+              <span className="mm-badge">
+                Renewal {renewalDisplay}
               </span>
             </div>
-            <p className="mt-4 max-w-xl text-sm text-muted-foreground leading-relaxed">
+            <p className="mt-3 max-w-xl mm-secondary leading-relaxed">
               Manage your subscription, compare packages, and upgrade when your team is ready to
               scale.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
+          <div className="flex flex-col sm:flex-row lg:flex-col gap-2 shrink-0">
             {heroUpgradeTarget && (
               <button
                 type="button"
                 onClick={scrollToPlans}
-                className="min-h-12 px-6 rounded-2xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-foreground shadow-lg shadow-violet-900/40 hover:from-violet-500 hover:to-sky-500 focus-ring button-active transition-all"
+                className="mm-btn mm-btn-primary"
               >
                 Upgrade to {heroUpgradeTarget}
               </button>
@@ -806,7 +797,7 @@ export default function BillingPage() {
             <button
               type="button"
               onClick={scrollToPlans}
-              className="min-h-12 px-6 rounded-2xl border border-border/80 bg-background/40 text-sm font-semibold text-foreground hover:bg-card focus-ring button-active"
+              className="mm-btn mm-btn-secondary"
             >
               View all plans
             </button>
@@ -814,7 +805,7 @@ export default function BillingPage() {
         </div>
 
         {/* Usage progress */}
-        <div className="relative mt-8 grid grid-cols-1 sm:grid-cols-2 gap-5 rounded-2xl border border-white/5 bg-black/20 p-5 backdrop-blur-sm">
+        <div className="relative mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border border-border bg-background-secondary p-4">
           <ProgressBar label="Users" used={members} total={maxUsers} tone="violet" />
           <ProgressBar
             label="Storage"
@@ -856,9 +847,9 @@ export default function BillingPage() {
                   aria-selected={active}
                   onClick={() => setCycle(c)}
                   className={[
-                    "mm-toggle-thumb min-h-11 min-w-[7.5rem] rounded-full px-5 text-sm font-semibold capitalize focus-ring",
+                    "mm-toggle-thumb min-h-9 min-w-[7.5rem] rounded-full px-5 text-sm font-semibold capitalize focus-ring",
                     active
-                      ? "bg-gradient-to-r from-violet-600 to-sky-600 text-foreground shadow-md shadow-violet-900/30"
+                      ? "bg-primary text-primary-foreground "
                       : "text-muted-foreground hover:text-foreground",
                   ].join(" ")}
                 >
@@ -880,7 +871,7 @@ export default function BillingPage() {
             value={coupon}
             onChange={(e) => setCoupon(e.target.value.toUpperCase())}
             placeholder="Coupon code"
-            className="bg-background/80 border border-border rounded-xl px-3 py-2.5 text-sm min-h-11 w-40 focus-ring"
+            className="bg-background/80 border border-border rounded-md px-3 py-2.5 text-sm min-h-9 w-40 focus-ring"
             autoComplete="off"
           />
         </div>
@@ -888,11 +879,11 @@ export default function BillingPage() {
 
       {/* Pricing cards */}
       <section
-        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 xl:gap-6 mb-12 items-stretch"
+        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 xl:gap-4 mb-6 items-stretch"
         aria-label="Subscription plans"
       >
         {filteredPlans.length === 0 && (
-          <div className="col-span-full rounded-3xl border border-border bg-card/50 p-12 text-center text-muted-foreground">
+          <div className="col-span-full rounded-lg border border-border bg-card/50 p-12 text-center text-muted-foreground">
             No {cycle} plans available right now.
           </div>
         )}
@@ -934,32 +925,32 @@ export default function BillingPage() {
             <article
               key={p.id}
               className={[
-                "mm-card-hover relative flex flex-col rounded-[1.75rem] border p-6 sm:p-8 min-w-0",
+                "mm-card-hover relative flex flex-col mm-card p-4 sm:p-5 min-w-0",
                 popular
-                  ? "border-violet-500/55 bg-gradient-to-b from-violet-950/90 via-card to-background shadow-2xl shadow-violet-950/50 xl:scale-[1.04] xl:z-[1] xl:py-10"
+                  ? "border-primary xl:z-[1]"
                   : enterprise
-                    ? "border-amber-500/30 bg-gradient-to-b from-amber-950/40 via-card to-background"
-                    : "border-border bg-gradient-to-b from-zinc-900 to-background",
+                    ? "border-amber-300 dark:border-amber-500/30"
+                    : "",
               ].join(" ")}
             >
               {/* Badges / ribbons */}
               {isCurrent && (
-                <div className="absolute -right-px top-6 overflow-hidden z-[2]">
-                  <span className="block bg-gradient-to-r from-emerald-600 to-teal-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-foreground shadow-md rounded-l-lg">
+                <div className="absolute -right-px top-5 overflow-hidden z-[2]">
+                  <span className="block bg-emerald-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm rounded-l-md">
                     Current Plan
                   </span>
                 </div>
               )}
               {popular && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-[2]">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-sky-600 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wide text-foreground shadow-lg whitespace-nowrap">
-                    ⭐ Most Popular
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-[2]">
+                  <span className="mm-badge-primary font-semibold uppercase tracking-wide whitespace-nowrap">
+                    Most Popular
                   </span>
                 </div>
               )}
               {!popular && !enterprise && (
-                <div className="absolute top-5 right-5 max-w-[45%]">
-                  <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-200">
+                <div className="absolute top-4 right-4 max-w-[45%]">
+                  <span className="mm-badge-primary text-[10px] font-semibold uppercase tracking-wide">
                     {meta.badge}
                   </span>
                 </div>
@@ -974,9 +965,9 @@ export default function BillingPage() {
 
               <div
                 className={[
-                  "mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border",
+                  "mb-4 flex h-14 w-14 items-center justify-center rounded-lg border",
                   popular
-                    ? "border-violet-500/40 bg-violet-500/15 text-violet-300"
+                    ? "border-primary/40 bg-accent text-primary"
                     : enterprise
                       ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
                       : "border-border bg-muted/80 text-muted-foreground",
@@ -1033,7 +1024,7 @@ export default function BillingPage() {
 
               {/* Users + additional seats — always visible for paid tiers */}
               {!enterprise && (
-                <div className="mt-4 space-y-2 rounded-2xl border border-border bg-background/50 p-3.5">
+                <div className="mt-4 space-y-2 rounded-lg border border-border bg-background/50 p-3.5">
                   <div className="flex items-center justify-between gap-2 text-sm">
                     <span className="text-muted-foreground">Users included</span>
                     <span className="font-semibold text-foreground">
@@ -1045,7 +1036,7 @@ export default function BillingPage() {
                       <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Additional Users
                       </span>
-                      <span className="text-sm font-semibold text-violet-300 tabular-nums">
+                      <span className="text-sm font-semibold text-primary tabular-nums">
                         {formatCurrency(addOnPrice, p.currency)} / User / {addOnUnit}
                       </span>
                     </div>
@@ -1054,8 +1045,8 @@ export default function BillingPage() {
               )}
 
               {enterprise ? (
-                <div className="mt-6 rounded-2xl border border-amber-500/20 bg-amber-950/20 p-4 space-y-2 flex-1">
-                  <p className="text-sm font-semibold text-amber-100">
+                <div className="mt-6 rounded-lg border border-amber-500/20 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-2 flex-1">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-100">
                     Need more than 10 Users?
                   </p>
                   <p className="text-sm text-muted-foreground">Need White Label CRM?</p>
@@ -1066,13 +1057,13 @@ export default function BillingPage() {
                   <div className="flex flex-col gap-2 pt-3">
                     <a
                       href={DEMO_MAILTO}
-                      className="min-h-12 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 text-sm font-semibold text-foreground shadow-lg shadow-amber-900/20 hover:from-amber-500 hover:to-orange-500 focus-ring button-active"
+                      className="min-h-9 inline-flex items-center justify-center rounded-lg bg-amber-600 text-sm font-semibold text-foreground  hover:bg-amber-500 focus-ring button-active"
                     >
                       Schedule Demo
                     </a>
                     <a
                       href={SALES_MAILTO}
-                      className="min-h-11 inline-flex items-center justify-center rounded-2xl border border-amber-500/40 bg-transparent text-sm font-semibold text-amber-100 hover:bg-amber-500/10 focus-ring"
+                      className="min-h-9 inline-flex items-center justify-center rounded-lg border border-amber-500/40 bg-transparent text-sm font-semibold text-amber-800 dark:text-amber-100 hover:bg-amber-500/10 focus-ring"
                     >
                       Contact Sales
                     </a>
@@ -1084,7 +1075,7 @@ export default function BillingPage() {
                     {features.map((f) => (
                       <li key={f.label} className="flex items-start gap-2.5 text-sm text-muted-foreground">
                         <IconCheck
-                          className={`h-4 w-4 shrink-0 mt-0.5 ${popular ? "text-violet-400" : "text-emerald-400"}`}
+                          className={`h-4 w-4 shrink-0 mt-0.5 ${popular ? "text-primary" : "text-emerald-600"}`}
                         />
                         <span>{f.label}</span>
                       </li>
@@ -1096,11 +1087,11 @@ export default function BillingPage() {
                     onClick={() => requestSubscribe(p, purpose)}
                     aria-busy={busy}
                     className={[
-                      "mt-8 min-h-12 rounded-2xl text-sm font-semibold transition-all focus-ring button-active disabled:cursor-not-allowed",
+                      "mt-8 min-h-9 rounded-lg text-sm font-semibold transition-all focus-ring button-active disabled:cursor-not-allowed",
                       isCurrent
                         ? "border border-border bg-muted/50 text-muted-foreground"
                         : popular
-                          ? "bg-gradient-to-r from-violet-600 to-sky-600 text-foreground shadow-lg shadow-violet-900/30 hover:from-violet-500 hover:to-sky-500"
+                          ? "bg-primary text-primary-foreground  "
                           : "bg-primary text-primary-foreground hover:bg-primary-hover",
                       busy ? "opacity-70" : "",
                     ].join(" ")}
@@ -1122,14 +1113,14 @@ export default function BillingPage() {
       </section>
 
       {/* Feature comparison */}
-      <section className="mb-12" aria-labelledby="compare-heading">
+      <section className="mb-6" aria-labelledby="compare-heading">
         <h2 id="compare-heading" className="text-xl font-semibold tracking-tight text-foreground mb-1">
           Feature comparison
         </h2>
         <p className="text-sm text-muted-foreground mb-5">
           See exactly what unlocks when you upgrade.
         </p>
-        <div className="rounded-2xl border border-border overflow-hidden bg-card/40">
+        <div className="rounded-lg border border-border overflow-hidden bg-card/40">
           <div className="overflow-x-auto table-scroll">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
@@ -1145,7 +1136,7 @@ export default function BillingPage() {
                       key={col}
                       scope="col"
                       className={`p-4 text-center font-semibold ${
-                        col === "Professional" ? "text-violet-300" : "text-foreground"
+                        col === "Professional" ? "text-primary" : "text-foreground"
                       }`}
                     >
                       {col}
@@ -1201,7 +1192,7 @@ export default function BillingPage() {
       </section>
 
       {/* Billing timeline */}
-      <section className="mb-12" aria-labelledby="timeline-heading">
+      <section className="mb-6" aria-labelledby="timeline-heading">
         <h2 id="timeline-heading" className="text-xl font-semibold tracking-tight text-foreground mb-5">
           Billing timeline
         </h2>
@@ -1215,7 +1206,7 @@ export default function BillingPage() {
                     node.state === "done"
                       ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
                       : node.state === "current"
-                        ? "border-violet-500/60 bg-violet-500/20 text-violet-200 ring-2 ring-violet-500/30"
+                        ? "border-primary bg-accent text-primary ring-1 ring-primary/20"
                         : "border-border bg-card text-muted-foreground",
                   ].join(" ")}
                   aria-hidden
@@ -1224,7 +1215,7 @@ export default function BillingPage() {
                 </span>
                 {i < visualTimeline.length - 1 && (
                   <span
-                    className="w-px flex-1 min-h-[1.75rem] bg-gradient-to-b from-zinc-600 to-zinc-800"
+                    className="w-px flex-1 min-h-[1.75rem] bg-border"
                     aria-hidden
                   />
                 )}
@@ -1252,7 +1243,7 @@ export default function BillingPage() {
         </ol>
 
         {data?.timeline && data.timeline.length > 0 && (
-          <div className="mt-2 rounded-2xl border border-border bg-card/40 p-4">
+          <div className="mt-2 rounded-lg border border-border bg-card/40 p-4">
             <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
               Recent events
             </h3>
@@ -1276,9 +1267,9 @@ export default function BillingPage() {
           Payment history
         </h2>
         {(data?.payments || []).length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-border bg-card/30 px-6 py-14 text-center">
+          <div className="rounded-lg border border-dashed border-border bg-card/30 px-6 py-14 text-center">
             <div
-              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/80 border border-border"
+              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-lg bg-muted/80 border border-border"
               aria-hidden
             >
               <svg className="h-8 w-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1298,13 +1289,13 @@ export default function BillingPage() {
             <button
               type="button"
               onClick={scrollToPlans}
-              className="mt-6 min-h-11 px-5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover focus-ring button-active"
+              className="mt-6 min-h-9 px-5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover focus-ring button-active"
             >
               Browse plans
             </button>
           </div>
         ) : (
-          <div className="rounded-2xl border border-border bg-card/60 overflow-hidden">
+          <div className="rounded-lg border border-border bg-card/60 overflow-hidden">
             <div className="overflow-x-auto desktop-only-table">
               <table className="w-full text-sm">
                 <thead>
@@ -1347,7 +1338,7 @@ export default function BillingPage() {
                         {pay.status === "paid" && (
                           <button
                             type="button"
-                            className="ml-2 text-xs text-sky-400 underline focus-ring rounded"
+                            className="ml-2 text-xs text-primary underline focus-ring rounded"
                             onClick={() => void downloadInvoice(pay.id, pay.invoiceNumber)}
                           >
                             PDF
@@ -1383,7 +1374,7 @@ export default function BillingPage() {
               {(data?.payments || []).map((pay) => (
                 <div
                   key={pay.id}
-                  className="rounded-xl border border-border bg-background/50 p-4 text-sm"
+                  className="rounded-md border border-border bg-background/50 p-4 text-sm"
                 >
                   <div className="flex justify-between gap-2">
                     <span className="font-medium text-foreground">{pay.plan?.name || "Payment"}</span>
@@ -1415,11 +1406,11 @@ export default function BillingPage() {
         >
           <button
             type="button"
-            className="absolute inset-0 bg-black/65 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/40 "
             aria-label="Close confirmation"
             onClick={() => !busyCode && setConfirm(null)}
           />
-          <div className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl border border-border bg-gradient-to-b from-zinc-900 to-background shadow-2xl p-6 sm:p-8 mm-fade-up">
+          <div className="relative w-full sm:max-w-md rounded-t-lg sm:rounded-lg border border-border bg-card shadow-2xl p-6 sm:p-8 mm-fade-up">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
               Confirm checkout
             </p>
@@ -1435,7 +1426,7 @@ export default function BillingPage() {
               </span>
             </p>
             <p className="mt-1 text-xs text-muted-foreground">+ 18% GST applied at checkout</p>
-            <div className="mt-5 rounded-xl border border-border bg-background/50 p-4">
+            <div className="mt-5 rounded-md border border-border bg-background/50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                 Included
               </p>
@@ -1456,7 +1447,7 @@ export default function BillingPage() {
                 type="button"
                 disabled={!!busyCode}
                 onClick={() => setConfirm(null)}
-                className="flex-1 min-h-11 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-muted focus-ring disabled:opacity-50"
+                className="flex-1 min-h-9 rounded-md border border-border text-sm font-medium text-muted-foreground hover:bg-muted focus-ring disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -1468,7 +1459,7 @@ export default function BillingPage() {
                     purpose: confirm.purpose,
                   })
                 }
-                className="flex-1 min-h-11 rounded-xl bg-gradient-to-r from-violet-600 to-sky-600 text-sm font-semibold text-foreground focus-ring button-active disabled:opacity-70"
+                className="flex-1 min-h-9 rounded-md bg-primary text-sm font-semibold text-primary-foreground focus-ring button-active disabled:opacity-70"
               >
                 {busyCode ? "Please wait…" : "Continue"}
               </button>

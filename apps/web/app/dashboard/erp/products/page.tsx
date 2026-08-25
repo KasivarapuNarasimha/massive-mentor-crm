@@ -294,7 +294,7 @@ export default function ErpProductsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <form
           onSubmit={createProduct}
-          className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3"
+          className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
         >
           <h2 className="sm:col-span-2 text-sm font-semibold">New product</h2>
           {renderFields(form, setForm)}
@@ -305,7 +305,7 @@ export default function ErpProductsPage() {
 
         <form
           onSubmit={createCategory}
-          className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm space-y-3"
+          className="mm-card p-4 space-y-3"
         >
           <h2 className="text-sm font-semibold">Categories</h2>
           <div className="flex flex-col sm:flex-row gap-2">
@@ -326,7 +326,7 @@ export default function ErpProductsPage() {
               categories.map((c) => (
                 <li
                   key={c.id}
-                  className="rounded-xl border border-border/70 bg-background/40 px-3 py-2 text-sm"
+                  className="rounded-md border border-border/70 bg-background/40 px-3 py-2 text-sm"
                 >
                   {c.name}
                 </li>
@@ -336,7 +336,7 @@ export default function ErpProductsPage() {
         </form>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-border/80 bg-card/50 overflow-hidden">
+      <div className="mt-6 mm-card overflow-hidden">
         <div className="px-4 py-3 border-b border-border/70">
           <h2 className="text-sm font-semibold">Product list</h2>
         </div>
@@ -362,7 +362,7 @@ export default function ErpProductsPage() {
               </thead>
               <tbody>
                 {products.map((p) => (
-                  <tr key={p.id} className="border-t border-border/60">
+                  <tr key={p.id} className="border-t border-border">
                     <td className="px-4 py-2 font-medium tabular-nums">{p.sku}</td>
                     <td className="px-4 py-2">{p.name}</td>
                     <td className="px-4 py-2 capitalize">{p.type || "goods"}</td>
@@ -422,7 +422,7 @@ export default function ErpProductsPage() {
           className="grid grid-cols-1 sm:grid-cols-2 gap-3"
         >
           {inventoryFieldsLocked ? (
-            <p className="sm:col-span-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            <p className="sm:col-span-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
               Type and Track Inventory are locked because this product already has stock
               movements.
             </p>

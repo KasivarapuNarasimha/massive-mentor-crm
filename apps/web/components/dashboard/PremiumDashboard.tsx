@@ -148,8 +148,8 @@ function EmptyBlock({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
-      <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-background">
-        <svg className="h-7 w-7 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-border bg-muted">
+        <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -163,7 +163,7 @@ function EmptyBlock({
       {actionHref && actionLabel && (
         <Link
           href={actionHref}
-          className="mt-4 text-xs font-semibold text-violet-300 hover:text-violet-200 focus-ring rounded"
+          className="mt-4 text-xs font-semibold text-primary hover:text-primary-hover focus-ring rounded"
         >
           {actionLabel} →
         </Link>
@@ -177,31 +177,31 @@ const QUICK_ACTIONS = [
     href: "/dashboard/leads",
     label: "New Lead",
     icon: "👤",
-    tone: "from-sky-500/20 to-cyan-500/5 border-sky-500/30",
+    tone: "border-border bg-card",
   },
   {
     href: "/dashboard/deals",
     label: "New Deal",
     icon: "💼",
-    tone: "from-violet-500/20 to-fuchsia-500/5 border-violet-500/30",
+    tone: "border-border bg-card",
   },
   {
     href: "/dashboard/meetings",
     label: "Schedule Meeting",
     icon: "📅",
-    tone: "from-emerald-500/20 to-teal-500/5 border-emerald-500/30",
+    tone: "border-border bg-card",
   },
   {
     href: "/dashboard/ai-sales",
     label: "Generate Proposal",
     icon: "✨",
-    tone: "from-amber-500/20 to-orange-500/5 border-amber-500/30",
+    tone: "border-border bg-card",
   },
   {
     href: "/dashboard/finance",
     label: "Create Invoice",
     icon: "🧾",
-    tone: "from-pink-500/20 to-rose-500/5 border-pink-500/30",
+    tone: "border-border bg-card",
   },
 ] as const;
 
@@ -514,7 +514,7 @@ export function PremiumDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
         </svg>
       ),
-      tone: "from-sky-500/15 to-sky-500/5 border-sky-500/25 text-sky-300",
+      tone: "border-border bg-card",
       growth: trendFromCounts(reports?.totalLeads ?? 0, Math.max(0, (reports?.totalLeads ?? 0) - 2)),
       previous: Math.max(0, (reports?.totalLeads ?? 0) - 2),
     },
@@ -528,7 +528,7 @@ export function PremiumDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       ),
-      tone: "from-emerald-500/15 to-emerald-500/5 border-emerald-500/25 text-emerald-300",
+      tone: "border-border bg-card",
       growth: trendFromCounts(reports?.totalClients ?? 0, Math.max(0, (reports?.totalClients ?? 0) - 1)),
       previous: Math.max(0, (reports?.totalClients ?? 0) - 1),
     },
@@ -542,7 +542,7 @@ export function PremiumDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
       ),
-      tone: "from-violet-500/15 to-violet-500/5 border-violet-500/25 text-violet-300",
+      tone: "border-border bg-card",
       growth: trendFromCounts(reports?.totalDeals ?? deals.length, Math.max(0, (reports?.totalDeals ?? deals.length) - 3)),
       previous: Math.max(0, (reports?.totalDeals ?? deals.length) - 3),
     },
@@ -557,7 +557,7 @@ export function PremiumDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      tone: "from-amber-500/15 to-amber-500/5 border-amber-500/25 text-amber-300",
+      tone: "border-border bg-card",
       growth: trendFromCounts(revenue, Math.max(0, revenue * 0.92)),
       previous: Math.round(Math.max(0, revenue * 0.92)),
     },
@@ -571,7 +571,7 @@ export function PremiumDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
         </svg>
       ),
-      tone: "from-pink-500/15 to-pink-500/5 border-pink-500/25 text-pink-300",
+      tone: "border-border bg-card",
       growth: trendFromCounts(reports?.meetingsToday ?? 0, 1),
       previous: 1,
     },
@@ -585,7 +585,7 @@ export function PremiumDashboard() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
         </svg>
       ),
-      tone: "from-cyan-500/15 to-cyan-500/5 border-cyan-500/25 text-cyan-300",
+      tone: "border-border bg-card",
       growth: trendFromCounts(
         reports?.tasksDue ?? tasks.filter((t) => t.status !== "done").length,
         Math.max(1, tasksOverdue.length)
@@ -616,41 +616,39 @@ export function PremiumDashboard() {
   if (loading && !reports) {
     return (
       <div className="space-y-6" aria-busy="true" aria-label="Loading dashboard">
-        <div className="h-56 rounded-3xl mm-skeleton" />
+        <div className="h-56 rounded-lg mm-skeleton" />
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <PremiumKpiSkeleton key={i} />
           ))}
         </div>
-        <Skeleton className="h-40 rounded-2xl" />
+        <Skeleton className="h-40 rounded-lg" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Skeleton className="h-64 rounded-2xl" />
-          <Skeleton className="h-64 rounded-2xl" />
+          <Skeleton className="h-64 rounded-lg" />
+          <Skeleton className="h-64 rounded-lg" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8 overflow-x-hidden mm-page-enter">
-      {/* 1. Welcome Hero — shared mm-dash-hero (light clean SaaS / dark premium glass) */}
+    <div className="space-y-5 sm:space-y-6 overflow-x-hidden mm-page-enter">
+      {/* 1. Welcome — compact enterprise header */}
       <section
-        className="mm-fade-up mm-dash-hero p-5 sm:p-7"
+        className="mm-fade-up mm-dash-hero p-4 sm:p-5"
         aria-labelledby="dash-welcome"
       >
-        <div className="mm-hero-mesh" aria-hidden />
-        <div className="mm-dash-hero-overlay" aria-hidden />
         <div className="relative">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
             <div className="min-w-0">
               <p className="mm-section-label">Welcome back</p>
               <h1
                 id="dash-welcome"
-                className="mt-2 text-2xl sm:text-3xl lg:text-[2.15rem] font-semibold tracking-tight text-foreground leading-tight"
+                className="mt-1 mm-page-title"
               >
                 {greet}, {name}
               </h1>
-              <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-xl">
+              <p className="mt-1 mm-secondary max-w-xl">
                 Here&apos;s the pulse of{" "}
                 <span className="text-foreground font-medium">{companyName}</span> for today.
               </p>
@@ -679,14 +677,14 @@ export function PremiumDashboard() {
           <div className="mm-dash-hero-panel mt-6 p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-2">
               <span
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 border border-primary/25 text-primary dark:bg-violet-500/20 dark:border-violet-400/20 dark:text-violet-300"
+                className="flex h-7 w-7 items-center justify-center rounded-md bg-accent border border-border text-primary"
                 aria-hidden
               >
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
               </span>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-primary dark:text-violet-200/90">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 AI Executive Summary
               </h2>
             </div>
@@ -723,7 +721,7 @@ export function PremiumDashboard() {
             <Link
               key={a.href + a.label}
               href={a.href}
-              className={`snap-start shrink-0 mm-card-hover flex items-center gap-2.5 rounded-2xl border bg-gradient-to-br ${a.tone} px-4 py-3 min-h-12 text-sm font-semibold text-foreground focus-ring button-active`}
+              className={`snap-start shrink-0 mm-card-hover flex items-center gap-2 rounded-md border ${a.tone} px-3 py-2 h-9 min-h-9 text-[13px] font-medium text-foreground focus-ring`}
             >
               <span aria-hidden className="text-base">
                 {a.icon}
@@ -760,7 +758,7 @@ export function PremiumDashboard() {
                   : undefined
               }
               loading={loading && !reports}
-              className="min-h-[132px]"
+              className="min-h-[96px]"
             />
           ))}
         </div>
@@ -768,23 +766,23 @@ export function PremiumDashboard() {
 
       {/* Lead Assignment Summary — Business Admin visibility */}
       {canSeeAssignmentSummary && (
-        <section aria-labelledby="lead-assignment-heading" className="mt-2">
-          <div className="rounded-2xl border border-border bg-card/70 p-5 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+        <section aria-labelledby="lead-assignment-heading" className="mt-1">
+          <div className="mm-card p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5 mb-3">
               <div>
                 <h2
                   id="lead-assignment-heading"
-                  className="text-lg font-semibold tracking-tight text-foreground flex items-center gap-2"
+                  className="mm-section-title flex items-center gap-2"
                 >
-                  <span aria-hidden>👥</span> Lead Assignment
+                  Lead Assignment
                 </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="mm-secondary mt-0.5">
                   Live counts for your business — total, assigned, and per team member
                 </p>
               </div>
               <Link
                 href="/dashboard/leads"
-                className="text-xs font-semibold text-sky-300 hover:text-sky-200 focus-ring rounded shrink-0"
+                className="text-xs font-semibold text-primary hover:text-primary-hover focus-ring rounded shrink-0"
               >
                 Manage leads →
               </Link>
@@ -798,43 +796,33 @@ export function PremiumDashboard() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
-                  <div className="rounded-xl border border-border bg-background/40 px-4 py-3">
-                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      Total Leads
-                    </div>
-                    <div className="text-2xl font-semibold tabular-nums mt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-4">
+                  <div className="rounded-md border border-border bg-card px-3.5 py-2.5">
+                    <div className="mm-kpi-label">Total Leads</div>
+                    <div className="text-xl font-semibold tabular-nums mt-1 text-foreground">
                       {(assignmentSummary?.totalLeads ?? reports?.totalLeads ?? 0).toLocaleString()}
                     </div>
                   </div>
-                  <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3">
-                    <div className="text-[11px] uppercase tracking-wide text-emerald-300/90">
-                      Assigned Leads
-                    </div>
-                    <div className="text-2xl font-semibold tabular-nums mt-1 text-emerald-200">
+                  <div className="rounded-md border border-border bg-card px-3.5 py-2.5">
+                    <div className="mm-kpi-label text-emerald-700 dark:text-emerald-400">Assigned Leads</div>
+                    <div className="text-xl font-semibold tabular-nums mt-1 text-foreground">
                       {(assignmentSummary?.assignedLeads ?? 0).toLocaleString()}
                     </div>
                   </div>
-                  <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3">
-                    <div className="text-[11px] uppercase tracking-wide text-amber-300/90">
-                      Unassigned Leads
-                    </div>
-                    <div className="text-2xl font-semibold tabular-nums mt-1 text-amber-200">
+                  <div className="rounded-md border border-border bg-card px-3.5 py-2.5">
+                    <div className="mm-kpi-label text-amber-700 dark:text-amber-400">Unassigned Leads</div>
+                    <div className="text-xl font-semibold tabular-nums mt-1 text-foreground">
                       {(assignmentSummary?.unassignedLeads ?? 0).toLocaleString()}
                     </div>
                   </div>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-border">
-                  <table className="w-full text-sm">
+                <div className="mm-table-wrap">
+                  <table className="mm-table">
                     <thead>
-                      <tr className="border-b border-border bg-muted/30 text-left">
-                        <th className="px-4 py-2.5 font-semibold text-muted-foreground">
-                          Team Member
-                        </th>
-                        <th className="px-4 py-2.5 font-semibold text-muted-foreground text-right tabular-nums">
-                          Leads Assigned
-                        </th>
+                      <tr>
+                        <th>Team Member</th>
+                        <th className="text-right">Leads Assigned</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -856,7 +844,7 @@ export function PremiumDashboard() {
                             <td className="px-4 py-2.5">
                               <Link
                                 href={`/dashboard/leads?assignedTo=${encodeURIComponent(m.userId || "")}`}
-                                className="font-medium text-foreground hover:text-sky-300 focus-ring rounded"
+                                className="font-medium text-foreground hover:text-primary focus-ring rounded"
                               >
                                 {m.name}
                               </Link>
@@ -905,21 +893,21 @@ export function PremiumDashboard() {
       <section aria-labelledby="media-lib-heading" className="mt-2">
         <Link
           href="/dashboard/media"
-          className="block rounded-2xl border border-border bg-card/70 p-5 sm:p-6 mm-card-hover focus-ring"
+          className="block mm-card p-4 sm:p-5 mm-card-hover focus-ring"
         >
-          <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <h2
                 id="media-lib-heading"
-                className="text-lg font-semibold tracking-tight text-foreground flex items-center gap-2"
+                className="mm-section-title"
               >
-                <span aria-hidden>📁</span> Media Library
+                Media Library
               </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="mm-secondary mt-0.5">
                 Brochures, catalogs & WhatsApp assets
               </p>
             </div>
-            <span className="text-xs font-semibold text-violet-300">Open →</span>
+            <span className="text-xs font-semibold text-primary">Open →</span>
           </div>
           {loading && !mediaStats ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -978,7 +966,7 @@ export function PremiumDashboard() {
           </h2>
           <Link
             href="/dashboard/deals"
-            className="text-xs font-semibold text-violet-300 hover:text-violet-200 focus-ring rounded"
+            className="text-xs font-semibold text-primary hover:text-primary-hover focus-ring rounded"
           >
             Open board →
           </Link>
@@ -987,7 +975,7 @@ export function PremiumDashboard() {
           {pipeline.map((col) => (
             <div
               key={col.key}
-              className="snap-start shrink-0 w-[140px] sm:w-[150px] rounded-2xl border border-border bg-card/70 p-3.5 mm-card-hover"
+              className="snap-start shrink-0 w-[140px] sm:w-[150px] rounded-md border border-border bg-card p-3 mm-card-hover"
             >
               <div className="flex items-center justify-between gap-1">
                 <span className="text-xs font-semibold text-muted-foreground">{col.label}</span>
@@ -1005,7 +993,7 @@ export function PremiumDashboard() {
                       ? "bg-emerald-500"
                       : col.key === "lost"
                         ? "bg-red-500/70"
-                        : "bg-gradient-to-r from-violet-500 to-sky-500"
+                        : "bg-primary"
                   }`}
                   style={{
                     width: `${Math.min(
@@ -1021,7 +1009,7 @@ export function PremiumDashboard() {
           ))}
         </div>
         {deals.length === 0 && (
-          <div className="mt-2 rounded-2xl border border-border bg-card/40">
+          <div className="mt-2 rounded-md border border-border bg-card">
             <EmptyBlock
               title="No deals in pipeline"
               hint="Create your first deal to see the Kanban stages fill up."
@@ -1035,7 +1023,7 @@ export function PremiumDashboard() {
       {/* 4. Analytics — full interactive suite */}
       <Suspense
         fallback={
-          <div className="h-64 animate-pulse rounded-3xl bg-white/5 border border-white/10" />
+          <div className="h-64 animate-pulse rounded-lg bg-muted border border-border" />
         }
       >
         <AnalyticsDashboard />
@@ -1047,7 +1035,7 @@ export function PremiumDashboard() {
         <article className="mm-panel p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground tracking-tight">Recent activity</h3>
-            <Link href="/dashboard/activity" className="text-[11px] text-violet-300 font-semibold focus-ring rounded">
+            <Link href="/dashboard/activity" className="text-[11px] text-primary font-semibold focus-ring rounded">
               View all
             </Link>
           </div>
@@ -1061,7 +1049,7 @@ export function PremiumDashboard() {
               {activities.slice(0, 8).map((a, i) => (
                 <li key={a.id || i} className="flex gap-3">
                   <div className="flex flex-col items-center">
-                    <span className="h-2.5 w-2.5 rounded-full bg-violet-500 ring-4 ring-violet-500/15" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-primary/10" />
                     {i < Math.min(activities.length, 8) - 1 && (
                       <span className="w-px flex-1 bg-muted min-h-[1.5rem]" />
                     )}
@@ -1084,7 +1072,7 @@ export function PremiumDashboard() {
         <article className="mm-panel p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground tracking-tight">Tasks & meetings</h3>
-            <Link href="/dashboard/tasks" className="text-[11px] text-violet-300 font-semibold focus-ring rounded">
+            <Link href="/dashboard/tasks" className="text-[11px] text-primary font-semibold focus-ring rounded">
               Tasks
             </Link>
           </div>
@@ -1119,7 +1107,7 @@ export function PremiumDashboard() {
                   {tasksOverdue.slice(0, 3).map((t) => (
                     <li
                       key={t.id}
-                      className="rounded-xl border border-red-500/20 bg-red-950/20 px-3 py-2 text-sm text-red-100 truncate"
+                      className="rounded-md border border-red-200 bg-red-50 dark:border-red-500/30 dark:bg-red-950/30 px-3 py-2 text-sm text-red-800 dark:text-red-100 truncate"
                     >
                       {t.title}
                     </li>
@@ -1153,11 +1141,11 @@ export function PremiumDashboard() {
         </article>
 
         {/* AI Insights */}
-        <article className="rounded-2xl border border-violet-500/25 bg-gradient-to-b from-violet-950/40 to-zinc-900/80 p-4 sm:p-5">
+        <article className="rounded-lg border border-border bg-card p-4 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <span
-                className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/20 border border-violet-500/30 text-xs"
+                className="flex h-7 w-7 items-center justify-center rounded-md bg-accent border border-border text-[10px] font-semibold text-primary"
                 aria-hidden
               >
                 AI
@@ -1166,7 +1154,7 @@ export function PremiumDashboard() {
             </h3>
             <Link
               href="/dashboard/ai-sales"
-              className="text-[11px] text-violet-300 font-semibold focus-ring rounded"
+              className="text-[11px] text-primary font-semibold focus-ring rounded"
             >
               Open AI
             </Link>
@@ -1216,7 +1204,7 @@ export function PremiumDashboard() {
             </div>
             <div className="rounded-xl border border-border bg-background/50 px-3 py-2">
               <div className="text-muted-foreground">Win rate</div>
-              <div className="font-semibold text-emerald-300 tabular-nums">{conversion}%</div>
+              <div className="font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{conversion}%</div>
             </div>
           </div>
         </article>

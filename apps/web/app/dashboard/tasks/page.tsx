@@ -178,25 +178,31 @@ export default function TasksPage() {
     } else toast.error(friendlyError(res.error, "Could not delete task. Please try again."));
   };
 
+  const statusBadgeClass = (status: string) => {
+    if (status === "done") return "mm-badge mm-badge-success capitalize";
+    if (status === "in_progress") return "mm-badge mm-badge-warning capitalize";
+    return "mm-badge capitalize";
+  };
+
   return (
-    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6 overflow-x-hidden pb-20 md:pb-6">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-5">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-semibold">Tasks</h1>
-          <p className="text-muted-foreground text-sm sm:text-base mt-1">
+          <h1 className="mm-page-title">Tasks</h1>
+          <p className="mm-secondary mt-1">
             Track follow-ups and action items. Newest first.
           </p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium touch-manipulation focus-ring mm-btn mm-btn-primary"
+          className="mm-btn mm-btn-primary w-full sm:w-auto focus-ring"
         >
           + New Task
         </button>
       </div>
 
-      <ExportFiltersBar module="tasks" token={token} search={search} onSearchChange={setSearch} className="mb-4" />
+      <ExportFiltersBar module="tasks" token={token} search={search} onSearchChange={setSearch} className="mb-3" />
       <label className="sr-only" htmlFor="task-search">
         Search tasks
       </label>
@@ -206,7 +212,7 @@ export default function TasksPage() {
         placeholder="Search tasks..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-4 w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11 focus-ring"
+        className="mm-input mb-3 focus-ring"
       />
 
       {isLoading ? (
@@ -224,7 +230,7 @@ export default function TasksPage() {
               <button
                 type="button"
                 onClick={openCreate}
-                className="mm-btn mm-btn-primary min-h-11 px-5 focus-ring"
+                className="mm-btn mm-btn-primary focus-ring"
               >
                 Create Task
               </button>
@@ -233,47 +239,47 @@ export default function TasksPage() {
         />
       ) : (
         <>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {tasks.map((task) => (
               <div
                 key={task.id}
-                className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center"
+                className="mm-card p-3.5 sm:p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center"
               >
                 <div className="min-w-0">
-                  <div className="font-medium text-foreground">{task.title}</div>
-                  <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-2 gap-y-1">
+                  <div className="text-[13px] font-medium text-foreground">{task.title}</div>
+                  <div className="mm-secondary mt-1 flex flex-wrap gap-x-2 gap-y-1">
                     {task.priority && <span className="capitalize">{task.priority}</span>}
                     {task.dueDate && (
                       <span>· Due {String(task.dueDate).split("T")[0]}</span>
                     )}
                     {task.contactId && (
-                      <span className="text-emerald-400/90">· Linked to lead/contact</span>
+                      <span>· Linked to lead/contact</span>
                     )}
                     {task.dealId && (
-                      <span className="text-sky-400/90">· Linked to deal</span>
+                      <span>· Linked to deal</span>
                     )}
                   </div>
                   {task.description ? (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                    <p className="mm-secondary mt-1 line-clamp-2">
                       {task.description}
                     </p>
                   ) : null}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs px-3 py-1.5 bg-white/5 rounded-full capitalize">
+                  <span className={statusBadgeClass(task.status)}>
                     {task.status}
                   </span>
                   <button
                     type="button"
                     onClick={() => openEdit(task)}
-                    className="min-h-10 px-3 py-2 text-xs bg-white/10 hover:bg-white/20 rounded-xl touch-manipulation"
+                    className="mm-btn mm-btn-secondary h-9 px-3 text-xs"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleDelete(task.id, task.title)}
-                    className="min-h-10 px-3 py-2 text-xs text-red-400 hover:bg-red-950/50 rounded-xl touch-manipulation"
+                    className="mm-btn mm-btn-danger h-9 px-3 text-xs"
                   >
                     Del
                   </button>
@@ -296,81 +302,87 @@ export default function TasksPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
-            <h3 className="font-semibold mb-4 text-lg">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-card border border-border p-4 sm:p-5 rounded-t-xl sm:rounded-lg w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom shadow-lg">
+            <h3 className="font-semibold mb-4 text-base tracking-tight">
               {editingTask ? "Edit Task" : "New Task"}
             </h3>
             {editingTask && (editingTask.contactId || editingTask.dealId) ? (
-              <p className="text-xs text-muted-foreground mb-3">
+              <p className="mm-secondary mb-3">
                 {editingTask.contactId ? "Linked to a lead/contact. " : ""}
                 {editingTask.dealId ? "Linked to a deal." : ""}
               </p>
             ) : null}
-            <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
-              <label className="block text-xs text-muted-foreground">
+            <form onSubmit={handleSubmit} className="space-y-3 adaptive-form">
+              <label className="mm-label">
                 <span className="mm-required">Title</span>
                 <input
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g. Call client about proposal"
-                  className="mt-1 w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11 focus-ring"
+                  className="mt-1 mm-input focus-ring"
                   required
                   autoFocus
                 />
               </label>
-              <label className="block text-xs text-muted-foreground">
+              <label className="mm-label">
                 Description
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Optional notes"
-                  className="mt-1 w-full bg-background border border-border rounded-xl p-3 h-24 text-base sm:text-sm focus-ring"
+                  className="mt-1 mm-input focus-ring min-h-24"
                 />
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="block text-xs text-muted-foreground">
+                <label className="mm-label">
                   Due date
                   <input
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="mt-1 w-full bg-background border border-border rounded-xl p-3 text-foreground text-base sm:text-sm min-h-11 focus-ring"
+                    className="mt-1 mm-input focus-ring"
                   />
                 </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  aria-label="Task status"
-                  className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
-                >
-                  <option value="todo">todo</option>
-                  <option value="in_progress">in_progress</option>
-                  <option value="done">done</option>
-                </select>
+                <label className="mm-label">
+                  Status
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    aria-label="Task status"
+                    className="mt-1 mm-input"
+                  >
+                    <option value="todo">todo</option>
+                    <option value="in_progress">in_progress</option>
+                    <option value="done">done</option>
+                  </select>
+                </label>
               </div>
-              <select
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
-                aria-label="Priority"
-              >
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-              </select>
-              <div className="flex gap-3">
+              <label className="mm-label">
+                Priority
+                <select
+                  value={formData.priority}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                  className="mt-1 mm-input"
+                  aria-label="Priority"
+                >
+                  <option value="low">low</option>
+                  <option value="medium">medium</option>
+                  <option value="high">high</option>
+                </select>
+              </label>
+              <div className="flex gap-2 pt-1">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 min-h-11 py-2.5 bg-white/10 rounded-xl touch-manipulation"
+                  className="mm-btn mm-btn-secondary flex-1"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className={`flex-1 min-h-11 py-2.5 bg-primary text-primary-foreground rounded-xl touch-manipulation focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
+                  className={`mm-btn mm-btn-primary flex-1 focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
                   aria-busy={isSubmitting}
                 >
                   {isSubmitting ? "Saving…" : editingTask ? "Update" : "Create"}

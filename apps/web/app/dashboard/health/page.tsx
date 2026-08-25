@@ -89,49 +89,49 @@ export default function HealthScorePage() {
   };
 
   const getScoreColor = (scoreValue: number) => {
-    if (scoreValue >= 75) return "text-emerald-400";
-    if (scoreValue >= 55) return "text-yellow-400";
-    return "text-orange-400";
+    if (scoreValue >= 75) return "text-emerald-700 dark:text-emerald-400";
+    if (scoreValue >= 55) return "text-amber-700 dark:text-amber-400";
+    return "text-orange-700 dark:text-orange-400";
   };
 
   const getProgressColor = (scoreValue: number) => {
     if (scoreValue >= 75) return "bg-emerald-500";
-    if (scoreValue >= 55) return "bg-yellow-500";
+    if (scoreValue >= 55) return "bg-amber-500";
     return "bg-orange-500";
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 overflow-x-hidden pb-24 md:pb-8">
+      <div className="flex items-center justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Health Score</h1>
-          <p className="text-sm text-muted-foreground mt-1">AI-powered analysis from your profile</p>
+          <h1 className="mm-page-title">Health Score</h1>
+          <p className="mm-secondary mt-0.5">AI-powered analysis from your profile</p>
         </div>
-        <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground focus-ring" aria-label="Back to dashboard overview">
+        <Link href="/dashboard" className="mm-secondary hover:text-foreground focus-ring shrink-0" aria-label="Back to dashboard overview">
           ← Back to Overview
         </Link>
       </div>
 
       {isLoading ? (
-        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
+        <div className="mm-card p-4 sm:p-5">
           <div className="animate-pulse">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-5">
               <div>
                 <Skeleton className="h-5 w-40 mb-2" />
                 <Skeleton className="h-3 w-48" />
               </div>
-              <Skeleton className="h-9 w-36 rounded-xl" />
+              <Skeleton className="h-9 w-36 rounded-lg" />
             </div>
 
             {/* Big Score */}
-            <div className="mb-8">
+            <div className="mb-6">
               <Skeleton className="h-3 w-28 mb-2" />
-              <Skeleton className="h-20 w-40" />
+              <Skeleton className="h-16 w-32" />
             </div>
 
             {/* Insights area */}
-            <div className="mb-8">
+            <div className="mb-6">
               <Skeleton className="h-3 w-24 mb-3" />
               <div className="space-y-2">
                 <Skeleton className="h-3 w-5/6" />
@@ -141,9 +141,9 @@ export default function HealthScorePage() {
             </div>
 
             {/* Category Breakdown skeleton */}
-            <div className="mb-8">
+            <div className="mb-6">
               <Skeleton className="h-3 w-36 mb-4" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
                 {[...Array(6)].map((_, i) => (
                   <div key={i}>
                     <div className="flex justify-between mb-1.5">
@@ -159,10 +159,10 @@ export default function HealthScorePage() {
             {/* Trend placeholder */}
             <div>
               <Skeleton className="h-3 w-36 mb-3" />
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex-1 px-4 py-3 bg-background border border-border rounded-xl">
-                    <Skeleton className="h-8 w-full mb-2" />
+                  <div key={i} className="flex-1 px-3 py-2.5 rounded-lg border border-border bg-background">
+                    <Skeleton className="h-7 w-full mb-2" />
                     <Skeleton className="h-2.5 w-20 mx-auto" />
                   </div>
                 ))}
@@ -171,26 +171,26 @@ export default function HealthScorePage() {
           </div>
         </div>
       ) : score ? (
-        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 transition-colors hover:border-border">
-          <div className="flex items-center justify-between mb-6">
+        <div className="mm-card p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-3 mb-5">
             <div>
-              <h2 className="text-xl font-semibold">Business Health Score</h2>
-              <p className="text-sm text-muted-foreground">Last calculated: {formatDate(score.calculatedAt)}</p>
+              <h2 className="text-base font-semibold">Business Health Score</h2>
+              <p className="mm-secondary mt-0.5">Last calculated: {formatDate(score.calculatedAt)}</p>
             </div>
             <button
               onClick={handleRecalculate}
               disabled={isRecalculating}
-              className="px-5 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-sm font-medium focus-ring button-active transition-colors disabled:opacity-50"
+              className="mm-btn mm-btn-secondary focus-ring shrink-0"
             >
               {isRecalculating ? "Recalculating..." : "Recalculate Score"}
             </button>
           </div>
 
           {/* Overall Score */}
-          <div className="mb-8">
-            <div className="text-sm font-medium text-muted-foreground tracking-widest mb-1">OVERALL SCORE</div>
+          <div className="mb-6">
+            <div className="mm-secondary font-medium tracking-wider uppercase mb-1">Overall score</div>
             <div 
-              className={`text-7xl sm:text-8xl md:text-[92px] font-semibold tabular-nums tracking-[-4px] sm:tracking-[-6px] leading-none ${getScoreColor(score.overallScore)}`}
+              className={`text-5xl sm:text-6xl font-semibold tabular-nums tracking-tight leading-none ${getScoreColor(score.overallScore)}`}
               aria-label={`Overall health score: ${score.overallScore} out of 100`}
             >
               {score.overallScore}
@@ -199,12 +199,12 @@ export default function HealthScorePage() {
 
           {/* AI Insights */}
           {score.insights && score.insights.length > 0 && (
-            <div className="mb-8">
-              <div className="text-sm font-medium text-muted-foreground mb-3 tracking-widest">AI INSIGHTS</div>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+            <div className="mb-6">
+              <div className="mm-secondary font-medium tracking-wider uppercase mb-2.5">AI insights</div>
+              <ul className="space-y-1.5 text-[13px] text-muted-foreground">
                 {score.insights.map((insight, index) => (
                   <li key={index} className="flex gap-2">
-                    <span className="text-emerald-400 mt-1">→</span>
+                    <span className="text-emerald-600 dark:text-emerald-400 mt-0.5">→</span>
                     <span>{insight}</span>
                   </li>
                 ))}
@@ -213,18 +213,18 @@ export default function HealthScorePage() {
           )}
 
           {/* Category Breakdown */}
-          <div className="mb-8">
-            <div className="text-sm font-medium text-muted-foreground mb-4 tracking-widest">CATEGORY BREAKDOWN</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
+          <div className="mb-6">
+            <div className="mm-secondary font-medium tracking-wider uppercase mb-3">Category breakdown</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
               {(Object.keys(score.breakdown) as Array<keyof typeof score.breakdown>).map((key) => {
                 const value = score.breakdown[key];
                 return (
                   <div key={key}>
-                    <div className="flex justify-between text-sm mb-1.5">
+                    <div className="flex justify-between text-[13px] mb-1.5">
                       <span className="text-muted-foreground">{CATEGORY_LABELS[key]}</span>
-                      <span className={`font-mono ${getScoreColor(value)}`}>{value}</span>
+                      <span className={`font-mono tabular-nums ${getScoreColor(value)}`}>{value}</span>
                     </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden" role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={100} aria-label={`${CATEGORY_LABELS[key]} score`}>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden" role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={100} aria-label={`${CATEGORY_LABELS[key]} score`}>
                       <div
                         className={`h-full transition-all duration-500 ${getProgressColor(value)}`}
                         style={{ width: `${value}%` }}
@@ -239,14 +239,14 @@ export default function HealthScorePage() {
           {/* Trend History */}
           {recentScores.length > 0 && (
             <div>
-              <div className="text-sm font-medium text-muted-foreground mb-3 tracking-widest">RECENT TREND (LAST 3)</div>
-              <div className="flex gap-4">
+              <div className="mm-secondary font-medium tracking-wider uppercase mb-2.5">Recent trend (last 3)</div>
+              <div className="flex gap-3">
                 {recentScores.slice().reverse().map((s: HealthScore, index: number) => (
-                  <div key={index} className="flex-1 text-center px-4 py-3 bg-background border border-border rounded-xl transition-colors hover:border-border">
-                    <div className={`text-3xl font-semibold tabular-nums ${getScoreColor(s.overallScore)}`}>
+                  <div key={index} className="flex-1 text-center px-3 py-2.5 rounded-lg border border-border bg-background">
+                    <div className={`text-2xl font-semibold tabular-nums ${getScoreColor(s.overallScore)}`}>
                       {s.overallScore}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1.5">
+                    <div className="mm-secondary mt-1">
                       {formatDate(s.calculatedAt)}
                     </div>
                   </div>
@@ -256,12 +256,12 @@ export default function HealthScorePage() {
           )}
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-2xl p-8 sm:p-12 text-center">
-          <div className="mx-auto w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6">
-            <span className="text-3xl">📊</span>
+        <div className="mm-card p-6 sm:p-8 text-center">
+          <div className="mx-auto w-10 h-10 bg-muted rounded-lg flex items-center justify-center mb-3">
+            <span className="text-lg">📊</span>
           </div>
-          <h3 className="text-2xl font-semibold mb-3">No Health Score Yet</h3>
-          <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+          <h3 className="text-base font-semibold mb-1.5">No Health Score Yet</h3>
+          <p className="mm-secondary mb-5 max-w-md mx-auto">
             Complete your business profile and click the button below to generate your first AI-powered analysis.
           </p>
           <button
@@ -276,7 +276,7 @@ export default function HealthScorePage() {
               }
               setIsLoading(false);
             }}
-            className="px-8 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active transition-colors"
+            className="mm-btn mm-btn-primary focus-ring"
           >
             Calculate Health Score
           </button>

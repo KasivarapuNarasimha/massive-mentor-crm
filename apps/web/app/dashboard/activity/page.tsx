@@ -112,11 +112,11 @@ export default function ActivityTimelinePage() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+    <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6 overflow-x-hidden pb-20 md:pb-6">
+      <div className="flex flex-wrap items-start justify-between gap-2.5 mb-4">
         <div>
-          <h1 className="text-3xl font-semibold mb-2">Activity & Audit Log</h1>
-          <p className="text-muted-foreground text-sm">
+          <h1 className="mm-page-title mb-1">Activity & Audit Log</h1>
+          <p className="mm-secondary">
             Human-readable trail of important account and CRM actions.
           </p>
         </div>
@@ -124,7 +124,7 @@ export default function ActivityTimelinePage() {
           <button
             type="button"
             onClick={toggleDebug}
-            className="text-[11px] px-2.5 py-1 rounded-lg border border-border text-muted-foreground hover:text-muted-foreground"
+            className="mm-btn mm-btn-ghost h-8 min-h-8 px-2.5 text-[11px]"
             title="Show raw JSON payloads under each card"
           >
             {debugMode ? "Hide developer payloads" : "Developer mode"}
@@ -137,25 +137,25 @@ export default function ActivityTimelinePage() {
         token={token}
         search={search}
         onSearchChange={setSearch}
-        className="mb-4"
+        className="mb-3"
       />
 
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+      <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
         <div className="hidden" />
         <button
           type="button"
           onClick={exportCsv}
-          className="px-4 py-2 rounded-xl text-sm border border-border text-foreground hover:bg-muted"
+          className="mm-btn mm-btn-secondary h-9"
         >
           Export audit CSV
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-6">
+      <div className="mm-filter-bar mb-4">
         <select
           value={entityType}
           onChange={(e) => setEntityType(e.target.value)}
-          className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11 w-full sm:w-auto"
+          className="mm-input w-full sm:w-auto"
         >
           <option value="">All modules</option>
           <option value="contact">Contact</option>
@@ -170,7 +170,7 @@ export default function ActivityTimelinePage() {
         <select
           value={action}
           onChange={(e) => setAction(e.target.value)}
-          className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11 w-full sm:w-auto"
+          className="mm-input w-full sm:w-auto"
         >
           <option value="">All actions</option>
           <option value="create">Create</option>
@@ -185,27 +185,27 @@ export default function ActivityTimelinePage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search email, module, details…"
-          className="flex-1 w-full sm:min-w-[160px] bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
+          className="mm-input flex-1 w-full sm:min-w-[160px]"
         />
         <button
           type="button"
           onClick={load}
-          className="min-h-11 px-6 bg-white/10 rounded-xl text-sm touch-manipulation w-full sm:w-auto"
+          className="mm-btn mm-btn-secondary h-9 touch-manipulation w-full sm:w-auto"
         >
           Filter
         </button>
       </div>
 
       {isLoading ? (
-        <div className="animate-pulse h-40 bg-card rounded" />
+        <div className="animate-pulse h-40 mm-card" />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           <section>
-            <h2 className="text-sm font-semibold text-muted-foreground mb-3">
+            <h2 className="mm-secondary font-semibold mb-2.5">
               Audit trail ({audit.length})
             </h2>
             {audit.length === 0 ? (
-              <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-sm">
+              <div className="mm-card mm-empty text-muted-foreground text-sm">
                 No audit entries yet.
               </div>
             ) : (
@@ -227,11 +227,11 @@ export default function ActivityTimelinePage() {
           </section>
 
           <section>
-            <h2 className="text-sm font-semibold text-muted-foreground mb-3">
+            <h2 className="mm-secondary font-semibold mb-2.5">
               CRM activity ({activities.length})
             </h2>
             {activities.length === 0 ? (
-              <div className="text-muted-foreground text-sm">No CRM activity rows yet.</div>
+              <div className="mm-secondary">No CRM activity rows yet.</div>
             ) : (
               <div className="space-y-2">
                 {activities.map((a) => (

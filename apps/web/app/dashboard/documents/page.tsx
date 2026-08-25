@@ -86,61 +86,62 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6 overflow-x-hidden pb-20 md:pb-6">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-5">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-semibold">Documents</h1>
-          <p className="text-muted-foreground text-sm sm:text-base mt-1">Attach files and links to entities.</p>
+          <h1 className="mm-page-title">Documents</h1>
+          <p className="mm-secondary mt-1">Attach files and links to entities.</p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium touch-manipulation"
+          className="mm-btn mm-btn-primary w-full sm:w-auto h-9 touch-manipulation focus-ring"
         >
           + Add Document
         </button>
       </div>
 
-      <ExportFiltersBar module="documents" token={token} className="mb-4" />
+      <ExportFiltersBar module="documents" token={token} className="mb-3" />
 
       {isLoading ? (
-        <div className="h-40 bg-card rounded-2xl animate-pulse" />
+        <div className="h-40 mm-card animate-pulse" />
       ) : docs.length === 0 ? (
-        <div className="bg-card border border-border rounded-2xl p-12 text-center">No documents yet.</div>
+        <div className="mm-card mm-empty text-muted-foreground text-sm">No documents yet.</div>
       ) : (
-        <div className="grid gap-3">
+        <div className="space-y-2">
           {docs.map((d) => (
             <div
               key={d.id}
-              className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start"
+              className="mm-card p-3.5 sm:p-4 flex flex-col gap-2.5 sm:flex-row sm:justify-between sm:items-start"
             >
               <div className="min-w-0">
-                <div className="font-medium text-foreground">{d.title}</div>
+                <div className="text-[13px] font-medium text-foreground">{d.title}</div>
                 {d.url && (
-                  <a href={d.url} target="_blank" rel="noreferrer" className="text-xs text-blue-400 break-all">
+                  <a href={d.url} target="_blank" rel="noreferrer" className="text-xs text-primary break-all">
                     {d.url}
                   </a>
                 )}
                 {d.entityType && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {d.entityType}: {d.entityId}
+                  <div className="mm-secondary mt-1">
+                    <span className="mm-badge">{d.entityType}</span>
+                    {d.entityId ? ` ${d.entityId}` : ""}
                   </div>
                 )}
               </div>
-              <div className="flex sm:flex-col items-center sm:items-end gap-2 text-xs">
-                <div className="text-muted-foreground">{new Date(d.createdAt).toLocaleDateString()}</div>
+              <div className="flex sm:flex-col items-center sm:items-end gap-2">
+                <div className="mm-secondary">{new Date(d.createdAt).toLocaleDateString()}</div>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => openEdit(d)}
-                    className="min-h-10 px-3 py-2 bg-white/10 rounded-xl touch-manipulation"
+                    className="mm-btn mm-btn-secondary h-9 px-3 text-xs touch-manipulation"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteDoc(d.id, d.title)}
-                    className="min-h-10 px-3 py-2 text-red-400 border border-red-900/40 rounded-xl touch-manipulation"
+                    className="mm-btn mm-btn-danger h-9 px-3 text-xs touch-manipulation"
                   >
                     Del
                   </button>
@@ -152,28 +153,28 @@ export default function DocumentsPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
-            <h3 className="font-semibold mb-4 text-lg">{editingDoc ? "Edit Document" : "Add Document"}</h3>
-            <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-card border border-border p-4 sm:p-5 rounded-t-xl sm:rounded-lg w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom shadow-lg">
+            <h3 className="font-semibold mb-4 text-base tracking-tight">{editingDoc ? "Edit Document" : "Add Document"}</h3>
+            <form onSubmit={handleSubmit} className="space-y-3 adaptive-form">
               <input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Document title *"
-                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="mm-input"
                 required
               />
               <input
                 value={formData.url}
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                 placeholder="URL or link"
-                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="mm-input"
               />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <select
                   value={formData.entityType}
                   onChange={(e) => setFormData({ ...formData, entityType: e.target.value })}
-                  className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
+                  className="mm-input"
                 >
                   <option value="contact">contact</option>
                   <option value="deal">deal</option>
@@ -183,17 +184,17 @@ export default function DocumentsPage() {
                   value={formData.entityId}
                   onChange={(e) => setFormData({ ...formData, entityId: e.target.value })}
                   placeholder="Entity ID"
-                  className="bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
+                  className="mm-input"
                 />
               </div>
-              <div className="flex gap-3">
-                <button type="button" onClick={closeModal} className="flex-1 min-h-11 py-2.5 bg-white/10 rounded-xl touch-manipulation">
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1 touch-manipulation">
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 min-h-11 py-2.5 bg-primary text-primary-foreground rounded-xl touch-manipulation"
+                  className={`mm-btn mm-btn-primary flex-1 touch-manipulation focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
                 >
                   {isSubmitting ? "Saving..." : editingDoc ? "Update" : "Add"}
                 </button>

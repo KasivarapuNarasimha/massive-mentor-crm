@@ -137,12 +137,12 @@ export default function AssignmentHistoryPage() {
 
   if (!canView) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-10">
-        <h1 className="text-2xl font-semibold">Lead Assignment History</h1>
-        <p className="text-muted-foreground mt-2">
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <h1 className="mm-page-title">Lead Assignment History</h1>
+        <p className="mm-secondary mt-2">
           Only Business Admin / Admin / CEO can view assignment history.
         </p>
-        <Link href="/dashboard/leads" className="text-primary text-sm mt-4 inline-block underline">
+        <Link href="/dashboard/leads" className="mm-btn mm-btn-secondary mt-4 inline-flex">
           Back to Leads
         </Link>
       </div>
@@ -150,93 +150,93 @@ export default function AssignmentHistoryPage() {
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-6 space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6 space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+        <div className="min-w-0">
+          <h1 className="mm-page-title">
             Lead Assignment History
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <p className="mm-secondary mt-1">
             Track bulk assigns, equal distribution, and reassignments. History is never deleted.
           </p>
         </div>
         <Link
           href="/dashboard/leads"
-          className="text-sm px-3 py-2 rounded-xl border border-border hover:bg-white/5"
+          className="mm-btn mm-btn-secondary"
         >
           ← Leads
         </Link>
       </div>
 
-      <div className="rounded-2xl border border-border overflow-hidden bg-card/40">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[720px]">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground border-b border-border bg-muted/30">
-                <th className="px-4 py-3 font-medium">#</th>
-                <th className="px-4 py-3 font-medium">Assigned By</th>
-                <th className="px-4 py-3 font-medium">Assigned To</th>
-                <th className="px-4 py-3 font-medium">Leads</th>
-                <th className="px-4 py-3 font-medium">Type</th>
-                <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3 font-medium">Status</th>
+      <div className="mm-table-wrap">
+        <table className="mm-table min-w-[720px]">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Assigned By</th>
+              <th>Assigned To</th>
+              <th>Leads</th>
+              <th>Type</th>
+              <th>Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={7} className="text-center text-muted-foreground">
+                  Loading…
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
-                    Loading…
-                  </td>
-                </tr>
-              ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
-                    No assignments yet. Use Leads → Assign User to create one.
-                  </td>
-                </tr>
-              ) : (
-                items.map((row) => {
-                  const toLabel =
-                    row.mode === "all_members"
-                      ? `All Members (${row.memberCount})`
-                      : row.lines
-                          .slice(0, 2)
-                          .map((l) => l.userName || l.userEmail || l.userId)
-                          .join(", ") + (row.lines.length > 2 ? "…" : "");
-                  return (
-                    <tr
-                      key={row.id}
-                      className="border-b border-border/60 hover:bg-white/5 cursor-pointer"
-                      onClick={() => void openDetail(row.id)}
-                    >
-                      <td className="px-4 py-3 tabular-nums font-medium">#{row.sequence}</td>
-                      <td className="px-4 py-3">{row.actorName || "—"}</td>
-                      <td className="px-4 py-3 max-w-[200px] truncate" title={toLabel}>
-                        {toLabel || "—"}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums font-semibold">
-                        {row.leadCount.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs px-2 py-0.5 rounded-md bg-white/10 border border-border">
-                          {modeLabel(row.mode, row.scope)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                        {formatDate(row.createdAt)}
-                      </td>
-                      <td className="px-4 py-3 capitalize text-emerald-400/90">{row.status}</td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+            ) : items.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="text-center text-muted-foreground">
+                  No assignments yet. Use Leads → Assign User to create one.
+                </td>
+              </tr>
+            ) : (
+              items.map((row) => {
+                const toLabel =
+                  row.mode === "all_members"
+                    ? `All Members (${row.memberCount})`
+                    : row.lines
+                        .slice(0, 2)
+                        .map((l) => l.userName || l.userEmail || l.userId)
+                        .join(", ") + (row.lines.length > 2 ? "…" : "");
+                return (
+                  <tr
+                    key={row.id}
+                    className="cursor-pointer"
+                    onClick={() => void openDetail(row.id)}
+                  >
+                    <td className="tabular-nums font-medium">#{row.sequence}</td>
+                    <td>{row.actorName || "—"}</td>
+                    <td className="max-w-[200px] truncate" title={toLabel}>
+                      {toLabel || "—"}
+                    </td>
+                    <td className="tabular-nums font-semibold">
+                      {row.leadCount.toLocaleString()}
+                    </td>
+                    <td>
+                      <span className="mm-badge">
+                        {modeLabel(row.mode, row.scope)}
+                      </span>
+                    </td>
+                    <td className="text-muted-foreground whitespace-nowrap">
+                      {formatDate(row.createdAt)}
+                    </td>
+                    <td>
+                      <span className="mm-badge mm-badge-success capitalize">{row.status}</span>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
         {total > 25 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border text-sm">
-            <span className="text-muted-foreground">
+          <div className="flex items-center justify-between px-3 py-2.5 border-t border-border text-[13px]">
+            <span className="mm-secondary">
               {(page - 1) * 25 + 1}–{Math.min(page * 25, total)} of {total}
             </span>
             <div className="flex gap-2">
@@ -244,7 +244,7 @@ export default function AssignmentHistoryPage() {
                 type="button"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1.5 rounded-lg border border-border disabled:opacity-40"
+                className="mm-btn mm-btn-secondary h-9 px-3 disabled:opacity-40"
               >
                 Prev
               </button>
@@ -252,7 +252,7 @@ export default function AssignmentHistoryPage() {
                 type="button"
                 disabled={page * 25 >= total}
                 onClick={() => setPage((p) => p + 1)}
-                className="px-3 py-1.5 rounded-lg border border-border disabled:opacity-40"
+                className="mm-btn mm-btn-secondary h-9 px-3 disabled:opacity-40"
               >
                 Next
               </button>
@@ -262,54 +262,56 @@ export default function AssignmentHistoryPage() {
       </div>
 
       {detail && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[90dvh] overflow-y-auto p-5 sm:p-6">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-card border border-border rounded-t-xl sm:rounded-lg w-full sm:max-w-lg max-h-[90dvh] overflow-y-auto p-4 sm:p-5 shadow-lg">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold">Assignment #{detail.sequence}</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{formatDate(detail.createdAt)}</p>
+                <h2 className="text-base font-semibold tracking-tight">Assignment #{detail.sequence}</h2>
+                <p className="mm-secondary mt-0.5">{formatDate(detail.createdAt)}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setDetail(null)}
-                className="text-muted-foreground hover:text-foreground text-sm"
+                className="mm-btn mm-btn-ghost h-9 px-2"
               >
                 Close
               </button>
             </div>
 
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px]">
               <div>
-                <dt className="text-xs text-muted-foreground">Assigned By</dt>
+                <dt className="mm-secondary">Assigned By</dt>
                 <dd className="font-medium">{detail.actorName || "—"}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Total Leads</dt>
+                <dt className="mm-secondary">Total Leads</dt>
                 <dd className="font-medium tabular-nums">{detail.leadCount.toLocaleString()}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Type</dt>
+                <dt className="mm-secondary">Type</dt>
                 <dd className="font-medium">{modeLabel(detail.mode, detail.scope)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Status</dt>
-                <dd className="font-medium capitalize">{detail.status}</dd>
+                <dt className="mm-secondary">Status</dt>
+                <dd>
+                  <span className="mm-badge mm-badge-success capitalize">{detail.status}</span>
+                </dd>
               </div>
             </dl>
             {detail.notes && (
-              <p className="mt-3 text-sm text-muted-foreground border border-border rounded-xl p-3">
+              <p className="mt-3 text-[13px] text-muted-foreground border border-border rounded-md p-3">
                 {detail.notes}
               </p>
             )}
 
-            <h3 className="text-sm font-semibold mt-5 mb-2">Members</h3>
-            <ul className="rounded-xl border border-border divide-y divide-border">
+            <h3 className="text-[13px] font-semibold mt-5 mb-2">Members</h3>
+            <ul className="rounded-md border border-border divide-y divide-border">
               {(detail.lines || []).map((l) => (
-                <li key={l.userId} className="flex justify-between px-3 py-2 text-sm">
+                <li key={l.userId} className="flex justify-between px-3 py-2 text-[13px]">
                   <span>
                     {l.userName || l.userEmail || l.userId}
                     {l.userEmail && l.userName ? (
-                      <span className="text-xs text-muted-foreground block">{l.userEmail}</span>
+                      <span className="mm-secondary block">{l.userEmail}</span>
                     ) : null}
                   </span>
                   <span className="tabular-nums font-semibold">{l.leadCount.toLocaleString()}</span>
@@ -317,19 +319,19 @@ export default function AssignmentHistoryPage() {
               ))}
             </ul>
 
-            <div className="mt-6 pt-4 border-t border-border">
-              <h3 className="text-sm font-semibold mb-2">Edit assignment</h3>
-              <p className="text-xs text-muted-foreground mb-3">
+            <div className="mt-5 pt-4 border-t border-border">
+              <h3 className="text-[13px] font-semibold mb-2">Edit assignment</h3>
+              <p className="mm-secondary mb-3">
                 Move leads from one member to another without editing each lead. Creates a new history
                 entry; original is kept.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
-                  <label className="text-[10px] uppercase text-muted-foreground">From</label>
+                  <label className="mm-label">From</label>
                   <select
                     value={moveFrom}
                     onChange={(e) => setMoveFrom(e.target.value)}
-                    className="mm-input w-full min-h-9 text-sm mt-0.5"
+                    className="mm-input"
                   >
                     {(detail.lines || []).map((l) => (
                       <option key={l.userId} value={l.userId}>
@@ -339,11 +341,11 @@ export default function AssignmentHistoryPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase text-muted-foreground">To</label>
+                  <label className="mm-label">To</label>
                   <select
                     value={moveTo}
                     onChange={(e) => setMoveTo(e.target.value)}
-                    className="mm-input w-full min-h-9 text-sm mt-0.5"
+                    className="mm-input"
                   >
                     {members.map((m) => (
                       <option key={m.id} value={m.id}>
@@ -353,13 +355,13 @@ export default function AssignmentHistoryPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase text-muted-foreground">Count</label>
+                  <label className="mm-label">Count</label>
                   <input
                     type="number"
                     min={1}
                     value={moveCount}
                     onChange={(e) => setMoveCount(e.target.value)}
-                    className="mm-input w-full min-h-9 text-sm mt-0.5 tabular-nums"
+                    className="mm-input tabular-nums"
                   />
                 </div>
               </div>
@@ -367,7 +369,7 @@ export default function AssignmentHistoryPage() {
                 type="button"
                 disabled={moving}
                 onClick={() => void runMove()}
-                className="mt-3 w-full min-h-11 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold disabled:opacity-50"
+                className={`mt-3 w-full mm-btn mm-btn-primary ${moving ? "mm-btn-loading" : ""}`}
               >
                 {moving ? "Moving…" : "Move leads"}
               </button>

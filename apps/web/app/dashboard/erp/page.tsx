@@ -56,14 +56,10 @@ function KpiCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-2 text-2xl font-bold tracking-tight text-foreground tabular-nums">
-        {value}
-      </p>
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+    <div className="mm-kpi-card">
+      <p className="mm-kpi-label">{label}</p>
+      <p className="mm-kpi-value">{value}</p>
+      {hint ? <p className="mm-kpi-meta">{hint}</p> : null}
     </div>
   );
 }
@@ -131,13 +127,13 @@ export default function ErpDashboardPage() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/dashboard/finance"
-              className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-ring"
+              className="inline-flex items-center justify-center rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-ring"
             >
               Open Finance
             </Link>
             <Link
               href="/dashboard/approvals"
-              className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-ring"
+              className="inline-flex items-center justify-center rounded-md border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted focus-ring"
             >
               Approvals
             </Link>
@@ -146,11 +142,11 @@ export default function ErpDashboardPage() {
       />
 
       {loading ? (
-        <div className="rounded-2xl border border-border/60 bg-muted/30 p-8 text-sm text-muted-foreground">
+        <div className="rounded-lg border border-border bg-muted p-8 text-sm text-muted-foreground">
           Loading ERP overview…
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
           {error}
         </div>
       ) : kpis ? (
@@ -183,7 +179,7 @@ export default function ErpDashboardPage() {
           </div>
 
           {pnl ? (
-            <div className="mt-6 rounded-2xl border border-border/80 bg-card/50 p-5">
+            <div className="mt-6 mm-card p-5">
               <h2 className="text-sm font-semibold text-foreground">
                 Profit &amp; Loss snapshot
               </h2>
@@ -208,7 +204,7 @@ export default function ErpDashboardPage() {
             </div>
           ) : null}
 
-          <div className="mt-6 rounded-2xl border border-border/80 bg-card/50 p-5">
+          <div className="mt-6 mm-card p-5">
             <h2 className="text-sm font-semibold text-foreground">Operations</h2>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {[
@@ -222,7 +218,7 @@ export default function ErpDashboardPage() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted focus-ring"
+                  className="rounded-md border border-border bg-card px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted focus-ring"
                 >
                   {item.label}
                 </Link>

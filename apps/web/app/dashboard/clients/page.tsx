@@ -254,20 +254,20 @@ export default function ClientsPage() {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8">
+    <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 overflow-x-hidden pb-24 md:pb-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-5">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Clients</h1>
-          <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-base">
+          <h1 className="mm-page-title">Clients</h1>
+          <p className="mm-secondary mt-1">
             Manage your existing clients and accounts.
           </p>
           {templateSlug ? (
-            <p className="text-xs text-muted-foreground mt-1">Template: {templateSlug}</p>
+            <p className="mm-secondary mt-1">Template: {templateSlug}</p>
           ) : null}
         </div>
         <button
           onClick={openCreate}
-          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active transition-colors touch-manipulation"
+          className="mm-btn mm-btn-primary w-full sm:w-auto h-9 min-h-9 px-4 text-[13px] focus-ring touch-manipulation"
         >
           + New Client
         </button>
@@ -278,21 +278,21 @@ export default function ClientsPage() {
         token={token}
         search={search}
         onSearchChange={setSearch}
-        className="mb-4"
+        className="mb-3"
       />
 
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-5 sm:mb-6">
+      <div className="mm-filter-bar mb-4">
         <input
           type="search"
           placeholder="Search clients..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 bg-background border border-border rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm text-foreground focus:outline-none focus:border-border min-h-11"
+          className="mm-input flex-1 min-w-[12rem]"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-background border border-border rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm text-foreground focus:outline-none focus:border-border min-h-11"
+          className="mm-input w-full sm:w-auto"
         >
           <option value="">All Statuses</option>
           {statusOptions.map((s) => (
@@ -317,7 +317,7 @@ export default function ClientsPage() {
               <button
                 type="button"
                 onClick={openCreate}
-                className="mm-btn mm-btn-primary min-h-11 px-6 focus-ring"
+                className="mm-btn mm-btn-primary h-9 min-h-9 px-5 focus-ring"
               >
                 Create Client
               </button>
@@ -327,39 +327,39 @@ export default function ClientsPage() {
       ) : (
         <>
           {/* Mobile / tablet card list */}
-          <div className="md:hidden space-y-3">
+          <div className="md:hidden space-y-2.5">
             {filteredClients.map((client) => (
               <div
                 key={client.id}
-                className="bg-card border border-border rounded-2xl p-4 space-y-3"
+                className="mm-card p-3 space-y-2.5"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-medium text-foreground truncate">{client.name}</div>
+                    <div className="font-medium text-[13px] text-foreground truncate">{client.name}</div>
                     {client.email && (
                       <div className="text-xs text-muted-foreground truncate">{client.email}</div>
                     )}
-                    <div className="text-sm text-muted-foreground mt-1">{client.company || "—"}</div>
+                    <div className="mm-secondary mt-1">{client.company || "—"}</div>
                   </div>
-                  <span className="shrink-0 px-2.5 py-0.5 text-xs rounded-full bg-white/10 border border-white/10">
+                  <span className="mm-badge shrink-0">
                     {client.status}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-muted-foreground tabular-nums">
+                  <span className="text-[13px] text-foreground tabular-nums">
                     {client.value != null ? money(client.value) : "—"}
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5">
                     <button
                       onClick={() => openEdit(client)}
-                      className="min-h-10 px-3 py-2 text-xs bg-white/10 rounded-xl border border-white/10 touch-manipulation"
+                      className="mm-btn mm-btn-secondary h-9 min-h-9 px-2.5 text-xs touch-manipulation"
                     >
                       Edit
                     </button>
                     {(role === "manager" || role === "admin" || role === "business_admin") && (
                       <button
                         onClick={() => handleDelete(client.id, client.name)}
-                        className="min-h-10 px-3 py-2 text-xs text-red-400 rounded-xl border border-red-900/50 touch-manipulation"
+                        className="mm-btn mm-btn-danger h-9 min-h-9 px-2.5 text-xs touch-manipulation"
                       >
                         Delete
                       </button>
@@ -371,22 +371,22 @@ export default function ClientsPage() {
           </div>
 
           {/* Desktop table */}
-          <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="hidden md:block mm-table-wrap">
             <div className="table-scroll">
               <table className="mm-table min-w-[640px]">
-                <thead className="border-b border-border text-muted-foreground">
+                <thead>
                   <tr>
-                    <th className="text-left p-4 font-medium">Name</th>
-                    <th className="text-left p-4 font-medium">Company</th>
-                    <th className="text-left p-4 font-medium">Status</th>
-                    <th className="text-left p-4 font-medium">Value</th>
-                    <th className="text-right p-4 font-medium">Actions</th>
+                    <th>Name</th>
+                    <th>Company</th>
+                    <th>Status</th>
+                    <th>Value</th>
+                    <th className="text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody>
                   {filteredClients.map((client) => (
-                    <tr key={client.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="p-4">
+                    <tr key={client.id}>
+                      <td>
                         <div>
                           <div className="font-medium text-foreground">{client.name}</div>
                           {client.email && (
@@ -394,26 +394,26 @@ export default function ClientsPage() {
                           )}
                         </div>
                       </td>
-                      <td className="p-4 text-muted-foreground">{client.company || "-"}</td>
-                      <td className="p-4">
-                        <span className="inline-block px-2.5 py-0.5 text-xs rounded-full bg-white/10 text-white/80 border border-white/10">
+                      <td className="text-muted-foreground">{client.company || "-"}</td>
+                      <td>
+                        <span className="mm-badge">
                           {client.status}
                         </span>
                       </td>
-                      <td className="p-4 text-muted-foreground">
+                      <td className="text-foreground tabular-nums">
                         {client.value != null ? money(client.value) : "-"}
                       </td>
-                      <td className="p-4 text-right space-x-2">
+                      <td className="text-right space-x-1.5">
                         <button
                           onClick={() => openEdit(client)}
-                          className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-lg border border-white/10"
+                          className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs"
                         >
                           Edit
                         </button>
                         {(role === "manager" || role === "admin" || role === "business_admin") && (
                           <button
                             onClick={() => handleDelete(client.id, client.name)}
-                            className="px-3 py-1 text-xs text-red-400 hover:bg-red-950/50 rounded-lg border border-red-900/50"
+                            className="mm-btn mm-btn-danger h-8 min-h-8 px-2.5 text-xs"
                           >
                             Delete
                           </button>
@@ -429,15 +429,15 @@ export default function ClientsPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92dvh] flex flex-col overflow-hidden p-4 sm:p-6 safe-bottom">
-            <h2 className="text-xl font-semibold mb-2">{editingClient ? "Edit Client" : "New Client"}</h2>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="mm-card rounded-t-lg sm:rounded-lg w-full sm:max-w-lg max-h-[92dvh] flex flex-col overflow-hidden p-4 sm:p-5 safe-bottom">
+            <h2 className="mm-section-title text-base mb-2">{editingClient ? "Edit Client" : "New Client"}</h2>
             {templateSlug ? (
-              <p className="text-xs text-muted-foreground mb-4">Fields from template: {templateSlug}</p>
+              <p className="mm-secondary mb-3">Fields from template: {templateSlug}</p>
             ) : (
-              <div className="mb-4" />
+              <div className="mb-3" />
             )}
-            <div className="flex-1 overflow-y-auto space-y-4">
+            <div className="flex-1 overflow-y-auto space-y-3">
               <DynamicForm
                 formId="client-form"
                 fields={fieldDefs}
@@ -450,18 +450,18 @@ export default function ClientsPage() {
 
               {/* Finance bridge — explicit only; Client Value stays CRM LTV */}
               {editingClient ? (
-                <div className="rounded-xl border border-border bg-background/60 p-4 space-y-3">
+                <div className="mm-card p-3 space-y-3">
                   <div>
-                    <h3 className="text-sm font-semibold">Finance</h3>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <h3 className="mm-section-title text-[13px]">Finance</h3>
+                    <p className="mm-secondary mt-0.5">
                       Client Value is CRM only. Use this section to record actual revenue in Finance
                       (Finance roles / Admin). Prevents double-counting with Won Deals.
                     </p>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground">Financial Status</label>
+                    <label className="mm-label">Financial Status</label>
                     <select
-                      className="w-full mt-1 bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
+                      className="mm-input"
                       value={finStatus}
                       onChange={(e) => setFinStatus(e.target.value as FinancialStatus)}
                     >
@@ -473,32 +473,32 @@ export default function ClientsPage() {
                   {finStatus === "received" && (
                     <>
                       <div>
-                        <label className="text-xs text-muted-foreground">Amount</label>
+                        <label className="mm-label">Amount</label>
                         <input
                           type="text"
                           inputMode="decimal"
-                          className="w-full mt-1 bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
+                          className="mm-input"
                           value={finAmount}
                           onChange={(e) => setFinAmount(e.target.value)}
                           placeholder="e.g. 90000"
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-muted-foreground">Revenue Date</label>
+                        <label className="mm-label">Revenue Date</label>
                         <input
                           type="date"
-                          className="w-full mt-1 bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
+                          className="mm-input"
                           value={finDate}
                           onChange={(e) => setFinDate(e.target.value)}
                         />
                       </div>
                       {clientDeals.length > 0 && (
                         <div>
-                          <label className="text-xs text-muted-foreground">
+                          <label className="mm-label">
                             Linked Deal (optional — preferred if Won)
                           </label>
                           <select
-                            className="w-full mt-1 bg-background border border-border rounded-xl px-3 py-2 text-sm min-h-10"
+                            className="mm-input"
                             value={finDealId}
                             onChange={(e) => setFinDealId(e.target.value)}
                           >
@@ -519,7 +519,7 @@ export default function ClientsPage() {
                     type="button"
                     disabled={finBusy}
                     onClick={() => void handleAddToFinance()}
-                    className="w-full min-h-10 rounded-xl bg-emerald-600/90 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50"
+                    className={`mm-btn mm-btn-primary w-full ${finBusy ? "mm-btn-loading" : ""}`}
                   >
                     {finBusy
                       ? "Saving…"
@@ -531,7 +531,7 @@ export default function ClientsPage() {
               ) : null}
 
               {editingClient?.id ? (
-                <div className="mt-4 pt-4 border-t border-border">
+                <div className="mt-3 pt-3 border-t border-border">
                   <NotesPanel
                     entityType="contact"
                     entityId={editingClient.id}
@@ -541,11 +541,11 @@ export default function ClientsPage() {
                 </div>
               ) : null}
             </div>
-            <div className="flex gap-3 mt-6">
+            <div className="flex gap-2 mt-4">
               <button
                 type="button"
                 onClick={closeModal}
-                className="flex-1 px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-sm font-medium"
+                className="mm-btn mm-btn-secondary flex-1"
               >
                 Cancel
               </button>
@@ -553,7 +553,7 @@ export default function ClientsPage() {
                 type="submit"
                 form="client-form"
                 disabled={isSubmitting}
-                className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover disabled:opacity-50"
+                className={`mm-btn mm-btn-primary flex-1 ${isSubmitting ? "mm-btn-loading" : ""}`}
               >
                 {isSubmitting ? "Saving..." : editingClient ? "Update Client" : "Create Client"}
               </button>

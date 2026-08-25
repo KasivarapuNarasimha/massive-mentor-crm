@@ -104,24 +104,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-background px-4 py-8 safe-x safe-bottom">
+    <div className="min-h-dvh flex items-center justify-center bg-[#f3f4f6] dark:bg-background px-4 py-8 safe-x safe-bottom">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-medium mb-4">
-            CUSTOMER PORTAL
+        <div className="text-center mb-6">
+          <div className="inline-flex px-2.5 py-0.5 rounded border border-border bg-white dark:bg-card text-muted-foreground text-[11px] font-medium mb-3 tracking-wide">
+            Customer portal
           </div>
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-xl sm:text-[1.375rem] font-semibold tracking-tight text-foreground">
             Massive Mentor
           </h1>
-          <p className="mt-2 text-muted-foreground text-sm sm:text-base">
+          <p className="mt-1.5 text-muted-foreground text-[13px]">
             Sign in to your business CRM workspace
           </p>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-5 sm:p-8">
-          <form onSubmit={handleSubmit} className="space-y-5 adaptive-form">
+        <div className="bg-white dark:bg-card border border-border rounded-lg p-5 sm:p-6 shadow-sm">
+          <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-muted-foreground mb-2">
+              <label htmlFor="email" className="block text-xs font-medium text-foreground mb-1.5">
                 Email address
               </label>
               <input
@@ -131,14 +131,14 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="w-full px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11 bg-input border border-input-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring"
+                className="w-full px-3 py-2 text-[13px] h-9 min-h-9 bg-card border border-input-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                 placeholder="you@business.com"
               />
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="password" className="block text-sm font-medium text-muted-foreground">
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="password" className="block text-xs font-medium text-foreground">
                   Password
                 </label>
                 <Link
@@ -154,7 +154,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full px-4 py-3 sm:py-2.5 text-base sm:text-sm min-h-11 bg-input border border-input-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-ring"
+                className="w-full px-3 py-2 text-[13px] h-9 min-h-9 bg-card border border-input-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
                 placeholder="••••••••"
               />
             </div>
@@ -162,7 +162,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full min-h-12 bg-primary text-primary-foreground font-medium py-3 rounded-lg hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2 touch-manipulation"
+              className="w-full h-9 min-h-9 bg-primary text-primary-foreground text-[13px] font-medium rounded-md hover:bg-primary-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1 touch-manipulation"
             >
               {isSubmitting ? "Signing in..." : "Sign in"}
             </button>

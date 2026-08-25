@@ -113,12 +113,12 @@ function ScoreBadge({ score }: { score: number }) {
   const label = score >= 80 ? "Hot" : score >= 50 ? "Warm" : "Cold";
   const colorClass =
     score >= 80
-      ? "bg-red-500/20 text-red-400 border-red-500/30"
+      ? "mm-badge-danger"
       : score >= 50
-        ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30"
-        : "bg-blue-500/20 text-blue-400 border-blue-500/30";
+        ? "mm-badge-warning"
+        : "mm-badge-primary";
   return (
-    <span className={`inline-block px-2.5 py-0.5 text-xs rounded-full border ${colorClass}`}>
+    <span className={`mm-badge ${colorClass}`}>
       {label} ({score})
     </span>
   );
@@ -1632,16 +1632,16 @@ export default function LeadsPage() {
   };
 
   const inputClass =
-    "bg-background border border-input-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring w-full min-w-0";
+    "mm-input";
   const selectClass = `${inputClass} appearance-none`;
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-5 md:px-6 lg:px-8 pt-4 sm:pt-6 lg:pt-8 pb-4 sm:pb-6 overflow-x-hidden min-w-0 flex flex-col gap-0">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-5 md:px-6 lg:px-8 pt-4 sm:pt-5 lg:pt-6 pb-4 sm:pb-5 overflow-x-hidden min-w-0 flex flex-col gap-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-6 gap-3 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2.5 shrink-0">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Leads</h1>
-          <p className="text-muted-foreground mt-1.5 text-sm sm:text-base">
+          <h1 className="mm-page-title">Leads</h1>
+          <p className="mm-secondary mt-1">
             Manage your sales leads and prospects.
           </p>
         </div>
@@ -1649,13 +1649,13 @@ export default function LeadsPage() {
           <button
             type="button"
             onClick={downloadCsvTemplate}
-            className="min-h-11 px-4 sm:px-5 py-2.5 bg-white/5 border border-border rounded-xl text-sm font-medium hover:bg-white/10 transition-colors text-muted-foreground touch-manipulation"
+            className="mm-btn mm-btn-secondary touch-manipulation"
             title="Download a CSV with headers that match the backend schema"
           >
             CSV template
           </button>
           <label
-            className={`min-h-11 px-4 sm:px-5 py-2.5 bg-white/10 rounded-xl text-sm font-medium cursor-pointer hover:bg-white/15 transition-colors text-center flex items-center justify-center touch-manipulation ${
+            className={`mm-btn mm-btn-secondary cursor-pointer text-center touch-manipulation ${
               importing ? "opacity-50 pointer-events-none" : ""
             }`}
           >
@@ -1671,7 +1671,7 @@ export default function LeadsPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="min-h-11 px-4 sm:px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary-hover transition-colors touch-manipulation"
+            className="mm-btn mm-btn-primary touch-manipulation"
           >
             + New Lead
           </button>
@@ -1679,10 +1679,10 @@ export default function LeadsPage() {
       </div>
 
       {/* Total + optional import summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <div className="bg-card border border-border rounded-2xl p-4 col-span-1">
-          <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Total Leads</div>
-          <div className="text-2xl font-semibold tabular-nums text-foreground">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-4">
+        <div className="mm-kpi-card col-span-1">
+          <div className="mm-kpi-label">Total Leads</div>
+          <div className="mm-kpi-value">
             {isLoading ? "—" : serverTotal.toLocaleString()}
           </div>
           {!isLoading && (
@@ -1698,7 +1698,7 @@ export default function LeadsPage() {
 
         {importReport && (
           <>
-            <div className="bg-card border border-border rounded-2xl p-4">
+            <div className="bg-card border border-border rounded-lg p-4">
               <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">
                 Parsed rows
               </div>
@@ -1706,23 +1706,23 @@ export default function LeadsPage() {
                 {importReport.parsedRows.toLocaleString()}
               </div>
             </div>
-            <div className="bg-card border border-emerald-900/40 rounded-2xl p-4">
+            <div className="bg-card border border-border rounded-lg p-4">
               <div className="text-[11px] uppercase tracking-wider text-emerald-500/80 mb-1">
                 Imported
               </div>
-              <div className="text-2xl font-semibold tabular-nums text-emerald-400">
+              <div className="text-2xl font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
                 {importReport.imported.toLocaleString()}
               </div>
             </div>
-            <div className="bg-card border border-sky-900/40 rounded-2xl p-4">
-              <div className="text-[11px] uppercase tracking-wider text-sky-400/80 mb-1">
+            <div className="bg-card border border-border rounded-lg p-4">
+              <div className="text-[11px] uppercase tracking-wider text-sky-700 dark:text-sky-400/80 mb-1">
                 Updated existing
               </div>
-              <div className="text-2xl font-semibold tabular-nums text-sky-400">
+              <div className="text-2xl font-semibold tabular-nums text-sky-700 dark:text-sky-400">
                 {(importReport.updated ?? 0).toLocaleString()}
               </div>
             </div>
-            <div className="bg-card border border-amber-900/40 rounded-2xl p-4">
+            <div className="bg-card border border-border rounded-lg p-4">
               <div className="text-[11px] uppercase tracking-wider text-amber-500/80 mb-1">
                 Duplicates skipped
               </div>
@@ -1730,7 +1730,7 @@ export default function LeadsPage() {
                 {importReport.skippedDuplicates.toLocaleString()}
               </div>
             </div>
-            <div className="bg-card border border-red-900/40 rounded-2xl p-4">
+            <div className="bg-card border border-border rounded-lg p-4">
               <div className="text-[11px] uppercase tracking-wider text-red-400/80 mb-1">
                 Failed rows
               </div>
@@ -1743,7 +1743,7 @@ export default function LeadsPage() {
       </div>
 
       {importReport && (
-        <div className="mb-6 border border-border rounded-2xl bg-background/80 p-4 space-y-3">
+        <div className="mb-6 border border-border rounded-lg bg-card p-4 space-y-3">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h3 className="text-sm font-semibold text-foreground">Import report</h3>
@@ -1772,7 +1772,7 @@ export default function LeadsPage() {
           </div>
 
           {importReport.errors && importReport.errors.length > 0 ? (
-            <div className="max-h-56 overflow-auto space-y-2 bg-card border border-border rounded-xl p-3">
+            <div className="max-h-56 overflow-auto space-y-2 bg-card border border-border rounded-md p-3">
               {importReport.errors.map((err, i) => (
                 <div
                   key={`${err.row}-${err.column || "x"}-${i}`}
@@ -1787,7 +1787,7 @@ export default function LeadsPage() {
                     ) : null}
                   </div>
                   {err.suggestedFix && (
-                    <div className="text-xs text-emerald-400/80 mt-0.5">
+                    <div className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
                       Suggested fix: {err.suggestedFix}
                     </div>
                   )}
@@ -1800,7 +1800,7 @@ export default function LeadsPage() {
               ))}
             </div>
           ) : importReport.imported + (importReport.updated || 0) > 0 ? (
-            <p className="text-sm text-emerald-400">All usable rows imported or updated successfully.</p>
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">All usable rows imported or updated successfully.</p>
           ) : null}
 
           {importReport.report && (
@@ -1846,7 +1846,7 @@ export default function LeadsPage() {
       />
 
       {urlFiltersApplied && (search || statusFilter || assignedToFilter) && (
-        <div className="mb-3 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-200 flex flex-wrap items-center gap-2">
+        <div className="mb-3 rounded-md border border-border bg-accent px-3 py-2 text-xs text-accent-foreground flex flex-wrap items-center gap-2">
           <span>
             Filtered from analytics
             {statusFilter ? ` · status: ${statusFilter}` : ""}
@@ -1861,7 +1861,7 @@ export default function LeadsPage() {
           </span>
           <button
             type="button"
-            className="underline text-violet-300 hover:text-foreground"
+            className="underline text-primary hover:text-foreground"
             onClick={() => {
               setSearch("");
               setStatusFilter("");
@@ -1875,9 +1875,9 @@ export default function LeadsPage() {
       )}
 
       {/* Filters — status + assignee + config-driven filter fields */}
-      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 mb-4 items-stretch sm:items-center">
+      <div className="mm-filter-bar mb-3 items-stretch sm:items-center">
         {templateSlug && (
-          <span className="text-xs px-2.5 py-1 rounded-full bg-white/5 border border-border text-muted-foreground w-fit">
+          <span className="mm-badge w-fit">
             Template: {templateSlug}
           </span>
         )}
@@ -1886,12 +1886,12 @@ export default function LeadsPage() {
           placeholder="Search name, phone, email, custom fields…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className={`${inputClass} flex-1 w-full sm:min-w-[180px] sm:max-w-md min-h-11 text-base sm:text-sm`}
+          className={`${inputClass} flex-1 w-full sm:min-w-[180px] sm:max-w-md`}
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className={`${selectClass} w-full sm:w-auto sm:min-w-[140px] min-h-11 text-base sm:text-sm`}
+          className={`${selectClass} w-full sm:w-auto sm:min-w-[140px]`}
           aria-label="Filter by status"
         >
           <option value="">All Statuses</option>
@@ -1907,7 +1907,7 @@ export default function LeadsPage() {
             setAssignedToFilter(e.target.value);
             setPage(1);
           }}
-          className={`${selectClass} w-full sm:w-auto sm:min-w-[160px] min-h-11 text-base sm:text-sm`}
+          className={`${selectClass} w-full sm:w-auto sm:min-w-[160px] min-h-9 text-base sm:text-sm`}
           aria-label="Filter by assigned team member"
         >
           <option value="">All assignees</option>
@@ -1928,7 +1928,7 @@ export default function LeadsPage() {
               onChange={(e) =>
                 setMetaFilters((prev) => ({ ...prev, [f.key]: e.target.value }))
               }
-              className={`${selectClass} w-full sm:w-auto sm:min-w-[140px] min-h-11 text-base sm:text-sm`}
+              className={`${selectClass} w-full sm:w-auto sm:min-w-[140px] min-h-9 text-base sm:text-sm`}
               aria-label={`Filter by ${f.label}`}
             >
               <option value="">All {f.label}</option>
@@ -1943,16 +1943,16 @@ export default function LeadsPage() {
 
       {/* Enterprise sticky bulk toolbar */}
       {selectedIds.size > 0 && (
-        <div className="mb-4 sticky z-20 bg-card/98 backdrop-blur-md border border-border rounded-2xl p-3 shadow-xl shadow-black/50 space-y-3 top-[var(--mm-chrome-h,6.5rem)]">
+        <div className="mb-3 sticky z-20 mm-filter-bar shadow-sm space-y-2.5 top-[var(--mm-chrome-h,6.5rem)]">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
             <div className="text-sm text-muted-foreground shrink-0 flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-foreground tabular-nums px-2 py-1 rounded-lg bg-white/10">
+              <span className="font-semibold text-foreground tabular-nums px-2 py-1 rounded-lg bg-muted">
                 {selectedIds.size} selected
               </span>
               <button
                 type="button"
                 onClick={toggleSelectAllPage}
-                className="text-xs px-2.5 py-1.5 rounded-lg bg-white/5 border border-border hover:bg-white/10"
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-muted border border-border hover:bg-muted"
               >
                 {allPageSelected ? "Deselect page" : "Select page"}
               </button>
@@ -1960,7 +1960,7 @@ export default function LeadsPage() {
                 type="button"
                 onClick={selectCurrentPage}
                 disabled={allResultsSelected}
-                className="text-xs px-2.5 py-1.5 rounded-lg bg-white/5 border border-border hover:bg-white/10 disabled:opacity-40"
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-muted border border-border hover:bg-muted disabled:opacity-40"
               >
                 Select this page ({pageLeads.length})
               </button>
@@ -1978,7 +1978,7 @@ export default function LeadsPage() {
               </button>
             </div>
             {bulkProgress && (
-              <div className="flex items-center gap-2 text-xs text-sky-300 sm:ml-auto">
+              <div className="flex items-center gap-2 text-xs text-primary sm:ml-auto">
                 <span className="inline-block w-3.5 h-3.5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
                 {bulkProgress}
               </div>
@@ -1997,7 +1997,7 @@ export default function LeadsPage() {
                 void loadTeam();
                 setAssignModalOpen(true);
               }}
-              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50"
+              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-muted hover:bg-muted border border-border disabled:opacity-50"
             >
               Assign User
             </button>
@@ -2018,7 +2018,7 @@ export default function LeadsPage() {
                   });
                   setBulkEditOpen(true);
                 }}
-                className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-medium border border-sky-500 disabled:opacity-50"
+                className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-primary hover:bg-primary-hover text-white font-medium border border-primary/40 disabled:opacity-50"
               >
                 Bulk Edit
               </button>
@@ -2027,7 +2027,7 @@ export default function LeadsPage() {
               type="button"
               disabled={bulkBusy}
               onClick={runBulkAiScore}
-              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 disabled:opacity-50"
+              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 disabled:opacity-50"
             >
               AI Score
             </button>
@@ -2035,7 +2035,7 @@ export default function LeadsPage() {
               type="button"
               disabled={bulkBusy}
               onClick={runBulkWhatsApp}
-              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 disabled:opacity-50"
+              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 disabled:opacity-50"
             >
               WhatsApp
             </button>
@@ -2043,7 +2043,7 @@ export default function LeadsPage() {
               type="button"
               disabled={bulkBusy}
               onClick={runBulkEmail}
-              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/30 disabled:opacity-50"
+              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-sky-50 dark:bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-400 border border-primary/40/30 disabled:opacity-50"
             >
               Email
             </button>
@@ -2055,7 +2055,7 @@ export default function LeadsPage() {
                 setFollowUpDays("1");
                 setFollowUpModalOpen(true);
               }}
-              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 border border-violet-500/30 disabled:opacity-50"
+              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-accent hover:bg-accent text-primary border border-border disabled:opacity-50"
             >
               Create Follow-up
             </button>
@@ -2063,7 +2063,7 @@ export default function LeadsPage() {
               type="button"
               disabled={bulkBusy}
               onClick={runBulkExport}
-              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/15 border border-white/10 disabled:opacity-50"
+              className="min-h-9 px-3 py-1.5 text-xs rounded-lg bg-muted hover:bg-muted border border-border disabled:opacity-50"
             >
               Export
             </button>
@@ -2094,13 +2094,13 @@ export default function LeadsPage() {
 
       {/* List — natural height only (no forced min-h / stretch that leaves blank space) */}
       {isLoading ? (
-        <div className="bg-card border border-border rounded-2xl p-6 shrink-0 space-y-3" aria-busy="true" aria-label="Loading leads">
+        <div className="bg-card border border-border rounded-lg p-6 shrink-0 space-y-3" aria-busy="true" aria-label="Loading leads">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="mm-skeleton h-12 w-full rounded-xl" />
+            <div key={i} className="mm-skeleton h-12 w-full rounded-md" />
           ))}
         </div>
       ) : filteredLeads.length === 0 ? (
-        <div className="mm-empty bg-card border border-border rounded-2xl shrink-0" role="status">
+        <div className="mm-empty bg-card border border-border rounded-lg shrink-0" role="status">
           <div className="mm-empty-icon" aria-hidden>
             <span className="text-2xl">🎯</span>
           </div>
@@ -2116,14 +2116,14 @@ export default function LeadsPage() {
             <button
               type="button"
               onClick={openCreate}
-              className="mt-3 mm-btn mm-btn-primary min-h-11 px-6 focus-ring"
+              className="mt-3 mm-btn mm-btn-primary min-h-9 px-6 focus-ring"
             >
               Create Lead
             </button>
           )}
         </div>
       ) : (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden w-full min-w-0 shrink-0 self-start">
+        <div className="bg-card border border-border rounded-lg overflow-hidden w-full min-w-0 shrink-0 self-start">
           {/* Mobile cards */}
           <div className="md:hidden divide-y divide-border">
             {pageLeads.map((lead) => (
@@ -2149,7 +2149,7 @@ export default function LeadsPage() {
                     )}
                     <div className="flex flex-wrap gap-2 mt-2 text-xs">
                       {lead.district && (
-                        <span className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-muted-foreground">
+                        <span className="px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground">
                           {lead.district}
                         </span>
                       )}
@@ -2157,7 +2157,7 @@ export default function LeadsPage() {
                         {lead.status}
                       </span>
                       <span
-                        className="px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-200"
+                        className="px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/25 text-sky-700 dark:text-sky-300"
                         title={lead.assignedTo || undefined}
                       >
                         Assigned To: {assigneeLabel(lead.assignedTo)}
@@ -2167,7 +2167,7 @@ export default function LeadsPage() {
                           const fb = getLeadFeedbackText(lead as Record<string, unknown>);
                           return (
                             <span
-                              className="px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/25 text-violet-200 max-w-[220px] truncate"
+                              className="px-2 py-0.5 rounded-full bg-accent border border-border text-accent-foreground max-w-[220px] truncate"
                               title={fb || undefined}
                             >
                               {fb ? fb : "No feedback"}
@@ -2188,20 +2188,20 @@ export default function LeadsPage() {
                     <div className="flex flex-wrap gap-2 mt-3">
                       <button
                         onClick={() => openEdit(lead)}
-                        className="px-2.5 py-1 text-xs bg-white/10 rounded-lg border border-white/10"
+                        className="px-2.5 py-1 text-xs bg-muted rounded-lg border border-border"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => setMediaSendLead(lead)}
-                        className="px-2.5 py-1 text-xs bg-emerald-600/20 text-emerald-300 rounded-lg border border-emerald-500/40"
+                        className="px-2.5 py-1 text-xs bg-emerald-50 dark:bg-emerald-600/20 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/40"
                       >
                         Send Media
                       </button>
                       <button
                         onClick={() => scoreLead(lead)}
                         disabled={isSubmitting || bulkBusy}
-                        className="px-2.5 py-1 text-xs bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/30"
+                        className="px-2.5 py-1 text-xs bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/30"
                       >
                         Score
                       </button>
@@ -2308,7 +2308,7 @@ export default function LeadsPage() {
                             </div>
                           ) : (
                             <div
-                              className={`text-muted-foreground truncate ${isMoney ? "tabular-nums text-emerald-400/90" : ""}`}
+                              className={`text-muted-foreground truncate ${isMoney ? "tabular-nums text-emerald-700 dark:text-emerald-400" : ""}`}
                               title={display !== "—" ? display : undefined}
                             >
                               {display}
@@ -2370,14 +2370,14 @@ export default function LeadsPage() {
                         type="button"
                         onClick={() => scoreLead(lead)}
                         disabled={isSubmitting || bulkBusy}
-                        className="px-2.5 py-1 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30 disabled:opacity-50"
+                        className="px-2.5 py-1 text-xs bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/30 disabled:opacity-50"
                       >
                         Score
                       </button>
                       <button
                         type="button"
                         onClick={() => setMediaSendLead(lead)}
-                        className="px-2.5 py-1 text-xs bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-300 rounded-lg border border-emerald-500/40"
+                        className="px-2.5 py-1 text-xs bg-emerald-50 dark:bg-emerald-600/15 hover:bg-emerald-100 dark:hover:bg-emerald-600/25 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/40"
                       >
                         Media
                       </button>
@@ -2386,14 +2386,14 @@ export default function LeadsPage() {
                         onClick={() => openEmailCompose([lead])}
                         disabled={bulkBusy || !lead.email}
                         title={lead.email ? `Email ${lead.email}` : "No email on this lead"}
-                        className="px-2.5 py-1 text-xs bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 rounded-lg border border-sky-500/30 disabled:opacity-50"
+                        className="px-2.5 py-1 text-xs bg-sky-50 dark:bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-400 rounded-lg border border-primary/40/30 disabled:opacity-50"
                       >
                         Email
                       </button>
                       <button
                         type="button"
                         onClick={() => openEdit(lead)}
-                        className="px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 rounded-lg border border-white/10"
+                        className="px-2.5 py-1 text-xs bg-muted hover:bg-white/20 rounded-lg border border-border"
                       >
                         Edit
                       </button>
@@ -2434,7 +2434,7 @@ export default function LeadsPage() {
                 type="button"
                 disabled={safePage <= 1 || isLoading}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1.5 rounded-lg bg-white/5 border border-border hover:bg-white/10 disabled:opacity-40"
+                className="px-3 py-1.5 rounded-lg bg-muted border border-border hover:bg-muted disabled:opacity-40"
               >
                 Previous
               </button>
@@ -2445,7 +2445,7 @@ export default function LeadsPage() {
                 type="button"
                 disabled={safePage >= totalPages || isLoading}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="px-3 py-1.5 rounded-lg bg-white/5 border border-border hover:bg-white/10 disabled:opacity-40"
+                className="px-3 py-1.5 rounded-lg bg-muted border border-border hover:bg-muted disabled:opacity-40"
               >
                 Next
               </button>
@@ -2457,7 +2457,7 @@ export default function LeadsPage() {
       {/* Create/Edit Modal — DynamicForm from BusinessConfig fields */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-card border border-border rounded-lg w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
             <h2 className="text-xl font-semibold p-6 flex-shrink-0 border-b border-border">
               {editingLead ? "Edit Lead" : "New Lead"}
               {templateSlug ? (
@@ -2476,7 +2476,7 @@ export default function LeadsPage() {
                 statusOptions={statusOptions.map((s) => ({ key: s.key, label: s.label }))}
                 disabled={isSubmitting}
               />
-              <div className="mt-4 p-3 bg-background border border-border rounded-xl">
+              <div className="mt-4 p-3 bg-background border border-border rounded-md">
                 <label className="block text-xs text-muted-foreground mb-1.5 tracking-wide">
                   Assign To
                 </label>
@@ -2491,7 +2491,7 @@ export default function LeadsPage() {
                 <select
                   value={formAssigneeId}
                   onChange={(e) => setFormAssigneeId(e.target.value)}
-                  className="w-full bg-card border border-border rounded-lg px-3 py-2.5 text-sm text-foreground min-h-11"
+                  className="w-full bg-card border border-border rounded-lg px-3 py-2.5 text-sm text-foreground min-h-9"
                   disabled={isSubmitting}
                 >
                   <option value="">Unassigned</option>
@@ -2508,7 +2508,7 @@ export default function LeadsPage() {
               </div>
               {editingLead && (
                 <div className="mt-5 space-y-3">
-                  <div className="p-3 bg-background border border-border rounded-xl">
+                  <div className="p-3 bg-background border border-border rounded-md">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-xs text-muted-foreground mb-1 tracking-widest">AI LEAD SCORE</div>
@@ -2532,15 +2532,15 @@ export default function LeadsPage() {
                           scoreLead(live);
                         }}
                         disabled={isSubmitting}
-                        className="px-3 py-1 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/30 disabled:opacity-50"
+                        className="px-3 py-1 text-xs bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-500/30 disabled:opacity-50"
                       >
                         {isSubmitting ? "Scoring..." : "Score / Refresh"}
                       </button>
                     </div>
                   </div>
                   {aiRecMap[editingLead.id] ? (
-                    <div className="p-3 bg-violet-500/5 border border-violet-500/30 rounded-xl">
-                      <div className="text-xs text-violet-300/90 tracking-widest mb-2">
+                    <div className="p-3 bg-accent border border-border rounded-md">
+                      <div className="text-xs text-primary/90 tracking-widest mb-2">
                         AI RECOMMENDATION
                       </div>
                       <AiLeadRecommendationBadge
@@ -2572,7 +2572,7 @@ export default function LeadsPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-sm font-medium"
+                  className="flex-1 px-5 py-2.5 bg-muted hover:bg-white/20 border border-white/20 rounded-md text-sm font-medium"
                 >
                   Cancel
                 </button>
@@ -2580,7 +2580,7 @@ export default function LeadsPage() {
                   type="submit"
                   form="lead-form"
                   disabled={isSubmitting}
-                  className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover disabled:opacity-50"
+                  className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary-hover disabled:opacity-50"
                 >
                   {isSubmitting ? "Saving..." : editingLead ? "Update Lead" : "Create Lead"}
                 </button>
@@ -2593,7 +2593,7 @@ export default function LeadsPage() {
       {/* Assign User modal — selected | first N filtered | all filtered (≤50k) */}
       {assignModalOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto p-5 sm:p-6">
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-lg w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto p-5 sm:p-6">
             <h3 className="text-lg font-semibold mb-1">Assign User</h3>
             <p className="text-xs text-muted-foreground mb-4">
               Assign leads to an active workspace member. Filtered scopes use current search/status
@@ -2602,7 +2602,7 @@ export default function LeadsPage() {
 
             <div className="space-y-2 mb-4">
               <label
-                className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
                   assignScope === "ids"
                     ? "border-primary/50 bg-primary/10"
                     : "border-border hover:bg-muted/40"
@@ -2627,7 +2627,7 @@ export default function LeadsPage() {
               </label>
 
               <label
-                className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
                   assignScope === "first_n"
                     ? "border-primary/50 bg-primary/10"
                     : "border-border hover:bg-muted/40"
@@ -2671,7 +2671,7 @@ export default function LeadsPage() {
                             className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
                               assignFirstPreset === val
                                 ? "bg-primary text-primary-foreground border-primary"
-                                : "bg-white/5 border-border hover:bg-white/10"
+                                : "bg-muted border-border hover:bg-muted"
                             }`}
                           >
                             {label}
@@ -2693,7 +2693,7 @@ export default function LeadsPage() {
                           {assignCustomValidation ? (
                             <p className="text-xs text-red-400 mt-1">{assignCustomValidation}</p>
                           ) : assignCustomCount.trim() ? (
-                            <p className="text-xs text-emerald-400/90 mt-1">
+                            <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
                               Assign first{" "}
                               {Math.min(
                                 Number.parseInt(assignCustomCount, 10) || 0,
@@ -2706,7 +2706,7 @@ export default function LeadsPage() {
                         </div>
                       )}
                       {assignFirstPreset !== "custom" && (
-                        <p className="text-xs text-sky-300/90">
+                        <p className="text-xs text-primary/90">
                           Assign first{" "}
                           {Math.min(
                             Number.parseInt(assignFirstPreset, 10),
@@ -2721,7 +2721,7 @@ export default function LeadsPage() {
               </label>
 
               <label
-                className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
                   assignScope === "all_filtered"
                     ? "border-primary/50 bg-primary/10"
                     : "border-border hover:bg-muted/40"
@@ -2767,7 +2767,7 @@ export default function LeadsPage() {
             <select
               value={assignValue}
               onChange={(e) => setAssignValue(e.target.value)}
-              className={`${inputClass} mb-2 min-h-11`}
+              className={`${inputClass} mb-2 min-h-9`}
             >
               <option value="">Select team member…</option>
               <option value={ALL_MEMBERS_VALUE}>
@@ -2784,7 +2784,7 @@ export default function LeadsPage() {
               ))}
             </select>
             {assignValue === ALL_MEMBERS_VALUE && (
-              <p className="text-xs text-sky-300/90 mb-3">
+              <p className="text-xs text-primary/90 mb-3">
                 Leads will be split equally among {teamMembers.length} active members (difference at most 1).
               </p>
             )}
@@ -2800,7 +2800,7 @@ export default function LeadsPage() {
             />
 
             {bulkProgress && (
-              <div className="flex items-center gap-2 text-xs text-sky-300 mb-3">
+              <div className="flex items-center gap-2 text-xs text-primary mb-3">
                 <span className="inline-block w-3.5 h-3.5 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
                 {bulkProgress}
               </div>
@@ -2816,7 +2816,7 @@ export default function LeadsPage() {
                   setAssignCustomCount("");
                   setAssignNotes("");
                 }}
-                className="flex-1 min-h-11 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
+                className="flex-1 min-h-9 px-4 py-2.5 bg-muted rounded-md text-sm border border-border"
               >
                 Cancel
               </button>
@@ -2835,7 +2835,7 @@ export default function LeadsPage() {
                       resolvedAssignLimit < 1))
                 }
                 onClick={() => void requestAssignPreview()}
-                className="flex-1 min-h-11 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium disabled:opacity-50"
+                className="flex-1 min-h-9 px-4 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium disabled:opacity-50"
               >
                 {bulkBusy ? "Preparing…" : "Review & assign"}
               </button>
@@ -2858,7 +2858,7 @@ export default function LeadsPage() {
       {/* Assignment confirmation with equal-distribution summary */}
       {assignConfirmOpen && assignPreview && (
         <div className="fixed inset-0 bg-black/75 z-[60] flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 sm:p-6 shadow-2xl">
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-lg w-full sm:max-w-md p-5 sm:p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-foreground">Confirm assignment</h3>
             <p className="text-sm text-muted-foreground mt-1 mb-4">
               You are about to assign{" "}
@@ -2879,7 +2879,7 @@ export default function LeadsPage() {
                 "."
               )}
             </p>
-            <div className="rounded-xl border border-border bg-muted/30 max-h-56 overflow-y-auto">
+            <div className="rounded-md border border-border bg-muted/30 max-h-56 overflow-y-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b border-border">
@@ -2942,7 +2942,7 @@ export default function LeadsPage() {
                   type="button"
                   disabled={bulkBusy}
                   onClick={() => undoAssignPreviewRemove()}
-                  className="text-xs font-medium text-sky-300 hover:text-sky-200 underline disabled:opacity-40"
+                  className="text-xs font-medium text-primary hover:text-primary-hover underline disabled:opacity-40"
                 >
                   Undo
                 </button>
@@ -2963,7 +2963,7 @@ export default function LeadsPage() {
                   setAssignPreview(null);
                   setAssignRemovedStack([]);
                 }}
-                className="flex-1 min-h-11 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
+                className="flex-1 min-h-9 px-4 py-2.5 bg-muted rounded-md text-sm border border-border"
               >
                 Back
               </button>
@@ -2975,7 +2975,7 @@ export default function LeadsPage() {
                     assignPreview.distribution.length === 0)
                 }
                 onClick={() => void runBulkAssign()}
-                className="flex-1 min-h-11 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold disabled:opacity-50"
+                className="flex-1 min-h-9 px-4 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-semibold disabled:opacity-50"
               >
                 {bulkBusy ? "Assigning…" : "Continue"}
               </button>
@@ -2987,9 +2987,9 @@ export default function LeadsPage() {
       {/* Bulk Edit modal */}
       {bulkEditOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto p-5 sm:p-6">
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-lg w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto p-5 sm:p-6">
             <h3 className="text-lg font-semibold text-foreground">Bulk Edit</h3>
-            <p className="text-sm text-sky-300/90 mt-1 font-medium">
+            <p className="text-sm text-primary/90 mt-1 font-medium">
               Preview: {selectedIds.size} lead{selectedIds.size === 1 ? "" : "s"} will be updated
             </p>
             <p className="text-xs text-muted-foreground mt-1 mb-4">
@@ -3091,7 +3091,7 @@ export default function LeadsPage() {
               <button
                 type="button"
                 onClick={() => setBulkEditOpen(false)}
-                className="flex-1 min-h-11 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
+                className="flex-1 min-h-9 px-4 py-2.5 bg-muted rounded-md text-sm border border-border"
               >
                 Cancel
               </button>
@@ -3099,7 +3099,7 @@ export default function LeadsPage() {
                 type="button"
                 disabled={bulkBusy}
                 onClick={runBulkEdit}
-                className="flex-1 min-h-11 px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                className="flex-1 min-h-9 px-4 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-md text-sm font-semibold disabled:opacity-50"
               >
                 {bulkBusy ? "Saving…" : `Update ${selectedIds.size} lead(s)`}
               </button>
@@ -3111,9 +3111,9 @@ export default function LeadsPage() {
       {/* Bulk Delete confirmation — current selection OR all filtered results */}
       {bulkDeleteOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-red-900/40 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-5 sm:p-6">
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-lg w-full sm:max-w-lg p-5 sm:p-6">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-500/15 text-red-400 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-md bg-red-500/15 text-red-400 flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -3130,7 +3130,7 @@ export default function LeadsPage() {
                 </p>
                 <div className="mt-4 space-y-2">
                   <label
-                    className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                    className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
                       bulkDeleteScope === "selected"
                         ? "border-red-500/50 bg-red-500/10"
                         : "border-border hover:bg-muted/40"
@@ -3153,7 +3153,7 @@ export default function LeadsPage() {
                     </span>
                   </label>
                   <label
-                    className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                    className={`flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors ${
                       bulkDeleteScope === "all_filtered"
                         ? "border-red-500/50 bg-red-500/10"
                         : "border-border hover:bg-muted/40"
@@ -3193,7 +3193,7 @@ export default function LeadsPage() {
               <button
                 type="button"
                 onClick={() => setBulkDeleteOpen(false)}
-                className="flex-1 min-h-11 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
+                className="flex-1 min-h-9 px-4 py-2.5 bg-muted rounded-md text-sm border border-border"
               >
                 Cancel
               </button>
@@ -3205,7 +3205,7 @@ export default function LeadsPage() {
                   (bulkDeleteScope === "all_filtered" && serverTotal === 0)
                 }
                 onClick={() => void runBulkDelete()}
-                className="flex-1 min-h-11 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                className="flex-1 min-h-9 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-md text-sm font-semibold disabled:opacity-50"
               >
                 {bulkBusy
                   ? "Deleting…"
@@ -3221,7 +3221,7 @@ export default function LeadsPage() {
       {/* Compose email modal */}
       {emailModalOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-5 sm:p-6 shadow-2xl">
+          <div className="bg-card border border-border rounded-t-2xl sm:rounded-lg w-full sm:max-w-lg p-5 sm:p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-foreground">Compose email</h3>
             <p className="text-xs text-muted-foreground mt-1 mb-4">
               Sent via platform email (SMTP).{" "}
@@ -3261,7 +3261,7 @@ export default function LeadsPage() {
                 type="button"
                 onClick={() => setEmailModalOpen(false)}
                 disabled={emailSending}
-                className="flex-1 min-h-11 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
+                className="flex-1 min-h-9 px-4 py-2.5 bg-muted rounded-md text-sm border border-border"
               >
                 Cancel
               </button>
@@ -3269,7 +3269,7 @@ export default function LeadsPage() {
                 type="button"
                 disabled={emailSending}
                 onClick={() => void sendComposedEmail()}
-                className="flex-1 min-h-11 px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+                className="flex-1 min-h-9 px-4 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-md text-sm font-semibold disabled:opacity-50"
               >
                 {emailSending ? "Sending…" : "Send email"}
               </button>
@@ -3281,7 +3281,7 @@ export default function LeadsPage() {
       {/* Follow-up modal */}
       {followUpModalOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6">
+          <div className="bg-card border border-border rounded-lg w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-1">Create Follow-up</h3>
             <p className="text-xs text-muted-foreground mb-4">
               Create a task for each of the {selectedIds.size} selected lead(s).
@@ -3305,7 +3305,7 @@ export default function LeadsPage() {
               <button
                 type="button"
                 onClick={() => setFollowUpModalOpen(false)}
-                className="flex-1 px-4 py-2.5 bg-white/10 rounded-xl text-sm border border-white/10"
+                className="flex-1 px-4 py-2.5 bg-muted rounded-md text-sm border border-border"
               >
                 Cancel
               </button>
@@ -3313,7 +3313,7 @@ export default function LeadsPage() {
                 type="button"
                 disabled={bulkBusy}
                 onClick={runBulkFollowUp}
-                className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-md text-sm font-medium disabled:opacity-50"
               >
                 {bulkBusy ? "Creating…" : "Create tasks"}
               </button>
@@ -3325,7 +3325,7 @@ export default function LeadsPage() {
       {/* AI Score Result Modal */}
       {scoreResult && (
         <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6">
+          <div className="bg-card border border-border rounded-lg w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold">AI Lead Score</h3>
@@ -3342,7 +3342,7 @@ export default function LeadsPage() {
             <div className="text-center py-2">
               <div className="text-7xl font-bold tabular-nums text-foreground mb-3">{scoreResult.score}</div>
               <ScoreBadge score={scoreResult.score} />
-              <div className="mt-5 p-4 bg-background border border-border rounded-xl text-left">
+              <div className="mt-5 p-4 bg-background border border-border rounded-md text-left">
                 <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Reason</div>
                 <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
                   {scoreResult.explanation}
@@ -3356,14 +3356,14 @@ export default function LeadsPage() {
                   navigator.clipboard.writeText(scoreResult.explanation);
                   toast.success("Reason copied to clipboard");
                 }}
-                className="flex-1 px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-sm font-medium"
+                className="flex-1 px-5 py-2.5 bg-muted hover:bg-white/20 border border-white/20 rounded-md text-sm font-medium"
               >
                 Copy Reason
               </button>
               <button
                 type="button"
                 onClick={() => setScoreResult(null)}
-                className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover"
+                className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary-hover"
               >
                 Close
               </button>

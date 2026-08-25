@@ -146,19 +146,19 @@ export default function NotesPage() {
     entityType === "contact" ? "Contact" : entityType === "deal" ? "Deal" : "Meeting";
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <h1 className="text-2xl sm:text-3xl font-semibold mb-1">Notes</h1>
-      <p className="text-muted-foreground mb-6 text-sm sm:text-base">
+    <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6 overflow-x-hidden pb-20 md:pb-6">
+      <h1 className="mm-page-title mb-1">Notes</h1>
+      <p className="mm-secondary mb-4">
         Attach notes to contacts, deals, or meetings. Search by name — no internal IDs.
       </p>
 
-      <div className="space-y-3 mb-6">
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1.5">Attach Note To</label>
+      <div className="mm-filter-bar mb-4 flex-col sm:flex-row !items-stretch sm:!items-end gap-2.5">
+        <div className="w-full sm:w-auto">
+          <label className="mm-label">Attach Note To</label>
           <select
             value={entityType}
             onChange={(e) => handleEntityTypeChange(e.target.value as NoteEntityType)}
-            className="w-full sm:w-auto min-w-[180px] bg-background border border-border rounded-xl px-3 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+            className="mm-input w-full sm:w-auto min-w-[180px]"
             aria-label="Attach note to entity type"
           >
             <option value="contact">Contact</option>
@@ -167,8 +167,8 @@ export default function NotesPage() {
           </select>
         </div>
 
-        <div>
-          <label className="block text-xs text-muted-foreground mb-1.5">
+        <div className="w-full flex-1 min-w-0">
+          <label className="mm-label">
             Select {typeLabel}
           </label>
           <EntitySearchSelect
@@ -185,20 +185,20 @@ export default function NotesPage() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Write a note..."
           rows={3}
-          className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-base sm:text-sm min-h-11 focus-ring"
+          className="mm-input flex-1 focus-ring"
         />
         <div className="flex gap-2 sm:flex-col">
           <button
             type="button"
             onClick={() => void handleCreate()}
             disabled={isSubmitting || !content.trim() || !entityId}
-            className="flex-1 sm:flex-none min-h-11 px-6 bg-primary text-primary-foreground rounded-xl touch-manipulation disabled:opacity-50 font-medium"
+            className={`mm-btn mm-btn-primary flex-1 sm:flex-none h-9 touch-manipulation ${isSubmitting ? "mm-btn-loading" : ""}`}
           >
             {editingNoteId ? "Update" : "Add"} Note
           </button>
@@ -209,7 +209,7 @@ export default function NotesPage() {
                 setEditingNoteId(null);
                 setContent("");
               }}
-              className="min-h-11 px-4 bg-white/10 rounded-xl touch-manipulation"
+              className="mm-btn mm-btn-secondary h-9 touch-manipulation"
             >
               Cancel
             </button>
@@ -230,20 +230,20 @@ export default function NotesPage() {
           description={`No notes attached to this ${typeLabel.toLowerCase()}. Add one above.`}
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {entityLabel ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="mm-secondary">
               Showing notes for <span className="text-foreground font-medium">{entityLabel}</span>
             </p>
           ) : null}
           {notes.map((n) => (
             <div
               key={n.id}
-              className="bg-card border border-border rounded-2xl p-4 text-sm whitespace-pre-wrap flex flex-col gap-3 sm:flex-row sm:justify-between"
+              className="mm-card p-3.5 text-[13px] whitespace-pre-wrap flex flex-col gap-2.5 sm:flex-row sm:justify-between"
             >
               <div className="min-w-0 break-words">
                 <div>{n.content}</div>
-                <div className="text-[11px] text-muted-foreground mt-2">
+                <div className="mm-secondary mt-1.5">
                   {n.createdAt
                     ? new Date(n.createdAt).toLocaleString(undefined, {
                         dateStyle: "medium",
@@ -252,18 +252,18 @@ export default function NotesPage() {
                     : ""}
                 </div>
               </div>
-              <div className="flex gap-2 text-xs shrink-0">
+              <div className="flex gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => startEdit(n)}
-                  className="min-h-10 px-3 py-2 bg-white/10 rounded-xl touch-manipulation"
+                  className="mm-btn mm-btn-secondary h-9 px-3 text-xs touch-manipulation"
                 >
                   Edit
                 </button>
                 <button
                   type="button"
                   onClick={() => void handleDeleteNote(n.id)}
-                  className="min-h-10 px-3 py-2 text-red-400 border border-red-900/40 rounded-xl touch-manipulation"
+                  className="mm-btn mm-btn-danger h-9 px-3 text-xs touch-manipulation"
                 >
                   Del
                 </button>

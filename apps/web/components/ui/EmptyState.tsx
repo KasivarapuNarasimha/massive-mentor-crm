@@ -22,13 +22,13 @@ export function EmptyState({
 }: Props) {
   return (
     <div
-      className={`mm-empty bg-card border border-border rounded-2xl ${className}`}
+      className={`mm-empty bg-card border border-border rounded-lg ${className}`}
       role="status"
       aria-live="polite"
     >
       <div className="mm-empty-icon" aria-hidden>
         {icon ?? (
-          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -38,9 +38,9 @@ export function EmptyState({
           </svg>
         )}
       </div>
-      <p className="text-base font-semibold text-foreground">{title}</p>
+      <p className="text-sm font-semibold text-foreground">{title}</p>
       {description ? (
-        <p className="text-sm text-muted-foreground max-w-sm leading-relaxed">{description}</p>
+        <p className="text-[13px] text-muted-foreground max-w-sm leading-snug">{description}</p>
       ) : null}
       {action ? <div className="mt-3 flex flex-wrap justify-center gap-2">{action}</div> : null}
     </div>

@@ -145,22 +145,22 @@ export default function MeetingsPage() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6 overflow-x-hidden pb-20 md:pb-6">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-5">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-semibold">Meetings</h1>
-          <p className="text-muted-foreground text-sm sm:text-base mt-1">Schedule and log meetings with contacts.</p>
+          <h1 className="mm-page-title">Meetings</h1>
+          <p className="mm-secondary mt-1">Schedule and log meetings with contacts.</p>
         </div>
         <button
           type="button"
           onClick={openCreate}
-          className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium touch-manipulation"
+          className="mm-btn mm-btn-primary w-full sm:w-auto focus-ring"
         >
           + Schedule Meeting
         </button>
       </div>
 
-      <ExportFiltersBar module="meetings" token={token} className="mb-4" />
+      <ExportFiltersBar module="meetings" token={token} className="mb-3" />
 
       {isLoading ? (
         <PageLoading variant="cards" rows={4} label="Loading meetings" />
@@ -172,59 +172,63 @@ export default function MeetingsPage() {
             <button
               type="button"
               onClick={openCreate}
-              className="mm-btn mm-btn-primary min-h-11 px-5 focus-ring"
+              className="mm-btn mm-btn-primary focus-ring"
             >
               Schedule Meeting
             </button>
           }
         />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {meetings.map((m) => (
             <div
               key={m.id}
-              className="bg-card border border-border rounded-2xl p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start"
+              className="mm-card p-3.5 sm:p-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start"
             >
               <div className="min-w-0">
-                <div className="font-medium text-foreground">{m.title}</div>
-                <div className="text-sm text-muted-foreground mt-0.5">
+                <div className="text-[13px] font-medium text-foreground">{m.title}</div>
+                <div className="mm-secondary mt-0.5">
                   {new Date(m.scheduledAt).toLocaleString()}
                   {m.durationMin ? ` (${m.durationMin}m)` : ""}
                 </div>
-                {m.outcome && <div className="text-xs mt-1 text-emerald-400">Outcome: {m.outcome}</div>}
+                {m.outcome && (
+                  <div className="mt-1">
+                    <span className="mm-badge mm-badge-success">Outcome: {m.outcome}</span>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 text-xs w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => meetingCheck(m.id, "check-in")}
-                  className="min-h-10 px-3 py-2 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-xl touch-manipulation"
+                  className="mm-btn h-9 px-3 text-xs border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-950/60"
                 >
                   Check In
                 </button>
                 <button
                   type="button"
                   onClick={() => meetingCheck(m.id, "check-out")}
-                  className="min-h-10 px-3 py-2 bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-xl touch-manipulation"
+                  className="mm-btn h-9 px-3 text-xs border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-400 dark:hover:bg-amber-950/60"
                 >
                   Check Out
                 </button>
                 <a
                   href={`/dashboard/ai-sales?meetingId=${encodeURIComponent(m.id)}`}
-                  className="min-h-10 px-3 py-2 bg-violet-500/15 text-violet-300 border border-violet-500/30 rounded-xl touch-manipulation inline-flex items-center justify-center text-center"
+                  className="mm-btn mm-btn-secondary h-9 px-3 text-xs inline-flex items-center justify-center text-center"
                 >
                   AI Summary
                 </a>
                 <button
                   type="button"
                   onClick={() => openEdit(m)}
-                  className="min-h-10 px-3 py-2 bg-white/10 rounded-xl touch-manipulation"
+                  className="mm-btn mm-btn-secondary h-9 px-3 text-xs"
                 >
                   Edit
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDelete(m.id, m.title)}
-                  className="min-h-10 px-3 py-2 text-red-400 border border-red-900/40 rounded-xl touch-manipulation"
+                  className="mm-btn mm-btn-danger h-9 px-3 text-xs"
                 >
                   Del
                 </button>
@@ -235,24 +239,24 @@ export default function MeetingsPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border p-4 sm:p-6 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom">
-            <h3 className="font-semibold mb-4 text-lg">{editingMeeting ? "Edit Meeting" : "Schedule Meeting"}</h3>
-            <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-card border border-border p-4 sm:p-5 rounded-t-xl sm:rounded-lg w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom shadow-lg">
+            <h3 className="font-semibold mb-4 text-base tracking-tight">{editingMeeting ? "Edit Meeting" : "Schedule Meeting"}</h3>
+            <form onSubmit={handleSubmit} className="space-y-3 adaptive-form">
               <input
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 placeholder="Meeting title *"
-                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="mm-input"
                 required
               />
-              <label className="block text-xs text-muted-foreground">
+              <label className="mm-label">
                 Date & time *
                 <input
                   type="datetime-local"
                   value={formData.scheduledAt}
                   onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
-                  className="mt-1 w-full bg-background border border-border rounded-xl p-3 text-foreground text-base sm:text-sm min-h-11"
+                  className="mt-1 mm-input"
                   required
                 />
               </label>
@@ -261,28 +265,28 @@ export default function MeetingsPage() {
                 onChange={(e) => setFormData({ ...formData, durationMin: e.target.value })}
                 placeholder="Duration min"
                 type="number"
-                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="mm-input"
               />
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 placeholder="Notes"
-                className="w-full bg-background border border-border rounded-xl p-3 h-20 text-base sm:text-sm"
+                className="mm-input min-h-20"
               />
               <input
                 value={formData.outcome}
                 onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
                 placeholder="Outcome"
-                className="w-full bg-background border border-border rounded-xl p-3 text-base sm:text-sm min-h-11"
+                className="mm-input"
               />
-              <div className="flex gap-3">
-                <button type="button" onClick={closeModal} className="flex-1 min-h-11 py-2.5 bg-white/10 rounded-xl touch-manipulation">
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1">
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 min-h-11 py-2.5 bg-primary text-primary-foreground rounded-xl touch-manipulation"
+                  className={`mm-btn mm-btn-primary flex-1 focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
                 >
                   {isSubmitting ? "Saving..." : "Save"}
                 </button>

@@ -4,14 +4,14 @@ import { WhatsAppConversationCenter } from "@/components/whatsapp/WhatsAppConver
 
 export default function WhatsAppPage() {
   return (
-    <div className="h-[calc(100dvh-7rem)] min-h-[520px] flex flex-col">
-      <div className="mb-3 shrink-0">
-        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">WhatsApp</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+    <div className="h-[calc(100dvh-7rem)] min-h-[520px] flex flex-col px-4 sm:px-5 md:px-6">
+      <div className="mb-2 shrink-0 pt-3 sm:pt-4">
+        <h1 className="mm-page-title">WhatsApp</h1>
+        <p className="mm-secondary mt-0.5">
           Conversation Center — chat, assign, follow up, and use AI without leaving the CRM.
         </p>
       </div>
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 pb-4">
         <WhatsAppConversationCenter />
       </div>
     </div>

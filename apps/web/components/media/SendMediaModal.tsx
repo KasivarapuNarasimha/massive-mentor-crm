@@ -735,19 +735,19 @@ export function SendMediaModal({
   // ── Basic Mode post-open: media list + confirm manual send ──────────────
   if (basicPhase) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center sm:p-4">
-        <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto p-5 space-y-4">
+      <div className="fixed inset-0 z-50 bg-black/50 dark:bg-black/60 flex items-end sm:items-center justify-center sm:p-4">
+        <div className="bg-card border border-border rounded-t-xl sm:rounded-lg w-full sm:max-w-md max-h-[92dvh] overflow-y-auto p-4 sm:p-5 space-y-4 shadow-lg">
           <div className="flex justify-between items-start gap-2">
             <div>
-              <h3 className="text-lg font-semibold">Opening WhatsApp...</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <h3 className="text-base font-semibold tracking-tight">Opening WhatsApp...</h3>
+              <p className="mm-secondary mt-0.5">
                 To {contactName}
                 {basicPhase.phone ? ` · ${basicPhase.phone}` : ""}
               </p>
             </div>
             <button
               type="button"
-              className="text-sm text-muted-foreground"
+              className="mm-btn mm-btn-ghost h-8 min-h-8 px-2 text-sm"
               onClick={() => {
                 setBasicPhase(null);
                 onClose();
@@ -757,7 +757,7 @@ export function SendMediaModal({
             </button>
           </div>
 
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-100">
+          <div className="mm-card px-3 py-2.5 text-sm border-emerald-200 bg-emerald-50 text-emerald-800">
             🟢 Basic Mode — message opened in WhatsApp Web/App. Click Send there when ready.
           </div>
 
@@ -768,7 +768,7 @@ export function SendMediaModal({
                 {basicPhase.files.map((f) => (
                   <li
                     key={f.assetId}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-sm"
+                    className="flex items-center gap-2 mm-card px-3 py-2 text-sm"
                   >
                     <span className="text-base">📄</span>
                     <span className="truncate flex-1">{f.name}</span>
@@ -778,24 +778,24 @@ export function SendMediaModal({
               <button
                 type="button"
                 onClick={() => downloadSelectedFiles(basicPhase.files)}
-                className="w-full min-h-11 rounded-xl bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold"
+                className="mm-btn mm-btn-primary w-full"
               >
                 Download Selected Files
               </button>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="mm-secondary">
                 Download these files and attach them manually in WhatsApp.
               </p>
             </div>
           )}
 
-          <div className="rounded-xl border border-border bg-background/60 p-4 space-y-3">
+          <div className="mm-card p-4 space-y-3">
             <p className="text-sm font-medium">Did you send the message?</p>
             <div className="flex gap-2">
               <button
                 type="button"
                 disabled={confirming}
                 onClick={() => void confirmBasicSend(true, basicPhase)}
-                className="flex-1 min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50"
+                className="mm-btn mm-btn-primary flex-1"
               >
                 Yes
               </button>
@@ -803,7 +803,7 @@ export function SendMediaModal({
                 type="button"
                 disabled={confirming}
                 onClick={() => void confirmBasicSend(false, basicPhase)}
-                className="flex-1 min-h-11 rounded-xl border border-border bg-muted/40 hover:bg-muted text-sm font-semibold disabled:opacity-50"
+                className="mm-btn mm-btn-secondary flex-1"
               >
                 No
               </button>
@@ -814,7 +814,7 @@ export function SendMediaModal({
                 onClick={() =>
                   window.open(basicPhase.waUrl, "_blank", "noopener,noreferrer")
                 }
-                className="w-full text-xs text-emerald-400 hover:underline"
+                className="w-full text-xs text-primary hover:underline"
               >
                 Re-open WhatsApp
               </button>
@@ -826,50 +826,50 @@ export function SendMediaModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center sm:p-4">
-      <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[92dvh] overflow-y-auto p-5">
+    <div className="fixed inset-0 z-50 bg-black/50 dark:bg-black/60 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="bg-card border border-border rounded-t-xl sm:rounded-lg w-full sm:max-w-2xl max-h-[92dvh] overflow-y-auto p-4 sm:p-5 shadow-lg">
         <div className="flex justify-between items-start gap-2">
           <div>
-            <h3 className="text-lg font-semibold">Send Media</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <h3 className="text-base font-semibold tracking-tight">Send Media</h3>
+            <p className="mm-secondary mt-0.5">
               To {contactName}
               {contactPhone ? ` · ${contactPhone}` : " · no phone"}
             </p>
           </div>
-          <button type="button" className="text-sm text-muted-foreground" onClick={onClose}>
+          <button type="button" className="mm-btn mm-btn-ghost h-8 min-h-8 px-2 text-sm" onClick={onClose}>
             Close
           </button>
         </div>
 
         {/* WhatsApp Mode badge — Basic is default when Cloud API not configured */}
         <div
-          className={`mt-3 rounded-xl border px-3 py-2.5 text-sm ${
+          className={`mt-3 mm-card px-3 py-2.5 text-sm ${
             waMode === "enterprise"
-              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-100"
-              : "border-sky-500/40 bg-sky-500/10 text-sky-100"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-sky-200 bg-sky-50 text-sky-800"
           }`}
         >
           <div className="font-semibold">
             WhatsApp Mode · 🟢 {waModeLabel}
           </div>
-          <p className="text-xs opacity-90 mt-0.5">{waModeDesc}</p>
+          <p className="mm-secondary mt-0.5 !text-inherit opacity-90">{waModeDesc}</p>
         </div>
 
         {offlineHint && (
-          <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          <div className="mt-3 mm-card px-3 py-2 text-xs border-amber-200 bg-amber-50 text-amber-800">
             Offline mode — using locally cached files. Sending requires internet.
           </div>
         )}
 
         {suggestions.length > 0 && (
-          <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-3">
+          <div className="mt-4 mm-card p-3">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-primary">
                   AI Suggested Files
                 </div>
                 {serviceHints.length > 0 && (
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                  <p className="mm-secondary mt-0.5">
                     Based on: {serviceHints.slice(0, 4).join(", ")}
                   </p>
                 )}
@@ -877,7 +877,7 @@ export function SendMediaModal({
               <button
                 type="button"
                 onClick={selectAllSuggestions}
-                className="text-[11px] font-medium px-2 py-1 rounded-lg bg-primary text-primary-foreground"
+                className="mm-btn mm-btn-primary h-8 min-h-8 px-2 text-[11px]"
               >
                 Send All
               </button>
@@ -885,15 +885,15 @@ export function SendMediaModal({
             <ul className="space-y-1">
               {suggestions.slice(0, 6).map((s) => (
                 <li key={s.id}>
-                  <label className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-white/5 rounded-lg">
+                  <label className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-muted rounded-lg">
                     <input
                       type="checkbox"
                       checked={selected.has(s.id)}
                       onChange={() => toggle(s.id)}
                     />
-                    <span className="text-emerald-400 text-xs">✓</span>
+                    <span className="text-emerald-700 text-xs">✓</span>
                     <span className="truncate flex-1 font-medium">{s.name}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase">{s.kind}</span>
+                    <span className="mm-badge">{s.kind}</span>
                   </label>
                 </li>
               ))}
@@ -903,7 +903,7 @@ export function SendMediaModal({
 
         {kits.length > 0 && (
           <div className="mt-4">
-            <label className="text-[10px] uppercase text-muted-foreground">Template kit</label>
+            <label className="mm-label">Template kit</label>
             <select
               value={kitId}
               onChange={(e) => setKitId(e.target.value)}
@@ -920,27 +920,27 @@ export function SendMediaModal({
         )}
 
         <div className="mt-4">
-          <label className="text-[10px] uppercase text-muted-foreground">
+          <label className="mm-label">
             All approved files
           </label>
           {loading ? (
-            <p className="text-sm text-muted-foreground py-4">Loading library…</p>
+            <p className="mm-secondary py-4">Loading library…</p>
           ) : assets.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">
+            <p className="mm-secondary py-4">
               No approved files available. Ask an admin to upload and approve materials.
             </p>
           ) : (
-            <ul className="mt-1 max-h-40 overflow-y-auto rounded-xl border border-border divide-y divide-border">
+            <ul className="mt-1 max-h-40 overflow-y-auto rounded-lg border border-border divide-y divide-border">
               {assets.map((a) => (
                 <li key={a.id}>
-                  <label className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-white/5">
+                  <label className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-muted">
                     <input
                       type="checkbox"
                       checked={selected.has(a.id)}
                       onChange={() => toggle(a.id)}
                     />
                     <span className="truncate flex-1">{a.name}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase">{a.kind}</span>
+                    <span className="mm-badge">{a.kind}</span>
                   </label>
                 </li>
               ))}
@@ -962,7 +962,7 @@ export function SendMediaModal({
                     key={t.id}
                     type="button"
                     onClick={() => void applyCaptionTemplate(t)}
-                    className="text-[11px] px-2.5 py-1 rounded-full border border-border hover:border-primary/40 hover:bg-primary/10"
+                    className="mm-badge hover:border-primary hover:bg-primary/10 cursor-pointer"
                   >
                     {t.name}
                   </button>
@@ -972,7 +972,7 @@ export function SendMediaModal({
           )}
 
           {/* Template library */}
-          <div className="rounded-xl border border-border p-3 space-y-2">
+          <div className="mm-card p-3 space-y-2">
             <div className="flex flex-wrap items-center gap-2 justify-between">
               <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Message Templates
@@ -1008,14 +1008,14 @@ export function SendMediaModal({
             </div>
             <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
               {filteredTemplates.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground py-1">No templates in this filter.</p>
+                <p className="mm-secondary py-1">No templates in this filter.</p>
               ) : (
                 filteredTemplates.map((t) => (
                   <button
                     key={t.id}
                     type="button"
                     onClick={() => void applyCaptionTemplate(t)}
-                    className="text-[11px] px-2.5 py-1 rounded-lg border border-border bg-black/15 hover:bg-white/5 text-left"
+                    className="text-[11px] px-2.5 py-1 rounded-lg border border-border bg-muted hover:bg-muted/80 text-left"
                     title={t.category}
                   >
                     <span className="font-medium">{t.name}</span>
@@ -1036,7 +1036,7 @@ export function SendMediaModal({
               <button
                 type="button"
                 onClick={() => void copyPreview()}
-                className="text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-white/5"
+                className="mm-btn mm-btn-secondary h-8 min-h-8 px-2 text-[11px]"
               >
                 Copy Preview
               </button>
@@ -1047,21 +1047,21 @@ export function SendMediaModal({
                   setSaveTplName("");
                   setSaveTplGlobal(false);
                 }}
-                className="text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-white/5"
+                className="mm-btn mm-btn-secondary h-8 min-h-8 px-2 text-[11px]"
               >
                 Save as Template
               </button>
               <button
                 type="button"
                 onClick={saveAsTemplateLocal}
-                className="text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-white/5 text-muted-foreground"
+                className="mm-btn mm-btn-ghost h-8 min-h-8 px-2 text-[11px]"
               >
                 Save as Default
               </button>
               <button
                 type="button"
                 onClick={resetTemplate}
-                className="text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-white/5 text-muted-foreground"
+                className="mm-btn mm-btn-ghost h-8 min-h-8 px-2 text-[11px]"
               >
                 Reset
               </button>
@@ -1074,18 +1074,18 @@ export function SendMediaModal({
               <button
                 type="button"
                 onClick={() => setShowEmoji((v) => !v)}
-                className="text-sm px-2.5 py-1.5 rounded-lg border border-border hover:bg-white/5"
+                className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-sm"
                 title="Emoji"
               >
                 😊 Emoji
               </button>
               {showEmoji && (
-                <div className="absolute left-0 top-full mt-1 z-20 p-2 rounded-xl border border-border bg-card shadow-xl grid grid-cols-8 gap-1 w-56">
+                <div className="absolute left-0 top-full mt-1 z-20 p-2 rounded-lg border border-border bg-card shadow-md grid grid-cols-8 gap-1 w-56">
                   {EMOJIS.map((e) => (
                     <button
                       key={e}
                       type="button"
-                      className="text-lg p-1 hover:bg-white/10 rounded"
+                      className="text-lg p-1 hover:bg-muted rounded-md"
                       onClick={() => insertEmoji(e)}
                     >
                       {e}
@@ -1098,7 +1098,9 @@ export function SendMediaModal({
               type="button"
               disabled={aiBusy || !caption.trim()}
               onClick={() => void runImproveAi()}
-              className="text-[11px] px-2.5 py-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20 disabled:opacity-50"
+              className={`mm-btn mm-btn-primary h-8 min-h-8 px-2.5 text-[11px] ${
+                aiBusy ? "mm-btn-loading" : ""
+              }`}
             >
               {aiBusy ? "Working…" : "✨ Improve with AI"}
             </button>
@@ -1116,7 +1118,7 @@ export function SendMediaModal({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="rounded-xl border border-border bg-card/40 p-3 flex flex-col min-h-0">
+            <div className="mm-card p-3 flex flex-col min-h-0">
               <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                 Template
               </div>
@@ -1132,9 +1134,9 @@ export function SendMediaModal({
               <div
                 className={`text-[11px] mt-1.5 tabular-nums ${
                   charOver
-                    ? "text-red-400 font-semibold"
+                    ? "text-destructive font-semibold"
                     : charWarn
-                      ? "text-amber-300"
+                      ? "text-amber-700"
                       : "text-muted-foreground"
                 }`}
               >
@@ -1144,12 +1146,12 @@ export function SendMediaModal({
               </div>
             </div>
 
-            <div className="rounded-xl border border-emerald-500/35 bg-emerald-500/5 p-3 flex flex-col min-h-0">
+            <div className="mm-card p-3 flex flex-col min-h-0 border-emerald-200 bg-emerald-50/40">
               <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
                   Live Preview
                 </div>
-                <span className="text-[10px] text-emerald-400/80">
+                <span className="mm-secondary">
                   As {contactName || "customer"} will see
                 </span>
               </div>
@@ -1158,17 +1160,17 @@ export function SendMediaModal({
                   {previewWithSignature}
                 </pre>
               ) : (
-                <p className="text-xs text-muted-foreground">Caption is empty.</p>
+                <p className="mm-secondary">Caption is empty.</p>
               )}
               {messaging?.autoSignatureEnabled && messaging.signatureEnabled && (
-                <p className="text-[10px] text-muted-foreground mt-2 border-t border-emerald-500/20 pt-2">
+                <p className="mm-secondary mt-2 border-t border-border pt-2">
                   Signature will be appended automatically on send.
                 </p>
               )}
             </div>
           </div>
 
-          <div className="rounded-xl border border-border/80 bg-white/[0.02] p-3">
+          <div className="mm-card p-3">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
               Available Variables
             </div>
@@ -1178,7 +1180,7 @@ export function SendMediaModal({
                   key={v}
                   type="button"
                   onClick={() => insertVariable(v)}
-                  className="text-[11px] font-mono px-2 py-1 rounded-lg border border-border bg-black/20 hover:border-primary/50 hover:bg-primary/10 transition-colors"
+                  className="text-[11px] font-mono px-2 py-1 rounded-lg border border-border bg-muted hover:border-primary hover:bg-primary/10 transition-colors"
                   title={`Insert {{${v}}}`}
                 >
                   {`{{${v}}}`}
@@ -1188,20 +1190,20 @@ export function SendMediaModal({
           </div>
 
           {unknownVars.length > 0 && (
-            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 space-y-1.5">
-              <div className="text-xs font-semibold text-amber-200">
+            <div className="mm-card px-3 py-2.5 space-y-1.5 border-amber-200 bg-amber-50">
+              <div className="text-xs font-semibold text-amber-800">
                 Unknown variable{unknownVars.length > 1 ? "s" : ""}
               </div>
               {unknownVars.map((u) => (
-                <div key={u.raw} className="text-xs text-amber-100/90">
-                  <span className="font-mono text-amber-200">{u.raw}</span>
+                <div key={u.raw} className="text-xs text-amber-900">
+                  <span className="font-mono text-amber-800">{u.raw}</span>
                   {u.suggestion ? (
                     <>
                       {" "}
                       — Did you mean{" "}
                       <button
                         type="button"
-                        className="font-mono text-emerald-300 underline underline-offset-2"
+                        className="font-mono text-primary underline underline-offset-2"
                         onClick={() => {
                           setCaption((prev) =>
                             prev.replace(
@@ -1266,7 +1268,7 @@ export function SendMediaModal({
           type="button"
           disabled={sending || selected.size === 0 || charOver}
           onClick={() => void send()}
-          className="mt-4 w-full min-h-11 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold disabled:opacity-50"
+          className={`mt-4 w-full mm-btn mm-btn-primary ${sending ? "mm-btn-loading" : ""}`}
         >
           {sending
             ? waMode === "basic"
@@ -1279,19 +1281,19 @@ export function SendMediaModal({
 
         {/* Save template modal */}
         {saveTplOpen && (
-          <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4">
-            <div className="bg-card border border-border rounded-2xl w-full max-w-sm p-5 space-y-3">
-              <h4 className="font-semibold">Save as Template</h4>
+          <div className="fixed inset-0 z-[70] bg-black/50 dark:bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-card border border-border rounded-lg w-full max-w-sm p-5 space-y-3 shadow-lg">
+              <h4 className="font-semibold text-base tracking-tight">Save as Template</h4>
               <input
                 value={saveTplName}
                 onChange={(e) => setSaveTplName(e.target.value)}
                 placeholder="Template name"
-                className="mm-input w-full text-sm min-h-10"
+                className="mm-input w-full text-sm"
               />
               <select
                 value={saveTplCategory}
                 onChange={(e) => setSaveTplCategory(e.target.value)}
-                className="mm-input w-full text-sm min-h-10"
+                className="mm-input w-full text-sm"
               >
                 {(templateCategories.length
                   ? templateCategories
@@ -1312,7 +1314,7 @@ export function SendMediaModal({
                   Company-wide (Business Admin)
                 </label>
               )}
-              <p className="text-[11px] text-muted-foreground">
+              <p className="mm-secondary">
                 {saveTplGlobal
                   ? "Visible to all sales users in this workspace."
                   : "Saved under My Templates — only you can see it."}
@@ -1320,14 +1322,14 @@ export function SendMediaModal({
               <div className="flex gap-2">
                 <button
                   type="button"
-                  className="flex-1 min-h-10 rounded-xl border border-border"
+                  className="mm-btn mm-btn-secondary flex-1"
                   onClick={() => setSaveTplOpen(false)}
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="flex-1 min-h-10 rounded-xl bg-primary text-primary-foreground font-medium"
+                  className="mm-btn mm-btn-primary flex-1"
                   onClick={() => void savePersonalOrGlobalTemplate()}
                 >
                   Save

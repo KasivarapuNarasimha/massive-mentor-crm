@@ -128,23 +128,23 @@ export function AiCommandCenter() {
   return (
     <section
       aria-labelledby="mm-ai-command-heading"
-      className="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card p-4 sm:p-6 shadow-sm"
+      className="rounded-lg border border-border bg-card p-4 shadow-sm"
     >
       <div className="flex items-start gap-3 mb-3">
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/20 border border-primary/30 text-primary"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent border border-border text-primary"
           aria-hidden
         >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
         </span>
         <div className="min-w-0">
-          <h2 id="mm-ai-command-heading" className="text-lg sm:text-xl font-semibold tracking-tight">
-            MASSIVE MENTOR AI
+          <h2 id="mm-ai-command-heading" className="text-[15px] font-semibold tracking-tight text-foreground">
+            Massive Mentor AI
           </h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            What do you want to accomplish? Ask, search, or command your CRM &amp; ERP.
+          <p className="text-[13px] text-muted-foreground mt-0.5">
+            Ask, search, or command your CRM &amp; ERP.
           </p>
         </div>
       </div>
@@ -157,27 +157,27 @@ export function AiCommandCenter() {
           id="mm-ai-command-input"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="🔎 Ask, search or command Massive Mentor..."
+          placeholder="Ask, search or command Massive Mentor…"
           disabled={busy}
-          className="flex-1 min-h-12 rounded-xl border border-border bg-background px-4 text-base sm:text-sm focus-ring"
+          className="flex-1 h-9 min-h-9 rounded-md border border-border bg-white dark:bg-background px-3 text-[13px] focus-ring"
         />
         <button
           type="submit"
           disabled={busy || !message.trim()}
-          className="min-h-12 px-5 rounded-xl bg-primary text-primary-foreground font-medium disabled:opacity-50 touch-manipulation"
+          className="h-9 min-h-9 px-4 rounded-md bg-primary text-primary-foreground text-[13px] font-medium disabled:opacity-50 touch-manipulation"
         >
           {busy ? "Working…" : "Run"}
         </button>
       </form>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
         {QUICK_COMMANDS.map((q) => (
           <button
             key={q}
             type="button"
             disabled={busy}
             onClick={() => void run(q)}
-            className="text-xs px-3 py-1.5 rounded-full border border-border bg-background/80 hover:bg-white/10 disabled:opacity-50"
+            className="text-[11px] px-2.5 py-1 rounded-md border border-border bg-muted hover:bg-muted/80 text-foreground disabled:opacity-50"
           >
             {q}
           </button>

@@ -33,19 +33,19 @@ export function PaginationBar({
 
   return (
     <nav
-      className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 pt-4 text-sm text-muted-foreground"
+      className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-2 pt-3 text-[13px] text-muted-foreground border-t border-border mt-2"
       aria-label="Pagination"
     >
-      <div className="text-xs sm:text-sm">
+      <div className="text-xs">
         Showing <span className="text-foreground tabular-nums font-medium">{from}</span>–
         <span className="text-foreground tabular-nums font-medium">{to}</span> of{" "}
         <span className="text-foreground tabular-nums font-medium">{total.toLocaleString()}</span>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         <label className="flex items-center gap-1.5 text-xs">
           <span className="text-muted-foreground">Rows</span>
           <select
-            className="mm-input min-h-9 w-auto py-1.5 px-2 text-xs"
+            className="mm-input w-auto py-1 px-2 text-xs h-8 min-h-8"
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
             aria-label="Rows per page"
@@ -62,7 +62,7 @@ export function PaginationBar({
             type="button"
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
-            className="mm-btn mm-btn-secondary min-h-9 px-3 text-xs disabled:opacity-40"
+            className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs disabled:opacity-40"
             aria-label="Previous page"
           >
             Prev
@@ -91,7 +91,7 @@ export function PaginationBar({
             type="button"
             disabled={page >= safeTotalPages}
             onClick={() => onPageChange(page + 1)}
-            className="mm-btn mm-btn-secondary min-h-9 px-3 text-xs disabled:opacity-40"
+            className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs disabled:opacity-40"
             aria-label="Next page"
           >
             Next
@@ -118,10 +118,10 @@ function PageBtn({
       onClick={() => onClick(n)}
       aria-label={`Page ${n}`}
       aria-current={active ? "page" : undefined}
-      className={`min-h-9 min-w-9 px-2 rounded-lg text-xs tabular-nums border transition-colors ${
+      className={`h-8 min-h-8 min-w-8 px-2 rounded-md text-xs tabular-nums border transition-colors ${
         active
-          ? "bg-violet-500/20 border-violet-500/40 text-foreground font-semibold"
-          : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+          ? "bg-accent border-primary/30 text-accent-foreground font-semibold"
+          : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
       }`}
     >
       {n}

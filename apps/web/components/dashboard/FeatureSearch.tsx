@@ -91,7 +91,7 @@ export function FeatureSearch({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="hidden lg:inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted focus-ring"
+          className="hidden lg:inline-flex items-center justify-center h-8 w-8 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted focus-ring"
           aria-label="Search features (Ctrl+K)"
           title="Search features (Ctrl+K)"
         >
@@ -160,12 +160,12 @@ export function FeatureSearch({
           }}
           placeholder="Search features…"
           autoComplete="off"
-          className="w-full h-9 pl-8 pr-12 rounded-xl bg-card border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-emerald-500/50 focus-ring"
+          className="w-full h-9 pl-8 pr-12 rounded-md bg-white dark:bg-card border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus-ring"
           aria-autocomplete="list"
           aria-controls="mm-feature-search-results"
           aria-expanded={showPanel}
         />
-        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 rounded border border-border bg-muted/60 px-1.5 py-0.5 text-[9px] text-muted-foreground font-medium">
+        <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground font-medium">
           ⌘K
         </kbd>
       </div>
@@ -174,7 +174,7 @@ export function FeatureSearch({
         <div
           id="mm-feature-search-results"
           role="listbox"
-          className="absolute z-50 left-0 right-0 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-border bg-card shadow-xl py-1"
+          className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-card shadow-md py-1"
         >
           {results.length === 0 ? (
             <div className="px-3 py-3 text-xs text-muted-foreground">No matching features</div>

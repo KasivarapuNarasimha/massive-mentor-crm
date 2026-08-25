@@ -343,7 +343,7 @@ export default function ErpPurchasesPage() {
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`min-h-11 px-4 py-2.5 rounded-xl text-sm capitalize touch-manipulation ${
+            className={`min-h-9 px-4 py-2.5 rounded-md text-sm capitalize touch-manipulation ${
               tab === t
                 ? "bg-primary text-primary-foreground"
                 : "bg-card border border-border text-muted-foreground"
@@ -358,7 +358,7 @@ export default function ErpPurchasesPage() {
         <div className="space-y-4">
           <form
             onSubmit={createPo}
-            className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3"
+            className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
           >
             <h2 className="sm:col-span-2 text-sm font-semibold">Create purchase order</h2>
             <select
@@ -387,18 +387,18 @@ export default function ErpPurchasesPage() {
           </form>
 
           {loading ? (
-            <div className="rounded-2xl border border-border/60 bg-muted/30 p-6 text-sm text-muted-foreground">
+            <div className="rounded-lg border border-border bg-muted p-6 text-sm text-muted-foreground">
               Loading orders…
             </div>
           ) : orders.length === 0 ? (
-            <div className="rounded-2xl border border-border/60 bg-card/50 p-6 text-sm text-muted-foreground">
+            <div className="mm-card p-6 text-sm text-muted-foreground">
               No purchase orders yet.
             </div>
           ) : (
             orders.map((o) => (
               <div
                 key={o.id}
-                className="rounded-2xl border border-border/80 bg-card/60 p-4 flex flex-wrap justify-between gap-3 text-sm"
+                className="mm-card p-4 flex flex-wrap justify-between gap-3 text-sm"
               >
                 <div>
                   <div className="font-medium">
@@ -422,7 +422,7 @@ export default function ErpPurchasesPage() {
                   {["draft", "sent"].includes((o.status || "draft").toLowerCase()) ? (
                     <button
                       type="button"
-                      className="text-xs text-red-400 px-2"
+                      className="text-xs text-red-700 dark:text-red-400 px-2"
                       onClick={() => void actPo(o.id, "cancel")}
                     >
                       Cancel
@@ -439,7 +439,7 @@ export default function ErpPurchasesPage() {
         <div className="space-y-4">
           <form
             onSubmit={createGrn}
-            className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3"
+            className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
           >
             <h2 className="sm:col-span-2 text-sm font-semibold">Create goods receipt</h2>
             <select
@@ -474,18 +474,18 @@ export default function ErpPurchasesPage() {
           </form>
 
           {loading ? (
-            <div className="rounded-2xl border border-border/60 bg-muted/30 p-6 text-sm text-muted-foreground">
+            <div className="rounded-lg border border-border bg-muted p-6 text-sm text-muted-foreground">
               Loading receipts…
             </div>
           ) : receipts.length === 0 ? (
-            <div className="rounded-2xl border border-border/60 bg-card/50 p-6 text-sm text-muted-foreground">
+            <div className="mm-card p-6 text-sm text-muted-foreground">
               No goods receipts yet.
             </div>
           ) : (
             receipts.map((g) => (
               <div
                 key={g.id}
-                className="rounded-2xl border border-border/80 bg-card/60 p-4 flex flex-wrap justify-between gap-3 text-sm"
+                className="mm-card p-4 flex flex-wrap justify-between gap-3 text-sm"
               >
                 <div>
                   <div className="font-medium">{g.number || g.id}</div>
@@ -509,7 +509,7 @@ export default function ErpPurchasesPage() {
         <div className="space-y-4">
           <form
             onSubmit={createReturn}
-            className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3"
+            className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
           >
             <h2 className="sm:col-span-2 text-sm font-semibold">Create purchase return</h2>
             <select
@@ -551,18 +551,18 @@ export default function ErpPurchasesPage() {
           </form>
 
           {loading ? (
-            <div className="rounded-2xl border border-border/60 bg-muted/30 p-6 text-sm text-muted-foreground">
+            <div className="rounded-lg border border-border bg-muted p-6 text-sm text-muted-foreground">
               Loading returns…
             </div>
           ) : returns.length === 0 ? (
-            <div className="rounded-2xl border border-border/60 bg-card/50 p-6 text-sm text-muted-foreground">
+            <div className="mm-card p-6 text-sm text-muted-foreground">
               No purchase returns yet.
             </div>
           ) : (
             returns.map((r) => (
               <div
                 key={r.id}
-                className="rounded-2xl border border-border/80 bg-card/60 p-4 flex flex-wrap justify-between gap-3 text-sm"
+                className="mm-card p-4 flex flex-wrap justify-between gap-3 text-sm"
               >
                 <div>
                   <div className="font-medium">{r.number || r.id}</div>

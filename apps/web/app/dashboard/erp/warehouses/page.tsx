@@ -83,7 +83,7 @@ export default function ErpWarehousesPage() {
 
       <form
         onSubmit={create}
-        className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3"
+        className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
       >
         <h2 className="sm:col-span-2 text-sm font-semibold">New warehouse</h2>
         <input
@@ -121,18 +121,18 @@ export default function ErpWarehousesPage() {
 
       <div className="mt-6 space-y-2">
         {loading ? (
-          <div className="rounded-2xl border border-border/60 bg-muted/30 p-6 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-muted p-6 text-sm text-muted-foreground">
             Loading warehouses…
           </div>
         ) : rows.length === 0 ? (
-          <div className="rounded-2xl border border-border/60 bg-card/50 p-6 text-sm text-muted-foreground">
+          <div className="mm-card p-6 text-sm text-muted-foreground">
             No warehouses yet.
           </div>
         ) : (
           rows.map((w) => (
             <div
               key={w.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/80 bg-card/60 p-4"
+              className="flex flex-wrap items-center justify-between gap-3 mm-card p-4"
             >
               <div className="min-w-0">
                 <div className="font-medium">

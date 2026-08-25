@@ -519,7 +519,7 @@ export function MediaLibraryDashboard() {
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Stats strip */}
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -531,41 +531,42 @@ export function MediaLibraryDashboard() {
             { label: "Videos", value: String(stats.byKind.videos) },
             { label: "WhatsApp sends", value: stats.totalWhatsAppShares.toLocaleString() },
           ].map((k) => (
-            <div
-              key={k.label}
-              className="rounded-xl border border-border bg-card/50 px-3 py-2.5"
-            >
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                {k.label}
-              </div>
-              <div className="text-lg font-semibold tabular-nums mt-0.5">{k.value}</div>
+            <div key={k.label} className="mm-kpi-card !min-h-0 !gap-1 !py-2.5 !px-3">
+              <div className="mm-kpi-label">{k.label}</div>
+              <div className="mm-kpi-value !text-base">{k.value}</div>
             </div>
           ))}
         </div>
       )}
 
-      <div className="flex gap-2 border-b border-border pb-2 flex-wrap">
-        {(
-          [
-            ["library", "Library"],
-            ["analytics", "Analytics"],
-            ["activity", "Activity"],
-            ...(canManage ? ([["storage", "Storage"]] as const) : []),
-          ] as const
-        ).map(([k, label]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setTab(k)}
-            className={`px-3 py-1.5 text-sm rounded-lg ${
-              tab === k ? "bg-primary text-primary-foreground" : "bg-white/5 border border-border"
+      <div className="mm-toolbar !mb-0 gap-2">
+        <div className="mm-tabs flex-1 min-w-0 overflow-x-auto">
+          {(
+            [
+              ["library", "Library"],
+              ["analytics", "Analytics"],
+              ["activity", "Activity"],
+              ...(canManage ? ([["storage", "Storage"]] as const) : []),
+            ] as const
+          ).map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setTab(k)}
+              className="mm-tab"
+              data-active={tab === k ? "true" : undefined}
+              aria-selected={tab === k}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {canManage && tab === "library" && (
+          <label
+            className={`mm-btn mm-btn-primary h-9 min-h-9 px-3 text-xs cursor-pointer ${
+              uploading ? "mm-btn-loading" : ""
             }`}
           >
-            {label}
-          </button>
-        ))}
-        {canManage && tab === "library" && (
-          <label className="ml-auto inline-flex items-center justify-center min-h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-medium cursor-pointer">
             {uploading ? "Uploading…" : "Upload files"}
             <input
               type="file"
@@ -580,14 +581,14 @@ export function MediaLibraryDashboard() {
       </div>
 
       {uploadProgress.length > 0 && (
-        <div className="rounded-xl border border-border bg-card/50 p-3 space-y-1.5">
+        <div className="mm-card p-3 space-y-1.5">
           <div className="flex justify-between items-center">
             <span className="text-xs font-semibold uppercase text-muted-foreground">
               Upload progress
             </span>
             <button
               type="button"
-              className="text-[11px] text-muted-foreground"
+              className="mm-btn mm-btn-ghost h-8 min-h-8 px-2 text-[11px]"
               onClick={() => setUploadProgress([])}
             >
               Dismiss
@@ -598,11 +599,11 @@ export function MediaLibraryDashboard() {
               <span
                 className={
                   u.status === "done"
-                    ? "text-emerald-400"
+                    ? "text-emerald-700"
                     : u.status === "error"
-                      ? "text-red-400"
+                      ? "text-destructive"
                       : u.status === "skipped"
-                        ? "text-amber-400"
+                        ? "text-amber-700"
                         : "text-muted-foreground"
                 }
               >
@@ -635,13 +636,13 @@ export function MediaLibraryDashboard() {
                     key={r.id}
                     type="button"
                     onClick={() => void openDetail(r.id, "preview")}
-                    className="shrink-0 w-44 rounded-xl border border-border bg-card/40 p-3 text-left hover:border-primary/50 transition-colors"
+                    className="mm-card shrink-0 w-40 p-2.5 text-left mm-card-hover"
                   >
-                    <div className="text-xl mb-1">{kindIcon(r.kind)}</div>
+                    <div className="text-lg mb-1">{kindIcon(r.kind)}</div>
                     <div className="text-xs font-medium truncate" title={r.name}>
                       {r.name}
                     </div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                    <div className="mm-secondary mt-0.5">
                       {relativeTime(r.createdAt)}
                     </div>
                   </button>
@@ -650,8 +651,8 @@ export function MediaLibraryDashboard() {
             </section>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            <aside className="lg:col-span-1 space-y-1.5">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+            <aside className="lg:col-span-1 mm-card p-2 space-y-1">
               <button
                 type="button"
                 onClick={() => {
@@ -659,10 +660,10 @@ export function MediaLibraryDashboard() {
                   setFavoritesOnly(false);
                   setCollectionKey("");
                 }}
-                className={`w-full text-left px-3 py-2 rounded-xl text-sm border ${
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-sm border ${
                   !folderId && !favoritesOnly && !collectionKey
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:bg-white/5"
+                    ? "border-primary bg-primary/10 text-foreground font-medium"
+                    : "border-transparent hover:bg-muted"
                 }`}
               >
                 All files
@@ -683,10 +684,10 @@ export function MediaLibraryDashboard() {
                     setFolderId("");
                     setFavoritesOnly(false);
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-sm border ${
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-sm border ${
                     collectionKey === c.key
-                      ? "border-violet-500/50 bg-violet-500/10"
-                      : "border-border hover:bg-white/5"
+                      ? "border-primary bg-primary/10 font-medium"
+                      : "border-transparent hover:bg-muted"
                   }`}
                   title={c.description}
                 >
@@ -708,10 +709,10 @@ export function MediaLibraryDashboard() {
                     setFavoritesOnly(false);
                     setCollectionKey("");
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-sm border ${
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-sm border ${
                     folderId === f.id
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:bg-white/5"
+                      ? "border-primary bg-primary/10 font-medium"
+                      : "border-transparent hover:bg-muted"
                   }`}
                 >
                   <span className="font-medium">{f.name}</span>
@@ -729,7 +730,7 @@ export function MediaLibraryDashboard() {
                   <button
                     type="button"
                     onClick={() => void createFolder()}
-                    className="px-2 rounded-lg bg-white/10 border border-border text-xs"
+                    className="mm-btn mm-btn-secondary h-9 min-h-9 px-2.5 text-xs"
                   >
                     Add
                   </button>
@@ -737,20 +738,22 @@ export function MediaLibraryDashboard() {
               )}
             </aside>
 
-            <div className="lg:col-span-3 space-y-3">
-              <div className="flex flex-wrap gap-2 items-center">
+            <div className="lg:col-span-3 space-y-2.5">
+              <div className="mm-filter-bar !mb-0">
                 <input
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && void runAiSearch()}
                   placeholder='AI search: "CRM brochure", "real estate pricing"…'
-                  className="mm-input max-w-md text-sm min-h-9 flex-1"
+                  className="mm-input max-w-md text-sm flex-1 min-w-[10rem]"
                 />
                 <button
                   type="button"
                   onClick={() => void runAiSearch()}
                   disabled={aiSearching}
-                  className="px-3 min-h-9 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium disabled:opacity-50"
+                  className={`mm-btn mm-btn-primary h-9 min-h-9 px-3 text-xs ${
+                    aiSearching ? "mm-btn-loading" : ""
+                  }`}
                 >
                   {aiSearching ? "Searching…" : "AI Search"}
                 </button>
@@ -761,12 +764,12 @@ export function MediaLibraryDashboard() {
                     setCollectionKey("");
                   }}
                   placeholder="Exact search…"
-                  className="mm-input max-w-xs text-sm min-h-9"
+                  className="mm-input max-w-xs text-sm min-w-[8rem]"
                 />
                 <select
                   value={kind}
                   onChange={(e) => setKind(e.target.value)}
-                  className="mm-input text-sm min-h-9 w-32"
+                  className="mm-input text-sm w-32"
                 >
                   <option value="">All types</option>
                   <option value="image">Images</option>
@@ -774,7 +777,7 @@ export function MediaLibraryDashboard() {
                   <option value="video">Videos</option>
                   <option value="document">Documents</option>
                 </select>
-                <span className="text-xs text-muted-foreground">
+                <span className="mm-secondary">
                   {collectionKey
                     ? collections.find((c) => c.key === collectionKey)?.name || collectionKey
                     : favoritesOnly
@@ -784,18 +787,18 @@ export function MediaLibraryDashboard() {
                 </span>
               </div>
               {canManage && (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="mm-secondary">
                   Supported: JPG, PNG, WebP, PDF, MP4, DOCX, PPTX, XLSX · Max 25 MB
                 </p>
               )}
 
               {loading ? (
-                <p className="text-muted-foreground text-sm py-10 text-center">Loading…</p>
+                <p className="mm-secondary py-10 text-center">Loading…</p>
               ) : assets.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-border bg-card/30 py-14 px-6 text-center">
-                  <div className="text-4xl mb-3">📁</div>
-                  <p className="text-base font-medium">No files uploaded yet.</p>
-                  <p className="text-sm text-muted-foreground mt-1">
+                <div className="mm-card mm-empty border-dashed">
+                  <div className="mm-empty-icon text-xl">📁</div>
+                  <p className="text-sm font-medium">No files uploaded yet.</p>
+                  <p className="mm-secondary">
                     {favoritesOnly
                       ? "Star files to see them here."
                       : canManage
@@ -803,7 +806,11 @@ export function MediaLibraryDashboard() {
                         : "Ask a Business Admin to upload company materials."}
                   </p>
                   {canManage && !favoritesOnly && (
-                    <label className="inline-flex mt-5 min-h-11 px-5 items-center rounded-xl bg-primary text-primary-foreground text-sm font-semibold cursor-pointer">
+                    <label
+                      className={`mm-btn mm-btn-primary mt-3 cursor-pointer ${
+                        uploading ? "mm-btn-loading" : ""
+                      }`}
+                    >
                       {uploading ? "Uploading…" : "Upload Files"}
                       <input
                         type="file"
@@ -815,11 +822,11 @@ export function MediaLibraryDashboard() {
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2">
                   {assets.map((a) => (
                     <div
                       key={a.id}
-                      className="group relative rounded-xl border border-border bg-card/40 p-3 hover:border-primary/40 transition-colors"
+                      className="group relative mm-card p-2.5 mm-card-hover"
                     >
                       <button
                         type="button"
@@ -827,44 +834,40 @@ export function MediaLibraryDashboard() {
                         onClick={() => void openDetail(a.id, "detail")}
                       >
                         <div className="flex items-start justify-between gap-1">
-                          <span className="text-2xl">{kindIcon(a.kind)}</span>
-                          {a.isFavorite && <span className="text-amber-400 text-sm">⭐</span>}
+                          <span className="text-xl">{kindIcon(a.kind)}</span>
+                          {a.isFavorite && <span className="text-amber-600 text-sm">⭐</span>}
                         </div>
-                        <div className="text-sm font-medium truncate mt-1" title={a.name}>
+                        <div className="text-[13px] font-medium truncate mt-1" title={a.name}>
                           {a.name}
                         </div>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="mm-secondary">
                           {formatBytes(a.sizeBytes)}
                           {a.folderName ? ` · ${a.folderName}` : ""}
                         </div>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {a.approvalStatus === "pending" && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200">
-                              Pending
-                            </span>
+                            <span className="mm-badge mm-badge-warning">Pending</span>
                           )}
                           {a.archivedAt && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-500/30">
-                              Archived
-                            </span>
+                            <span className="mm-badge">Archived</span>
                           )}
                           {a.expiresAt && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-200">
+                            <span className="mm-badge mm-badge-danger">
                               Exp {new Date(a.expiresAt).toLocaleDateString()}
                             </span>
                           )}
                           {(a.versionNumber || 1) > 1 && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-200">
+                            <span className="mm-badge mm-badge-primary">
                               v{a.versionNumber}
                             </span>
                           )}
                         </div>
                       </button>
                       {/* Quick actions */}
-                      <div className="absolute top-2 right-2">
+                      <div className="absolute top-1.5 right-1.5">
                         <button
                           type="button"
-                          className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded-lg bg-black/40 border border-white/10 text-xs"
+                          className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 rounded-md border border-border bg-card text-xs text-muted-foreground hover:bg-muted"
                           onClick={(e) => {
                             e.stopPropagation();
                             setMenuId(menuId === a.id ? null : a.id);
@@ -874,7 +877,7 @@ export function MediaLibraryDashboard() {
                           ⋮
                         </button>
                         {menuId === a.id && (
-                          <div className="absolute right-0 top-7 z-20 w-48 rounded-xl border border-border bg-card shadow-xl py-1 text-xs">
+                          <div className="absolute right-0 top-7 z-20 w-48 rounded-lg border border-border bg-card shadow-md py-1 text-xs">
                             <ActionItem
                               label="👁 Preview"
                               onClick={() => void openDetail(a.id, "preview")}
@@ -940,7 +943,7 @@ export function MediaLibraryDashboard() {
                                   </select>
                                   <button
                                     type="button"
-                                    className="mt-1 w-full text-left px-1 py-1 hover:bg-white/5 rounded"
+                                    className="mt-1 w-full text-left px-1 py-1 hover:bg-muted rounded-md"
                                     onClick={() => void moveAsset(a.id)}
                                   >
                                     📂 Move to Folder
@@ -963,7 +966,7 @@ export function MediaLibraryDashboard() {
 
               {totalPages > 1 && (
                 <div className="flex justify-between items-center text-sm pt-2">
-                  <span className="text-muted-foreground">
+                  <span className="mm-secondary">
                     Page {page} of {totalPages}
                   </span>
                   <div className="flex gap-2">
@@ -971,7 +974,7 @@ export function MediaLibraryDashboard() {
                       type="button"
                       disabled={page <= 1}
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      className="px-3 py-1 rounded-lg border border-border disabled:opacity-40"
+                      className="mm-btn mm-btn-secondary h-8 min-h-8 px-3 text-xs"
                     >
                       Prev
                     </button>
@@ -979,7 +982,7 @@ export function MediaLibraryDashboard() {
                       type="button"
                       disabled={page >= totalPages}
                       onClick={() => setPage((p) => p + 1)}
-                      className="px-3 py-1 rounded-lg border border-border disabled:opacity-40"
+                      className="mm-btn mm-btn-secondary h-8 min-h-8 px-3 text-xs"
                     >
                       Next
                     </button>
@@ -992,9 +995,9 @@ export function MediaLibraryDashboard() {
       )}
 
       {tab === "analytics" && stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-2xl border border-border p-5 bg-card/40 space-y-3">
-            <h3 className="font-semibold">Library overview</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="mm-card p-4 space-y-3">
+            <h3 className="text-sm font-semibold">Library overview</h3>
             <Row label="Total files" value={stats.totalFiles.toLocaleString()} />
             <Row label="Storage used" value={stats.storageUsedLabel} />
             <Row label="Images" value={String(stats.byKind.images)} />
@@ -1002,8 +1005,8 @@ export function MediaLibraryDashboard() {
             <Row label="Videos" value={String(stats.byKind.videos)} />
             <Row label="Documents" value={String(stats.byKind.documents)} />
           </div>
-          <div className="rounded-2xl border border-border p-5 bg-card/40 space-y-3">
-            <h3 className="font-semibold">Sharing & engagement</h3>
+          <div className="mm-card p-4 space-y-3">
+            <h3 className="text-sm font-semibold">Sharing & engagement</h3>
             <Row label="WhatsApp shares" value={stats.totalWhatsAppShares.toLocaleString()} />
             <Row label="Email shares" value={stats.totalEmailShares.toLocaleString()} />
             <Row
@@ -1023,20 +1026,20 @@ export function MediaLibraryDashboard() {
               }
             />
           </div>
-          <div className="md:col-span-2 rounded-2xl border border-border p-5 bg-card/40">
-            <h3 className="font-semibold mb-3">Recently uploaded</h3>
+          <div className="md:col-span-2 mm-card p-4">
+            <h3 className="text-sm font-semibold mb-3">Recently uploaded</h3>
             <ul className="divide-y divide-border">
               {stats.recent.map((r) => (
                 <li key={r.id}>
                   <button
                     type="button"
-                    className="w-full flex justify-between py-2 text-sm text-left hover:bg-white/5 px-1 rounded"
+                    className="w-full flex justify-between py-2 text-sm text-left hover:bg-muted px-1 rounded-md"
                     onClick={() => void openDetail(r.id, "preview")}
                   >
                     <span>
                       {kindIcon(r.kind)} {r.name}
                     </span>
-                    <span className="text-muted-foreground text-xs">{relativeTime(r.createdAt)}</span>
+                    <span className="mm-secondary">{relativeTime(r.createdAt)}</span>
                   </button>
                 </li>
               ))}
@@ -1046,15 +1049,15 @@ export function MediaLibraryDashboard() {
       )}
 
       {tab === "activity" && (
-        <div className="rounded-2xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="mm-table-wrap">
+          <table className="mm-table">
             <thead>
-              <tr className="text-left text-xs text-muted-foreground border-b border-border bg-muted/30">
-                <th className="px-3 py-2">Sent By</th>
-                <th className="px-3 py-2">File</th>
-                <th className="px-3 py-2">To</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Date</th>
+              <tr>
+                <th>Sent By</th>
+                <th>File</th>
+                <th>To</th>
+                <th>Status</th>
+                <th>Date</th>
               </tr>
             </thead>
             <tbody>
@@ -1066,17 +1069,19 @@ export function MediaLibraryDashboard() {
                 </tr>
               ) : (
                 activity.map((row) => (
-                  <tr key={String(row.id)} className="border-b border-border/50">
-                    <td className="px-3 py-2">{String(row.sentByName || "—")}</td>
-                    <td className="px-3 py-2 font-medium">{String(row.assetName)}</td>
-                    <td className="px-3 py-2">
+                  <tr key={String(row.id)}>
+                    <td>{String(row.sentByName || "—")}</td>
+                    <td className="font-medium">{String(row.assetName)}</td>
+                    <td>
                       {String(row.contactName || "—")}
-                      <span className="block text-[11px] text-muted-foreground">
+                      <span className="block mm-secondary">
                         {String(row.toPhone || "")}
                       </span>
                     </td>
-                    <td className="px-3 py-2 capitalize">{String(row.status)}</td>
-                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                    <td className="capitalize">
+                      <span className="mm-badge">{String(row.status)}</span>
+                    </td>
+                    <td className="text-muted-foreground whitespace-nowrap">
                       {row.createdAt
                         ? new Date(String(row.createdAt)).toLocaleString()
                         : "—"}
@@ -1092,7 +1097,7 @@ export function MediaLibraryDashboard() {
       {tab === "storage" && canManage && (
         <div className="space-y-4">
           {!storageDash ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">Loading storage…</p>
+            <p className="mm-secondary py-8 text-center">Loading storage…</p>
           ) : (
             <>
               {(() => {
@@ -1121,23 +1126,23 @@ export function MediaLibraryDashboard() {
                 }>;
                 return (
                   <>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="rounded-xl border border-border p-4 bg-card/40">
-                        <div className="text-[10px] uppercase text-muted-foreground">Used</div>
-                        <div className="text-xl font-semibold">{st?.usedLabel || "—"}</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <div className="mm-kpi-card">
+                        <div className="mm-kpi-label">Used</div>
+                        <div className="mm-kpi-value !text-lg">{st?.usedLabel || "—"}</div>
                       </div>
-                      <div className="rounded-xl border border-border p-4 bg-card/40">
-                        <div className="text-[10px] uppercase text-muted-foreground">Available</div>
-                        <div className="text-xl font-semibold">{st?.availableLabel || "—"}</div>
+                      <div className="mm-kpi-card">
+                        <div className="mm-kpi-label">Available</div>
+                        <div className="mm-kpi-value !text-lg">{st?.availableLabel || "—"}</div>
                       </div>
-                      <div className="rounded-xl border border-border p-4 bg-card/40">
-                        <div className="text-[10px] uppercase text-muted-foreground">Quota</div>
-                        <div className="text-xl font-semibold">{st?.quotaLabel || "—"}</div>
+                      <div className="mm-kpi-card">
+                        <div className="mm-kpi-label">Quota</div>
+                        <div className="mm-kpi-value !text-lg">{st?.quotaLabel || "—"}</div>
                       </div>
-                      <div className="rounded-xl border border-border p-4 bg-card/40">
-                        <div className="text-[10px] uppercase text-muted-foreground">Usage</div>
-                        <div className="text-xl font-semibold">{st?.percentUsed ?? 0}%</div>
-                        <div className="mt-2 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div className="mm-kpi-card">
+                        <div className="mm-kpi-label">Usage</div>
+                        <div className="mm-kpi-value !text-lg">{st?.percentUsed ?? 0}%</div>
+                        <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
                           <div
                             className="h-full bg-primary rounded-full"
                             style={{ width: `${Math.min(100, st?.percentUsed || 0)}%` }}
@@ -1146,10 +1151,10 @@ export function MediaLibraryDashboard() {
                       </div>
                     </div>
                     {suggestions.length > 0 && (
-                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2">
+                      <div className="mm-card p-4 space-y-2 border-amber-200 bg-amber-50/50">
                         <h3 className="font-semibold text-sm">Cleanup suggestions</h3>
                         {suggestions.map((s, i) => (
-                          <p key={i} className="text-sm text-muted-foreground">
+                          <p key={i} className="mm-secondary">
                             • {s.message}
                             {s.potentialLabel !== "0 B" ? ` (up to ${s.potentialLabel})` : ""}
                           </p>
@@ -1157,7 +1162,7 @@ export function MediaLibraryDashboard() {
                         <div className="flex gap-2 pt-1">
                           <button
                             type="button"
-                            className="text-xs px-3 py-1.5 rounded-lg border border-border"
+                            className="mm-btn mm-btn-secondary h-8 min-h-8 px-3 text-xs"
                             onClick={async () => {
                               if (!token) return;
                               const r = await api.processMediaExpiry(token);
@@ -1173,7 +1178,7 @@ export function MediaLibraryDashboard() {
                           </button>
                           <button
                             type="button"
-                            className="text-xs px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300"
+                            className="mm-btn mm-btn-danger h-8 min-h-8 px-3 text-xs"
                             onClick={async () => {
                               if (!token || !confirm("Permanently purge all soft-deleted files?"))
                                 return;
@@ -1190,8 +1195,8 @@ export function MediaLibraryDashboard() {
                         </div>
                       </div>
                     )}
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="rounded-xl border border-border p-4 bg-card/40">
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <div className="mm-card p-4">
                         <h3 className="font-semibold text-sm mb-2">Largest files</h3>
                         <ul className="space-y-1 text-sm">
                           {largest.map((f) => (
@@ -1203,25 +1208,25 @@ export function MediaLibraryDashboard() {
                               >
                                 {kindIcon(f.kind)} {f.name}
                               </button>
-                              <span className="text-muted-foreground shrink-0">{f.sizeLabel}</span>
+                              <span className="mm-secondary shrink-0">{f.sizeLabel}</span>
                             </li>
                           ))}
                           {!largest.length && (
-                            <li className="text-muted-foreground text-xs">No files</li>
+                            <li className="mm-secondary">No files</li>
                           )}
                         </ul>
                       </div>
-                      <div className="rounded-xl border border-border p-4 bg-card/40">
+                      <div className="mm-card p-4">
                         <h3 className="font-semibold text-sm mb-2">Unused files (30+ days)</h3>
                         <ul className="space-y-1 text-sm">
                           {unused.map((f) => (
                             <li key={f.id} className="flex justify-between gap-2">
                               <span className="truncate">{f.name}</span>
-                              <span className="text-muted-foreground shrink-0">{f.sizeLabel}</span>
+                              <span className="mm-secondary shrink-0">{f.sizeLabel}</span>
                             </li>
                           ))}
                           {!unused.length && (
-                            <li className="text-muted-foreground text-xs">None found</li>
+                            <li className="mm-secondary">None found</li>
                           )}
                         </ul>
                       </div>
@@ -1236,21 +1241,25 @@ export function MediaLibraryDashboard() {
 
       {/* File details / preview panel */}
       {detail && (
-        <div className="fixed inset-0 z-50 bg-black/75 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[92dvh] overflow-y-auto p-5">
+        <div className="fixed inset-0 z-50 bg-black/50 dark:bg-black/60 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="bg-card border border-border rounded-t-xl sm:rounded-lg w-full sm:max-w-2xl max-h-[92dvh] overflow-y-auto p-4 sm:p-5 shadow-lg">
             <div className="flex justify-between gap-2 mb-3">
               <div className="min-w-0">
-                <h3 className="font-semibold truncate">{detail.name}</h3>
-                <p className="text-xs text-muted-foreground">
+                <h3 className="font-semibold truncate text-base tracking-tight">{detail.name}</h3>
+                <p className="mm-secondary">
                   {detail.mimeType} · {formatBytes(detail.sizeBytes)}
                 </p>
               </div>
-              <button type="button" className="text-sm shrink-0" onClick={() => setDetail(null)}>
+              <button
+                type="button"
+                className="mm-btn mm-btn-ghost h-8 min-h-8 px-2 text-sm shrink-0"
+                onClick={() => setDetail(null)}
+              >
                 Close
               </button>
             </div>
 
-            <div className="flex gap-2 mb-4 flex-wrap">
+            <div className="flex gap-1.5 mb-4 flex-wrap">
               {(
                 [
                   ["detail", "Details"],
@@ -1262,8 +1271,8 @@ export function MediaLibraryDashboard() {
                 <button
                   key={m}
                   type="button"
-                  className={`px-2.5 py-1 text-xs rounded-lg border ${
-                    previewMode === m ? "border-primary bg-primary/10" : "border-border"
+                  className={`mm-btn h-8 min-h-8 px-2.5 text-xs ${
+                    previewMode === m ? "mm-btn-primary" : "mm-btn-secondary"
                   }`}
                   onClick={() => setPreviewMode(m)}
                 >
@@ -1272,21 +1281,21 @@ export function MediaLibraryDashboard() {
               ))}
               <button
                 type="button"
-                className="px-2.5 py-1 text-xs rounded-lg border border-border"
+                className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs"
                 onClick={() => void toggleFav(detail.id)}
               >
                 {detail.isFavorite ? "⭐ Unfavorite" : "⭐ Favorite"}
               </button>
               <button
                 type="button"
-                className="px-2.5 py-1 text-xs rounded-lg border border-emerald-500/40 text-emerald-300"
+                className="mm-btn mm-btn-primary h-8 min-h-8 px-2.5 text-xs"
                 onClick={() => startWhatsAppSend([detail.id])}
               >
                 WhatsApp
               </button>
               <button
                 type="button"
-                className="px-2.5 py-1 text-xs rounded-lg border border-border"
+                className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs"
                 onClick={() => void downloadAsset(detail)}
               >
                 Download
@@ -1294,7 +1303,7 @@ export function MediaLibraryDashboard() {
               {canManage && (
                 <button
                   type="button"
-                  className="px-2.5 py-1 text-xs rounded-lg border border-sky-500/40 text-sky-200"
+                  className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs"
                   onClick={async () => {
                     if (!token) return;
                     const days = Number(
@@ -1331,14 +1340,14 @@ export function MediaLibraryDashboard() {
             </div>
 
             {shareLink && (
-              <div className="mb-3 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs break-all">
+              <div className="mb-3 mm-card px-3 py-2 text-xs break-all mm-badge-primary !rounded-lg">
                 {shareLink}
               </div>
             )}
 
             {previewMode === "preview" ? (
               !previewBlobUrl ? (
-                <p className="text-sm text-muted-foreground py-12 text-center">Loading preview…</p>
+                <p className="mm-secondary py-12 text-center">Loading preview…</p>
               ) : detail.kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -1355,20 +1364,20 @@ export function MediaLibraryDashboard() {
                   title={detail.name}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground py-8 text-center">
+                <p className="mm-secondary py-8 text-center">
                   Preview not available — use Download.
                 </p>
               )
             ) : previewMode === "timeline" ? (
               <ol className="relative border-l border-border ml-2 space-y-3 py-2">
                 {timeline.length === 0 ? (
-                  <p className="text-sm text-muted-foreground pl-4">No activity yet</p>
+                  <p className="mm-secondary pl-4">No activity yet</p>
                 ) : (
                   timeline.map((ev) => (
                     <li key={ev.id} className="ml-4">
                       <div className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border border-border bg-card" />
                       <div className="text-sm font-medium capitalize">{ev.action}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="mm-secondary">
                         {ev.actorName || "System"}
                         {ev.detail ? ` · ${ev.detail}` : ""}
                       </div>
@@ -1381,22 +1390,22 @@ export function MediaLibraryDashboard() {
               </ol>
             ) : previewMode === "versions" ? (
               <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">
+                <p className="mm-secondary">
                   Current version: v{detail.versionNumber || 1}
                 </p>
                 {versions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">
+                  <p className="mm-secondary py-6 text-center">
                     No previous versions. Replacing a file creates version history.
                   </p>
                 ) : (
                   versions.map((v) => (
                     <div
                       key={String(v.id)}
-                      className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"
+                      className="flex items-center justify-between gap-2 mm-card px-3 py-2 text-sm"
                     >
                       <div>
                         <div className="font-medium">Version {String(v.versionNumber)}</div>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="mm-secondary">
                           {String(v.name)} · {formatBytes(Number(v.sizeBytes) || 0)} ·{" "}
                           {v.createdAt
                             ? new Date(String(v.createdAt)).toLocaleString()
@@ -1406,7 +1415,7 @@ export function MediaLibraryDashboard() {
                       {canManage && (
                         <button
                           type="button"
-                          className="text-xs px-2 py-1 rounded-lg border border-border hover:bg-white/5"
+                          className="mm-btn mm-btn-secondary h-8 min-h-8 px-2 text-xs"
                           onClick={async () => {
                             if (!token || !confirm(`Restore version ${v.versionNumber}?`)) return;
                             const r = await api.restoreMediaVersion(
@@ -1459,7 +1468,7 @@ export function MediaLibraryDashboard() {
                     {detail.approvalStatus === "pending" && (
                       <button
                         type="button"
-                        className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white"
+                        className="mm-btn mm-btn-primary h-8 min-h-8 px-3 text-xs"
                         onClick={async () => {
                           if (!token) return;
                           const r = await api.setMediaApproval(
@@ -1480,7 +1489,7 @@ export function MediaLibraryDashboard() {
                     )}
                     <button
                       type="button"
-                      className="text-xs px-3 py-1.5 rounded-lg border border-border"
+                      className="mm-btn mm-btn-secondary h-8 min-h-8 px-3 text-xs"
                       onClick={async () => {
                         if (!token) return;
                         const d = window.prompt(
@@ -1505,7 +1514,7 @@ export function MediaLibraryDashboard() {
                     {!detail.archivedAt ? (
                       <button
                         type="button"
-                        className="text-xs px-3 py-1.5 rounded-lg border border-border"
+                        className="mm-btn mm-btn-secondary h-8 min-h-8 px-3 text-xs"
                         onClick={async () => {
                           if (!token) return;
                           const r = await api.archiveMediaAsset(detail.id, "manual", token);
@@ -1521,7 +1530,7 @@ export function MediaLibraryDashboard() {
                     ) : (
                       <button
                         type="button"
-                        className="text-xs px-3 py-1.5 rounded-lg border border-border"
+                        className="mm-btn mm-btn-secondary h-8 min-h-8 px-3 text-xs"
                         onClick={async () => {
                           if (!token) return;
                           const r = await api.unarchiveMediaAsset(detail.id, token);
@@ -1545,10 +1554,10 @@ export function MediaLibraryDashboard() {
 
       {/* Duplicate resolution */}
       {dupPrompt && (
-        <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 space-y-3">
-            <h3 className="font-semibold text-lg">File already exists</h3>
-            <p className="text-sm text-muted-foreground">
+        <div className="fixed inset-0 z-[70] bg-black/50 dark:bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg w-full max-w-md p-5 space-y-3 shadow-lg">
+            <h3 className="font-semibold text-base tracking-tight">File already exists</h3>
+            <p className="mm-secondary">
               <span className="font-medium text-foreground">{dupPrompt.file.name}</span> matches
               an existing file
               {dupPrompt.duplicates[0] ? ` (${dupPrompt.duplicates[0].name})` : ""}.
@@ -1556,21 +1565,21 @@ export function MediaLibraryDashboard() {
             <div className="flex flex-col gap-2">
               <button
                 type="button"
-                className="min-h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium"
+                className="mm-btn mm-btn-primary w-full"
                 onClick={() => void resolveDuplicate("replace")}
               >
                 Replace (new version)
               </button>
               <button
                 type="button"
-                className="min-h-10 rounded-xl border border-border text-sm font-medium"
+                className="mm-btn mm-btn-secondary w-full"
                 onClick={() => void resolveDuplicate("keep_both")}
               >
                 Keep both
               </button>
               <button
                 type="button"
-                className="min-h-10 rounded-xl border border-border text-sm text-muted-foreground"
+                className="mm-btn mm-btn-ghost w-full"
                 onClick={() => void resolveDuplicate("skip")}
               >
                 Skip
@@ -1582,10 +1591,10 @@ export function MediaLibraryDashboard() {
 
       {/* Pick lead for WhatsApp */}
       {pickLeadOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5">
-            <h3 className="font-semibold mb-2">Send via WhatsApp</h3>
-            <p className="text-xs text-muted-foreground mb-3">
+        <div className="fixed inset-0 z-[60] bg-black/50 dark:bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-lg w-full max-w-md p-5 shadow-lg">
+            <h3 className="font-semibold mb-2 text-base tracking-tight">Send via WhatsApp</h3>
+            <p className="mm-secondary mb-3">
               Choose a lead/client with a phone number.
             </p>
             <div className="flex gap-2 mb-3">
@@ -1594,19 +1603,19 @@ export function MediaLibraryDashboard() {
                 onChange={(e) => setLeadSearch(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void searchLeads()}
                 placeholder="Search leads…"
-                className="mm-input flex-1 text-sm min-h-9"
+                className="mm-input flex-1 text-sm"
               />
               <button
                 type="button"
                 onClick={() => void searchLeads()}
-                className="px-3 rounded-lg border border-border text-sm"
+                className="mm-btn mm-btn-secondary h-9 min-h-9 px-3 text-sm"
               >
                 Search
               </button>
             </div>
-            <ul className="max-h-56 overflow-y-auto divide-y divide-border border border-border rounded-xl">
+            <ul className="max-h-56 overflow-y-auto divide-y divide-border border border-border rounded-lg">
               {leads.length === 0 ? (
-                <li className="px-3 py-6 text-center text-sm text-muted-foreground">
+                <li className="px-3 py-6 text-center mm-secondary">
                   No leads found
                 </li>
               ) : (
@@ -1614,14 +1623,14 @@ export function MediaLibraryDashboard() {
                   <li key={l.id}>
                     <button
                       type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-white/5"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted"
                       onClick={() => {
                         setSendContact(l);
                         setPickLeadOpen(false);
                       }}
                     >
                       <span className="font-medium">{l.name}</span>
-                      <span className="block text-[11px] text-muted-foreground">
+                      <span className="block mm-secondary">
                         {l.phone || "No phone"}
                       </span>
                     </button>
@@ -1631,7 +1640,7 @@ export function MediaLibraryDashboard() {
             </ul>
             <button
               type="button"
-              className="mt-3 w-full text-sm py-2 border border-border rounded-xl"
+              className="mm-btn mm-btn-secondary w-full mt-3"
               onClick={() => setPickLeadOpen(false)}
             >
               Cancel
@@ -1670,8 +1679,8 @@ function ActionItem({
   return (
     <button
       type="button"
-      className={`w-full text-left px-3 py-1.5 hover:bg-white/5 ${
-        danger ? "text-red-400" : ""
+      className={`w-full text-left px-3 py-1.5 hover:bg-muted ${
+        danger ? "text-destructive" : ""
       }`}
       onClick={(e) => {
         e.stopPropagation();
@@ -1686,8 +1695,8 @@ function ActionItem({
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-[10px] uppercase text-muted-foreground">{label}</dt>
-      <dd className="font-medium break-words">{value}</dd>
+      <dt className="mm-kpi-label">{label}</dt>
+      <dd className="text-[13px] font-medium break-words">{value}</dd>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { PageHeader, PageShell } from "@/components/ui/PageShell";
 import {
   SUPPORTED_CURRENCIES,
   type CurrencyCode,
@@ -224,85 +225,81 @@ export default function BusinessProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="w-full max-w-3xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight">Business Profile</h1>
-          <p className="text-muted-foreground mt-2">This information powers your Health Score, SWOT, and AI Mentor.</p>
-        </div>
+      <PageShell>
+        <PageHeader
+          title="Business Profile"
+          description="This information powers your Health Score, SWOT, and AI Mentor."
+        />
 
-        <div className="space-y-8 animate-pulse">
-          {/* Basic Information skeleton */}
-          <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
-            <Skeleton className="h-6 w-40 mb-6" />
-            <div className="space-y-6">
+        <div className="space-y-4 animate-pulse max-w-3xl">
+          <div className="mm-card p-4 sm:p-5">
+            <Skeleton className="h-5 w-40 mb-4" />
+            <div className="space-y-3">
               <div>
-                <Skeleton className="h-4 w-24 mb-2" />
-                <Skeleton className="h-12 w-full rounded-xl" />
+                <Skeleton className="h-3 w-24 mb-1.5" />
+                <Skeleton className="h-9 w-full rounded-lg" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <Skeleton className="h-4 w-20 mb-2" />
-                  <Skeleton className="h-12 w-full rounded-xl" />
+                  <Skeleton className="h-3 w-20 mb-1.5" />
+                  <Skeleton className="h-9 w-full rounded-lg" />
                 </div>
                 <div>
-                  <Skeleton className="h-4 w-20 mb-2" />
-                  <Skeleton className="h-12 w-full rounded-xl" />
+                  <Skeleton className="h-3 w-20 mb-1.5" />
+                  <Skeleton className="h-9 w-full rounded-lg" />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Description skeleton */}
-          <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
-            <Skeleton className="h-6 w-48 mb-6" />
-            <Skeleton className="h-32 w-full rounded-xl" />
+          <div className="mm-card p-4 sm:p-5">
+            <Skeleton className="h-5 w-48 mb-4" />
+            <Skeleton className="h-28 w-full rounded-lg" />
           </div>
 
-          {/* Business Details skeleton */}
-          <div className="bg-card border border-border rounded-2xl p-6 sm:p-8">
-            <Skeleton className="h-6 w-40 mb-6" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="mm-card p-4 sm:p-5">
+            <Skeleton className="h-5 w-40 mb-4" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[...Array(4)].map((_, i) => (
                 <div key={i}>
-                  <Skeleton className="h-4 w-28 mb-2" />
-                  <Skeleton className="h-12 w-full rounded-xl" />
+                  <Skeleton className="h-3 w-28 mb-1.5" />
+                  <Skeleton className="h-9 w-full rounded-lg" />
                 </div>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Business Profile</h1>
-        <p className="text-muted-foreground mt-2">This information powers your Health Score, SWOT, and AI Mentor.</p>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Business Profile"
+        description="This information powers your Health Score, SWOT, and AI Mentor."
+      />
 
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Basic Information */}
-        <div className="bg-card border border-border rounded-2xl p-8">
-          <h2 className="font-semibold text-lg mb-6">Basic Information</h2>
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-3xl adaptive-form">
+        <div className="mm-card p-4 sm:p-5">
+          <h2 className="mm-section-title mb-4">Basic Information</h2>
 
-          <div className="space-y-6">
+          <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Business Name *</label>
+              <label className="mm-label">Business Name *</label>
               <input
                 type="text"
                 value={formData.businessName}
                 onChange={(e) => handleChange("businessName", e.target.value)}
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
+                className="mm-input"
                 placeholder="Acme Corp"
                 required
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">Business Type *</label>
+                <label className="mm-label">Business Type *</label>
                 <select
                   value={templateSlug}
                   onChange={(e) => {
@@ -311,7 +308,7 @@ export default function BusinessProfilePage() {
                     const name = industryCatalog.find((t) => t.slug === slug)?.name || "";
                     handleChange("industry", name);
                   }}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
+                  className="mm-input"
                   required
                 >
                   <option value="">Select business type…</option>
@@ -322,18 +319,18 @@ export default function BusinessProfilePage() {
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-muted-foreground mt-1.5">
+                <p className="mm-field-hint">
                   Changes re-apply CRM menus, dashboards, modules, and forms from the industry
                   template. Unknown types use Generic CRM.
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-2">Current Stage</label>
+                <label className="mm-label">Current Stage</label>
                 <select
                   value={formData.stage}
                   onChange={(e) => handleChange("stage", e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
+                  className="mm-input"
                 >
                   <option value="">Select stage...</option>
                   {STAGES.map((s) => (
@@ -345,32 +342,30 @@ export default function BusinessProfilePage() {
           </div>
         </div>
 
-        {/* Description */}
-        <div className="bg-card border border-border rounded-2xl p-8">
-          <h2 className="font-semibold text-lg mb-2">About Your Business</h2>
-          <p className="text-sm text-muted-foreground mb-4">Help the AI understand what you do (this is very important).</p>
+        <div className="mm-card p-4 sm:p-5">
+          <h2 className="mm-section-title mb-1">About Your Business</h2>
+          <p className="mm-secondary mb-3">Help the AI understand what you do (this is very important).</p>
 
           <textarea
             value={formData.description}
             onChange={(e) => handleChange("description", e.target.value)}
             rows={5}
-            className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground resize-y focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
+            className="mm-input resize-y"
             placeholder="We help small e-commerce brands increase customer lifetime value through personalized email marketing automation..."
           />
-          <div className="text-xs text-muted-foreground mt-1.5 text-right">{formData.description.length} / 2000</div>
+          <div className="mm-secondary mt-1.5 text-right">{formData.description.length} / 2000</div>
         </div>
 
-        {/* Business Details */}
-        <div className="bg-card border border-border rounded-2xl p-8">
-          <h2 className="font-semibold text-lg mb-6">Business Details</h2>
+        <div className="mm-card p-4 sm:p-5">
+          <h2 className="mm-section-title mb-4">Business Details</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-3">
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Team Size</label>
+              <label className="mm-label">Team Size</label>
               <select
                 value={formData.employeeCount ?? ""}
                 onChange={(e) => handleChange("employeeCount", e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
+                className="mm-input"
               >
                 <option value="">Select team size...</option>
                 {EMPLOYEE_COUNTS.map((num) => (
@@ -380,11 +375,11 @@ export default function BusinessProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Currency</label>
+              <label className="mm-label">Currency</label>
               <select
                 value={formData.currency}
                 onChange={(e) => handleChange("currency", e.target.value)}
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
+                className="mm-input"
                 aria-label="Business currency"
               >
                 {SUPPORTED_CURRENCIES.map((c) => (
@@ -393,17 +388,17 @@ export default function BusinessProfilePage() {
                   </option>
                 ))}
               </select>
-              <p className="text-[11px] text-muted-foreground mt-1.5">
+              <p className="mm-field-hint">
                 Default follows your location (India → INR). Used for dashboards, invoices &amp; AI.
               </p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Annual Revenue</label>
+              <label className="mm-label">Annual Revenue</label>
               <select
                 value={formData.annualRevenue}
                 onChange={(e) => handleChange("annualRevenue", e.target.value)}
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
+                className="mm-input"
                 aria-label="Annual revenue range"
               >
                 <option value="">Select revenue range…</option>
@@ -416,55 +411,54 @@ export default function BusinessProfilePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Main Product / Service</label>
+              <label className="mm-label">Main Product / Service</label>
               <input
                 type="text"
                 value={formData.mainProduct}
                 onChange={(e) => handleChange("mainProduct", e.target.value)}
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
+                className="mm-input"
                 placeholder="Email marketing platform"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Primary Location</label>
+              <label className="mm-label">Primary Location</label>
               <input
                 type="text"
                 value={formData.location}
                 onChange={(e) => handleChange("location", e.target.value)}
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
+                className="mm-input"
                 placeholder="San Francisco, CA"
               />
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Target Market / Ideal Customer</label>
+              <label className="mm-label">Target Market / Ideal Customer</label>
               <input
                 type="text"
                 value={formData.targetMarket}
                 onChange={(e) => handleChange("targetMarket", e.target.value)}
-                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30"
+                className="mm-input"
                 placeholder="Early-stage brands in your market (describe size in your currency)"
               />
             </div>
           </div>
         </div>
 
-        {/* Save Button */}
-        <div className="flex items-center gap-4 pt-2">
+        <div className="flex items-center gap-3 pt-1">
           <button
             type="submit"
             disabled={isSaving}
-            className="px-8 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className={`mm-btn mm-btn-primary focus-ring ${isSaving ? "mm-btn-loading" : ""}`}
           >
             {isSaving ? "Saving..." : "Save Profile"}
           </button>
         </div>
 
-        <p className="text-xs text-muted-foreground">
+        <p className="mm-secondary">
           This data is used to generate accurate Health Scores, SWOT analyses, and personalized AI advice.
         </p>
       </form>
-    </div>
+    </PageShell>
   );
 }

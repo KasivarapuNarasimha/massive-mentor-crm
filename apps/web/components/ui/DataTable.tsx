@@ -124,14 +124,14 @@ export function DataTable<T>({
   };
 
   return (
-    <div className={`space-y-3 ${className}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className={`space-y-2.5 ${className}`}>
+      <div className="mm-toolbar">
         <div className="flex flex-wrap items-center gap-2">{toolbar}</div>
         <div className="flex items-center gap-2">
           <div className="relative">
             <button
               type="button"
-              className="mm-btn mm-btn-secondary min-h-9 px-3 text-xs focus-ring"
+              className="mm-btn mm-btn-secondary px-3 text-xs focus-ring"
               onClick={() => setMenuOpen((o) => !o)}
               aria-expanded={menuOpen}
               aria-haspopup="true"
@@ -148,13 +148,13 @@ export function DataTable<T>({
                   onClick={() => setMenuOpen(false)}
                 />
                 <div
-                  className="absolute right-0 z-30 mt-1 w-52 rounded-xl border border-border bg-card p-2 shadow-xl"
+                  className="absolute right-0 z-30 mt-1 w-52 rounded-md border border-border bg-card p-1.5 shadow-md"
                   role="menu"
                 >
                   {columns.map((c) => (
                     <label
                       key={c.id}
-                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:bg-white/5 cursor-pointer"
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted cursor-pointer"
                     >
                       <input
                         type="checkbox"
@@ -171,7 +171,7 @@ export function DataTable<T>({
           </div>
           <button
             type="button"
-            className="mm-btn mm-btn-secondary min-h-9 px-3 text-xs focus-ring"
+            className="mm-btn mm-btn-secondary px-3 text-xs focus-ring"
             onClick={exportCsv}
             disabled={!rows.length}
             aria-label="Export table as CSV"
@@ -225,7 +225,7 @@ export function DataTable<T>({
                       aria-orientation="vertical"
                       aria-label={`Resize ${c.header}`}
                       onMouseDown={(e) => startResize(c.id, e)}
-                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize opacity-0 group-hover/th:opacity-100 bg-violet-500/40 hover:bg-violet-400"
+                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize opacity-0 group-hover/th:opacity-100 bg-primary/40 hover:bg-primary"
                     />
                   </th>
                 ))}

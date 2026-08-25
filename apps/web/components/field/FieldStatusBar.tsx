@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { captureGps, toLocationBody } from "@/lib/location-client";
 
 /** Fixed strip height — keep in sync with DashboardShell FIELD_BAR_H */
-export const FIELD_STATUS_BAR_HEIGHT_CLASS = "h-12"; // 48px
+export const FIELD_STATUS_BAR_HEIGHT_CLASS = "h-11"; // 44px — denser enterprise strip
 
 type FieldStatus = {
   state?: {
@@ -26,13 +26,13 @@ type FieldStatus = {
 };
 
 const STATUS_CLASS: Record<string, string> = {
-  online: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
-  in_field: "bg-sky-500/25 text-sky-200 border-sky-400/50",
-  meeting: "bg-violet-500/25 text-violet-200 border-violet-400/50",
-  offline: "bg-muted/50 text-muted-foreground border-border",
+  online: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30",
+  in_field: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30",
+  meeting: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30",
+  offline: "bg-muted text-muted-foreground border-border",
 };
 
-const STATUS_STYLE_FALLBACK = "bg-muted/50 text-muted-foreground border-border";
+const STATUS_STYLE_FALLBACK = "bg-muted text-muted-foreground border-border";
 
 function label(s?: string) {
   if (s === "in_field") return "On Field";
@@ -78,7 +78,7 @@ export function FieldStatusBar() {
   if (!isAuthenticated || !token) {
     return (
       <div
-        className={`${FIELD_STATUS_BAR_HEIGHT_CLASS} w-full border-b border-border bg-card/95`}
+        className={`${FIELD_STATUS_BAR_HEIGHT_CLASS} w-full border-b border-border bg-white dark:bg-card`}
         data-testid="field-status-bar"
         aria-hidden
       />
@@ -131,26 +131,26 @@ export function FieldStatusBar() {
     <div
       className={[
         FIELD_STATUS_BAR_HEIGHT_CLASS,
-        "w-full border-b flex items-center gap-2 sm:gap-3",
+        "w-full border-b border-border flex items-center gap-2 sm:gap-3",
         "px-3 sm:px-5 md:px-6",
-        "overflow-hidden",
-        inField ? "bg-sky-950/90 border-sky-800/60" : "bg-card/95 border-border",
+        "overflow-hidden bg-white dark:bg-card",
+        inField ? "bg-sky-50 dark:bg-sky-950/40" : "",
       ].join(" ")}
       data-testid="field-status-bar"
       role="status"
       aria-live="polite"
     >
       <span
-        className={`inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide px-2 sm:px-2.5 py-0.5 rounded-full border shrink-0 ${
+        className={`inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded border shrink-0 ${
           STATUS_CLASS[status] || STATUS_STYLE_FALLBACK
         }`}
       >
         <span
           className={`w-1.5 h-1.5 rounded-full shrink-0 ${
             status === "online" || status === "in_field"
-              ? "bg-emerald-400"
+              ? "bg-emerald-500"
               : status === "meeting"
-                ? "bg-violet-400"
+                ? "bg-blue-500"
                 : "bg-muted-foreground"
           }`}
           aria-hidden
@@ -158,7 +158,7 @@ export function FieldStatusBar() {
         {label(status)}
       </span>
 
-      <div className="min-w-0 flex-1 flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground truncate">
+      <div className="min-w-0 flex-1 flex items-center gap-1.5 text-xs text-muted-foreground truncate">
         <span className="text-muted-foreground shrink-0 hidden sm:inline">Location:</span>
         <span
           className="font-medium text-foreground truncate"
@@ -167,10 +167,10 @@ export function FieldStatusBar() {
           {place}
         </span>
         {data?.state?.lastSource === "gps" && (
-          <span className="shrink-0 text-[10px] text-emerald-500/80 font-medium">GPS</span>
+          <span className="shrink-0 text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">GPS</span>
         )}
         {data?.state?.lastSource === "ip" && (
-          <span className="shrink-0 text-[10px] text-amber-500/80 font-medium">IP</span>
+          <span className="shrink-0 text-[10px] text-amber-700 dark:text-amber-400 font-medium">IP</span>
         )}
       </div>
 
@@ -180,7 +180,7 @@ export function FieldStatusBar() {
             type="button"
             disabled={busy}
             onClick={() => run("/location/field/start", "Field work started — you are On Field")}
-            className="min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-lg text-[11px] sm:text-xs font-semibold bg-sky-500 text-white hover:bg-sky-400 disabled:opacity-50 touch-manipulation whitespace-nowrap"
+            className="h-8 min-h-8 px-2.5 rounded-md text-[11px] sm:text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-50 touch-manipulation whitespace-nowrap"
             data-testid="start-field-work"
           >
             {busy ? "…" : "Start Field"}
@@ -190,7 +190,7 @@ export function FieldStatusBar() {
             type="button"
             disabled={busy}
             onClick={() => run("/location/field/end", "Field work ended")}
-            className="min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-lg text-[11px] sm:text-xs font-semibold bg-amber-500 text-white hover:bg-amber-400 disabled:opacity-50 touch-manipulation whitespace-nowrap"
+            className="h-8 min-h-8 px-2.5 rounded-md text-[11px] sm:text-xs font-semibold bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-50 touch-manipulation whitespace-nowrap"
             data-testid="end-field-work"
           >
             {busy ? "…" : "End Field"}
@@ -198,7 +198,7 @@ export function FieldStatusBar() {
         )}
         <Link
           href="/dashboard/field-sales"
-          className="min-h-8 sm:min-h-9 px-2.5 sm:px-3 rounded-lg text-[11px] sm:text-xs font-medium bg-white/10 text-foreground hover:bg-white/15 border border-border inline-flex items-center touch-manipulation whitespace-nowrap"
+          className="h-8 min-h-8 px-2.5 rounded-md text-[11px] sm:text-xs font-medium bg-card text-foreground hover:bg-muted border border-border inline-flex items-center touch-manipulation whitespace-nowrap"
         >
           Map
         </Link>

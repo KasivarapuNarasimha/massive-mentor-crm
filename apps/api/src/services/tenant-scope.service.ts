@@ -49,21 +49,32 @@ export type CrmScope = {
 };
 
 /**
- * Resolve actor role from membership (preferred) or user.role.
+ * Resolve actor role from membership in the *active* customer workspace
+ * (same businessId as getUserBusinessId), not the oldest membership row.
+ * Falls back to any membership / user.role for single-business and legacy users.
  */
 export async function resolveActorRole(userId: string): Promise<string> {
-  const [user, mem] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true, platformRole: true },
-    }),
-    prisma.businessMember.findFirst({
-      where: { userId },
-      orderBy: { createdAt: "asc" },
-      select: { role: true },
-    }),
-  ]);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, platformRole: true },
+  });
   if (user?.platformRole === "super_admin") return "super_admin";
+
+  // Prefer role on the active workspace (multi-business safe)
+  const activeBusinessId = await getUserBusinessId(userId);
+  if (activeBusinessId) {
+    const activeMem = await prisma.businessMember.findFirst({
+      where: { userId, businessId: activeBusinessId },
+      select: { role: true },
+    });
+    if (activeMem?.role) return activeMem.role;
+  }
+
+  const mem = await prisma.businessMember.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { role: true },
+  });
   return mem?.role || user?.role || "sales_executive";
 }
 

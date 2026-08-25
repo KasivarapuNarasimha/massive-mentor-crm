@@ -27,7 +27,7 @@ export function PageLoading({
         aria-label={label}
       >
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-card border border-border rounded-2xl p-3 space-y-3 min-h-[12rem]">
+          <div key={i} className="bg-card border border-border rounded-lg p-3 space-y-3 min-h-[10rem]">
             <Skeleton className="h-4 w-20" />
             <Skeleton className="h-16 w-full" />
             <Skeleton className="h-16 w-full" />
@@ -43,7 +43,7 @@ export function PageLoading({
         {Array.from({ length: rows }).map((_, i) => (
           <div
             key={i}
-            className="bg-card border border-border rounded-2xl p-4 flex flex-col sm:flex-row gap-3"
+            className="bg-card border border-border rounded-lg p-3.5 flex flex-col sm:flex-row gap-3"
           >
             <div className="flex-1 space-y-2">
               <Skeleton className="h-4 w-2/3 max-w-xs" />
@@ -63,10 +63,10 @@ export function PageLoading({
         <Skeleton className="h-4 w-72 max-w-full" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+            <Skeleton key={i} className="h-24 w-full rounded-lg" />
           ))}
         </div>
-        <Skeleton className="h-64 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-lg" />
       </div>
     );
   }
@@ -74,7 +74,7 @@ export function PageLoading({
   // table
   return (
     <div
-      className={`bg-card border border-border rounded-2xl p-6 space-y-3 ${className}`}
+      className={`bg-card border border-border rounded-lg p-4 space-y-2.5 ${className}`}
       aria-busy="true"
       aria-label={label}
     >

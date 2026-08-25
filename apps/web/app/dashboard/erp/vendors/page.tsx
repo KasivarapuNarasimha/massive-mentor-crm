@@ -132,7 +132,7 @@ export default function ErpVendorsPage() {
 
       <form
         onSubmit={save}
-        className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-3"
+        className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
       >
         <h2 className="sm:col-span-2 text-sm font-semibold">
           {editingId ? "Edit vendor" : "New vendor"}
@@ -209,18 +209,18 @@ export default function ErpVendorsPage() {
 
       <div className="mt-6 space-y-2">
         {loading ? (
-          <div className="rounded-2xl border border-border/60 bg-muted/30 p-6 text-sm text-muted-foreground">
+          <div className="rounded-lg border border-border bg-muted p-6 text-sm text-muted-foreground">
             Loading vendors…
           </div>
         ) : vendors.length === 0 ? (
-          <div className="rounded-2xl border border-border/60 bg-card/50 p-6 text-sm text-muted-foreground">
+          <div className="mm-card p-6 text-sm text-muted-foreground">
             No vendors yet.
           </div>
         ) : (
           vendors.map((v) => (
             <div
               key={v.id}
-              className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border/80 bg-card/60 p-4 text-sm"
+              className="flex flex-wrap items-start justify-between gap-3 mm-card p-4 text-sm"
             >
               <div className="min-w-0">
                 <div className="font-medium">
@@ -242,7 +242,7 @@ export default function ErpVendorsPage() {
                 </button>
                 <button
                   type="button"
-                  className="text-xs text-red-400 px-2"
+                  className="text-xs text-red-700 dark:text-red-400 px-2"
                   onClick={() => void remove(v.id)}
                 >
                   Delete

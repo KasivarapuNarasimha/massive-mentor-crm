@@ -382,27 +382,27 @@ export default function DealsPage() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-5 sm:mb-8">
+    <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 overflow-x-hidden pb-24 md:pb-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4 sm:mb-5">
         <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Deals</h1>
-          <p className="text-muted-foreground mt-1 sm:mt-2 text-sm sm:text-base">
+          <h1 className="mm-page-title">Deals</h1>
+          <p className="mm-secondary mt-1">
             Pipeline management with Kanban view.
           </p>
         </div>
         <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto">
-          <div className="flex rounded-xl border border-border overflow-hidden shrink-0">
+          <div className="flex rounded-md border border-border overflow-hidden shrink-0">
             <button
               type="button"
               onClick={() => setView("kanban")}
-              className={`flex-1 sm:flex-none min-h-11 px-4 py-2 text-sm touch-manipulation ${view === "kanban" ? "bg-white/10 text-foreground" : "text-muted-foreground"}`}
+              className={`mm-btn flex-1 sm:flex-none rounded-none h-9 min-h-9 px-3 text-[13px] touch-manipulation ${view === "kanban" ? "bg-muted text-foreground" : "bg-card text-muted-foreground"}`}
             >
               Kanban
             </button>
             <button
               type="button"
               onClick={() => setView("list")}
-              className={`flex-1 sm:flex-none min-h-11 px-4 py-2 text-sm touch-manipulation ${view === "list" ? "bg-white/10 text-foreground" : "text-muted-foreground"}`}
+              className={`mm-btn flex-1 sm:flex-none rounded-none h-9 min-h-9 px-3 text-[13px] touch-manipulation ${view === "list" ? "bg-muted text-foreground" : "bg-card text-muted-foreground"}`}
             >
               List
             </button>
@@ -410,71 +410,73 @@ export default function DealsPage() {
           <button
             type="button"
             onClick={openCreate}
-            className="w-full sm:w-auto min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active touch-manipulation"
+            className="mm-btn mm-btn-primary w-full sm:w-auto h-9 min-h-9 px-4 text-[13px] focus-ring touch-manipulation"
           >
             + New Deal
           </button>
         </div>
       </div>
 
-      <ExportFiltersBar module="deals" token={token} search={search} onSearchChange={setSearch} className="mb-4" />
-      <input
-        type="search"
-        placeholder="Search deals..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full max-w-md bg-background border border-border rounded-xl px-4 py-3 sm:py-2.5 text-base sm:text-sm text-foreground focus:outline-none focus:border-border mb-6 min-h-11"
-      />
+      <ExportFiltersBar module="deals" token={token} search={search} onSearchChange={setSearch} className="mb-3" />
+      <div className="mm-filter-bar mb-4">
+        <input
+          type="search"
+          placeholder="Search deals..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="mm-input w-full max-w-md"
+        />
+      </div>
 
       {isLoading ? (
         <PageLoading variant="kanban" label="Loading deals" />
       ) : view === "kanban" ? (
         <>
           {highlightStage && (
-            <div className="mb-3 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-200">
+            <div className="mb-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-[13px] text-foreground">
               Filtered from analytics · highlighting{" "}
               <span className="font-semibold">{stageLabel(highlightStage)}</span>
             </div>
           )}
           {/* Mobile: stacked stage sections (no horizontal squeeze) */}
-          <div className="md:hidden space-y-4">
+          <div className="md:hidden space-y-3">
             {STAGES.map((stage) => (
               <div
                 key={stage}
                 ref={(el) => {
                   stageColRefs.current[stage] = el;
                 }}
-                className={`bg-card border rounded-2xl p-3 ${
+                className={`mm-card p-3 ${
                   highlightStage === stage
-                    ? "border-violet-500/60 ring-2 ring-violet-500/30"
-                    : "border-border"
+                    ? "border-primary ring-1 ring-primary/20"
+                    : ""
                 }`}
               >
-                <div className="flex items-center justify-between mb-3 px-1">
-                  <div className="text-sm font-semibold text-white/90">{stageLabel(stage)}</div>
-                  <div className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                <div className="flex items-center justify-between mb-2 px-0.5">
+                  <div className="mm-section-title text-[13px]">{stageLabel(stage)}</div>
+                  <div className="mm-badge">
                     {(dealsByStage[stage] || []).length}
                   </div>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {(dealsByStage[stage] || []).length > 0 ? (
                     (dealsByStage[stage] || []).map((deal) => (
                       <div
                         key={deal.id || `${stage}-${deal.title}`}
-                        className="bg-background border border-border rounded-xl p-3 space-y-2"
+                        className="bg-card border border-border rounded-md p-2.5 space-y-2"
                       >
-                        <div className="font-medium text-sm text-foreground">{deal.title || "Untitled"}</div>
+                        <div className="font-medium text-[13px] text-foreground">{deal.title || "Untitled"}</div>
                         {deal.contact?.name ? (
                           <div className="text-xs text-muted-foreground">{deal.contact.name}</div>
                         ) : null}
                         <div className="flex justify-between items-center gap-2">
-                          <div className="text-sm text-emerald-400 tabular-nums">
+                          <div className="text-[13px] text-foreground tabular-nums">
                             {deal.value != null ? money(deal.value) : "—"}
                           </div>
-                          <div className="flex gap-2 flex-wrap">
+                          <div className="flex gap-1.5 flex-wrap">
                             <Link
                               href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
-                              className="min-h-10 inline-flex items-center px-3 py-2 bg-primary/20 text-primary rounded-xl text-xs touch-manipulation"
+                              className="mm-btn mm-btn-secondary h-9 min-h-9 px-2.5 text-xs touch-manipulation"
                               title="Create Sales Order"
                             >
                               SO
@@ -482,14 +484,14 @@ export default function DealsPage() {
                             <button
                               type="button"
                               onClick={() => openEdit(deal)}
-                              className="min-h-10 px-3 py-2 bg-white/10 rounded-xl text-xs touch-manipulation"
+                              className="mm-btn mm-btn-secondary h-9 min-h-9 px-2.5 text-xs touch-manipulation"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDelete(deal.id, deal.title)}
-                              className="min-h-10 px-3 py-2 text-red-400 border border-red-900/50 rounded-xl text-xs touch-manipulation"
+                              className="mm-btn mm-btn-danger h-9 min-h-9 px-2.5 text-xs touch-manipulation"
                             >
                               Del
                             </button>
@@ -519,7 +521,7 @@ export default function DealsPage() {
                               await loadDeals({ silent: true });
                             }
                           }}
-                          className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-xs text-foreground min-h-10"
+                          className="mm-input w-full text-xs"
                           aria-label={`Change stage for ${deal.title}`}
                         >
                           {STAGES.map((s) => (
@@ -529,8 +531,8 @@ export default function DealsPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="text-center text-muted-foreground text-xs py-6 px-2">
-                      No deals in this stage
+                    <div className="mm-empty py-6">
+                      <p className="mm-secondary">No deals in this stage</p>
                     </div>
                   )}
                 </div>
@@ -540,7 +542,7 @@ export default function DealsPage() {
 
           {/* Tablet/desktop: horizontal scroll for 15-status pipeline */}
           <div className="hidden md:block overflow-x-auto pb-2">
-            <div className="flex gap-3 min-w-max">
+            <div className="flex gap-2.5 min-w-max">
             {STAGES.map((stage) => (
               <div
                 key={stage}
@@ -550,43 +552,43 @@ export default function DealsPage() {
                     stageColRefs.current[stage] = el;
                   }
                 }}
-                className={`bg-card border rounded-2xl p-3 min-h-[400px] w-[200px] shrink-0 ${
+                className={`mm-card p-2.5 min-h-[400px] w-[200px] shrink-0 ${
                   highlightStage === stage
-                    ? "border-violet-500/60 ring-2 ring-violet-500/30"
-                    : "border-border"
+                    ? "border-primary ring-1 ring-primary/20"
+                    : ""
                 }`}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, stage)}
               >
-                <div className="flex items-center justify-between mb-3 px-1 gap-1">
-                  <div className="text-xs font-semibold text-foreground leading-tight">
+                <div className="flex items-center justify-between mb-2 px-0.5 gap-1">
+                  <div className="mm-section-title text-xs leading-tight">
                     {stageLabel(stage)}
                   </div>
-                  <div className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
+                  <div className="mm-badge shrink-0">
                     {(dealsByStage[stage] || []).length}
                   </div>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {(dealsByStage[stage] || []).length > 0 ? (
                     (dealsByStage[stage] || []).map((deal) => (
                       <div
                         key={deal.id || `${stage}-${deal.title}`}
                         draggable
                         onDragStart={(e) => handleDragStart(e, deal.id)}
-                        className="bg-background border border-border rounded-xl p-3 cursor-grab active:cursor-grabbing hover:border-border"
+                        className="bg-card border border-border rounded-md p-2.5 cursor-grab active:cursor-grabbing hover:border-border"
                       >
-                        <div className="font-medium text-sm text-foreground mb-1.5">{deal.title || "Untitled"}</div>
+                        <div className="font-medium text-[13px] text-foreground mb-1">{deal.title || "Untitled"}</div>
                         {deal.contact?.name ? (
-                          <div className="text-xs text-muted-foreground mb-2">{deal.contact.name}</div>
+                          <div className="text-xs text-muted-foreground mb-1.5">{deal.contact.name}</div>
                         ) : null}
                         <div className="flex justify-between items-center text-xs">
-                          <div className="text-emerald-400">
+                          <div className="text-foreground tabular-nums">
                             {deal.value != null ? money(deal.value) : "-"}
                           </div>
-                          <div className="flex gap-1.5">
+                          <div className="flex gap-1">
                             <Link
                               href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
-                              className="px-2 py-0.5 bg-primary/20 text-primary rounded text-[10px]"
+                              className="mm-btn mm-btn-secondary h-7 min-h-7 px-1.5 text-[10px]"
                               title="Create Sales Order"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -595,14 +597,14 @@ export default function DealsPage() {
                             <button
                               type="button"
                               onClick={() => openEdit(deal)}
-                              className="px-2 py-0.5 bg-white/5 hover:bg-white/10 rounded text-[10px]"
+                              className="mm-btn mm-btn-secondary h-7 min-h-7 px-1.5 text-[10px]"
                             >
                               Edit
                             </button>
                             <button
                               type="button"
                               onClick={() => handleDelete(deal.id, deal.title)}
-                              className="px-2 py-0.5 text-red-400 hover:bg-red-950/50 rounded text-[10px]"
+                              className="mm-btn mm-btn-danger h-7 min-h-7 px-1.5 text-[10px]"
                             >
                               Del
                             </button>
@@ -611,8 +613,8 @@ export default function DealsPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="text-center text-muted-foreground text-xs py-8 px-2">
-                      Drop deals here
+                    <div className="mm-empty py-8">
+                      <p className="mm-secondary">Drop deals here</p>
                     </div>
                   )}
                 </div>
@@ -624,43 +626,43 @@ export default function DealsPage() {
       ) : (
         <>
           {/* Mobile list cards */}
-          <div className="md:hidden space-y-3">
+          <div className="md:hidden space-y-2.5">
             {filteredDeals.map((deal) => (
               <div
                 key={deal.id}
-                className="bg-card border border-border rounded-2xl p-4 space-y-3"
+                className="mm-card p-3 space-y-2.5"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-medium text-foreground truncate">{deal.title || "Untitled"}</div>
-                    <div className="text-sm text-muted-foreground mt-0.5">{deal.contact?.name || "—"}</div>
+                    <div className="font-medium text-[13px] text-foreground truncate">{deal.title || "Untitled"}</div>
+                    <div className="mm-secondary mt-0.5">{deal.contact?.name || "—"}</div>
                   </div>
-                  <span className="shrink-0 px-2.5 py-0.5 text-xs rounded-full bg-white/10">
+                  <span className="mm-badge shrink-0">
                     {stageLabel(deal.stage)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-emerald-400 tabular-nums">
+                  <span className="text-[13px] text-foreground tabular-nums">
                     {deal.value != null ? money(deal.value) : "—"}
                   </span>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-1.5 flex-wrap">
                     <Link
                       href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
-                      className="min-h-10 inline-flex items-center px-3 py-2 text-xs bg-primary/20 text-primary rounded-xl touch-manipulation"
+                      className="mm-btn mm-btn-secondary h-9 min-h-9 px-2.5 text-xs touch-manipulation"
                     >
                       SO
                     </Link>
                     <button
                       type="button"
                       onClick={() => openEdit(deal)}
-                      className="min-h-10 px-3 py-2 text-xs bg-white/10 rounded-xl touch-manipulation"
+                      className="mm-btn mm-btn-secondary h-9 min-h-9 px-2.5 text-xs touch-manipulation"
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(deal.id, deal.title)}
-                      className="min-h-10 px-3 py-2 text-xs text-red-400 border border-red-900/50 rounded-xl touch-manipulation"
+                      className="mm-btn mm-btn-danger h-9 min-h-9 px-2.5 text-xs touch-manipulation"
                     >
                       Delete
                     </button>
@@ -671,36 +673,36 @@ export default function DealsPage() {
           </div>
 
           {/* Desktop table */}
-          <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="hidden md:block mm-table-wrap">
             <div className="table-scroll">
               <table className="mm-table min-w-[640px]">
-                <thead className="border-b border-border text-muted-foreground">
+                <thead>
                   <tr>
-                    <th className="text-left p-4">Title</th>
-                    <th className="text-left p-4">Contact</th>
-                    <th className="text-left p-4">Stage</th>
-                    <th className="text-left p-4">Value</th>
-                    <th className="text-right p-4">Actions</th>
+                    <th>Title</th>
+                    <th>Contact</th>
+                    <th>Stage</th>
+                    <th>Value</th>
+                    <th className="text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody>
                   {filteredDeals.map((deal) => (
-                    <tr key={deal.id} className="hover:bg-muted/50">
-                      <td className="p-4 font-medium text-foreground">{deal.title || "Untitled"}</td>
-                      <td className="p-4 text-muted-foreground">{deal.contact?.name || "-"}</td>
-                      <td className="p-4">
-                        <span className="px-2 py-0.5 text-xs rounded bg-white/10">{stageLabel(deal.stage)}</span>
+                    <tr key={deal.id}>
+                      <td className="font-medium text-foreground">{deal.title || "Untitled"}</td>
+                      <td className="text-muted-foreground">{deal.contact?.name || "-"}</td>
+                      <td>
+                        <span className="mm-badge">{stageLabel(deal.stage)}</span>
                       </td>
-                      <td className="p-4 text-emerald-400">{deal.value != null ? money(deal.value) : "-"}</td>
-                      <td className="p-4 text-right space-x-2">
+                      <td className="text-foreground tabular-nums">{deal.value != null ? money(deal.value) : "-"}</td>
+                      <td className="text-right space-x-1.5">
                         <Link
                           href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
-                          className="px-3 py-1 text-xs bg-primary/20 text-primary hover:bg-primary/30 rounded inline-block"
+                          className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs inline-flex"
                         >
                           SO
                         </Link>
-                        <button type="button" onClick={() => openEdit(deal)} className="px-3 py-1 text-xs bg-white/10 hover:bg-white/20 rounded">Edit</button>
-                        <button type="button" onClick={() => handleDelete(deal.id, deal.title)} className="px-3 py-1 text-xs text-red-400 hover:bg-red-950/50 rounded border border-red-900/50">Delete</button>
+                        <button type="button" onClick={() => openEdit(deal)} className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs">Edit</button>
+                        <button type="button" onClick={() => handleDelete(deal.id, deal.title)} className="mm-btn mm-btn-danger h-8 min-h-8 px-2.5 text-xs">Delete</button>
                       </td>
                     </tr>
                   ))}
@@ -712,35 +714,35 @@ export default function DealsPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto p-4 sm:p-6 safe-bottom">
-            <h2 className="text-xl font-semibold mb-6">{editingDeal ? "Edit Deal" : "New Deal"}</h2>
-            <form onSubmit={handleSubmit} className="space-y-4 adaptive-form">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="mm-card rounded-t-lg sm:rounded-lg w-full sm:max-w-md max-h-[92dvh] overflow-y-auto p-4 sm:p-5 safe-bottom">
+            <h2 className="mm-section-title text-base mb-4">{editingDeal ? "Edit Deal" : "New Deal"}</h2>
+            <form onSubmit={handleSubmit} className="space-y-3 adaptive-form">
               <div>
-                <label className="block text-sm text-muted-foreground mb-1">Title *</label>
+                <label className="mm-label">Title *</label>
                 <input
                   value={formData.title}
                   onChange={(e) => handleChange("title", e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+                  className="mm-input"
                   required
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-muted-foreground mb-1">Value</label>
+                  <label className="mm-label">Value</label>
                   <CurrencyAmountInput
                     value={formData.value}
                     onValueChange={(raw) => handleChange("value", raw)}
-                    className="w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+                    className="mm-input"
                     placeholder="e.g. 1,00,000"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-muted-foreground mb-1">Stage</label>
+                  <label className="mm-label">Stage</label>
                   <select
                     value={formData.stage}
                     onChange={(e) => handleChange("stage", e.target.value)}
-                    className="w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm min-h-11"
+                    className="mm-input"
                   >
                     {STAGES.map((s) => (
                       <option key={s} value={s}>{STAGE_LABELS[s]}</option>
@@ -749,17 +751,17 @@ export default function DealsPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-muted-foreground mb-1">Deal summary notes</label>
+                <label className="mm-label">Deal summary notes</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => handleChange("notes", e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 sm:py-2 text-base sm:text-sm h-24"
+                  className="mm-input h-24"
                   placeholder="Short notes saved on this deal record"
                 />
               </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeModal} className="flex-1 min-h-11 px-5 py-2.5 bg-white/10 border border-white/20 rounded-xl text-sm touch-manipulation">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className="flex-1 min-h-11 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-medium disabled:opacity-50 touch-manipulation">
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1 touch-manipulation">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className={`mm-btn mm-btn-primary flex-1 touch-manipulation ${isSubmitting ? "mm-btn-loading" : ""}`}>
                   {isSubmitting ? "Saving..." : "Save"}
                 </button>
               </div>

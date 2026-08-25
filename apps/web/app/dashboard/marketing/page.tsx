@@ -103,134 +103,122 @@ export default function MarketingAIPage() {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-x-hidden pb-24 md:pb-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-5 lg:py-6 overflow-x-hidden pb-20 md:pb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Marketing AI</h1>
-          <p className="text-muted-foreground mt-1">Generate targeted marketing content powered by AI</p>
+          <h1 className="mm-page-title">Marketing AI</h1>
+          <p className="mm-secondary mt-1">Generate targeted marketing content powered by AI</p>
         </div>
       </div>
 
-      {/* Input Form */}
-      <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 mb-8">
-        <h2 className="text-xl font-semibold mb-6">Marketing Brief</h2>
+      <div className="mm-card p-4 sm:p-5 mb-4">
+        <h2 className="text-sm font-semibold mb-3">Marketing Brief</h2>
 
-        <form onSubmit={handleGenerate} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleGenerate} className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Business Name *</label>
+              <label className="mm-label">Business Name *</label>
               <input
                 type="text"
                 value={formData.businessName}
                 onChange={(e) => handleChange("businessName", e.target.value)}
                 placeholder="Acme Coffee Co."
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/30"
+                className="mm-input"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Industry *</label>
+              <label className="mm-label">Industry *</label>
               <input
                 type="text"
                 value={formData.industry}
                 onChange={(e) => handleChange("industry", e.target.value)}
                 placeholder="Coffee / Food & Beverage"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/30"
+                className="mm-input"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Location</label>
+              <label className="mm-label">Location</label>
               <input
                 type="text"
                 value={formData.location}
                 onChange={(e) => handleChange("location", e.target.value)}
                 placeholder="San Francisco, CA"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/30"
+                className="mm-input"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-2">Target Audience *</label>
+              <label className="mm-label">Target Audience *</label>
               <input
                 type="text"
                 value={formData.targetAudience}
                 onChange={(e) => handleChange("targetAudience", e.target.value)}
                 placeholder="Young professionals aged 25-35 who value quality coffee"
-                className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/30"
+                className="mm-input"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-2">Business Goal *</label>
+            <label className="mm-label">Business Goal *</label>
             <textarea
               value={formData.goal}
               onChange={(e) => handleChange("goal", e.target.value)}
               placeholder="Increase brand awareness and drive more foot traffic to our new location"
               rows={3}
-              className="w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-white/30 resize-y"
+              className="mm-input resize-y"
               required
             />
           </div>
 
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="submit"
               disabled={isGenerating}
-              className="w-full sm:w-auto px-8 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary-hover focus-ring button-active transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className={`mm-btn mm-btn-primary w-full sm:w-auto focus-ring ${isGenerating ? "mm-btn-loading" : ""}`}
             >
-              {isGenerating ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
-                  Generating Marketing Content...
-                </>
-              ) : (
-                "Generate Marketing Content"
-              )}
+              {isGenerating ? "Generating Marketing Content..." : "Generate Marketing Content"}
             </button>
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="mm-secondary mt-2">
               This will use AI to create personalized reel ideas, ad copies, hashtags, and a 30-day plan.
             </p>
           </div>
         </form>
       </div>
 
-      {/* Results */}
       {isGenerating && (
-        <div className="space-y-6 animate-pulse">
-          <div className="h-8 bg-muted rounded w-48" />
+        <div className="space-y-3 animate-pulse">
+          <div className="h-6 bg-muted rounded w-40" />
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-card border border-border rounded-2xl p-6 h-48" />
+            <div key={i} className="mm-card p-4 h-36" />
           ))}
         </div>
       )}
 
       {result && !isGenerating && (
-        <div className="space-y-8">
-          {/* Used Inputs Summary */}
+        <div className="space-y-5">
           {usedInputs && (
-            <div className="text-sm text-muted-foreground">
+            <div className="mm-secondary">
               Generated for: <span className="text-foreground font-medium">{usedInputs.businessName}</span> • {usedInputs.industry}
             </div>
           )}
 
-          {/* Reel Ideas */}
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-semibold tracking-tight">Reel Ideas</h2>
-              <span className="text-xs px-3 py-1 bg-white/10 text-white/60 rounded-full">{result.reelIdeas.length} ideas</span>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold tracking-tight">Reel Ideas</h2>
+              <span className="mm-badge">{result.reelIdeas.length} ideas</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {result.reelIdeas.map((idea, index) => (
-                <div key={index} className="bg-card border border-border rounded-2xl p-5 hover:border-border transition-colors">
-                  <div className="font-semibold text-foreground mb-2">{idea.title}</div>
-                  <p className="text-sm text-muted-foreground mb-3">{idea.description}</p>
-                  <div className="text-xs text-emerald-400 font-mono bg-background px-3 py-1.5 rounded-lg border border-border">
+                <div key={index} className="mm-card p-3.5">
+                  <div className="text-[13px] font-semibold text-foreground mb-1.5">{idea.title}</div>
+                  <p className="mm-secondary mb-2">{idea.description}</p>
+                  <div className="text-xs font-mono bg-muted px-2.5 py-1.5 rounded border border-border text-foreground">
                     Hook: {idea.hook}
                   </div>
                 </div>
@@ -238,24 +226,23 @@ export default function MarketingAIPage() {
             </div>
           </section>
 
-          {/* Ad Copies */}
           <section>
-            <h2 className="text-2xl font-semibold tracking-tight mb-4">Ad Copies</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <h2 className="text-sm font-semibold tracking-tight mb-3">Ad Copies</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
               {(["facebook", "instagram", "google"] as const).map((platform) => (
-                <div key={platform} className="bg-card border border-border rounded-2xl p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="font-semibold capitalize">{platform} Ads</div>
+                <div key={platform} className="mm-card p-3.5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-[13px] font-semibold capitalize">{platform} Ads</div>
                     <button
                       onClick={() => copyToClipboard(result.adCopies[platform].join("\n\n"), `${platform} ad copies`)}
-                      className="text-xs px-2.5 py-1 bg-white/5 hover:bg-white/10 rounded-md transition-colors"
+                      className="mm-btn mm-btn-ghost h-8 min-h-8 px-2 text-xs"
                     >
                       Copy All
                     </button>
                   </div>
-                  <div className="space-y-4 text-sm">
+                  <div className="space-y-2 text-[13px]">
                     {result.adCopies[platform].map((copy, idx) => (
-                      <div key={idx} className="bg-background border border-border p-3 rounded-xl text-muted-foreground leading-relaxed">
+                      <div key={idx} className="bg-muted border border-border p-2.5 rounded-md text-muted-foreground leading-relaxed">
                         {copy}
                       </div>
                     ))}
@@ -265,23 +252,22 @@ export default function MarketingAIPage() {
             </div>
           </section>
 
-          {/* Hashtags */}
           <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-semibold tracking-tight">Hashtags</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold tracking-tight">Hashtags</h2>
               <button
                 onClick={copyAllHashtags}
-                className="text-xs px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition-colors"
+                className="mm-btn mm-btn-ghost h-8 min-h-8 px-2.5 text-xs"
               >
                 Copy All
               </button>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {result.hashtags.map((tag, index) => (
                 <button
                   key={index}
                   onClick={() => copyToClipboard(tag, "Hashtag")}
-                  className="px-3 py-1.5 bg-card border border-border hover:border-white/30 rounded-full text-sm text-muted-foreground transition-colors"
+                  className="mm-badge hover:border-border"
                 >
                   {tag}
                 </button>
@@ -289,35 +275,34 @@ export default function MarketingAIPage() {
             </div>
           </section>
 
-          {/* 30-Day Marketing Plan */}
           <section>
-            <h2 className="text-2xl font-semibold tracking-tight mb-4">30-Day Marketing Plan</h2>
+            <h2 className="text-sm font-semibold tracking-tight mb-3">30-Day Marketing Plan</h2>
 
-            <div className="bg-card border border-border rounded-2xl p-6 mb-6">
-              <div className="text-sm text-muted-foreground mb-2">STRATEGY OVERVIEW</div>
-              <p className="text-foreground leading-relaxed">{result.marketingPlan.overview}</p>
+            <div className="mm-card p-4 mb-3">
+              <div className="mm-secondary mb-1.5 uppercase tracking-wide">Strategy overview</div>
+              <p className="text-[13px] text-foreground leading-relaxed">{result.marketingPlan.overview}</p>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-2.5">
               {result.marketingPlan.weeks.map((week) => (
-                <div key={week.week} className="bg-card border border-border rounded-2xl p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="text-xs font-mono bg-white/10 text-foreground px-2.5 py-1 rounded">WEEK {week.week}</div>
-                    <div className="font-semibold text-lg">{week.focus}</div>
+                <div key={week.week} className="mm-card p-4">
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <span className="mm-badge mm-badge-primary font-mono">WEEK {week.week}</span>
+                    <div className="text-[13px] font-semibold">{week.focus}</div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[13px]">
                     <div>
-                      <div className="text-muted-foreground text-xs tracking-widest mb-2">CHANNELS</div>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="mm-secondary uppercase tracking-wide mb-1.5">Channels</div>
+                      <div className="flex flex-wrap gap-1">
                         {week.channels.map((ch, i) => (
-                          <span key={i} className="px-2 py-0.5 bg-muted rounded text-xs">{ch}</span>
+                          <span key={i} className="mm-badge">{ch}</span>
                         ))}
                       </div>
                     </div>
 
                     <div>
-                      <div className="text-muted-foreground text-xs tracking-widest mb-2">KEY TASKS</div>
+                      <div className="mm-secondary uppercase tracking-wide mb-1.5">Key tasks</div>
                       <ul className="space-y-1 text-muted-foreground">
                         {week.tasks.map((task, i) => (
                           <li key={i} className="flex gap-2">• {task}</li>
@@ -326,8 +311,8 @@ export default function MarketingAIPage() {
                     </div>
 
                     <div>
-                      <div className="text-muted-foreground text-xs tracking-widest mb-2">KPIs</div>
-                      <ul className="space-y-1 text-emerald-400 text-sm">
+                      <div className="mm-secondary uppercase tracking-wide mb-1.5">KPIs</div>
+                      <ul className="space-y-1 text-muted-foreground">
                         {week.kpis.map((kpi, i) => (
                           <li key={i}>→ {kpi}</li>
                         ))}
@@ -339,13 +324,13 @@ export default function MarketingAIPage() {
             </div>
           </section>
 
-          <div className="text-center pt-4">
+          <div className="text-center pt-2">
             <button
               onClick={() => {
                 setResult(null);
                 setUsedInputs(null);
               }}
-              className="text-sm text-muted-foreground hover:text-foreground underline"
+              className="mm-btn mm-btn-ghost text-xs underline"
             >
               Generate new content
             </button>

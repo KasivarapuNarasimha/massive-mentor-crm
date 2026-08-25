@@ -138,7 +138,7 @@ export default function ErpInventoryPage() {
 
       <form
         onSubmit={adjust}
-        className="rounded-2xl border border-border/80 bg-card/60 p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+        className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
       >
         <h2 className="sm:col-span-2 lg:col-span-3 text-sm font-semibold">Manual adjustment</h2>
         <select
@@ -197,7 +197,7 @@ export default function ErpInventoryPage() {
         </button>
       </form>
 
-      <div className="mt-6 rounded-2xl border border-border/80 bg-card/50 overflow-hidden">
+      <div className="mt-6 mm-card overflow-hidden">
         <div className="px-4 py-3 border-b border-border/70">
           <h2 className="text-sm font-semibold">Balances</h2>
         </div>
@@ -225,7 +225,7 @@ export default function ErpInventoryPage() {
                   return (
                     <tr
                       key={b.id || `${b.product?.id}-${b.warehouse?.id}-${i}`}
-                      className="border-t border-border/60"
+                      className="border-t border-border"
                     >
                       <td className="px-4 py-2">
                         <div className="font-medium">{b.product?.name || "—"}</div>
@@ -254,7 +254,7 @@ export default function ErpInventoryPage() {
         )}
       </div>
 
-      <div className="mt-6 rounded-2xl border border-border/80 bg-card/50 overflow-hidden">
+      <div className="mt-6 mm-card overflow-hidden">
         <div className="px-4 py-3 border-b border-border/70">
           <h2 className="text-sm font-semibold">Stock movements</h2>
         </div>
@@ -275,7 +275,7 @@ export default function ErpInventoryPage() {
                   {m.notes ? <div className="text-xs text-muted-foreground mt-0.5">{m.notes}</div> : null}
                 </div>
                 <span
-                  className={`font-semibold tabular-nums ${num(m.qty) < 0 ? "text-red-300" : "text-emerald-400"}`}
+                  className={`font-semibold tabular-nums ${num(m.qty) < 0 ? "text-red-300" : "text-emerald-700 dark:text-emerald-400"}`}
                 >
                   {num(m.qty) > 0 ? "+" : ""}
                   {num(m.qty)}

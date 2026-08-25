@@ -112,12 +112,12 @@ export default function AIMentorPage() {
 
   if (isLoadingHistory) {
     return (
-      <div className="flex h-[calc(100dvh-8rem)] md:h-[calc(100dvh-4rem)] flex-col max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 overflow-x-hidden pb-20 md:pb-6">
+      <div className="flex h-[calc(100dvh-8rem)] md:h-[calc(100dvh-4rem)] flex-col max-w-4xl mx-auto px-3 sm:px-6 py-3 sm:py-4 overflow-x-hidden pb-20 md:pb-4">
         {/* Header skeleton */}
-        <div className="border-b border-border py-4">
+        <div className="border-b border-border py-3">
           <div className="flex items-center justify-between">
             <div>
-              <Skeleton className="h-6 w-28 mb-1" />
+              <Skeleton className="h-5 w-28 mb-1" />
               <Skeleton className="h-3 w-64" />
             </div>
             <Skeleton className="h-4 w-28" />
@@ -125,10 +125,10 @@ export default function AIMentorPage() {
         </div>
 
         {/* Chat area skeleton */}
-        <div className="flex-1 overflow-y-auto py-6 space-y-6 bg-background">
+        <div className="flex-1 overflow-y-auto py-4 space-y-3 bg-background">
           {[1, 2, 3].map((i) => (
             <div key={i} className={`flex ${i % 2 === 0 ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[70%] rounded-2xl px-5 py-3 ${i % 2 === 0 ? "bg-white/10" : "bg-card border border-border"}`}>
+              <div className={`max-w-[70%] rounded-lg px-3.5 py-2.5 ${i % 2 === 0 ? "bg-muted" : "mm-card"}`}>
                 <Skeleton className="h-3 w-48 mb-1.5" />
                 <Skeleton className="h-3 w-32" />
               </div>
@@ -137,10 +137,10 @@ export default function AIMentorPage() {
         </div>
 
         {/* Input skeleton */}
-        <div className="border-t border-border p-4 bg-background">
-          <div className="flex gap-3">
-            <Skeleton className="flex-1 h-12 rounded-2xl" />
-            <Skeleton className="h-12 w-20 rounded-2xl" />
+        <div className="border-t border-border p-3 bg-background">
+          <div className="flex gap-2">
+            <Skeleton className="flex-1 h-9 rounded-lg" />
+            <Skeleton className="h-9 w-16 rounded-lg" />
           </div>
         </div>
       </div>
@@ -148,41 +148,41 @@ export default function AIMentorPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-8rem)] md:h-[calc(100dvh-4rem)] flex-col max-w-4xl mx-auto px-3 sm:px-6 py-4 sm:py-6 overflow-x-hidden pb-20 md:pb-6">
+    <div className="flex h-[calc(100dvh-8rem)] md:h-[calc(100dvh-4rem)] flex-col max-w-4xl mx-auto px-3 sm:px-6 py-3 sm:py-4 overflow-x-hidden pb-20 md:pb-4">
       {/* Header */}
-      <div className="border-b border-border py-4">
-        <div className="flex items-center justify-between">
+      <div className="border-b border-border py-3">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">AI Mentor</h1>
-            <p className="text-sm text-muted-foreground">Personalized business advice powered by Massive Mentor AI</p>
+            <h1 className="mm-page-title">AI Mentor</h1>
+            <p className="mm-secondary mt-0.5">Personalized business advice powered by Massive Mentor AI</p>
           </div>
-          <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground focus-ring" aria-label="Back to dashboard overview">
+          <Link href="/dashboard" className="mm-secondary hover:text-foreground focus-ring shrink-0" aria-label="Back to dashboard overview">
             ← Back to Dashboard
           </Link>
         </div>
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto py-6 space-y-6 bg-background">
+      <div className="flex-1 overflow-y-auto py-4 space-y-3 bg-background">
         {messages.length === 0 && !isLoading && (
-          <div className="text-center py-12">
-            <div className="mx-auto w-16 h-16 bg-card rounded-2xl flex items-center justify-center mb-6">
-              <span className="text-3xl">💬</span>
+          <div className="text-center py-8">
+            <div className="mx-auto w-10 h-10 bg-muted rounded-lg flex items-center justify-center mb-3">
+              <span className="text-lg">💬</span>
             </div>
-            <h3 className="text-xl font-semibold mb-2">Welcome to your AI Mentor</h3>
-            <p className="text-muted-foreground max-w-md mx-auto mb-8">
+            <h3 className="text-base font-semibold mb-1">Welcome to your AI Mentor</h3>
+            <p className="mm-secondary max-w-md mx-auto mb-5">
               Ask anything about growing your business. I have access to your profile and will give personalized advice.
             </p>
 
             {/* Suggested Prompts */}
             <div className="max-w-lg mx-auto">
-              <p className="text-sm text-muted-foreground mb-3 text-left">Try asking:</p>
+              <p className="mm-secondary mb-2 text-left">Try asking:</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {SUGGESTED_PROMPTS.map((prompt, index) => (
                   <button
                     key={index}
                     onClick={() => handleSuggestedPrompt(prompt)}
-                    className="text-left px-4 py-3 bg-card hover:bg-muted border border-border rounded-xl text-sm transition-colors focus-ring focus-visible:border-white/30"
+                    className="text-left px-3 py-2.5 mm-card hover:bg-muted text-[13px] transition-colors focus-ring"
                   >
                     {prompt}
                   </button>
@@ -198,10 +198,10 @@ export default function AIMentorPage() {
             className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-5 py-3 text-sm leading-relaxed ${
+              className={`max-w-[80%] rounded-lg px-3.5 py-2.5 text-[13px] leading-relaxed ${
                 message.role === "user"
-                  ? "bg-primary text-primary-foreground rounded-br-none"
-                  : "bg-card border border-border text-foreground rounded-bl-none"
+                  ? "bg-muted text-foreground"
+                  : "mm-card text-foreground"
               }`}
             >
               {message.role === "assistant" ? (
@@ -209,11 +209,7 @@ export default function AIMentorPage() {
               ) : (
                 <div className="whitespace-pre-wrap">{message.content}</div>
               )}
-              <div
-                className={`text-[10px] mt-1.5 opacity-60 ${
-                  message.role === "user" ? "text-foreground" : "text-muted-foreground"
-                }`}
-              >
+              <div className="text-[10px] mt-1.5 mm-secondary opacity-80">
                 {formatTime(message.createdAt)}
               </div>
             </div>
@@ -222,8 +218,8 @@ export default function AIMentorPage() {
 
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-card border border-border rounded-2xl rounded-bl-none px-5 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="mm-card rounded-lg px-3.5 py-2.5">
+              <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                   <div className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -239,20 +235,20 @@ export default function AIMentorPage() {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-border p-4 sm:p-6 bg-background">
-        <form onSubmit={handleSubmit} className="flex gap-3">
+      <div className="border-t border-border p-3 bg-background">
+        <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask your AI Mentor anything about your business..."
             disabled={isLoading}
-            className="flex-1 bg-card border border-border rounded-2xl px-5 py-3 text-sm focus:outline-none focus:border-border focus:ring-1 focus:ring-white/30 disabled:opacity-60"
+            className="mm-input flex-1"
           />
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="px-6 py-3 bg-primary text-primary-foreground rounded-2xl font-medium hover:bg-primary-hover focus-ring button-active transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mm-btn mm-btn-primary focus-ring"
           >
             Send
           </button>

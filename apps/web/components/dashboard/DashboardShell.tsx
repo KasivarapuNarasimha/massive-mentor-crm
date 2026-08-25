@@ -25,9 +25,9 @@ import { canAccessPath, filterNavByModules } from "@/lib/module-permissions";
 import { NAV_HIERARCHY, findActiveSubModuleId, type NavMainKey } from "@/lib/nav-hierarchy";
 import { FeatureSearch } from "@/components/dashboard/FeatureSearch";
 
-/** Layout chrome heights — keep FieldStatusBar at h-12 (3rem) */
-const NAV_H = "3.5rem"; // h-14
-const FIELD_BAR_H = "3rem"; // h-12
+/** Layout chrome heights — enterprise density (header ~56px) */
+const NAV_H = "3.5rem"; // 56px
+const FIELD_BAR_H = "2.75rem"; // 44px — slightly denser strip
 const DEMO_BANNER_H = "2rem";
 
 interface NavItem {
@@ -964,7 +964,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           {item.label}
         </span>
         {item.badge != null && item.badge !== "" && !sidebarCollapsed && (
-          <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded-md bg-white/10 text-muted-foreground shrink-0">
+          <span className="text-[10px] tabular-nums px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0 border border-border">
             {item.badge}
           </span>
         )}
@@ -1055,20 +1055,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     if (!visibleSubs.length) return null;
 
     return (
-      <div className="mb-4">
+      <div className="mb-3">
         {!sidebarCollapsed && (
-          <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2 px-1">
+          <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-1.5 px-1">
             {main.label}
           </div>
         )}
         {sidebarCollapsed && (
           <div
-            className="hidden lg:block mx-auto mb-2 h-px w-6 bg-border/80"
+            className="hidden lg:block mx-auto mb-1.5 h-px w-5 bg-border"
             aria-hidden
             title={main.label}
           />
         )}
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           {visibleSubs.map(({ sub, features }) => {
             const expanded = isSubExpanded(sub.id);
             // Collapsed rail: show feature icons flat (no accordion chrome)
@@ -1080,14 +1080,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               );
             }
             return (
-              <div key={sub.id} className="rounded-xl">
+              <div key={sub.id} className="rounded-md">
                 <button
                   type="button"
                   onClick={() => toggleSubModule(sub.id)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] font-semibold tracking-wide transition-colors focus-ring ${
+                  className={`w-full flex items-center gap-2 px-2 py-1 rounded-md text-[11px] font-semibold tracking-wide transition-colors focus-ring ${
                     expanded || features.some((f) => isActive(f.href))
-                      ? "text-foreground bg-muted/40"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                      ? "text-foreground bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/70"
                   }`}
                   aria-expanded={expanded}
                 >
@@ -1106,12 +1106,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                     />
                   </svg>
                   <span className="flex-1 text-left truncate">{sub.label}</span>
-                  <span className="text-[10px] tabular-nums text-muted-foreground/80">
+                  <span className="text-[10px] tabular-nums text-muted-foreground">
                     {features.length}
                   </span>
                 </button>
                 {expanded && (
-                  <div className="mt-0.5 ml-1 pl-2 border-l border-border/60 space-y-0.5">
+                  <div className="mt-0.5 ml-1 pl-2 border-l border-border space-y-0.5">
                     {features.map(renderNavLink)}
                   </div>
                 )}
@@ -1240,15 +1240,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </div>
       {/* Top Navigation — z-50 above location strip */}
       <nav
-        className="fixed left-0 right-0 z-50 border-b border-border/90 bg-background/90 backdrop-blur-xl safe-x shadow-sm shadow-black/10"
+        className="fixed left-0 right-0 z-50 border-b border-border bg-white dark:bg-card safe-x"
         style={{ top: navTop, height: NAV_H }}
         aria-label="Top navigation"
       >
-        <div className="max-w-[1600px] mx-auto px-3 sm:px-6 h-full flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        <div className="max-w-[1600px] mx-auto px-3 sm:px-5 h-full flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2.5 -ml-1 text-muted-foreground hover:text-foreground focus-ring rounded-xl touch-manipulation min-h-11 min-w-11 inline-flex items-center justify-center"
+              className="lg:hidden p-2 -ml-1 text-muted-foreground hover:text-foreground focus-ring rounded-md touch-manipulation min-h-9 min-w-9 inline-flex items-center justify-center"
               aria-label="Open menu"
               aria-expanded={sidebarOpen}
             >
@@ -1258,33 +1258,35 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </button>
             <Link
               href={portal?.homeRoute || "/dashboard"}
-              className="font-semibold tracking-tight text-base sm:text-xl truncate focus-ring rounded-lg"
+              className="inline-flex items-center gap-2 font-semibold tracking-tight text-[15px] truncate focus-ring rounded-md text-foreground"
             >
-              <span className="bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent sm:hidden">
-                MM
+              <span
+                className="hidden sm:inline-flex h-6 w-6 items-center justify-center rounded bg-primary text-primary-foreground text-[11px] font-bold shrink-0"
+                aria-hidden
+              >
+                M
               </span>
-              <span className="hidden sm:inline bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text text-transparent">
-                Massive Mentor
-              </span>
+              <span className="sm:hidden text-primary font-bold">MM</span>
+              <span className="hidden sm:inline">Massive Mentor</span>
             </Link>
             {portal?.portalLabel ? (
-              <div className="hidden sm:block text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400/90 border border-emerald-500/20 tracking-wide shrink-0 max-w-[160px] truncate font-medium">
+              <div className="hidden sm:block text-[10px] px-2 py-0.5 rounded border border-border bg-muted text-muted-foreground tracking-wide shrink-0 max-w-[160px] truncate font-medium">
                 {portal.portalLabel}
               </div>
             ) : (
-              <div className="hidden sm:block text-[10px] px-2.5 py-1 rounded-full bg-muted border border-border text-muted-foreground tracking-widest shrink-0">
+              <div className="hidden sm:block text-[10px] px-2 py-0.5 rounded border border-border bg-muted text-muted-foreground tracking-wide shrink-0 font-medium">
                 CRM
               </div>
             )}
             {/* Live plan / license badge — real customers only (hidden in Demo Mode) */}
             {!isDemoMode ? (
               <div
-                className={`hidden md:flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border tracking-wide shrink-0 font-semibold capitalize ${
+                className={`hidden md:inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded border tracking-wide shrink-0 font-semibold capitalize ${
                   isTrial
-                    ? "bg-sky-500/10 text-sky-300 border-sky-500/25"
+                    ? "mm-badge-primary"
                     : planStatus === "suspended" || licenseStatus === "expired"
-                      ? "bg-red-500/10 text-red-300 border-red-500/25"
-                      : "bg-violet-500/10 text-violet-200 border-violet-500/25"
+                      ? "mm-badge-danger"
+                      : "mm-badge-primary"
                 }`}
                 data-testid="plan-badge"
                 title={`Plan: ${plan || "—"} · Status: ${planStatus || "—"} · License: ${licenseStatus || "—"}`}
@@ -1296,7 +1298,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               </div>
             ) : (
               <div
-                className="hidden md:flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full border tracking-wide shrink-0 font-semibold border-sky-500/30 bg-sky-500/10 text-sky-200"
+                className="hidden md:inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded border tracking-wide shrink-0 font-semibold mm-badge-primary"
                 data-testid="demo-mode-badge"
               >
                 Demo
@@ -1304,7 +1306,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
 
-          <div className="relative flex items-center gap-2 sm:gap-3" ref={userMenuRef}>
+          <div className="relative flex items-center gap-1.5 sm:gap-2" ref={userMenuRef}>
             {/* System status — reuses cached health probe (no extra requests) */}
             <SystemStatusIndicator />
 
@@ -1322,7 +1324,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   value={workspaceRole || portal.role}
                   disabled={portalLoading}
                   onChange={(e) => setWorkspaceRole(e.target.value)}
-                  className="bg-card border border-border rounded-lg px-2.5 py-1.5 text-xs font-medium text-foreground max-w-[140px] lg:max-w-[200px] focus:outline-none focus:border-emerald-500/50 min-h-9"
+                  className="bg-card border border-border rounded-md px-2 py-1.5 text-xs font-medium text-foreground max-w-[140px] lg:max-w-[200px] focus:outline-none focus:border-primary min-h-8"
                   title="Switch entire portal workspace by role"
                   aria-label="Select role"
                 >
@@ -1345,7 +1347,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   ))}
                 </select>
                 {portal.isWorkspacePreview && (
-                  <span className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  <span className="hidden md:inline text-[10px] px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30">
                     Preview
                   </span>
                 )}
@@ -1356,7 +1358,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen(!notifOpen)}
-                className="p-2 text-muted-foreground hover:text-foreground relative min-h-11 min-w-11 inline-flex items-center justify-center"
+                className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted relative min-h-9 min-w-9 inline-flex items-center justify-center rounded-md"
                 aria-label="Notifications"
                 aria-expanded={notifOpen}
               >
@@ -1375,7 +1377,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 )}
               </button>
               {notifOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-card border border-border rounded-xl shadow-xl z-50 text-sm max-h-96 flex flex-col">
+                <div className="absolute right-0 mt-2 w-80 bg-card border border-border rounded-lg shadow-lg z-50 text-sm max-h-96 flex flex-col">
                   <div className="px-3 py-2 border-b border-border flex items-center justify-between shrink-0">
                     <span className="text-xs text-muted-foreground font-medium">
                       Notifications{unreadCount > 0 ? ` (${unreadCount} unread)` : ""}
@@ -1384,7 +1386,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       <button
                         type="button"
                         onClick={markAllRead}
-                        className="text-[11px] text-emerald-400 hover:text-emerald-300"
+                        className="text-[11px] text-primary hover:text-primary-hover"
                       >
                         Mark all read
                       </button>
@@ -1392,13 +1394,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   </div>
                   <div className="overflow-y-auto flex-1 p-1">
                     {notifError ? (
-                      <div className="p-4 text-center text-red-400/90 text-xs space-y-2">
+                      <div className="p-4 text-center text-destructive text-xs space-y-2">
                         <div>Could not load notifications.</div>
                         <div className="text-muted-foreground">{notifError}</div>
                         <button
                           type="button"
                           onClick={() => loadNotifs()}
-                          className="text-emerald-400 hover:text-emerald-300 underline"
+                          className="text-primary hover:text-primary-hover underline"
                         >
                           Retry
                         </button>
@@ -1420,16 +1422,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                           onClick={() => {
                             if (!n.isRead) markOneRead(n.id);
                           }}
-                          className={`w-full text-left p-2.5 rounded-lg mb-0.5 transition-colors ${
+                          className={`w-full text-left p-2.5 rounded-md mb-0.5 transition-colors ${
                             n.isRead
-                              ? "text-muted-foreground hover:bg-muted/50"
-                              : "bg-emerald-500/10 text-white hover:bg-emerald-500/15"
+                              ? "text-muted-foreground hover:bg-muted"
+                              : "bg-accent text-foreground hover:bg-accent/80"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <span className="font-medium text-xs">{title}</span>
                             {!n.isRead && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 mt-1" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1" />
                             )}
                           </div>
                           <div className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{message}</div>
@@ -1453,23 +1455,23 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 rounded-full focus-ring min-h-11 px-1"
+              className="flex items-center gap-2 rounded-md focus-ring min-h-9 px-1 hover:bg-muted"
               aria-haspopup="true"
               aria-expanded={userMenuOpen}
               aria-label="User menu"
               data-testid="user-menu"
             >
-              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium text-foreground ring-1 ring-border">
+              <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-foreground ring-1 ring-border">
                 {(user?.name || user?.email || "U")[0].toUpperCase()}
               </div>
-              <div className="hidden md:block text-sm text-muted-foreground max-w-[120px] truncate">
+              <div className="hidden md:block text-[13px] text-muted-foreground max-w-[120px] truncate">
                 {user?.name || user?.email}
               </div>
             </button>
 
             {userMenuOpen && (
               <div
-                className="absolute right-0 top-full mt-2 w-56 bg-card border border-border rounded-xl shadow-xl py-1 z-[70] text-sm"
+                className="absolute right-0 top-full mt-1.5 w-56 bg-card border border-border rounded-lg shadow-lg py-1 z-[70] text-sm"
                 role="menu"
                 aria-label="User menu"
                 data-testid="user-menu-dropdown"
@@ -1562,10 +1564,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           - Desktop (≥lg): permanent full sidebar
         */}
         <aside
-          className={`fixed lg:sticky lg:self-start left-0 z-30 border-r border-border/90 bg-sidebar/95 backdrop-blur-md transform transition-all duration-200 ease-out lg:translate-x-0 overflow-y-auto overscroll-contain ${
-            sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
-          } w-[min(100vw-3rem,18rem)] ${
-            sidebarCollapsed ? "lg:w-[4.25rem]" : "md:w-64 lg:w-64"
+          className={`fixed lg:sticky lg:self-start left-0 z-30 border-r border-border bg-white dark:bg-sidebar transform transition-all duration-200 ease-out lg:translate-x-0 overflow-y-auto overscroll-contain ${
+            sidebarOpen ? "translate-x-0 shadow-md" : "-translate-x-full"
+          } w-[min(100vw-3rem,14.5rem)] ${
+            sidebarCollapsed ? "lg:w-[3.5rem]" : "md:w-[14.5rem] lg:w-[14.5rem]"
           }`}
           style={{
             top: contentOffset,
@@ -1573,11 +1575,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           }}
           aria-label="Sidebar"
         >
-          <div className="h-full flex flex-col p-3 sm:p-4">
-            <div className={`pt-1 pb-4 ${sidebarCollapsed ? "lg:px-0" : "px-1"}`}>
-              <div className={`flex items-center justify-between gap-2 mb-3 ${sidebarCollapsed ? "lg:justify-center" : ""}`}>
+          <div className="h-full flex flex-col p-2.5 sm:p-3">
+            <div className={`pt-0.5 pb-3 ${sidebarCollapsed ? "lg:px-0" : "px-0.5"}`}>
+              <div className={`flex items-center justify-between gap-2 mb-2 ${sidebarCollapsed ? "lg:justify-center" : ""}`}>
                 <div
-                  className={`text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold ${
+                  className={`text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold ${
                     sidebarCollapsed ? "lg:hidden" : ""
                   }`}
                 >
@@ -1586,7 +1588,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={toggleSidebarCollapsed}
-                  className="hidden lg:inline-flex items-center justify-center h-8 w-8 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted focus-ring"
+                  className="hidden lg:inline-flex items-center justify-center h-7 w-7 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted focus-ring"
                   aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
                   title={sidebarCollapsed ? "Expand" : "Collapse"}
                 >
@@ -1602,7 +1604,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 </button>
               </div>
               {portal && !sidebarCollapsed && (
-                <div className="mb-3 px-3 py-2.5 rounded-xl bg-gradient-to-br from-white/[0.06] to-transparent border border-border/80 text-[11px] text-muted-foreground">
+                <div className="mb-2.5 px-2.5 py-2 rounded-md bg-background-secondary border border-border text-[11px] text-muted-foreground">
                   <div className="text-foreground font-medium truncate">{portal.businessName || portal.portalLabel}</div>
                   <div className="mt-0.5 truncate text-muted-foreground capitalize">
                     {portal.role?.replace(/_/g, " ")}
@@ -1612,7 +1614,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       value={workspaceRole || portal.role}
                       disabled={portalLoading}
                       onChange={(e) => setWorkspaceRole(e.target.value)}
-                      className="md:hidden mt-2 w-full bg-card border border-border rounded-lg px-2 py-2.5 text-xs text-foreground min-h-11"
+                      className="md:hidden mt-2 w-full bg-card border border-border rounded-md px-2 py-2 text-xs text-foreground min-h-9"
                       aria-label="Select role workspace"
                     >
                       {(portal.workspaceRoles?.length
@@ -1652,10 +1654,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
               {portal?.actions && portal.actions.length > 0 && !sidebarCollapsed && (
                 <>
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold mb-2 mt-6">
+                  <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold mb-1.5 mt-4">
                     Actions
                   </div>
-                  <div className="space-y-1 px-0.5">
+                  <div className="space-y-0.5 px-0.5">
                     {(() => {
                       const seen = new Set<string>();
                       return portal.actions
@@ -1670,7 +1672,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                             key={`action:${portal.role || "r"}:${a.key}`}
                             href={a.route || "/dashboard"}
                             onClick={() => setSidebarOpen(false)}
-                            className="block px-3 py-2 rounded-xl text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors focus-ring"
+                            className="block px-2.5 py-1.5 rounded-md text-xs font-medium bg-accent text-accent-foreground border border-border hover:bg-accent/80 transition-colors focus-ring"
                           >
                             {a.label}
                           </Link>
@@ -1684,8 +1686,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div
-              className={`mt-auto text-[10px] text-muted-foreground border-t border-border/80 pt-3 ${
-                sidebarCollapsed ? "lg:text-center lg:px-0" : "px-2"
+              className={`mt-auto text-[10px] text-muted-foreground border-t border-border pt-2.5 ${
+                sidebarCollapsed ? "lg:text-center lg:px-0" : "px-1.5"
               }`}
             >
               <span className={sidebarCollapsed ? "lg:hidden" : ""}>Massive Mentor</span>
@@ -1697,7 +1699,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         {/* Main content — starts below fixed chrome; pages use PageShell for title/KPI spacing */}
-        <main className="flex-1 min-w-0 w-full max-w-[1600px] mx-auto bg-background overflow-x-hidden lg:pl-0 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-6 mb-[4.5rem] md:mb-0">
+        <main className="flex-1 min-w-0 w-full max-w-[1600px] mx-auto bg-background overflow-x-hidden lg:pl-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-4 mb-[4rem] md:mb-0">
           {routeFeature && FEATURE_MIN_TIER[routeFeature] ? (
             <FeatureGate feature={routeFeature}>{children}</FeatureGate>
           ) : (
@@ -1721,24 +1723,24 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         Hidden on tablet+ (md) where drawer/sidebar is preferred.
       */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/98 backdrop-blur-md safe-bottom safe-x"
+        className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-card safe-bottom safe-x"
         aria-label="Mobile primary navigation"
       >
-        <div className="grid grid-cols-5 gap-0.5 px-1 pt-1 pb-1">
+        <div className="grid grid-cols-5 gap-0.5 px-1 pt-0.5 pb-0.5">
           {mobileTabs.map((item) => (
             <Link
               key={`tab:${item.href}`}
               href={item.href}
               onClick={(e) => onNavClick(e, item.href)}
-              className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-xl text-[10px] min-h-14 touch-manipulation ${
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 rounded-md text-[10px] min-h-12 touch-manipulation ${
                 isActive(item.href)
-                  ? "text-foreground bg-white/10"
+                  ? "text-primary bg-accent font-semibold"
                   : isRouteLocked(item.href)
-                    ? "text-muted-foreground"
-                    : "text-muted-foreground hover:text-muted-foreground"
+                    ? "text-muted-foreground opacity-60"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
-              <span className="scale-110">{item.icon}</span>
+              <span>{item.icon}</span>
               <span className="truncate max-w-full px-0.5">
                 {item.label.split(" ")[0]}
               </span>
@@ -1747,7 +1749,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-xl text-[10px] min-h-14 text-muted-foreground hover:text-muted-foreground touch-manipulation"
+            className="flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 rounded-md text-[10px] min-h-12 text-muted-foreground hover:text-foreground hover:bg-muted touch-manipulation"
             aria-label="More menu"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
