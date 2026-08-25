@@ -42,20 +42,27 @@ export default function DashboardLayout({
     }
     let cancelled = false;
     (async () => {
-      const res = await api.get<{
-        access: { allowed: boolean; reason?: string };
-      }>("/billing/access", token);
-      if (cancelled) return;
-      if (res.success && res.data?.access && !res.data.access.allowed) {
-        router.replace("/subscription-required");
-        return;
+      try {
+        const res = await api.get<{
+          access: { allowed: boolean; reason?: string };
+        }>("/billing/access", token);
+        if (cancelled) return;
+        if (res.success && res.data?.access && !res.data.access.allowed) {
+          setBillingChecked(true);
+          router.replace("/subscription-required");
+          return;
+        }
+        // 402 from API client may surface as error string
+        if (!res.success && (res.error || "").toLowerCase().includes("subscription")) {
+          setBillingChecked(true);
+          router.replace("/subscription-required");
+          return;
+        }
+      } catch {
+        // Network/transient errors must not trap the UI on the restore splash
+      } finally {
+        if (!cancelled) setBillingChecked(true);
       }
-      // 402 from API client may surface as error string
-      if (!res.success && (res.error || "").toLowerCase().includes("subscription")) {
-        router.replace("/subscription-required");
-        return;
-      }
-      setBillingChecked(true);
     })();
     return () => {
       cancelled = true;
@@ -85,10 +92,10 @@ export default function DashboardLayout({
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <div className="text-center max-w-xs">
           <div
-            className="mx-auto mb-4 h-10 w-10 rounded-2xl border border-violet-500/30 bg-violet-500/10 flex items-center justify-center"
+            className="mx-auto mb-4 h-9 w-9 rounded-md border border-border bg-card flex items-center justify-center"
             aria-hidden
           >
-            <div className="h-5 w-5 rounded-full border-2 border-violet-400/40 border-t-violet-300 animate-spin" />
+            <div className="h-4 w-4 rounded-full border-2 border-border border-t-foreground/70 animate-spin" />
           </div>
           <div className="text-muted-foreground text-sm font-medium tracking-tight">Loading workspace…</div>
           <div className="text-muted-foreground text-xs mt-1.5">Restoring your session</div>

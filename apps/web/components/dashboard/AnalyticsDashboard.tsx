@@ -47,7 +47,7 @@ type AnalyticsPayload = {
 
 function ChartSkeleton() {
   return (
-    <div className="h-[180px] animate-pulse rounded-2xl bg-white/5 border border-white/5" />
+    <div className="h-[180px] animate-pulse rounded-md bg-muted border border-border" />
   );
 }
 
@@ -201,13 +201,13 @@ export function AnalyticsDashboard() {
   if (loading && !data) {
     return (
       <section className="space-y-4" aria-busy="true" aria-label="Loading analytics">
-        <div className="h-8 w-48 animate-pulse rounded-xl bg-white/5" />
+        <div className="h-7 w-48 animate-pulse rounded-md bg-muted" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-3xl bg-white/5 border border-white/5" />
+            <div key={i} className="h-20 animate-pulse rounded-md bg-muted border border-border" />
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <ChartSkeleton />
           <ChartSkeleton />
         </div>
@@ -218,31 +218,31 @@ export function AnalyticsDashboard() {
   const d = data;
 
   return (
-    <section className="space-y-5 sm:space-y-6" aria-labelledby="analytics-heading">
+    <section className="space-y-4 sm:space-y-5" aria-labelledby="analytics-heading">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <p className="mm-section-label">Insights</p>
           <h2
             id="analytics-heading"
-            className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground mt-1.5"
+            className="text-lg sm:text-xl font-semibold tracking-tight text-foreground mt-1"
           >
             Analytics dashboard
           </h2>
-          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 leading-relaxed">
             Full-tenant live aggregates · hover for details · click to drill down
           </p>
         </div>
         <button
           type="button"
           onClick={() => void load()}
-          className="mm-btn mm-btn-secondary min-h-10 px-4 text-sm self-start sm:self-auto focus-ring"
+          className="mm-btn mm-btn-secondary min-h-9 px-3 text-xs self-start sm:self-auto focus-ring"
         >
           Refresh
         </button>
       </div>
 
-      {/* Animated KPI strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
         {[
           {
             label: "Total leads",
@@ -275,12 +275,12 @@ export function AnalyticsDashboard() {
             key={k.label}
             type="button"
             onClick={() => router.push(k.href)}
-            className={`group text-left rounded-lg border ${k.tone} p-3.5 sm:p-4 focus-ring min-h-[88px] shadow-sm`}
+            className={`group text-left rounded-md border ${k.tone} p-3 focus-ring min-h-[76px] shadow-none`}
           >
-            <div className="text-[11px] font-medium text-muted-foreground group-hover:text-muted-foreground">
+            <div className="text-[11px] font-medium text-muted-foreground">
               {k.label}
             </div>
-            <div className="mt-2 text-xl sm:text-[1.375rem] font-semibold text-foreground tracking-tight tabular-nums">
+            <div className="mt-1.5 text-lg sm:text-xl font-semibold text-foreground tracking-tight tabular-nums">
               {k.money ? (
                 <span key={k.value}>{fmtMoney(k.value, currency)}</span>
               ) : (
@@ -291,13 +291,13 @@ export function AnalyticsDashboard() {
         ))}
       </div>
 
-      {/* Chart grid — equal visual rhythm, responsive */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 auto-rows-fr">
+      {/* Chart grid — dense professional CRM layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
         <GlassCard
           title="Revenue trend"
           subtitle="Pipeline value created by month"
           chartRef={refRevenue}
-          className="xl:col-span-2 min-h-[280px]"
+          className="xl:col-span-2 min-h-[240px]"
         >
           <InteractiveAreaChart
             series={revenueTrend}
@@ -378,7 +378,7 @@ export function AnalyticsDashboard() {
           title="Daily lead creation"
           subtitle="Last 14 days"
           chartRef={refDaily}
-          className="xl:col-span-2"
+          className="xl:col-span-2 min-h-[220px]"
         >
           <InteractiveAreaChart
             series={dailyLeadTrend}

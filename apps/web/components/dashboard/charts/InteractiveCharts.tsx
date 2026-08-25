@@ -2,10 +2,10 @@
 
 /**
  * Interactive SaaS analytics charts — SVG, tooltips, drill-down, export.
- * Dark-mode first, glass-friendly, no heavy chart library.
+ * Flat professional CRM style (Zoho-like): solid colors, no glow/glass/gradients.
  */
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChartTooltipPortal,
   readChartSurfaceBoundary,
@@ -25,18 +25,22 @@ export type AnalyticPoint = {
   color?: string;
 };
 
+/** Solid CRM analytics palette — coral, pink, purple, blue, cyan, green, orange */
 const PALETTE = [
-  "#8b5cf6",
-  "#38bdf8",
-  "#34d399",
-  "#fbbf24",
-  "#f472b6",
-  "#2dd4bf",
-  "#fb923c",
-  "#a78bfa",
-  "#22d3ee",
-  "#c084fc",
+  "#ef4444", // red/coral
+  "#ec4899", // pink
+  "#8b5cf6", // purple
+  "#3b82f6", // blue
+  "#06b6d4", // cyan
+  "#22c55e", // green
+  "#f59e0b", // amber/orange
+  "#14b8a6", // teal
+  "#a855f7", // violet
+  "#f97316", // orange
 ];
+
+const LINE_COLOR = "#3b82f6";
+const GRID_STROKE = "currentColor";
 
 export function fmtNum(n: number) {
   if (!Number.isFinite(n)) return "0";
@@ -122,8 +126,8 @@ function ChartTooltip({
     growth == null
       ? "text-muted-foreground"
       : growth >= 0
-        ? "text-emerald-400"
-        : "text-red-400";
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-red-600 dark:text-red-400";
 
   return (
     <ChartTooltipPortal
@@ -135,9 +139,9 @@ function ChartTooltip({
         boundary: tip.boundary,
       }}
     >
-      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/10">
+      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border">
         <span
-          className="h-2.5 w-2.5 rounded-full shrink-0 ring-2 ring-white/15"
+          className="h-2.5 w-2.5 rounded-sm shrink-0 border border-border"
           style={{ background: tip.color }}
         />
         <span className="text-xs font-semibold text-foreground truncate tracking-tight">
@@ -152,12 +156,12 @@ function ChartTooltip({
         <MetricRow
           label="Share"
           value={`${tip.pct.toFixed(1)}%`}
-          valueClass="text-sky-300"
+          valueClass="text-foreground"
         />
         <MetricRow
           label="Revenue"
           value={fmtMoney(tip.point.revenue ?? 0, currency)}
-          valueClass="text-emerald-300"
+          valueClass="text-foreground"
         />
         <MetricRow label="Growth" value={growthText} valueClass={growthClass} />
       </div>
@@ -235,18 +239,18 @@ export function GlassCard({
     <article
       data-chart-surface="card"
       className={[
-        "group/card relative overflow-hidden rounded-lg border border-border",
-        "bg-card shadow-sm",
-        "p-4",
-        "min-w-0 mm-card-hover",
+        "group/card relative overflow-hidden rounded-md border border-border",
+        "bg-card shadow-none",
+        "p-3.5 sm:p-4",
+        "min-w-0",
         className,
       ].join(" ")}
     >
-      <div className="relative flex items-start justify-between gap-2 mb-3">
+      <div className="relative flex items-start justify-between gap-2 mb-2.5">
         <div className="min-w-0">
-          <h3 className="text-[15px] font-semibold text-foreground tracking-tight">{title}</h3>
+          <h3 className="text-sm font-semibold text-foreground tracking-tight">{title}</h3>
           {subtitle && (
-            <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">{subtitle}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">{subtitle}</p>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -307,7 +311,8 @@ function ExportButtons({
       canvas.height = h * 2;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      ctx.fillStyle = "#09090b";
+      // Flat light export surface (professional CRM reports)
+      ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.scale(2, 2);
       ctx.drawImage(img, 0, 0, w, h);
@@ -334,12 +339,12 @@ function ExportButtons({
     w.document.write(`<!DOCTYPE html><html><head><title>${title} · Massive Mentor</title>
       <style>
         @page{margin:16mm}
-        body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#09090b;color:#fafafa;padding:32px;margin:0}
-        .header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;border-bottom:1px solid #27272a;padding-bottom:12px}
+        body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#ffffff;color:#111827;padding:32px;margin:0}
+        .header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;border-bottom:1px solid #e5e7eb;padding-bottom:12px}
         h1{font-size:18px;margin:0;letter-spacing:-0.02em}
-        .meta{font-size:11px;color:#71717a}
+        .meta{font-size:11px;color:#6b7280}
         .chart{margin-top:8px} svg{max-width:100%;height:auto}
-        .footer{margin-top:24px;font-size:10px;color:#52525b}
+        .footer{margin-top:24px;font-size:10px;color:#9ca3af}
       </style></head><body>
       <div class="header"><div><h1>${title}</h1><div class="meta">Massive Mentor CRM · Analytics export</div></div>
       <div class="meta">${new Date().toLocaleString()}</div></div>
@@ -355,7 +360,7 @@ function ExportButtons({
       <button
         type="button"
         onClick={() => void exportPng()}
-        className="text-[10px] px-2 py-1 rounded-lg border border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 focus-ring"
+        className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted focus-ring"
         title="Export PNG"
       >
         PNG
@@ -363,7 +368,7 @@ function ExportButtons({
       <button
         type="button"
         onClick={exportPdf}
-        className="text-[10px] px-2 py-1 rounded-lg border border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/5 focus-ring"
+        className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground hover:text-foreground hover:bg-muted focus-ring"
         title="Export PDF"
       >
         PDF
@@ -409,21 +414,23 @@ export function InteractiveAreaChart({
   valueIsMoney = true,
 }: CommonProps) {
   const [tip, setTip] = useState<Tip | null>(null);
-  const uid = useId().replace(/:/g, "");
   if (!series.length || series.every((s) => !s.value)) return <EmptyChart />;
 
   const max = Math.max(...series.map((s) => s.value), 1);
   const total = series.reduce((s, p) => s + p.value, 0);
   const w = 400;
   const h = height;
-  const pad = 16;
+  const padX = 12;
+  const padTop = 14;
+  const padBot = 8;
+  const chartH = h - padTop - padBot - 4;
   const pts = series.map((s, i) => {
-    const x = pad + (i / Math.max(series.length - 1, 1)) * (w - pad * 2);
-    const y = pad + (1 - s.value / max) * (h - pad * 2 - 20);
+    const x = padX + (i / Math.max(series.length - 1, 1)) * (w - padX * 2);
+    const y = padTop + (1 - s.value / max) * chartH;
     return { x, y, s };
   });
   const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
-  const area = `${line} L${pts[pts.length - 1].x},${h - pad} L${pts[0].x},${h - pad} Z`;
+  const gridYs = [0.25, 0.5, 0.75, 1].map((t) => padTop + (1 - t) * chartH);
 
   return (
     <div
@@ -431,44 +438,33 @@ export function InteractiveAreaChart({
       style={{ minHeight: height }}
       data-chart-surface
     >
-      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id={`area-${uid}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.55" />
-            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.02" />
-          </linearGradient>
-          <linearGradient id={`stroke-${uid}`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#8b5cf6" />
-            <stop offset="100%" stopColor="#38bdf8" />
-          </linearGradient>
-        </defs>
-        <path
-          d={area}
-          fill={`url(#area-${uid})`}
-          className="transition-all duration-700"
-          style={{ opacity: 0.95 }}
-        />
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full text-border" preserveAspectRatio="none">
+        {gridYs.map((y) => (
+          <line
+            key={y}
+            x1={padX}
+            x2={w - padX}
+            y1={y}
+            y2={y}
+            stroke={GRID_STROKE}
+            strokeWidth="1"
+            opacity="0.55"
+          />
+        ))}
         <path
           d={line}
           fill="none"
-          stroke={`url(#stroke-${uid})`}
-          strokeWidth="2.5"
+          stroke={LINE_COLOR}
+          strokeWidth="2"
           strokeLinejoin="round"
           strokeLinecap="round"
-          className="drop-shadow-[0_0_8px_rgba(139,92,246,0.5)]"
-          style={{
-            strokeDasharray: 1200,
-            strokeDashoffset: 0,
-            animation: "mm-fade-up 0.6s ease-out both",
-          }}
         />
-        {/* Invisible hit area for easier hover on sparse points */}
         {pts.map((p, i) => (
           <g key={p.s.name + i}>
             <circle
               cx={p.x}
               cy={p.y}
-              r="14"
+              r="12"
               fill="transparent"
               className="cursor-pointer"
               onMouseEnter={(e) => {
@@ -482,7 +478,7 @@ export function InteractiveAreaChart({
                     point,
                     pct: total > 0 ? (p.s.value / total) * 100 : 0,
                     growth: growthPct(p.s.value, p.s.previous),
-                    color: "#a78bfa",
+                    color: LINE_COLOR,
                   })
                 );
               }}
@@ -506,16 +502,16 @@ export function InteractiveAreaChart({
             <circle
               cx={p.x}
               cy={p.y}
-              r="5"
-              fill="#a78bfa"
-              stroke="#09090b"
-              strokeWidth="2"
+              r="3.5"
+              fill={LINE_COLOR}
+              stroke="var(--card)"
+              strokeWidth="1.5"
               className="pointer-events-none"
             />
           </g>
         ))}
       </svg>
-      <div className="flex justify-between gap-0.5 px-1 mt-1 overflow-hidden">
+      <div className="flex justify-between gap-0.5 px-1 mt-0.5 overflow-hidden">
         {series.map((s, i) => (
           <span
             key={s.name + i}
@@ -543,10 +539,28 @@ export function InteractiveBarChart({
   if (!series.length || series.every((s) => !s.value)) return <EmptyChart />;
   const max = Math.max(...series.map((s) => s.value), 1);
   const total = series.reduce((s, p) => s + p.value, 0);
+  const plotH = height - 36;
 
   return (
     <div className="relative" style={{ minHeight: height }} data-chart-surface>
-      <div className="flex items-end gap-1.5 sm:gap-2 h-full px-1 pt-2" style={{ height: height - 28 }}>
+      {/* Light horizontal grid */}
+      <div
+        className="absolute left-0 right-0 pointer-events-none"
+        style={{ top: 18, height: plotH }}
+        aria-hidden
+      >
+        {[0.25, 0.5, 0.75, 1].map((t) => (
+          <div
+            key={t}
+            className="absolute left-0 right-0 border-t border-border/70"
+            style={{ bottom: `${t * 100}%` }}
+          />
+        ))}
+      </div>
+      <div
+        className="relative flex items-end gap-1.5 sm:gap-2 h-full px-0.5"
+        style={{ height: plotH + 18, paddingTop: 18 }}
+      >
         {series.map((s, i) => {
           const color = s.color || PALETTE[i % PALETTE.length];
           const pctH = (s.value / max) * 100;
@@ -554,7 +568,7 @@ export function InteractiveBarChart({
             <button
               type="button"
               key={s.name + i}
-              className="flex-1 min-w-0 flex flex-col items-center gap-1 group h-full justify-end focus-ring rounded-t-lg"
+              className="flex-1 min-w-0 flex flex-col items-center gap-1 group h-full justify-end focus-ring rounded-sm"
               onMouseEnter={(e) => {
                 setTip(
                   tipFromEvent(e, {
@@ -582,16 +596,17 @@ export function InteractiveBarChart({
               onMouseLeave={() => setTip(null)}
               onClick={() => onDrill?.(s)}
             >
+              <span className="text-[10px] tabular-nums font-semibold text-foreground leading-none mb-0.5">
+                {fmtNum(s.value)}
+              </span>
               <div
-                className="w-full max-w-[40px] rounded-t-lg transition-all duration-500 ease-out group-hover:brightness-125 group-hover:scale-x-105 origin-bottom motion-safe:animate-[mm-bar-grow_0.55s_ease-out]"
+                className="w-full max-w-[36px] rounded-sm transition-[height] duration-300 ease-out group-hover:opacity-90 origin-bottom"
                 style={{
-                  height: `${Math.max(pctH, 3)}%`,
-                  background: `linear-gradient(180deg, ${color}, ${color}55)`,
-                  boxShadow: `0 0 20px ${color}33`,
-                  transformOrigin: "bottom",
+                  height: `${Math.max(pctH, 2)}%`,
+                  background: color,
                 }}
               />
-              <span className="w-full truncate text-center text-[10px] text-muted-foreground group-hover:text-muted-foreground">
+              <span className="w-full truncate text-center text-[10px] text-muted-foreground">
                 {s.name}
               </span>
             </button>
@@ -632,17 +647,17 @@ export function InteractiveDonutChart({
 
   return (
     <div
-      className="relative flex flex-col sm:flex-row items-center gap-5 sm:gap-6 min-h-[200px]"
+      className="relative flex flex-col sm:flex-row items-center gap-4 sm:gap-5 min-h-[180px]"
       data-chart-surface
     >
-      <div className="relative shrink-0 w-[200px] h-[200px] sm:w-[220px] sm:h-[220px]">
+      <div className="relative shrink-0 w-[168px] h-[168px] sm:w-[180px] sm:h-[180px]">
         <svg viewBox="0 0 180 180" className="w-full h-full -rotate-90">
           <circle
             cx="90"
             cy="90"
             r={r}
             fill="none"
-            stroke="#27272a"
+            stroke="var(--border)"
             strokeWidth={stroke}
           />
           {slices.map((s) => (
@@ -657,8 +672,7 @@ export function InteractiveDonutChart({
               strokeDasharray={s.dash}
               strokeDashoffset={s.offset}
               strokeLinecap="butt"
-              className="cursor-pointer transition-all duration-300 hover:opacity-90"
-              style={{ filter: `drop-shadow(0 0 10px ${s.color}55)` }}
+              className="cursor-pointer hover:opacity-90"
               onMouseEnter={(e) => {
                 setTip(
                   tipFromEvent(e, {
@@ -689,31 +703,31 @@ export function InteractiveDonutChart({
           ))}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-2xl font-bold tabular-nums text-foreground tracking-tight">
+          <span className="text-xl font-semibold tabular-nums text-foreground tracking-tight">
             {fmtNum(total)}
           </span>
-          <span className="text-[11px] text-muted-foreground font-medium mt-0.5">
+          <span className="text-[10px] text-muted-foreground font-medium mt-0.5">
             {centerLabel || "total"}
           </span>
         </div>
       </div>
-      <ul className="flex-1 space-y-2 min-w-0 w-full max-h-52 overflow-y-auto pr-1">
+      <ul className="flex-1 space-y-1 min-w-0 w-full max-h-48 overflow-y-auto pr-1">
         {slices.map((s) => (
           <li key={s.name}>
             <button
               type="button"
               onClick={() => onDrill?.(s)}
-              className="w-full flex items-center gap-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors text-left py-1.5 px-1.5 rounded-lg hover:bg-white/[0.04]"
+              className="w-full flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors text-left py-1 px-1 rounded-md hover:bg-muted"
             >
               <span
-                className="h-3 w-3 rounded-full shrink-0 ring-2 ring-white/10"
+                className="h-2.5 w-2.5 rounded-sm shrink-0 border border-border"
                 style={{ background: s.color }}
               />
               <span className="truncate flex-1 font-medium">{s.name}</span>
               <span className="tabular-nums text-foreground font-semibold">
                 {fmtNum(s.value)}
               </span>
-              <span className="tabular-nums text-muted-foreground w-12 text-right font-medium">
+              <span className="tabular-nums text-muted-foreground w-10 text-right text-[11px]">
                 {((s.value / total) * 100).toFixed(0)}%
               </span>
             </button>
@@ -734,59 +748,85 @@ export function InteractiveFunnelChart({
   if (!series.length || series.every((s) => !s.value)) return <EmptyChart label="No funnel data" />;
   const max = Math.max(...series.map((s) => s.value), 1);
   const funnelBase = series[0]?.value || 1;
+  const W = 320;
+  const stageH = 34;
+  const gap = 3;
+  const minW = W * 0.28;
+  const n = series.length;
+  const H = n * stageH + Math.max(0, n - 1) * gap;
+
+  const widthFor = (value: number, index: number) => {
+    // Value-weighted width with progressive taper so the funnel always reads top→bottom
+    const valueW = (value / max) * W;
+    const taperW = W * (1 - (index / Math.max(n, 1)) * 0.55);
+    return Math.max(minW, Math.min(W, (valueW * 0.65 + taperW * 0.35)));
+  };
 
   return (
-    <div className="relative space-y-2 py-1" data-chart-surface>
-      {series.map((s, i) => {
-        const color = PALETTE[i % PALETTE.length];
-        const widthPct = Math.max(18, (s.value / max) * 100);
-        const conv = i === 0 ? 100 : (s.value / funnelBase) * 100;
-        return (
-          <button
-            type="button"
-            key={s.name}
-            className="w-full flex flex-col items-center gap-0.5 group focus-ring rounded-lg"
-            onMouseEnter={(e) => {
-              setTip(
-                tipFromEvent(e, {
-                  point: { ...s, count: s.value },
-                  pct: conv,
-                  growth: growthPct(s.value, s.previous),
-                  color,
-                })
-              );
-            }}
-            onMouseMove={(e) => {
-              setTip((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      clientX: e.clientX,
-                      clientY: e.clientY,
-                      boundary:
-                        readChartSurfaceBoundary(e.currentTarget) ??
-                        prev.boundary,
-                    }
-                  : prev
-              );
-            }}
-            onMouseLeave={() => setTip(null)}
-            onClick={() => onDrill?.(s)}
-          >
-            <div
-              className="h-9 sm:h-10 rounded-lg flex items-center justify-between px-3 text-xs font-medium text-foreground transition-all duration-500 group-hover:brightness-110"
-              style={{
-                width: `${widthPct}%`,
-                background: `linear-gradient(90deg, ${color}, ${color}99)`,
-                boxShadow: `0 4px 20px ${color}33`,
+    <div className="relative w-full py-1" data-chart-surface>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-auto max-h-[280px]"
+        role="img"
+        aria-label="Conversion funnel"
+      >
+        {series.map((s, i) => {
+          const color = s.color || PALETTE[i % PALETTE.length];
+          const topW = widthFor(s.value, i);
+          const next = series[i + 1];
+          const botW = next ? widthFor(next.value, i + 1) : Math.max(minW, topW * 0.82);
+          const y = i * (stageH + gap);
+          const topX = (W - topW) / 2;
+          const botX = (W - botW) / 2;
+          const points = `${topX},${y} ${topX + topW},${y} ${botX + botW},${y + stageH} ${botX},${y + stageH}`;
+          const conv = i === 0 ? 100 : (s.value / funnelBase) * 100;
+          const labelY = y + stageH / 2 + 4;
+          return (
+            <g
+              key={s.name}
+              className="cursor-pointer"
+              onMouseEnter={(e) => {
+                setTip(
+                  tipFromEvent(e, {
+                    point: { ...s, count: s.value },
+                    pct: conv,
+                    growth: growthPct(s.value, s.previous),
+                    color,
+                  })
+                );
               }}
+              onMouseMove={(e) => {
+                setTip((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        boundary:
+                          readChartSurfaceBoundary(e.currentTarget) ??
+                          prev.boundary,
+                      }
+                    : prev
+                );
+              }}
+              onMouseLeave={() => setTip(null)}
+              onClick={() => onDrill?.(s)}
             >
-              <span className="truncate">{s.name}</span>
-              <span className="tabular-nums ml-2">{fmtNum(s.value)}</span>
-            </div>
-          </button>
-        );
-      })}
+              <polygon points={points} fill={color} className="hover:opacity-90" />
+              <text
+                x={W / 2}
+                y={labelY}
+                textAnchor="middle"
+                className="pointer-events-none"
+                style={{ fontSize: 11, fontWeight: 600, fill: "#ffffff" }}
+              >
+                {s.name.length > 28 ? `${s.name.slice(0, 26)}…` : s.name}
+                {`  ·  ${fmtNum(s.value)}`}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
       {tip && <ChartTooltip tip={tip} currency={currency} />}
     </div>
   );
@@ -848,12 +888,12 @@ export function InteractiveHorizontalBar({
                 {valueIsMoney ? fmtMoney(s.value, currency) : fmtNum(s.value)}
               </span>
             </div>
-            <div className="h-2.5 rounded-full bg-muted/80 overflow-hidden">
+            <div className="h-2 rounded-sm bg-muted overflow-hidden border border-border/60">
               <div
-                className="h-full rounded-full transition-all duration-700 ease-out group-hover:brightness-125"
+                className="h-full rounded-sm transition-[width] duration-300 ease-out group-hover:opacity-90"
                 style={{
                   width: `${Math.max(w, 2)}%`,
-                  background: `linear-gradient(90deg, ${color}, ${color}aa)`,
+                  background: color,
                 }}
               />
             </div>
