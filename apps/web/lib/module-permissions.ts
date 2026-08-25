@@ -40,12 +40,14 @@ export const ROUTE_MODULE: Record<string, string> = {
   "/dashboard/backups": "backups",
   "/dashboard/profile": "profile",
   "/dashboard/settings/appearance": "appearance",
+  "/dashboard/settings/custom-fields": "settings",
 };
 
 /** Longest-prefix module for a path */
 export function moduleKeyForPath(pathname: string): string | null {
   const path = (pathname || "").split("?")[0] || "";
   if (path.startsWith("/dashboard/settings/appearance")) return "appearance";
+  if (path.startsWith("/dashboard/settings/custom-fields")) return "settings";
   if (path === "/dashboard" || path === "/dashboard/") return "dashboard";
   let best: { key: string; len: number } | null = null;
   for (const [route, key] of Object.entries(ROUTE_MODULE)) {
@@ -72,8 +74,9 @@ export function canAccessPath(
     return !loaded;
   }
   const key = moduleKeyForPath(pathname);
-  // Personal surfaces always allowed once authenticated
+  // Personal / settings customization surfaces always allowed once authenticated
   if (key === "profile" || key === "appearance") return true;
+  if (pathname.startsWith("/dashboard/settings/custom-fields")) return true;
   // Unknown CRM path after load → deny (prevents accidental exposure)
   if (!key) return !loaded;
   // Explicit empty grant list (should still include always-on from API)

@@ -328,6 +328,21 @@ const SETTINGS_NAV: NavItem[] = [
     ),
   },
   {
+    key: "settings:custom-fields",
+    href: "/dashboard/settings/custom-fields",
+    label: "Custom Fields",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M4 6h16M4 10h10M4 14h16M4 18h8"
+        />
+      </svg>
+    ),
+  },
+  {
     key: "settings:security",
     href: "/dashboard/security",
     label: "Security",
@@ -345,6 +360,7 @@ const SETTINGS_NAV: NavItem[] = [
 ];
 
 const APPEARANCE_HREF = "/dashboard/settings/appearance";
+const CUSTOM_FIELDS_HREF = "/dashboard/settings/custom-fields";
 
 /** ERP section routes — Finance is existing; do not duplicate modules */
 const ERP_HREFS = new Set([
@@ -381,6 +397,7 @@ const SETTINGS_HREFS = new Set([
   "/dashboard/integrations",
   "/dashboard/settings/appearance",
   APPEARANCE_HREF,
+  CUSTOM_FIELDS_HREF,
 ]);
 
 function navSectionFor(href: string): "crm" | "erp" | "settings" {

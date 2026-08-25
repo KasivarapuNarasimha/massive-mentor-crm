@@ -16,6 +16,10 @@ import { PageLoading } from "@/components/ui/PageLoading";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 import { NotesPanel } from "@/components/crm/NotesPanel";
 import {
+  CustomFieldsFormSection,
+  customFieldsFromRecord,
+} from "@/components/custom-fields/CustomFieldsFormSection";
+import {
   normalizePipelineStatus,
   pipelineStatusLabel,
   UNIFIED_PIPELINE_STATUSES,
@@ -97,6 +101,7 @@ export default function DealsPage() {
     probability: "",
     notes: "",
   });
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
 
@@ -198,6 +203,7 @@ export default function DealsPage() {
       probability: "",
       notes: "",
     });
+    setCustomFields({});
     setShowModal(true);
   };
 
@@ -211,12 +217,14 @@ export default function DealsPage() {
       probability: deal.probability ? String(deal.probability) : "",
       notes: deal.notes || "",
     });
+    setCustomFields(customFieldsFromRecord(deal));
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
     setEditingDeal(null);
+    setCustomFields({});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -262,6 +270,7 @@ export default function DealsPage() {
       title: formData.title.trim(),
       stage: formData.stage,
       notes: formData.notes.trim() || null,
+      customFields,
     };
 
     if (formData.value) {
@@ -759,6 +768,12 @@ export default function DealsPage() {
                   placeholder="Short notes saved on this deal record"
                 />
               </div>
+              <CustomFieldsFormSection
+                entity="deal"
+                values={customFields}
+                onChange={setCustomFields}
+                disabled={isSubmitting}
+              />
               <div className="flex gap-2 pt-1">
                 <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1 touch-manipulation">Cancel</button>
                 <button type="submit" disabled={isSubmitting} className={`mm-btn mm-btn-primary flex-1 touch-manipulation ${isSubmitting ? "mm-btn-loading" : ""}`}>

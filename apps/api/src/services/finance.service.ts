@@ -255,6 +255,7 @@ export async function createInvoice(
     status?: string;
     notes?: string;
     number?: string;
+    customFields?: Record<string, unknown> | null;
   }
 ) {
   const { businessId } = await assertFinanceAccess(userId);
@@ -265,6 +266,14 @@ export async function createInvoice(
   const taxAmount = amount.mul(taxRate).div(100).toDecimalPlaces(2);
   const total = amount.add(taxAmount).toDecimalPlaces(2);
   const number = input.number?.trim() || (await nextInvoiceNumber(businessId));
+  const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+  const customFieldsBag = await resolveCustomFieldsWrite(
+    userId,
+    "invoice",
+    input.customFields,
+    undefined,
+    { partial: true }
+  );
 
   const invoice = await prisma.invoice.create({
     data: {
@@ -284,6 +293,7 @@ export async function createInvoice(
       notes: input.notes || null,
       sourceType: null,
       sourceId: null,
+      customFields: customFieldsBag as object,
     },
   });
 
@@ -329,6 +339,7 @@ export async function updateInvoice(
     status: string;
     dueDate: string | null;
     notes: string;
+    customFields: Record<string, unknown> | null;
   }>
 ) {
   const { businessId } = await assertFinanceAccess(userId);
@@ -342,6 +353,17 @@ export async function updateInvoice(
   const taxAmount = amount.mul(taxRate).div(100).toDecimalPlaces(2);
   const total = amount.add(taxAmount).toDecimalPlaces(2);
   const status = input.status ?? existing.status;
+  const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+  const nextCustom =
+    input.customFields !== undefined
+      ? await resolveCustomFieldsWrite(
+          userId,
+          "invoice",
+          input.customFields,
+          existing.customFields,
+          { partial: true }
+        )
+      : undefined;
 
   const invoice = await prisma.invoice.update({
     where: { id },
@@ -361,6 +383,7 @@ export async function updateInvoice(
           : existing.dueDate,
       notes: input.notes !== undefined ? input.notes : existing.notes,
       paidAt: status === "paid" && !existing.paidAt ? new Date() : existing.paidAt,
+      ...(nextCustom !== undefined ? { customFields: nextCustom as object } : {}),
     },
   });
 
@@ -445,6 +468,7 @@ export async function createExpense(
     expenseDate?: string;
     vendor?: string;
     notes?: string;
+    customFields?: Record<string, unknown> | null;
   }
 ) {
   const { businessId } = await assertFinanceAccess(userId);
@@ -454,6 +478,14 @@ export async function createExpense(
   if (amount.lt(0)) throw new Error("Invalid amount");
   const taxAmount = toDecimal(input.taxAmount || 0);
   const total = amount.add(taxAmount).toDecimalPlaces(2);
+  const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+  const customFieldsBag = await resolveCustomFieldsWrite(
+    userId,
+    "expense",
+    input.customFields,
+    undefined,
+    { partial: true }
+  );
   const expense = await prisma.expense.create({
     data: {
       businessId,
@@ -467,6 +499,7 @@ export async function createExpense(
       expenseDate: input.expenseDate ? new Date(input.expenseDate) : new Date(),
       vendor: input.vendor || null,
       notes: input.notes || null,
+      customFields: customFieldsBag as object,
     },
   });
   await recordAudit({
@@ -594,6 +627,7 @@ export async function createPayment(
     reference?: string;
     paidAt?: string;
     notes?: string;
+    customFields?: Record<string, unknown> | null;
   }
 ) {
   const { businessId } = await assertFinanceAccess(userId);
@@ -607,6 +641,15 @@ export async function createPayment(
     if (!inv) throw new Error("Invoice not found");
   }
 
+  const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+  const customFieldsBag = await resolveCustomFieldsWrite(
+    userId,
+    "payment",
+    input.customFields,
+    undefined,
+    { partial: true }
+  );
+
   const payment = await prisma.payment.create({
     data: {
       businessId,
@@ -617,6 +660,7 @@ export async function createPayment(
       reference: input.reference || null,
       paidAt: input.paidAt ? new Date(input.paidAt) : new Date(),
       notes: input.notes || null,
+      customFields: customFieldsBag as object,
     },
   });
 

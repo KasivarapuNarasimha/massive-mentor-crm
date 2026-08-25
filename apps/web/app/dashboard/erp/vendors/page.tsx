@@ -6,6 +6,10 @@ import { useAuth } from "@/lib/auth-context";
 import { api, API_BASE_URL } from "@/lib/api";
 import { PageShell, PageHeader } from "@/components/ui/PageShell";
 import { ERP_BTN, ERP_BTN_GHOST, ERP_INPUT, listFrom } from "@/lib/erp";
+import {
+  CustomFieldsFormSection,
+  customFieldsFromRecord,
+} from "@/components/custom-fields/CustomFieldsFormSection";
 
 type Vendor = {
   id: string;
@@ -18,6 +22,7 @@ type Vendor = {
   paymentTerms?: string | null;
   notes?: string | null;
   isActive?: boolean;
+  customFields?: Record<string, unknown> | null;
 };
 
 const emptyForm = {
@@ -39,6 +44,7 @@ export default function ErpVendorsPage() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -70,11 +76,13 @@ export default function ErpVendorsPage() {
       notes: v.notes || "",
       isActive: v.isActive !== false,
     });
+    setCustomFields(customFieldsFromRecord(v));
   };
 
   const resetForm = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setCustomFields({});
   };
 
   const save = async (e: React.FormEvent) => {
@@ -90,6 +98,7 @@ export default function ErpVendorsPage() {
       paymentTerms: form.paymentTerms.trim() || undefined,
       notes: form.notes.trim() || undefined,
       isActive: form.isActive,
+      customFields,
     };
     setSaving(true);
     const res = editingId
@@ -195,6 +204,14 @@ export default function ErpVendorsPage() {
           />
           Active
         </label>
+        <div className="sm:col-span-2">
+          <CustomFieldsFormSection
+            entity="vendor"
+            values={customFields}
+            onChange={setCustomFields}
+            disabled={saving}
+          />
+        </div>
         <div className="sm:col-span-2 flex flex-wrap gap-2">
           <button type="submit" disabled={saving} className={ERP_BTN}>
             {saving ? "Saving…" : editingId ? "Update vendor" : "Create vendor"}

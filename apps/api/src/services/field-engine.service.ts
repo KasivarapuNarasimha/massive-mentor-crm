@@ -41,7 +41,23 @@ export async function getContactFieldDefs(businessId: string | null | undefined)
   const fields = config.fields as FieldDef[];
   if (!Array.isArray(fields)) return [];
   return fields
-    .filter((f) => f && f.entity === "contact")
+    .filter((f) => f && f.entity === "contact" && f.active !== false)
+    .slice()
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+/** Generic entity field defs from BusinessConfig (active only) */
+export async function getEntityFieldDefs(
+  businessId: string | null | undefined,
+  entity: string
+): Promise<FieldDef[]> {
+  if (!businessId) return [];
+  const config = await getBusinessConfig(businessId);
+  if (!config?.fields) return [];
+  const fields = config.fields as FieldDef[];
+  if (!Array.isArray(fields)) return [];
+  return fields
+    .filter((f) => f && f.entity === entity && f.active !== false)
     .slice()
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
@@ -223,6 +239,17 @@ function applyCoreMap(
   }
 }
 
+function normalizeOpts(
+  options?: FieldDef["options"]
+): Array<{ value: string; label: string; active?: boolean }> {
+  if (!options?.length) return [];
+  return options.map((o) =>
+    typeof o === "string"
+      ? { value: o, label: o, active: true }
+      : { value: o.value, label: o.label || o.value, active: o.active !== false }
+  );
+}
+
 function coerceFieldValue(def: FieldDef, raw: unknown, errors: string[]): unknown {
   if (raw === null || raw === undefined) return raw;
   switch (def.type) {
@@ -243,14 +270,50 @@ function coerceFieldValue(def: FieldDef, raw: unknown, errors: string[]): unknow
       if (raw === "true" || raw === "1" || raw === 1) return true;
       if (raw === "false" || raw === "0" || raw === 0) return false;
       return Boolean(raw);
-    case "multiselect":
-      if (Array.isArray(raw)) return raw.map(String);
-      if (typeof raw === "string") return raw.split(",").map((s) => s.trim()).filter(Boolean);
-      return [String(raw)];
+    case "multiselect": {
+      const arr = Array.isArray(raw)
+        ? raw.map(String)
+        : typeof raw === "string"
+          ? raw.split(",").map((s) => s.trim()).filter(Boolean)
+          : [String(raw)];
+      const opts = normalizeOpts(def.options);
+      if (opts.length) {
+        const allowed = new Set(opts.map((o) => o.value));
+        for (const v of arr) {
+          if (!allowed.has(v)) {
+            errors.push(`Invalid option for ${def.label || def.key}`);
+            return undefined;
+          }
+        }
+      }
+      return arr;
+    }
+    case "select":
+    case "radio": {
+      const s = String(raw).trim();
+      if (!s) return s;
+      const opts = normalizeOpts(def.options);
+      if (opts.length && !opts.some((o) => o.value === s)) {
+        errors.push(`Invalid option for ${def.label || def.key}`);
+        return undefined;
+      }
+      return s;
+    }
     case "email": {
       const s = String(raw).trim();
       if (s && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) {
         errors.push(`${def.label || def.key} must be a valid email`);
+      }
+      return s;
+    }
+    case "url": {
+      const s = String(raw).trim();
+      if (!s) return s;
+      try {
+        const u = new URL(s.includes("://") ? s : `https://${s}`);
+        if (!u.hostname) throw new Error("bad");
+      } catch {
+        errors.push(`${def.label || def.key} must be a valid URL`);
       }
       return s;
     }

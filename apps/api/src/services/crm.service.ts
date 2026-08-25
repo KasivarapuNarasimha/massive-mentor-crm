@@ -170,6 +170,7 @@ export const dealSchema = z.object({
   expectedClose: flexibleDateTime,
   probability: z.number().int().min(0).max(100).optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
+  customFields: z.record(z.unknown()).optional().nullable(),
 });
 
 export const taskSchema = z.object({
@@ -180,6 +181,7 @@ export const taskSchema = z.object({
   dueDate: flexibleDateTime,
   status: z.enum(["todo", "in_progress", "done"]).default("todo"),
   priority: z.enum(["low", "medium", "high"]).optional().nullable(),
+  customFields: z.record(z.unknown()).optional().nullable(),
 });
 
 export const meetingSchema = z.object({
@@ -190,6 +192,7 @@ export const meetingSchema = z.object({
   durationMin: z.number().int().positive().optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
   outcome: z.string().optional().nullable(),
+  customFields: z.record(z.unknown()).optional().nullable(),
 });
 
 export const noteSchema = z.object({
@@ -1556,6 +1559,22 @@ export async function createDeal(userId: string, input: DealInput) {
     );
   }
 
+  let customFieldsBag: Record<string, unknown> = {};
+  if (parsed.customFields && typeof parsed.customFields === "object") {
+    try {
+      const { validateCustomFieldsPayload } = await import("./custom-fields.service.js");
+      customFieldsBag = await validateCustomFieldsPayload(
+        userId,
+        "deal",
+        parsed.customFields as Record<string, unknown>,
+        { partial: true }
+      );
+    } catch (err) {
+      if (err && typeof err === "object" && "status" in err) throw err;
+      throw err;
+    }
+  }
+
   return prisma.deal.create({
     data: {
       userId,
@@ -1567,7 +1586,7 @@ export async function createDeal(userId: string, input: DealInput) {
       expectedClose: parsed.expectedClose ? new Date(parsed.expectedClose) : null,
       probability: parsed.probability ?? null,
       notes: parsed.notes || null,
-      customFields: {},
+      customFields: customFieldsBag as object,
     },
   }).then(async (deal) => {
     await notifyCrmCreated(userId, {
@@ -1607,6 +1626,20 @@ export async function updateDeal(userId: string, id: string, input: Partial<Deal
     String(nextStage).trim().toLowerCase() !==
     String(existing.stage || "").trim().toLowerCase();
 
+  let nextCustom = existing.customFields as object;
+  if (parsed.customFields && typeof parsed.customFields === "object") {
+    const { validateCustomFieldsPayload, mergeCustomFields: mergeCf } = await import(
+      "./custom-fields.service.js"
+    );
+    const patch = await validateCustomFieldsPayload(
+      userId,
+      "deal",
+      parsed.customFields as Record<string, unknown>,
+      { partial: true }
+    );
+    nextCustom = mergeCf(existing.customFields, patch) as object;
+  }
+
   const updated = await prisma.deal.update({
     where: { id },
     data: {
@@ -1619,6 +1652,7 @@ export async function updateDeal(userId: string, id: string, input: Partial<Deal
         : existing.expectedClose,
       probability: parsed.probability !== undefined ? parsed.probability : existing.probability,
       notes: parsed.notes !== undefined ? (parsed.notes || null) : existing.notes,
+      customFields: nextCustom,
     },
   });
 
@@ -1744,6 +1778,15 @@ export async function createTask(userId: string, input: TaskInput) {
   // Follow-up tasks to be written to a different workspace than the list scope.
   const businessId = await getUserBusinessId(userId);
 
+  const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+  const customFieldsBag = await resolveCustomFieldsWrite(
+    userId,
+    "task",
+    parsed.customFields,
+    undefined,
+    { partial: true }
+  );
+
   return prisma.task.create({
     data: {
       userId,
@@ -1755,6 +1798,7 @@ export async function createTask(userId: string, input: TaskInput) {
       dueDate: parsed.dueDate ? new Date(parsed.dueDate) : null,
       status: parsed.status,
       priority: parsed.priority || null,
+      customFields: customFieldsBag as object,
     },
   }).then(async (task) => {
     await notifyCrmCreated(userId, {
@@ -1777,6 +1821,13 @@ export async function updateTask(userId: string, id: string, input: Partial<Task
   if (!existing) throw new Error("Task not found");
 
   const parsed = taskSchema.partial().parse(input);
+  const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+  const nextCustom =
+    parsed.customFields !== undefined
+      ? await resolveCustomFieldsWrite(userId, "task", parsed.customFields, existing.customFields, {
+          partial: true,
+        })
+      : undefined;
 
   return prisma.task.update({
     where: { id },
@@ -1788,6 +1839,7 @@ export async function updateTask(userId: string, id: string, input: Partial<Task
       dueDate: parsed.dueDate !== undefined ? (parsed.dueDate ? new Date(parsed.dueDate) : null) : existing.dueDate,
       status: parsed.status ?? existing.status,
       priority: parsed.priority !== undefined ? (parsed.priority || null) : existing.priority,
+      ...(nextCustom !== undefined ? { customFields: nextCustom as object } : {}),
     },
   });
 }
@@ -1855,6 +1907,15 @@ export async function createMeeting(userId: string, input: MeetingInput) {
   // Align with getMeetings / buildOwnedEntityScope (same as createTask).
   const businessId = await getUserBusinessId(userId);
 
+  const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+  const customFieldsBag = await resolveCustomFieldsWrite(
+    userId,
+    "meeting",
+    parsed.customFields,
+    undefined,
+    { partial: true }
+  );
+
   return prisma.meeting.create({
     data: {
       userId,
@@ -1866,6 +1927,7 @@ export async function createMeeting(userId: string, input: MeetingInput) {
       durationMin: parsed.durationMin ?? null,
       notes: parsed.notes || null,
       outcome: parsed.outcome || null,
+      customFields: customFieldsBag as object,
     },
   }).then(async (meeting) => {
     await notifyCrmCreated(userId, {
@@ -1888,6 +1950,17 @@ export async function updateMeeting(userId: string, id: string, input: Partial<M
   if (!existing) throw new Error("Meeting not found");
 
   const parsed = meetingSchema.partial().parse(input);
+  const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+  const nextCustom =
+    parsed.customFields !== undefined
+      ? await resolveCustomFieldsWrite(
+          userId,
+          "meeting",
+          parsed.customFields,
+          existing.customFields,
+          { partial: true }
+        )
+      : undefined;
 
   return prisma.meeting.update({
     where: { id },
@@ -1899,6 +1972,7 @@ export async function updateMeeting(userId: string, id: string, input: Partial<M
       durationMin: parsed.durationMin !== undefined ? (parsed.durationMin ?? null) : existing.durationMin,
       notes: parsed.notes !== undefined ? (parsed.notes || null) : existing.notes,
       outcome: parsed.outcome !== undefined ? (parsed.outcome || null) : existing.outcome,
+      ...(nextCustom !== undefined ? { customFields: nextCustom as object } : {}),
     },
   });
 }

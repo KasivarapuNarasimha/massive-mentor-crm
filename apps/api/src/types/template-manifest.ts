@@ -17,15 +17,39 @@ export const fieldTypeSchema = z.enum([
   "url",
   "rating",
   "nps",
+  "radio",
 ]);
+
+/** Modules that support custom field definitions / values */
+export const customFieldEntitySchema = z.enum([
+  "contact",
+  "deal",
+  "task",
+  "meeting",
+  "feedback",
+  "invoice",
+  "expense",
+  "payment",
+  "product",
+  "vendor",
+]);
+
+/** Dropdown/radio/multiselect option — stable value + soft-disable */
+export const fieldOptionSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+  active: z.boolean().optional(),
+  order: z.number().optional(),
+});
 
 export const fieldDefSchema = z.object({
   key: z.string().min(1),
   label: z.string().min(1),
-  entity: z.enum(["contact", "deal", "task", "meeting", "feedback"]),
+  entity: customFieldEntitySchema,
   type: fieldTypeSchema,
   required: z.boolean().optional(),
-  options: z.array(z.string()).optional(),
+  /** Legacy string[] or structured FieldOption[] */
+  options: z.array(z.union([z.string(), fieldOptionSchema])).optional(),
   coreMap: z
     .enum(["name", "phone", "email", "company", "value", "status", "title", "description"])
     .optional(),
@@ -35,6 +59,14 @@ export const fieldDefSchema = z.object({
   showInDetail: z.boolean().optional(),
   defaultValue: z.unknown().optional(),
   order: z.number(),
+  description: z.string().optional(),
+  placeholder: z.string().optional(),
+  /** Soft-deactivate field without destroying stored values */
+  active: z.boolean().optional(),
+  /** template = industry seed; custom = tenant-created in Settings */
+  source: z.enum(["template", "custom"]).optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 
 export const moduleDefSchema = z.object({

@@ -10,6 +10,7 @@ import { ExportFiltersBar } from "@/components/ui/ExportFiltersBar";
 import { isCurrencyCode, setAppCurrency, parseAmount } from "@/lib/currency";
 import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { CurrencyAmountInput } from "@/components/ui/CurrencyAmountInput";
+import { CustomFieldsFormSection } from "@/components/custom-fields/CustomFieldsFormSection";
 
 type Kpis = {
   totalInvoiced: number;
@@ -103,6 +104,9 @@ export default function FinancePage() {
     method: "upi",
     reference: "",
   });
+  const [invCustomFields, setInvCustomFields] = useState<Record<string, unknown>>({});
+  const [expCustomFields, setExpCustomFields] = useState<Record<string, unknown>>({});
+  const [payCustomFields, setPayCustomFields] = useState<Record<string, unknown>>({});
 
   const loadDashboard = useCallback(async () => {
     if (!token) return;
@@ -204,12 +208,14 @@ export default function FinancePage() {
         dueDate: invForm.dueDate || undefined,
         description: invForm.description,
         status: "sent",
+        customFields: invCustomFields,
       },
       token
     );
     if (res.success) {
       toast.success("Invoice created");
       setInvForm({ clientName: "", amount: "", taxRate: "18", dueDate: "", description: "" });
+      setInvCustomFields({});
       emitDataChanged({ module: "finance", action: "create" });
       loadInvoices();
       loadDashboard();
@@ -226,12 +232,14 @@ export default function FinancePage() {
         amount: parseAmount(expForm.amount) ?? 0,
         category: expForm.category,
         vendor: expForm.vendor,
+        customFields: expCustomFields,
       },
       token
     );
     if (res.success) {
       toast.success("Expense recorded");
       setExpForm({ title: "", amount: "", category: "general", vendor: "" });
+      setExpCustomFields({});
       emitDataChanged({ module: "finance", action: "create" });
       loadExpenses();
       loadDashboard();
@@ -248,12 +256,14 @@ export default function FinancePage() {
         invoiceId: payForm.invoiceId || undefined,
         method: payForm.method,
         reference: payForm.reference,
+        customFields: payCustomFields,
       },
       token
     );
     if (res.success) {
       toast.success("Payment recorded");
       setPayForm({ amount: "", invoiceId: "", method: "upi", reference: "" });
+      setPayCustomFields({});
       emitDataChanged({ module: "finance", action: "create" });
       loadPayments();
       loadInvoices();
@@ -403,6 +413,13 @@ export default function FinancePage() {
             <input className={inputClass} type="number" step="0.01" placeholder="Tax rate %" value={invForm.taxRate} onChange={(e) => setInvForm({ ...invForm, taxRate: e.target.value })} />
             <input className={inputClass} type="date" value={invForm.dueDate} onChange={(e) => setInvForm({ ...invForm, dueDate: e.target.value })} />
             <input className={inputClass + " sm:col-span-2"} placeholder="Description" value={invForm.description} onChange={(e) => setInvForm({ ...invForm, description: e.target.value })} />
+            <div className="sm:col-span-2">
+              <CustomFieldsFormSection
+                entity="invoice"
+                values={invCustomFields}
+                onChange={setInvCustomFields}
+              />
+            </div>
             <button type="submit" className="sm:col-span-2 mm-btn mm-btn-primary">Save invoice</button>
           </form>
           <input className={inputClass} placeholder="Search invoices…" value={search} onChange={(e) => { setSearch(e.target.value); setInvPage(1); }} />
@@ -457,6 +474,13 @@ export default function FinancePage() {
             />
             <input className={inputClass} placeholder="Category" value={expForm.category} onChange={(e) => setExpForm({ ...expForm, category: e.target.value })} />
             <input className={inputClass} placeholder="Vendor" value={expForm.vendor} onChange={(e) => setExpForm({ ...expForm, vendor: e.target.value })} />
+            <div className="sm:col-span-2">
+              <CustomFieldsFormSection
+                entity="expense"
+                values={expCustomFields}
+                onChange={setExpCustomFields}
+              />
+            </div>
             <button type="submit" className="sm:col-span-2 mm-btn mm-btn-primary">Save expense</button>
           </form>
           <div className="space-y-2">
@@ -495,6 +519,13 @@ export default function FinancePage() {
               <option value="other">Other</option>
             </select>
             <input className={inputClass} placeholder="Reference" value={payForm.reference} onChange={(e) => setPayForm({ ...payForm, reference: e.target.value })} />
+            <div className="sm:col-span-2">
+              <CustomFieldsFormSection
+                entity="payment"
+                values={payCustomFields}
+                onChange={setPayCustomFields}
+              />
+            </div>
             <button type="submit" className="sm:col-span-2 mm-btn mm-btn-primary">Save payment</button>
           </form>
           <div className="space-y-2">

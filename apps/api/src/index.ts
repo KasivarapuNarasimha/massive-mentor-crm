@@ -263,6 +263,7 @@ import billingRoutes from "./routes/billing.routes.js";
 import securityRoutes from "./routes/security.routes.js";
 import mediaRoutes from "./routes/media.routes.js";
 import whatsappInboxRoutes from "./routes/whatsapp-inbox.routes.js";
+import customFieldsRoutes from "./routes/custom-fields.routes.js";
 import { seedIndustryTemplates } from "./services/template.service.js";
 import { startBackupScheduler, stopBackupScheduler } from "./services/backup.service.js";
 import { apiGeneralLimiter } from "./middleware/rateLimiter.js";
@@ -304,6 +305,8 @@ app.use("/api/teams", requireAuthMw, requireModuleFromPath, teamRoutes);
 app.use("/api/reports", requireAuthMw, requireModuleFromPath, reportRoutes);
 app.use("/api/businesses", businessRoutes);
 app.use("/api/templates", templateRoutes);
+/** Custom Fields engine — definitions in BusinessConfig; auth on router */
+app.use("/api/custom-fields", customFieldsRoutes);
 app.use("/api/dashboards", requireAuthMw, requireModuleFromPath, dashboardRoutes);
 app.use("/api/portal", portalRoutes);
 app.use("/api/business-users", requireAuthMw, requireModuleFromPath, userAdminRoutes);

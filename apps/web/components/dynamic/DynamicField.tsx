@@ -1,6 +1,7 @@
 "use client";
 
 import type { FieldDef } from "@/lib/business-config";
+import { activeFieldOptions } from "@/lib/business-config";
 import { CurrencyAmountInput } from "@/components/ui/CurrencyAmountInput";
 import { getAppCurrency } from "@/lib/currency";
 
@@ -53,7 +54,7 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
   if (field.coreMap === "status" || field.key === "status") {
     const opts = statusOptions?.length
       ? statusOptions
-      : (field.options || []).map((o) => ({ key: o, label: o }));
+      : activeFieldOptions(field.options).map((o) => ({ key: o.value, label: o.label }));
     return (
       <div>
         {label}
@@ -93,9 +94,14 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
         </div>
       );
     case "select":
+    case "radio": {
+      const opts = activeFieldOptions(field.options, str);
       return (
         <div>
           {label}
+          {field.description ? (
+            <p className="text-[11px] text-muted-foreground mb-1">{field.description}</p>
+          ) : null}
           <select
             id={id}
             value={str}
@@ -104,14 +110,44 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
             className={inputClass}
           >
             <option value="">Select…</option>
-            {(field.options || []).map((o) => (
-              <option key={o} value={o}>
-                {o}
+            {opts.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>
         </div>
       );
+    }
+    case "multiselect": {
+      const selected = Array.isArray(value) ? value.map(String) : str ? [str] : [];
+      const opts = activeFieldOptions(field.options, selected);
+      return (
+        <div>
+          {label}
+          {field.description ? (
+            <p className="text-[11px] text-muted-foreground mb-1">{field.description}</p>
+          ) : null}
+          <select
+            id={id}
+            multiple
+            value={selected}
+            disabled={disabled}
+            onChange={(e) => {
+              const vals = Array.from(e.target.selectedOptions).map((o) => o.value);
+              onChange(field.key, vals);
+            }}
+            className={`${inputClass} min-h-[5.5rem]`}
+          >
+            {opts.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      );
+    }
     case "boolean":
       return (
         <div className="flex items-center gap-2 pt-6">
@@ -206,6 +242,39 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
             type="email"
             value={str}
             disabled={disabled}
+            placeholder={field.placeholder || undefined}
+            onChange={(e) => onChange(field.key, e.target.value)}
+            className={inputClass}
+            required={field.required}
+          />
+        </div>
+      );
+    case "phone":
+      return (
+        <div>
+          {label}
+          <input
+            id={id}
+            type="tel"
+            value={str}
+            disabled={disabled}
+            placeholder={field.placeholder || undefined}
+            onChange={(e) => onChange(field.key, e.target.value)}
+            className={inputClass}
+            required={field.required}
+          />
+        </div>
+      );
+    case "url":
+      return (
+        <div>
+          {label}
+          <input
+            id={id}
+            type="url"
+            value={str}
+            disabled={disabled}
+            placeholder={field.placeholder || "https://"}
             onChange={(e) => onChange(field.key, e.target.value)}
             className={inputClass}
             required={field.required}
@@ -216,11 +285,15 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
       return (
         <div>
           {label}
+          {field.description ? (
+            <p className="text-[11px] text-muted-foreground mb-1">{field.description}</p>
+          ) : null}
           <input
             id={id}
             type="text"
             value={str}
             disabled={disabled}
+            placeholder={field.placeholder || undefined}
             onChange={(e) => onChange(field.key, e.target.value)}
             className={inputClass}
             required={field.required}

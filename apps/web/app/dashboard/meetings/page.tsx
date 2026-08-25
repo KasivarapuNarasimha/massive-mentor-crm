@@ -9,6 +9,10 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PageLoading } from "@/components/ui/PageLoading";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 import { NotesPanel } from "@/components/crm/NotesPanel";
+import {
+  CustomFieldsFormSection,
+  customFieldsFromRecord,
+} from "@/components/custom-fields/CustomFieldsFormSection";
 
 interface Meeting {
   id: string;
@@ -17,6 +21,7 @@ interface Meeting {
   durationMin?: number;
   notes?: string;
   outcome?: string;
+  customFields?: Record<string, unknown> | null;
 }
 
 export default function MeetingsPage() {
@@ -26,6 +31,7 @@ export default function MeetingsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [formData, setFormData] = useState({ title: "", scheduledAt: "", durationMin: "", notes: "", outcome: "" });
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const load = useCallback(async () => {
@@ -55,6 +61,7 @@ export default function MeetingsPage() {
     const pad = (n: number) => String(n).padStart(2, "0");
     const defaultWhen = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     setFormData({ title: "", scheduledAt: defaultWhen, durationMin: "30", notes: "", outcome: "" });
+    setCustomFields({});
     setShowModal(true);
   };
 
@@ -67,12 +74,14 @@ export default function MeetingsPage() {
       notes: meeting.notes || "",
       outcome: meeting.outcome || "",
     });
+    setCustomFields(customFieldsFromRecord(meeting));
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
     setEditingMeeting(null);
+    setCustomFields({});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,6 +106,7 @@ export default function MeetingsPage() {
       scheduledAt: when.toISOString(),
       notes: formData.notes.trim() || null,
       outcome: formData.outcome.trim() || null,
+      customFields,
     };
     if (formData.durationMin) payload.durationMin = parseInt(formData.durationMin);
     let res;
@@ -278,6 +288,12 @@ export default function MeetingsPage() {
                 onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
                 placeholder="Outcome"
                 className="mm-input"
+              />
+              <CustomFieldsFormSection
+                entity="meeting"
+                values={customFields}
+                onChange={setCustomFields}
+                disabled={isSubmitting}
               />
               <div className="flex gap-2 pt-1">
                 <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1">

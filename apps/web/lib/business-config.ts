@@ -3,13 +3,33 @@
  * Never hardcode industry — only interpret generic FieldDef / Pipeline shapes.
  */
 
+/** Structured select option (preferred); legacy defs may still use string[] */
+export type FieldOption = {
+  value: string;
+  label: string;
+  active?: boolean;
+  order?: number;
+};
+
+export type CustomFieldEntity =
+  | "contact"
+  | "deal"
+  | "task"
+  | "meeting"
+  | "feedback"
+  | "invoice"
+  | "expense"
+  | "payment"
+  | "product"
+  | "vendor";
+
 export type FieldDef = {
   key: string;
   label: string;
   entity: string;
   type: string;
   required?: boolean;
-  options?: string[];
+  options?: Array<string | FieldOption>;
   coreMap?: string;
   showInList?: boolean;
   showInForm?: boolean;
@@ -20,7 +40,58 @@ export type FieldDef = {
   /** Optional textarea rows (UI only) */
   rows?: number;
   placeholder?: string;
+  description?: string;
+  /** Soft-deactivate without destroying stored values */
+  active?: boolean;
+  /** template = industry seed; custom = Settings-created */
+  source?: "template" | "custom";
+  createdAt?: string;
+  updatedAt?: string;
 };
+
+/** Normalize options to structured list (legacy string[] → {value,label}) */
+export function normalizeFieldOptions(
+  options?: Array<string | FieldOption> | null
+): FieldOption[] {
+  if (!options?.length) return [];
+  return options.map((o, i) => {
+    if (typeof o === "string") {
+      return { value: o, label: o, active: true, order: i };
+    }
+    return {
+      value: o.value,
+      label: o.label || o.value,
+      active: o.active !== false,
+      order: o.order ?? i,
+    };
+  });
+}
+
+/** Active options for create/edit pickers (disabled options omitted unless current value needs them) */
+export function activeFieldOptions(
+  options?: Array<string | FieldOption> | null,
+  keepValue?: string | string[] | null
+): FieldOption[] {
+  const all = normalizeFieldOptions(options);
+  const keep = new Set(
+    Array.isArray(keepValue) ? keepValue.map(String) : keepValue != null && keepValue !== "" ? [String(keepValue)] : []
+  );
+  return all
+    .filter((o) => o.active !== false || keep.has(o.value))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+export const CUSTOM_FIELD_MODULES: Array<{ entity: CustomFieldEntity; label: string; group: string }> = [
+  { entity: "contact", label: "Leads & Contacts", group: "CRM" },
+  { entity: "deal", label: "Deals", group: "CRM" },
+  { entity: "task", label: "Tasks", group: "CRM" },
+  { entity: "meeting", label: "Meetings", group: "CRM" },
+  { entity: "invoice", label: "Invoices", group: "ERP / Finance" },
+  { entity: "expense", label: "Expenses", group: "ERP / Finance" },
+  { entity: "payment", label: "Payments", group: "ERP / Finance" },
+  { entity: "product", label: "Products", group: "ERP" },
+  { entity: "vendor", label: "Vendors", group: "ERP" },
+];
 
 export type PipelineStatus = {
   key: string;
@@ -50,13 +121,25 @@ export type BusinessConfigDTO = {
 export function contactFieldsFromConfig(config: BusinessConfigDTO | null | undefined): FieldDef[] {
   if (!config?.fields || !Array.isArray(config.fields)) return [];
   return (config.fields as FieldDef[])
-    .filter((f) => f && f.entity === "contact")
+    .filter((f) => f && f.entity === "contact" && f.active !== false)
+    .slice()
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+/** Fields for a given module entity (active only) */
+export function entityFieldsFromConfig(
+  config: BusinessConfigDTO | null | undefined,
+  entity: CustomFieldEntity | string
+): FieldDef[] {
+  if (!config?.fields || !Array.isArray(config.fields)) return [];
+  return (config.fields as FieldDef[])
+    .filter((f) => f && f.entity === entity && f.active !== false)
     .slice()
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 export function formFields(fields: FieldDef[]): FieldDef[] {
-  return fields.filter((f) => f.showInForm !== false);
+  return fields.filter((f) => f.active !== false && f.showInForm !== false);
 }
 
 export function listFields(fields: FieldDef[]): FieldDef[] {

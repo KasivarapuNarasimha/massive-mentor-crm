@@ -41,6 +41,7 @@ import { parseAmount } from "@/lib/currency";
 import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 import { NotesPanel } from "@/components/crm/NotesPanel";
+import { CustomFieldsDetailPanel } from "@/components/custom-fields/CustomFieldsDetailPanel";
 
 interface Contact {
   id: string;
@@ -856,6 +857,17 @@ export default function LeadsPage() {
     void loadConfig();
     void loadTeam();
   }, [loadConfig, loadTeam]);
+
+  // Refresh field defs when Settings → Custom Fields changes
+  useEffect(() => {
+    let unsub = () => {};
+    void import("@/lib/data-events").then(({ subscribeDataChanged }) => {
+      unsub = subscribeDataChanged(() => {
+        void loadConfig();
+      });
+    });
+    return () => unsub();
+  }, [loadConfig]);
 
   useEffect(() => {
     if (
@@ -2667,6 +2679,18 @@ export default function LeadsPage() {
                 statusOptions={statusOptions.map((s) => ({ key: s.key, label: s.label }))}
                 disabled={isSubmitting}
               />
+              {editingLead ? (
+                <CustomFieldsDetailPanel
+                  className="mt-4"
+                  title="Saved custom values"
+                  fields={fieldDefs}
+                  values={
+                    (leads.find((l) => l.id === editingLead.id)?.customFields ||
+                      editingLead.customFields ||
+                      {}) as Record<string, unknown>
+                  }
+                />
+              ) : null}
               <div className="mt-4 p-3 bg-background border border-border rounded-md">
                 <label className="block text-xs text-muted-foreground mb-1.5 tracking-wide">
                   Assign To

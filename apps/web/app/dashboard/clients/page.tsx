@@ -11,6 +11,7 @@ import { PageLoading } from "@/components/ui/PageLoading";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 import { NotesPanel } from "@/components/crm/NotesPanel";
+import { CustomFieldsDetailPanel } from "@/components/custom-fields/CustomFieldsDetailPanel";
 import {
   type BusinessConfigDTO,
   type FieldDef,
@@ -104,6 +105,17 @@ export default function ClientsPage() {
     loadConfig();
     loadClients();
   }, [loadConfig, loadClients]);
+
+  // Refresh field defs when Settings → Custom Fields changes
+  useEffect(() => {
+    let unsub = () => {};
+    void import("@/lib/data-events").then(({ subscribeDataChanged }) => {
+      unsub = subscribeDataChanged(() => {
+        void loadConfig();
+      });
+    });
+    return () => unsub();
+  }, [loadConfig]);
 
   const filteredClients = clients.filter((client) => {
     const matchesSearch =
@@ -447,6 +459,18 @@ export default function ClientsPage() {
                 statusOptions={statusOptions}
                 disabled={isSubmitting}
               />
+              {editingClient ? (
+                <CustomFieldsDetailPanel
+                  className="mt-1"
+                  title="Saved custom values"
+                  fields={fieldDefs}
+                  values={
+                    (clients.find((c) => c.id === editingClient.id)?.customFields ||
+                      editingClient.customFields ||
+                      {}) as Record<string, unknown>
+                  }
+                />
+              ) : null}
 
               {/* Finance bridge — explicit only; Client Value stays CRM LTV */}
               {editingClient ? (

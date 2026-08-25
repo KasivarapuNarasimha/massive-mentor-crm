@@ -1952,6 +1952,55 @@ class ApiClient {
     }>("/templates/config/current", token);
   }
 
+  /** Custom Fields engine — tenant FieldDef CRUD */
+  async listCustomFields(
+    token: string,
+    params?: { entity?: string; includeInactive?: boolean }
+  ) {
+    const q = new URLSearchParams();
+    if (params?.entity) q.set("entity", params.entity);
+    if (params?.includeInactive) q.set("includeInactive", "1");
+    const qs = q.toString();
+    return this.get<{ fields: unknown[] }>(
+      `/custom-fields${qs ? `?${qs}` : ""}`,
+      token
+    );
+  }
+
+  async createCustomField(token: string, body: Record<string, unknown>) {
+    return this.post<{ field: unknown }>("/custom-fields", body, token);
+  }
+
+  async updateCustomField(token: string, key: string, body: Record<string, unknown>) {
+    return this.request<{ field: unknown }>(`/custom-fields/${encodeURIComponent(key)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      token,
+    });
+  }
+
+  async deactivateCustomField(token: string, key: string) {
+    return this.request<{ field: unknown }>(`/custom-fields/${encodeURIComponent(key)}`, {
+      method: "DELETE",
+      token,
+    });
+  }
+
+  async setCustomFieldOptions(
+    token: string,
+    key: string,
+    options: Array<string | { value: string; label: string; active?: boolean; order?: number }>
+  ) {
+    return this.request<{ field: unknown }>(
+      `/custom-fields/${encodeURIComponent(key)}/options`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ options }),
+        token,
+      }
+    );
+  }
+
   async listIndustryTemplates(token: string) {
     return this.get<{ templates: Array<{ id: string; slug: string; name: string; category: string | null }> }>(
       "/templates",

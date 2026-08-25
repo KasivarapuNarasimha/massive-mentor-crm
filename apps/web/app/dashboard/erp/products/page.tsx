@@ -7,6 +7,10 @@ import { api } from "@/lib/api";
 import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { PageShell, PageHeader, ResponsiveModal } from "@/components/ui/PageShell";
 import { ERP_BTN, ERP_BTN_GHOST, ERP_INPUT, listFrom, num } from "@/lib/erp";
+import {
+  CustomFieldsFormSection,
+  customFieldsFromRecord,
+} from "@/components/custom-fields/CustomFieldsFormSection";
 
 type Category = {
   id: string;
@@ -26,6 +30,7 @@ type Product = {
   categoryId?: string | null;
   category?: { id: string; name: string } | null;
   isActive?: boolean;
+  customFields?: Record<string, unknown> | null;
   _count?: { movements?: number } | null;
 };
 
@@ -92,6 +97,8 @@ export default function ErpProductsPage() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState<ProductForm>(emptyForm);
+  const [createCustomFields, setCreateCustomFields] = useState<Record<string, unknown>>({});
+  const [editCustomFields, setEditCustomFields] = useState<Record<string, unknown>>({});
 
   const inventoryFieldsLocked = hasStockMovements(editing);
 
@@ -142,11 +149,16 @@ export default function ErpProductsPage() {
     e.preventDefault();
     if (!token) return;
     setSaving(true);
-    const res = await api.post("/erp/products", payloadFromForm(form), token);
+    const res = await api.post(
+      "/erp/products",
+      { ...payloadFromForm(form), customFields: createCustomFields },
+      token
+    );
     setSaving(false);
     if (res.success) {
       toast.success("Product created");
       setForm(emptyForm);
+      setCreateCustomFields({});
       void load();
     } else toast.error(res.error || "Failed to create product");
   };
@@ -154,12 +166,14 @@ export default function ErpProductsPage() {
   const openEdit = (p: Product) => {
     setEditing(p);
     setEditForm(productToForm(p));
+    setEditCustomFields(customFieldsFromRecord(p));
   };
 
   const closeEdit = () => {
     if (saving) return;
     setEditing(null);
     setEditForm(emptyForm);
+    setEditCustomFields({});
   };
 
   const saveEdit = async (e: React.FormEvent) => {
@@ -187,12 +201,17 @@ export default function ErpProductsPage() {
     }
 
     setSaving(true);
-    const res = await api.put(`/erp/products/${editing.id}`, payloadFromForm(editForm), token);
+    const res = await api.put(
+      `/erp/products/${editing.id}`,
+      { ...payloadFromForm(editForm), customFields: editCustomFields },
+      token
+    );
     setSaving(false);
     if (res.success) {
       toast.success("Product updated");
       setEditing(null);
       setEditForm(emptyForm);
+      setEditCustomFields({});
       void load();
     } else toast.error(res.error || "Failed to update product");
   };
@@ -298,6 +317,14 @@ export default function ErpProductsPage() {
         >
           <h2 className="sm:col-span-2 text-sm font-semibold">New product</h2>
           {renderFields(form, setForm)}
+          <div className="sm:col-span-2">
+            <CustomFieldsFormSection
+              entity="product"
+              values={createCustomFields}
+              onChange={setCreateCustomFields}
+              disabled={saving}
+            />
+          </div>
           <button type="submit" disabled={saving} className={`${ERP_BTN} sm:col-span-2`}>
             {saving && !editing ? "Saving…" : "Create product"}
           </button>
@@ -428,6 +455,14 @@ export default function ErpProductsPage() {
             </p>
           ) : null}
           {renderFields(editForm, setEditForm, { lockInventoryFields: inventoryFieldsLocked })}
+          <div className="sm:col-span-2">
+            <CustomFieldsFormSection
+              entity="product"
+              values={editCustomFields}
+              onChange={setEditCustomFields}
+              disabled={saving}
+            />
+          </div>
         </form>
       </ResponsiveModal>
     </PageShell>

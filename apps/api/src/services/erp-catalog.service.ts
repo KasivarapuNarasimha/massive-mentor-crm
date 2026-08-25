@@ -102,6 +102,7 @@ export async function createProduct(
     reorderLevel?: number;
     categoryId?: string;
     description?: string;
+    customFields?: Record<string, unknown> | null;
   }
 ) {
   const { businessId } = await assertErpAccess(userId);
@@ -119,6 +120,15 @@ export async function createProduct(
     if (!cat) throw new Error("Category not found");
   }
 
+  const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+  const customFieldsBag = await resolveCustomFieldsWrite(
+    userId,
+    "product",
+    input.customFields,
+    undefined,
+    { partial: true }
+  );
+
   try {
     const product = await prisma.product.create({
       data: {
@@ -135,6 +145,7 @@ export async function createProduct(
         categoryId: input.categoryId || null,
         description: input.description || null,
         createdByUserId: userId,
+        customFields: customFieldsBag as object,
       },
       include: { category: { select: { id: true, name: true } } },
     });
@@ -213,6 +224,18 @@ export async function updateProduct(
     }
   }
 
+  let nextCustom: Record<string, unknown> | undefined;
+  if (input.customFields !== undefined) {
+    const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+    nextCustom = await resolveCustomFieldsWrite(
+      userId,
+      "product",
+      input.customFields,
+      existing.customFields,
+      { partial: true }
+    );
+  }
+
   try {
     const product = await prisma.product.update({
       where: { id },
@@ -253,6 +276,7 @@ export async function updateProduct(
                   : toDecimal(input.reorderLevel as number, 4),
             }
           : {}),
+        ...(nextCustom !== undefined ? { customFields: nextCustom as object } : {}),
       },
       include: {
         category: { select: { id: true, name: true } },
@@ -405,11 +429,20 @@ export async function createVendor(
     address?: string;
     paymentTerms?: string;
     notes?: string;
+    customFields?: Record<string, unknown> | null;
   }
 ) {
   const { businessId } = await assertErpAccess(userId);
   const name = String(input.name || "").trim();
   if (!name) throw new Error("Vendor name is required");
+  const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+  const customFieldsBag = await resolveCustomFieldsWrite(
+    userId,
+    "vendor",
+    input.customFields,
+    undefined,
+    { partial: true }
+  );
   const vendor = await prisma.vendor.create({
     data: {
       businessId,
@@ -422,6 +455,7 @@ export async function createVendor(
       paymentTerms: input.paymentTerms || null,
       notes: input.notes || null,
       createdByUserId: userId,
+      customFields: customFieldsBag as object,
     },
   });
   await recordAudit({
@@ -441,6 +475,17 @@ export async function updateVendor(userId: string, id: string, input: Record<str
     where: { id, businessId, deletedAt: null },
   });
   if (!existing) throw new Error("Vendor not found");
+  let nextCustom: Record<string, unknown> | undefined;
+  if (input.customFields !== undefined) {
+    const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
+    nextCustom = await resolveCustomFieldsWrite(
+      userId,
+      "vendor",
+      input.customFields,
+      existing.customFields,
+      { partial: true }
+    );
+  }
   const vendor = await prisma.vendor.update({
     where: { id },
     data: {
@@ -455,6 +500,7 @@ export async function updateVendor(userId: string, id: string, input: Record<str
         : {}),
       ...(input.notes !== undefined ? { notes: (input.notes as string) || null } : {}),
       ...(input.isActive !== undefined ? { isActive: !!input.isActive } : {}),
+      ...(nextCustom !== undefined ? { customFields: nextCustom as object } : {}),
     },
   });
   return { vendor };

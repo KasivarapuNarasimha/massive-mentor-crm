@@ -11,6 +11,10 @@ import { PageLoading } from "@/components/ui/PageLoading";
 import { PaginationBar } from "@/components/ui/PaginationBar";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 import { useDataVersion } from "@/lib/data-events";
+import {
+  CustomFieldsFormSection,
+  customFieldsFromRecord,
+} from "@/components/custom-fields/CustomFieldsFormSection";
 
 interface Task {
   id: string;
@@ -21,6 +25,7 @@ interface Task {
   priority?: string;
   contactId?: string | null;
   dealId?: string | null;
+  customFields?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -44,6 +49,7 @@ export default function TasksPage() {
     priority: "medium",
     dueDate: "",
   });
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const load = useCallback(
@@ -105,6 +111,7 @@ export default function TasksPage() {
   const openCreate = () => {
     setEditingTask(null);
     setFormData({ title: "", description: "", status: "todo", priority: "medium", dueDate: "" });
+    setCustomFields({});
     setShowModal(true);
   };
 
@@ -117,12 +124,14 @@ export default function TasksPage() {
       priority: task.priority || "medium",
       dueDate: toDateInputValue(task.dueDate),
     });
+    setCustomFields(customFieldsFromRecord(task));
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
     setEditingTask(null);
+    setCustomFields({});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -148,6 +157,7 @@ export default function TasksPage() {
       status: formData.status,
       priority: formData.priority || null,
       dueDate: dueDateIso,
+      customFields,
     };
     let res;
     if (editingTask) {
@@ -371,6 +381,12 @@ export default function TasksPage() {
                   <option value="high">high</option>
                 </select>
               </label>
+              <CustomFieldsFormSection
+                entity="task"
+                values={customFields}
+                onChange={setCustomFields}
+                disabled={isSubmitting}
+              />
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
