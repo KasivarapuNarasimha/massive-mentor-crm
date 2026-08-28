@@ -12,6 +12,10 @@ import { usePlan } from "@/lib/plan-context";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PremiumKpi, PremiumKpiSkeleton } from "@/components/ui/PremiumKpi";
 import { AiCommandCenter } from "@/components/ai/AiCommandCenter";
+import {
+  UNIFIED_PIPELINE_STATUSES,
+  pipelineStatusLabel,
+} from "@/lib/pipeline-statuses";
 
 const AnalyticsDashboard = lazy(() =>
   import("@/components/dashboard/AnalyticsDashboard").then((m) => ({
@@ -97,6 +101,33 @@ type LeadAssignmentSummary = {
     email: string | null;
     count: number;
   }>;
+};
+
+type MemberActivitySummary = {
+  sinceDays: number;
+  since: string;
+  unavailableMetrics: Array<{ key: string; reason: string }>;
+  byMember: Array<{
+    userId: string;
+    name: string;
+    email: string | null;
+    role: string | null;
+    leadsAssigned: number;
+    leadsUpdated: number;
+    followUpsCompleted: number;
+    meetings: number;
+    emailsSent: number;
+    whatsappActions: number;
+    callsMade: null;
+  }>;
+  totals: {
+    leadsAssigned: number;
+    leadsUpdated: number;
+    followUpsCompleted: number;
+    meetings: number;
+    emailsSent: number;
+    whatsappActions: number;
+  };
 };
 
 /* ── Pipeline stages (display order) ───────────────────────── */
@@ -259,6 +290,27 @@ export function PremiumDashboard() {
   const [assignmentSummary, setAssignmentSummary] = useState<LeadAssignmentSummary | null>(
     null
   );
+  const [memberActivity, setMemberActivity] = useState<MemberActivitySummary | null>(null);
+  const [visSearch, setVisSearch] = useState("");
+  const [visStatus, setVisStatus] = useState("");
+  const [visAssignee, setVisAssignee] = useState("");
+  const [visSinceDays, setVisSinceDays] = useState("30");
+  const [visBusy, setVisBusy] = useState(false);
+  const [visResults, setVisResults] = useState<{
+    total: number;
+    items: Array<{
+      id: string;
+      name: string;
+      company: string | null;
+      status: string;
+      assignedToId: string | null;
+      assignedToName: string | null;
+      lastActivityAt: string | null;
+      nextFollowUp: string | null;
+      phone: string | null;
+      updatedAt: string;
+    }>;
+  } | null>(null);
 
   const roleKey = (role || user?.role || "").toLowerCase();
   const canSeeAssignmentSummary =
@@ -271,6 +323,7 @@ export function PremiumDashboard() {
       "sales_manager",
       "manager",
     ].includes(roleKey) || roleKey.includes("admin");
+  const canSeeMemberActivity = canSeeAssignmentSummary;
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -298,6 +351,7 @@ export function PremiumDashboard() {
       aiRes,
       mediaRes,
       assignRes,
+      memberActRes,
     ] = await Promise.all([
       api.get<ReportsDash>("/reports/dashboard", token),
       api.getCrmTasks("?pageSize=50", token),
@@ -307,6 +361,9 @@ export function PremiumDashboard() {
       safeJson(`${API_BASE_URL}/crm/ai/followup-engine?limit=8`),
       api.getMediaStats(token),
       api.getLeadAssignmentSummary(token),
+      canSeeMemberActivity
+        ? api.getMemberActivitySummary(token, 30)
+        : Promise.resolve({ success: false as const, data: null }),
     ]);
 
     if (reportsRes.success && reportsRes.data) {
@@ -380,8 +437,19 @@ export function PremiumDashboard() {
       setAssignmentSummary(null);
     }
 
+    if (
+      memberActRes &&
+      "success" in memberActRes &&
+      memberActRes.success &&
+      memberActRes.data
+    ) {
+      setMemberActivity(memberActRes.data as MemberActivitySummary);
+    } else {
+      setMemberActivity(null);
+    }
+
     setLoading(false);
-  }, [token]);
+  }, [token, canSeeMemberActivity]);
 
   useEffect(() => {
     void load();
@@ -764,6 +832,162 @@ export function PremiumDashboard() {
         </div>
       </section>
 
+      {/* Admin lead visibility search — reuses CRM list filters */}
+      {canSeeMemberActivity && (
+        <section aria-labelledby="admin-visibility-heading" className="mt-1">
+          <div className="mm-card p-4 sm:p-5">
+            <div className="mb-3">
+              <h2 id="admin-visibility-heading" className="mm-section-title">
+                Team lead visibility
+              </h2>
+              <p className="mm-secondary mt-0.5">
+                Search by status (e.g. RNR), member, or name — same filters as the Leads module.
+              </p>
+            </div>
+            <form
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 mb-3"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!token) return;
+                setVisBusy(true);
+                const raw = visSearch.trim();
+                const statusFromSearch = UNIFIED_PIPELINE_STATUSES.find(
+                  (s) =>
+                    s.key === raw.toLowerCase() ||
+                    s.label.toLowerCase() === raw.toLowerCase()
+                );
+                const res = await api.adminLeadVisibilitySearch(token, {
+                  search: statusFromSearch ? undefined : raw || undefined,
+                  status: visStatus || statusFromSearch?.key || undefined,
+                  assignedTo: visAssignee || undefined,
+                  sinceDays: visSinceDays ? Number(visSinceDays) : 30,
+                  pageSize: 25,
+                });
+                setVisBusy(false);
+                if (res.success && res.data) {
+                  setVisResults({ total: res.data.total, items: res.data.items });
+                } else {
+                  setVisResults({ total: 0, items: [] });
+                }
+              }}
+            >
+              <input
+                className="mm-input lg:col-span-2"
+                placeholder="Search name, company, phone — or status like RNR"
+                value={visSearch}
+                onChange={(e) => setVisSearch(e.target.value)}
+              />
+              <select
+                className="mm-input"
+                value={visStatus}
+                onChange={(e) => setVisStatus(e.target.value)}
+              >
+                <option value="">All statuses</option>
+                {UNIFIED_PIPELINE_STATUSES.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="mm-input"
+                value={visAssignee}
+                onChange={(e) => setVisAssignee(e.target.value)}
+              >
+                <option value="">All members</option>
+                <option value="unassigned">Unassigned</option>
+                {(assignmentSummary?.byMember || memberActivity?.byMember || []).map((m) => (
+                  <option key={m.userId || m.name} value={m.userId || ""}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <select
+                  className="mm-input flex-1"
+                  value={visSinceDays}
+                  onChange={(e) => setVisSinceDays(e.target.value)}
+                  title="Updated within"
+                >
+                  <option value="7">7 days</option>
+                  <option value="30">30 days</option>
+                  <option value="90">90 days</option>
+                  <option value="">Any time</option>
+                </select>
+                <button type="submit" className="mm-btn-primary text-sm px-3 shrink-0" disabled={visBusy}>
+                  {visBusy ? "…" : "Search"}
+                </button>
+              </div>
+            </form>
+            {visResults ? (
+              <div className="mm-table-wrap overflow-x-auto">
+                <table className="mm-table min-w-[720px]">
+                  <thead>
+                    <tr>
+                      <th>Lead</th>
+                      <th>Status</th>
+                      <th>Assigned to</th>
+                      <th>Last activity</th>
+                      <th>Next follow-up</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visResults.items.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground text-xs">
+                          No matching leads
+                        </td>
+                      </tr>
+                    ) : (
+                      visResults.items.map((row) => (
+                        <tr key={row.id} className="border-b border-border/60 last:border-0">
+                          <td className="px-4 py-2.5">
+                            <Link
+                              href={`/dashboard/leads?search=${encodeURIComponent(row.name)}`}
+                              className="font-medium text-foreground hover:text-primary"
+                            >
+                              {row.name}
+                            </Link>
+                            {row.company ? (
+                              <div className="text-[11px] text-muted-foreground">{row.company}</div>
+                            ) : null}
+                          </td>
+                          <td className="px-4 py-2.5 text-sm">
+                            {pipelineStatusLabel(row.status)}
+                          </td>
+                          <td className="px-4 py-2.5 text-sm">
+                            {row.assignedToName || (
+                              <span className="text-muted-foreground">Unassigned</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-muted-foreground tabular-nums">
+                            {row.lastActivityAt
+                              ? new Date(row.lastActivityAt).toLocaleString()
+                              : "—"}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-muted-foreground tabular-nums">
+                            {row.nextFollowUp
+                              ? new Date(row.nextFollowUp).toLocaleString()
+                              : "—"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  {visResults.total.toLocaleString()} match
+                  {visResults.total === 1 ? "" : "es"}
+                  {visResults.total > visResults.items.length
+                    ? ` · showing first ${visResults.items.length}`
+                    : ""}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      )}
+
       {/* Lead Assignment Summary — Business Admin visibility */}
       {canSeeAssignmentSummary && (
         <section aria-labelledby="lead-assignment-heading" className="mt-1">
@@ -883,6 +1107,176 @@ export function PremiumDashboard() {
                     </tfoot>
                   </table>
                 </div>
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Member Activity — real CRM metrics only (no invented call counts) */}
+      {canSeeMemberActivity && (
+        <section aria-labelledby="member-activity-heading" className="mt-1">
+          <div className="mm-card p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2.5 mb-3">
+              <div>
+                <h2
+                  id="member-activity-heading"
+                  className="mm-section-title flex items-center gap-2"
+                >
+                  Member Activity
+                </h2>
+                <p className="mm-secondary mt-0.5">
+                  Last {memberActivity?.sinceDays ?? 30} days — logged CRM actions by team member.
+                  Phone calls are not tracked in CRM.
+                </p>
+              </div>
+              <Link
+                href="/dashboard/activity"
+                className="text-xs font-semibold text-primary hover:text-primary-hover focus-ring rounded shrink-0"
+              >
+                Activity log →
+              </Link>
+            </div>
+
+            {loading && !memberActivity ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-16 rounded-xl" />
+                ))}
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+                  <div className="rounded-md border border-border bg-card px-3.5 py-2.5">
+                    <div className="mm-kpi-label">Lead edits logged</div>
+                    <div className="text-xl font-semibold tabular-nums mt-1 text-foreground">
+                      {(memberActivity?.totals.leadsUpdated ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border bg-card px-3.5 py-2.5">
+                    <div className="mm-kpi-label">Follow-ups done</div>
+                    <div className="text-xl font-semibold tabular-nums mt-1 text-foreground">
+                      {(memberActivity?.totals.followUpsCompleted ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border bg-card px-3.5 py-2.5">
+                    <div className="mm-kpi-label">Meetings</div>
+                    <div className="text-xl font-semibold tabular-nums mt-1 text-foreground">
+                      {(memberActivity?.totals.meetings ?? 0).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-border bg-card px-3.5 py-2.5">
+                    <div className="mm-kpi-label">Email + WhatsApp</div>
+                    <div className="text-xl font-semibold tabular-nums mt-1 text-foreground">
+                      {(
+                        (memberActivity?.totals.emailsSent ?? 0) +
+                        (memberActivity?.totals.whatsappActions ?? 0)
+                      ).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mm-table-wrap overflow-x-auto">
+                  <table className="mm-table min-w-[640px]">
+                    <thead>
+                      <tr>
+                        <th>Team Member</th>
+                        <th className="text-right">Assigned</th>
+                        <th className="text-right">Lead edits</th>
+                        <th className="text-right">Follow-ups</th>
+                        <th className="text-right">Meetings</th>
+                        <th className="text-right">Emails</th>
+                        <th className="text-right">WhatsApp</th>
+                        <th className="text-right">Calls</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(memberActivity?.byMember?.length ?? 0) === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={8}
+                            className="px-4 py-6 text-center text-muted-foreground text-xs"
+                          >
+                            No team members found for this workspace
+                          </td>
+                        </tr>
+                      ) : (
+                        memberActivity!.byMember.map((m) => (
+                          <tr
+                            key={m.userId}
+                            className="border-b border-border/60 last:border-0"
+                          >
+                            <td className="px-4 py-2.5">
+                              <div className="font-medium text-foreground">{m.name}</div>
+                              {m.email ? (
+                                <div className="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                                  {m.email}
+                                </div>
+                              ) : null}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                              {m.leadsAssigned.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums">
+                              {m.leadsUpdated.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums">
+                              {m.followUpsCompleted.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums">
+                              {m.meetings.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums">
+                              {m.emailsSent.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2.5 text-right tabular-nums">
+                              {m.whatsappActions.toLocaleString()}
+                            </td>
+                            <td
+                              className="px-4 py-2.5 text-right text-muted-foreground text-xs"
+                              title="Phone calls are not stored in CRM"
+                            >
+                              —
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {(memberActivity?.byMember?.length ?? 0) > 0 ? (
+                      <tfoot>
+                        <tr className="border-t border-border bg-muted/20">
+                          <td className="px-4 py-2.5 font-semibold">Total</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                            {(memberActivity?.totals.leadsAssigned ?? 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                            {(memberActivity?.totals.leadsUpdated ?? 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                            {(memberActivity?.totals.followUpsCompleted ?? 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                            {(memberActivity?.totals.meetings ?? 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                            {(memberActivity?.totals.emailsSent ?? 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
+                            {(memberActivity?.totals.whatsappActions ?? 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-muted-foreground text-xs">—</td>
+                        </tr>
+                      </tfoot>
+                    ) : null}
+                  </table>
+                </div>
+                {memberActivity?.unavailableMetrics?.length ? (
+                  <p className="text-[11px] text-muted-foreground mt-3">
+                    {memberActivity.unavailableMetrics.map((u) => u.reason).join(" ")} Lead edits
+                    reflect logged Activity/Audit rows only (single-lead edits may be under-counted
+                    until fully audited).
+                  </p>
+                ) : null}
               </>
             )}
           </div>

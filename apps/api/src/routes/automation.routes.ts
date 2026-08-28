@@ -6,6 +6,7 @@ import {
   markAllRead,
   logActivityHandler,
   listActivities,
+  teamActivityStream,
 } from "../controllers/automation.controller.js";
 import { requireAuth } from "../middleware/auth.js";
 
@@ -18,5 +19,6 @@ router.post("/notifications/read-all", requireAuth, markAllRead);
 router.post("/notifications/:id/read", requireAuth, markNotificationRead);
 router.post("/log-activity", requireAuth, logActivityHandler);
 router.get("/activity", requireAuth, listActivities);
+router.get("/team-activity/stream", requireAuth, teamActivityStream);
 
 export default router;

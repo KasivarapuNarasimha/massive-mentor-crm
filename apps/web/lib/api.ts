@@ -747,6 +747,84 @@ class ApiClient {
     }>("/leads/assignment-summary", token);
   }
 
+  /** Admin team CRM activity rollup (real tracked metrics only; calls unavailable) */
+  async getMemberActivitySummary(token?: string | null, sinceDays = 30) {
+    const q = sinceDays ? `?sinceDays=${encodeURIComponent(String(sinceDays))}` : "";
+    return this.get<{
+      sinceDays: number;
+      since: string;
+      unavailableMetrics: Array<{ key: string; reason: string }>;
+      byMember: Array<{
+        userId: string;
+        name: string;
+        email: string | null;
+        role: string | null;
+        leadsAssigned: number;
+        leadsUpdated: number;
+        followUpsCompleted: number;
+        meetings: number;
+        emailsSent: number;
+        whatsappActions: number;
+        callsMade: null;
+      }>;
+      totals: {
+        leadsAssigned: number;
+        leadsUpdated: number;
+        followUpsCompleted: number;
+        meetings: number;
+        emailsSent: number;
+        whatsappActions: number;
+      };
+    }>(`/leads/member-activity-summary${q}`, token);
+  }
+
+  /** Admin lead visibility search — reuses CRM contact list filters */
+  async adminLeadVisibilitySearch(
+    token: string | null | undefined,
+    params: {
+      status?: string;
+      assignedTo?: string;
+      search?: string;
+      sinceDays?: number;
+      page?: number;
+      pageSize?: number;
+    }
+  ) {
+    const q = new URLSearchParams();
+    if (params.status) q.set("status", params.status);
+    if (params.assignedTo) q.set("assignedTo", params.assignedTo);
+    if (params.search) q.set("search", params.search);
+    if (params.sinceDays != null) q.set("sinceDays", String(params.sinceDays));
+    if (params.page) q.set("page", String(params.page));
+    if (params.pageSize) q.set("pageSize", String(params.pageSize));
+    const qs = q.toString();
+    return this.get<{
+      total: number;
+      page: number;
+      pageSize: number;
+      items: Array<{
+        id: string;
+        name: string;
+        company: string | null;
+        status: string;
+        assignedToId: string | null;
+        assignedToName: string | null;
+        lastActivityAt: string | null;
+        nextFollowUp: string | null;
+        phone: string | null;
+        updatedAt: string;
+      }>;
+    }>(`/leads/admin-visibility-search${qs ? `?${qs}` : ""}`, token);
+  }
+
+  async sendTeamDailyReport(token: string | null | undefined, force = false) {
+    return this.post<{ sent: number; skipped?: string }>(
+      "/leads/team-daily-report/send",
+      { force },
+      token
+    );
+  }
+
   async listLeadAssignments(
     token?: string | null,
     q?: { page?: number; pageSize?: number }

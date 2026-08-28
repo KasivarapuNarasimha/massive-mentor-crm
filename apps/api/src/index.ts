@@ -445,6 +445,34 @@ server = app.listen(PORT, () => {
   setTimeout(runBilling, 60_000);
   setInterval(runBilling, 6 * 60 * 60 * 1000);
 
+  // Daily Admin team activity email — hourly check; per-business skip if already sent (UTC day)
+  const runTeamDailyReport = async () => {
+    const { runMonitoredJob, recordJobSkipped } = await import("./lib/job-monitor.js");
+    await runMonitoredJob("team-activity-daily-report", async () => {
+      const { withDistributedLock } = await import("./lib/distributed-lock.js");
+      const { sendTeamDailyReportsForAllBusinesses } = await import(
+        "./services/team-daily-report.service.js"
+      );
+      const { ran, result } = await withDistributedLock("team-activity-daily-report", () =>
+        sendTeamDailyReportsForAllBusinesses()
+      );
+      if (!ran) {
+        recordJobSkipped("team-activity-daily-report", "lock_held_by_other_instance");
+        return { skipped: true };
+      }
+      log.info("team-daily-report.complete", {
+        job: "team-activity-daily-report",
+        businesses: result?.businesses,
+        emailsSent: result?.emailsSent,
+        skipped: result?.skipped,
+      });
+      return result;
+    });
+  };
+  // First run ~5 min after boot; then hourly (idempotent per business/day)
+  setTimeout(runTeamDailyReport, 5 * 60_000);
+  setInterval(runTeamDailyReport, 60 * 60 * 1000);
+
   // WhatsApp enterprise: expired snoozes + SLA escalations (multi-instance safe)
   const runWaEnterprise = async () => {
     const { runMonitoredJob, recordJobSkipped } = await import("./lib/job-monitor.js");
@@ -465,7 +493,12 @@ server = app.listen(PORT, () => {
   setInterval(runWaEnterprise, 2 * 60 * 1000);
 
   log.info("scheduler.started", {
-    jobs: ["saas-billing-daily", "whatsapp-enterprise-jobs", "backup-scheduler"],
+    jobs: [
+      "saas-billing-daily",
+      "team-activity-daily-report",
+      "whatsapp-enterprise-jobs",
+      "backup-scheduler",
+    ],
   });
 });
 

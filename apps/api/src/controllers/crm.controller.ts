@@ -406,6 +406,84 @@ export async function leadAssignmentSummaryHandler(req: AuthenticatedRequest, re
   }
 }
 
+/** GET /api/leads/member-activity-summary — Admin team CRM activity (real tracked metrics only) */
+export async function memberActivitySummaryHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const sinceDays = req.query.sinceDays ? parseInt(String(req.query.sinceDays), 10) : 30;
+    const { getMemberActivitySummary } = await import("../services/activity.service.js");
+    const data = await getMemberActivitySummary(req.user.id, {
+      sinceDays: Number.isFinite(sinceDays) ? sinceDays : 30,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    console.error("Member activity summary error:", error);
+    const status =
+      error && typeof error === "object" && "status" in error
+        ? Number((error as { status: number }).status) || 500
+        : 500;
+    const message = error instanceof Error ? error.message : "Failed to load member activity";
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
+/** GET /api/leads/admin-visibility-search — Admin lead search (reuses CRM list filters) */
+export async function adminLeadVisibilitySearchHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const { adminLeadVisibilitySearch } = await import("../services/activity.service.js");
+    const data = await adminLeadVisibilitySearch(req.user.id, {
+      status: req.query.status ? String(req.query.status) : undefined,
+      assignedTo: req.query.assignedTo ? String(req.query.assignedTo) : undefined,
+      search: req.query.search ? String(req.query.search) : undefined,
+      sinceDays: req.query.sinceDays ? parseInt(String(req.query.sinceDays), 10) : undefined,
+      page: req.query.page ? parseInt(String(req.query.page), 10) : 1,
+      pageSize: req.query.pageSize ? parseInt(String(req.query.pageSize), 10) : 25,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    console.error("Admin lead visibility search error:", error);
+    const status =
+      error && typeof error === "object" && "status" in error
+        ? Number((error as { status: number }).status) || 500
+        : 500;
+    const message = error instanceof Error ? error.message : "Search failed";
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
+/** POST /api/leads/team-daily-report/send — force-send today's report for active business (admin) */
+export async function sendTeamDailyReportHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const { resolveActorRole } = await import("../services/tenant-scope.service.js");
+    const { getUserBusinessId } = await import("../services/field-engine.service.js");
+    const role = await resolveActorRole(req.user.id);
+    const ok = new Set(["ceo", "owner", "business_admin", "admin", "super_admin"]);
+    if (!ok.has(role) && !role.includes("admin")) {
+      return res.status(403).json({ success: false, error: "Insufficient permissions" });
+    }
+    const businessId = await getUserBusinessId(req.user.id);
+    if (!businessId) {
+      return res.status(400).json({ success: false, error: "No business context" });
+    }
+    const { sendTeamDailyReportForBusiness } = await import(
+      "../services/team-daily-report.service.js"
+    );
+    const data = await sendTeamDailyReportForBusiness(businessId, {
+      force: req.body?.force === true,
+      actorUserId: req.user.id,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    console.error("Team daily report send error:", error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to send report",
+    });
+  }
+}
+
 /** GET /api/leads/assignments — history (admin) */
 export async function listLeadAssignmentsHandler(req: AuthenticatedRequest, res: Response) {
   try {

@@ -48,6 +48,9 @@ import {
   sendLeadEmailHandler,
   listAssignableMembersHandler,
   leadAssignmentSummaryHandler,
+  memberActivitySummaryHandler,
+  adminLeadVisibilitySearchHandler,
+  sendTeamDailyReportHandler,
   listLeadAssignmentsHandler,
   getLeadAssignmentHandler,
   moveLeadAssignmentHandler,
@@ -63,6 +66,9 @@ router.post("/leads/bulk-delete", requireAuth, bulkDeleteLeadsHandler);
 router.post("/leads/bulk-assign", requireAuth, bulkAssignLeadsHandler);
 router.get("/leads/assignable-members", requireAuth, listAssignableMembersHandler);
 router.get("/leads/assignment-summary", requireAuth, leadAssignmentSummaryHandler);
+router.get("/leads/member-activity-summary", requireAuth, memberActivitySummaryHandler);
+router.get("/leads/admin-visibility-search", requireAuth, adminLeadVisibilitySearchHandler);
+router.post("/leads/team-daily-report/send", requireAuth, sendTeamDailyReportHandler);
 router.get("/leads/assignments", requireAuth, listLeadAssignmentsHandler);
 router.get("/leads/assignments/:id", requireAuth, getLeadAssignmentHandler);
 router.post("/leads/assignments/:id/move", requireAuth, moveLeadAssignmentHandler);

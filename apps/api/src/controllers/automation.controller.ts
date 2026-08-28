@@ -80,6 +80,81 @@ export async function logActivityHandler(req: AuthenticatedRequest, res: Respons
   }
 }
 
+/** GET /api/automations/team-activity/stream — SSE for Admin team activity toasts */
+export async function teamActivityStream(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, error: "Not authenticated" });
+    }
+    const { resolveActorRole } = await import("../services/tenant-scope.service.js");
+    const { getUserBusinessId } = await import("../services/field-engine.service.js");
+    const role = await resolveActorRole(req.user.id);
+    const adminOk = new Set([
+      "ceo",
+      "owner",
+      "business_admin",
+      "admin",
+      "super_admin",
+      "sales_manager",
+      "manager",
+    ]);
+    if (!adminOk.has(role) && !role.includes("admin")) {
+      return res.status(403).json({ success: false, error: "Insufficient permissions" });
+    }
+    const businessId = await getUserBusinessId(req.user.id);
+    if (!businessId) {
+      return res.status(400).json({ success: false, error: "No business context" });
+    }
+
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (typeof (res as { flushHeaders?: () => void }).flushHeaders === "function") {
+      (res as { flushHeaders: () => void }).flushHeaders();
+    }
+
+    const writeEvent = (event: string, data: unknown) => {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    writeEvent("connected", { businessId, at: new Date().toISOString() });
+
+    const { subscribeTeamActivity } = await import(
+      "../services/team-activity-realtime.service.js"
+    );
+    const viewerId = req.user.id;
+    const unsub = subscribeTeamActivity(businessId, (payload) => {
+      // Never toast the actor about their own action
+      if (payload.actorUserId === viewerId) return;
+      writeEvent("team_activity", payload);
+    });
+
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: heartbeat ${Date.now()}\n\n`);
+      } catch {
+        /* closed */
+      }
+    }, 20_000);
+
+    const cleanup = () => {
+      clearInterval(heartbeat);
+      unsub();
+    };
+    req.on("close", cleanup);
+    req.on("error", cleanup);
+  } catch (error: unknown) {
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Stream failed",
+      });
+    }
+  }
+}
+
 export async function listActivities(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });

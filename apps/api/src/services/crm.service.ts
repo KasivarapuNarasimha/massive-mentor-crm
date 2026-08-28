@@ -22,7 +22,10 @@ async function notifyCrmCreated(
     entityType: opts.entityType,
     entityId: opts.entityId,
     action: "created",
-    details: { title: opts.title },
+    details: {
+      title: opts.message?.match(/"([^"]+)"/)?.[1] || opts.title,
+      notifTitle: opts.title,
+    },
   }).catch((err) => {
     console.error("[notifyCrmCreated] activity log failed", opts.entityType, opts.entityId, err);
   });
@@ -611,6 +614,56 @@ export async function updateContact(
     pipelineSync?.contactConvertedToClient || pipelineSync?.dealCreated
       ? (await prisma.contact.findUnique({ where: { id: contact.id } })) || contact
       : contact;
+
+  // Meaningful single-lead/contact update → one Activity row (powers Admin metrics + team toasts).
+  // Skip no-op patches; never double-log with bulk_updated (that path is separate).
+  const assigneeChanged = prevAssignee !== nextAssignee;
+  const customChanged =
+    JSON.stringify(existing.customFields ?? {}) !== JSON.stringify(mergedCustom ?? {});
+  const meaningfulUpdate =
+    statusChanged ||
+    assigneeChanged ||
+    customChanged ||
+    (applied.core.name !== undefined && String(applied.core.name) !== String(existing.name || "")) ||
+    (applied.core.phone !== undefined && String(applied.core.phone || "") !== String(existing.phone || "")) ||
+    (applied.core.email !== undefined && String(applied.core.email || "") !== String(existing.email || "")) ||
+    (applied.core.company !== undefined &&
+      String(applied.core.company || "") !== String(existing.company || "")) ||
+    (applied.core.description !== undefined &&
+      String(applied.core.description || "") !== String(existing.description || "")) ||
+    (parsed.priority !== undefined && String(parsed.priority || "") !== String(existing.priority || "")) ||
+    (parsed.nextFollowUp !== undefined) ||
+    (parsed.source !== undefined && String(parsed.source || "") !== String(existing.source || "")) ||
+    (parsed.notes !== undefined);
+
+  if (meaningfulUpdate) {
+    await logActivity({
+      userId,
+      entityType: "contact",
+      entityId: finalContact.id,
+      action: "updated",
+      details: {
+        title: finalContact.name,
+        status: finalContact.status,
+        previousStatus: existing.status,
+        statusChanged,
+        assigneeChanged,
+      },
+    }).catch(() => undefined);
+    await recordAudit({
+      businessId: finalContact.businessId || resolvedBusinessId || null,
+      actorUserId: userId,
+      action: "lead_update",
+      entityType: "contact",
+      entityId: finalContact.id,
+      metadata: {
+        status: finalContact.status,
+        previousStatus: existing.status,
+        statusChanged,
+        assigneeChanged,
+      },
+    }).catch(() => undefined);
+  }
 
   scheduleFollowupRefresh(userId);
   return { contact: finalContact, pipelineSync };
@@ -1829,7 +1882,11 @@ export async function updateTask(userId: string, id: string, input: Partial<Task
         })
       : undefined;
 
-  return prisma.task.update({
+  const nextStatus = parsed.status ?? existing.status;
+  const completedNow =
+    nextStatus === "done" && String(existing.status || "").toLowerCase() !== "done";
+
+  const updated = await prisma.task.update({
     where: { id },
     data: {
       contactId: parsed.contactId !== undefined ? (parsed.contactId || null) : existing.contactId,
@@ -1837,11 +1894,23 @@ export async function updateTask(userId: string, id: string, input: Partial<Task
       title: parsed.title ?? existing.title,
       description: parsed.description !== undefined ? (parsed.description || null) : existing.description,
       dueDate: parsed.dueDate !== undefined ? (parsed.dueDate ? new Date(parsed.dueDate) : null) : existing.dueDate,
-      status: parsed.status ?? existing.status,
+      status: nextStatus,
       priority: parsed.priority !== undefined ? (parsed.priority || null) : existing.priority,
       ...(nextCustom !== undefined ? { customFields: nextCustom as object } : {}),
     },
   });
+
+  if (completedNow) {
+    await logActivity({
+      userId,
+      entityType: "task",
+      entityId: updated.id,
+      action: "task_completed",
+      details: { title: updated.title, contactId: updated.contactId },
+    }).catch(() => undefined);
+  }
+
+  return updated;
 }
 
 export async function deleteTask(userId: string, id: string) {

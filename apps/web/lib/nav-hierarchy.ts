@@ -145,6 +145,11 @@ export const NAV_HIERARCHY: NavMainModuleDef[] = [
         features: [
           { id: "settings-profile", label: "Business Profile", href: "/dashboard/profile" },
           { id: "settings-appearance", label: "Appearance", href: "/dashboard/settings/appearance" },
+          {
+            id: "settings-custom-fields",
+            label: "Custom Fields",
+            href: "/dashboard/settings/custom-fields",
+          },
         ],
       },
       {

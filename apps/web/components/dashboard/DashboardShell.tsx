@@ -24,6 +24,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { canAccessPath, filterNavByModules } from "@/lib/module-permissions";
 import { NAV_HIERARCHY, findActiveSubModuleId, type NavMainKey } from "@/lib/nav-hierarchy";
 import { FeatureSearch } from "@/components/dashboard/FeatureSearch";
+import { TeamActivityToaster } from "@/components/team/TeamActivityToaster";
 
 /** Layout chrome heights — enterprise density (header ~56px) */
 const NAV_H = "3.5rem"; // 56px
@@ -1231,6 +1232,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     : `calc(${NAV_H} + ${FIELD_BAR_H})`;
 
   return (
+    <>
+      <TeamActivityToaster />
     <div
       className="min-h-screen min-h-dvh bg-background text-foreground overflow-x-hidden safe-top"
       style={
@@ -1792,5 +1795,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
     </div>
+    </>
   );
 }
