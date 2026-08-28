@@ -62,7 +62,7 @@ class ApiClient {
   private getInflight = new Map<string, Promise<ApiResponse<unknown>>>();
   /** Short TTL cache so sequential callers (layout then PlanProvider) reuse results. */
   private getRecent = new Map<string, { at: number; promise: Promise<ApiResponse<unknown>> }>();
-  private static GET_CACHE_TTL_MS = 2_000;
+  private static GET_CACHE_TTL_MS = 5_000;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl.replace(/\/$/, "");

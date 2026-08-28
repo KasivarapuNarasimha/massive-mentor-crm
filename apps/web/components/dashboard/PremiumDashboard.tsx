@@ -348,7 +348,8 @@ export function PremiumDashboard() {
       api.getCrmMeetings("?pageSize=30", token),
       api.get<{ audit?: unknown[]; activities?: unknown[] }>("/automations/activity?pageSize=20", token),
       api.get<{ kpis?: FinanceKpis }>("/finance/dashboard", token),
-      api.get<{ recommendations?: unknown[]; items?: unknown[] }>("/crm/ai/followup-engine?limit=8", token),
+      // Same limit as AiFollowupCenter so in-flight/TTL dedupe can share one call
+      api.get<{ recommendations?: unknown[]; items?: unknown[] }>("/crm/ai/followup-engine?limit=40", token),
       api.getMediaStats(token),
       api.getLeadAssignmentSummary(token),
       canSeeMemberActivity
