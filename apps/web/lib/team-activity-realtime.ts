@@ -165,7 +165,12 @@ export function installTeamActivitySoundGestureUnlock(
     return () => undefined;
   }
 
-  const unlock = () => {
+  const unlock = (event: Event) => {
+    // Let the Enable Sound button own its click (unlock + confirmation tone).
+    // Otherwise capture-phase unlock re-renders and can drop the button onClick.
+    const target = event.target as Element | null;
+    if (target?.closest?.("[data-mm-enable-sound]")) return;
+
     unlockTeamActivitySound();
     onUnlocked?.();
     remove();

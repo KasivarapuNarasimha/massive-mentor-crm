@@ -168,6 +168,7 @@ export function TeamActivityToaster() {
     <>
       {canListen && showEnableSound && !isTeamActivitySoundUnlocked() ? (
         <div
+          data-mm-enable-sound
           className="fixed left-1/2 z-[70] -translate-x-1/2 w-[min(28rem,calc(100vw-1.5rem))]"
           style={{ top: "calc(var(--mm-chrome-h, 3.5rem) + 0.5rem)" }}
           role="status"
