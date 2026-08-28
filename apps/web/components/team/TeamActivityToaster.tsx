@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import {
   connectTeamActivityStream,
+  installTeamActivitySoundGestureUnlock,
   isTeamActivitySoundMuted,
+  isTeamActivitySoundUnlocked,
+  needsTeamActivitySoundEnable,
   playTeamActivitySound,
   setTeamActivitySoundMuted,
   unlockTeamActivitySound,
@@ -25,27 +28,48 @@ const ADMIN_ROLES = new Set([
 /**
  * Cross-CRM live team activity toasts (Admin). Mounted in DashboardShell so it
  * works on every CRM route, not only /dashboard.
+ *
+ * Sound: Chrome autoplay requires a user gesture before Web Audio can play.
+ * We unlock on the first pointer/key/touch after mount, and also show a
+ * one-time "Enable Sound" control until unlocked (never re-prompts after).
+ * Toasts are in-page Sonner UI — they do NOT use browser Notification permission.
  */
 export function TeamActivityToaster() {
   const { token, role, user } = useAuth();
   const seenRef = useRef<Set<string>>(new Set());
+  const [showEnableSound, setShowEnableSound] = useState(false);
 
   const roleKey = String(role || user?.role || "").toLowerCase();
   const canListen =
     ADMIN_ROLES.has(roleKey) || roleKey.includes("admin");
 
-  // Unlock Web Audio after first user gesture (browser autoplay policy)
+  const refreshEnablePrompt = useCallback(() => {
+    if (!canListen) {
+      setShowEnableSound(false);
+      return;
+    }
+    setShowEnableSound(needsTeamActivitySoundEnable());
+  }, [canListen]);
+
+  // Unlock Web Audio on first user gesture as soon as the shell mounts —
+  // do not wait for role resolution, or early clicks during load are lost.
   useEffect(() => {
-    const unlock = () => unlockTeamActivitySound();
-    window.addEventListener("pointerdown", unlock, { once: true });
-    window.addEventListener("keydown", unlock, { once: true });
-    window.addEventListener("touchstart", unlock, { once: true });
-    return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
-      window.removeEventListener("touchstart", unlock);
-    };
+    return installTeamActivitySoundGestureUnlock(() => {
+      setShowEnableSound(false);
+    });
   }, []);
+
+  useEffect(() => {
+    refreshEnablePrompt();
+  }, [refreshEnablePrompt]);
+
+  // If still locked after mount (no gesture yet), show Enable Sound for admins.
+  useEffect(() => {
+    if (!canListen) return;
+    if (needsTeamActivitySoundEnable()) {
+      setShowEnableSound(true);
+    }
+  }, [canListen]);
 
   useEffect(() => {
     if (!token || !canListen) return;
@@ -64,8 +88,14 @@ export function TeamActivityToaster() {
       const title = payload.title || "New Team Activity";
       const message = payload.message || "A team member performed a CRM action";
 
+      // If sound is still locked, surface the enable control (one-time UX).
+      if (needsTeamActivitySoundEnable()) {
+        setShowEnableSound(true);
+      }
+
       // Render toast first (do not depend on audio). Use top-center to match
       // ThemeAwareToaster — bottom-right was easy to miss behind CRM chrome.
+      // Independent of browser Notification permission.
       toast.custom(
         (t) => (
           <div
@@ -96,6 +126,7 @@ export function TeamActivityToaster() {
                 className="mt-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
                 onClick={() => {
                   setTeamActivitySoundMuted(!isTeamActivitySoundMuted());
+                  refreshEnablePrompt();
                 }}
               >
                 {isTeamActivitySoundMuted() ? "Unmute sound" : "Mute sound"}
@@ -119,7 +150,59 @@ export function TeamActivityToaster() {
 
     const disconnect = connectTeamActivityStream(token, onEvent);
     return () => disconnect();
-  }, [token, canListen]);
+  }, [token, canListen, refreshEnablePrompt]);
 
-  return null;
+  const onEnableSound = () => {
+    // Direct user gesture → unlock AudioContext for this origin.
+    // Do not clear an intentional mute unless the user explicitly enables sound.
+    unlockTeamActivitySound();
+    if (isTeamActivitySoundMuted()) {
+      setTeamActivitySoundMuted(false);
+    }
+    setShowEnableSound(false);
+    // Confirmation tone so the user hears that sound works now.
+    playTeamActivitySound();
+  };
+
+  return (
+    <>
+      {canListen && showEnableSound && !isTeamActivitySoundUnlocked() ? (
+        <div
+          className="fixed left-1/2 z-[70] -translate-x-1/2 w-[min(28rem,calc(100vw-1.5rem))]"
+          style={{ top: "calc(var(--mm-chrome-h, 3.5rem) + 0.5rem)" }}
+          role="status"
+        >
+          <div className="rounded-md border border-border bg-card shadow-md px-3 py-2.5 flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold text-foreground">
+                Enable Team Activity sound
+              </div>
+              <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                Your browser blocks CRM alert tones until you allow sound once.
+                Pop-up toasts still work without this.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onEnableSound}
+              className="shrink-0 rounded-md bg-primary text-primary-foreground text-xs font-medium px-3 py-1.5 hover:opacity-90"
+            >
+              Enable Sound
+            </button>
+            <button
+              type="button"
+              aria-label="Dismiss sound prompt"
+              className="shrink-0 text-muted-foreground hover:text-foreground text-sm px-1"
+              onClick={() => {
+                // Dismiss only for this page view; next visit still prompts until unlocked.
+                setShowEnableSound(false);
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
 }

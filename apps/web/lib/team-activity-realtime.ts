@@ -138,7 +138,10 @@ export function unlockTeamActivitySound(): void {
   localStorage.setItem(SOUND_UNLOCK_KEY, "1");
   try {
     const ctx = getAudioContext();
-    if (ctx && ctx.state === "suspended") {
+    if (!ctx) return;
+    // Always attempt resume from the gesture; Chrome may keep context suspended
+    // until resume() runs inside that user-activation window.
+    if (ctx.state === "suspended") {
       void ctx.resume().catch(() => undefined);
     }
   } catch {
@@ -146,9 +149,70 @@ export function unlockTeamActivitySound(): void {
   }
 }
 
+/**
+ * Install one-shot document-level gesture listeners that unlock Web Audio.
+ * Safe to call multiple times; only the first successful gesture persists unlock.
+ * Uses capture phase so clicks during late React mount still count.
+ */
+export function installTeamActivitySoundGestureUnlock(
+  onUnlocked?: () => void
+): () => void {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return () => undefined;
+  }
+  if (isTeamActivitySoundUnlocked()) {
+    onUnlocked?.();
+    return () => undefined;
+  }
+
+  const unlock = () => {
+    unlockTeamActivitySound();
+    onUnlocked?.();
+    remove();
+  };
+
+  const opts: AddEventListenerOptions = { capture: true };
+  const remove = () => {
+    document.removeEventListener("pointerdown", unlock, opts);
+    document.removeEventListener("keydown", unlock, opts);
+    document.removeEventListener("touchstart", unlock, opts);
+  };
+
+  document.addEventListener("pointerdown", unlock, opts);
+  document.addEventListener("keydown", unlock, opts);
+  document.addEventListener("touchstart", unlock, opts);
+  return remove;
+}
+
 export function isTeamActivitySoundUnlocked(): boolean {
   if (typeof window === "undefined") return false;
   return localStorage.getItem(SOUND_UNLOCK_KEY) === "1";
+}
+
+/**
+ * True when the CRM has not yet received a user gesture to unlock Web Audio.
+ * Chrome autoplay policy keeps AudioContext suspended until then; our play()
+ * also no-ops until unlock so silence is intentional until Enable Sound / click.
+ */
+export function needsTeamActivitySoundEnable(): boolean {
+  if (typeof window === "undefined") return false;
+  if (isTeamActivitySoundMuted()) return false;
+  return !isTeamActivitySoundUnlocked();
+}
+
+function startTeamActivityTone(ctx: AudioContext): void {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(880, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.12);
+  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.07, ctx.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.2);
 }
 
 /** Short soft notification tone (Web Audio) — once per event, no loop, no external asset. */
@@ -160,20 +224,18 @@ export function playTeamActivitySound(): void {
     const ctx = getAudioContext();
     if (!ctx) return;
     if (ctx.state === "suspended") {
-      void ctx.resume().catch(() => undefined);
+      // Resume is async; schedule the tone after Chrome allows audio.
+      void ctx
+        .resume()
+        .then(() => {
+          if (ctx.state === "running" && !isTeamActivitySoundMuted()) {
+            startTeamActivityTone(ctx);
+          }
+        })
+        .catch(() => undefined);
+      return;
     }
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.12);
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.07, ctx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.2);
+    startTeamActivityTone(ctx);
   } catch {
     /* autoplay / unsupported */
   }
