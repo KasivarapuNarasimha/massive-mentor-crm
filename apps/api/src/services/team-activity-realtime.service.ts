@@ -113,7 +113,17 @@ export function formatTeamActivityCopy(opts: {
 export function publishTeamActivity(payload: TeamActivityRealtimePayload): void {
   if (!payload.businessId) return;
   try {
-    bus.emit(channel(payload.businessId), payload);
+    const ch = channel(payload.businessId);
+    const listeners = bus.listenerCount(ch);
+    // If 0, Admins will still get the bell (DB notify) but no live toast.
+    if (listeners === 0) {
+      console.warn(
+        "[team-activity-realtime] publish with 0 SSE listeners businessId=%s action=%s",
+        payload.businessId,
+        payload.action
+      );
+    }
+    bus.emit(ch, payload);
   } catch (e) {
     console.warn(
       "[team-activity-realtime] publish failed:",

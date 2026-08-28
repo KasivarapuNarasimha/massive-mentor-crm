@@ -61,14 +61,17 @@ export function connectTeamActivityStream(
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
 
-          const parts = buffer.split(/\n\n/);
+          // Normalize CRLF from some proxies before framing
+          buffer = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+          const parts = buffer.split("\n\n");
           buffer = parts.pop() || "";
 
           for (const frame of parts) {
-            const lines = frame.split(/\n/);
+            const lines = frame.split("\n");
             let eventName = "message";
             const dataLines: string[] = [];
-            for (const line of lines) {
+            for (const raw of lines) {
+              const line = raw.trimEnd();
               if (line.startsWith("event:")) eventName = line.slice(6).trim();
               else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
             }
@@ -78,7 +81,7 @@ export function connectTeamActivityStream(
               const payload = JSON.parse(dataLines.join("\n")) as TeamActivityStreamEvent;
               onEvent(payload);
             } catch {
-              /* ignore */
+              /* ignore malformed frame */
             }
           }
         }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -28,16 +28,11 @@ const ADMIN_ROLES = new Set([
  */
 export function TeamActivityToaster() {
   const { token, role, user } = useAuth();
-  const [muted, setMuted] = useState(false);
   const seenRef = useRef<Set<string>>(new Set());
 
   const roleKey = String(role || user?.role || "").toLowerCase();
   const canListen =
     ADMIN_ROLES.has(roleKey) || roleKey.includes("admin");
-
-  useEffect(() => {
-    setMuted(isTeamActivitySoundMuted());
-  }, []);
 
   // Unlock Web Audio after first user gesture (browser autoplay policy)
   useEffect(() => {
@@ -69,8 +64,8 @@ export function TeamActivityToaster() {
       const title = payload.title || "New Team Activity";
       const message = payload.message || "A team member performed a CRM action";
 
-      playTeamActivitySound();
-
+      // Render toast first (do not depend on audio). Use top-center to match
+      // ThemeAwareToaster — bottom-right was easy to miss behind CRM chrome.
       toast.custom(
         (t) => (
           <div
@@ -100,12 +95,10 @@ export function TeamActivityToaster() {
                 type="button"
                 className="mt-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
                 onClick={() => {
-                  const next = !isTeamActivitySoundMuted();
-                  setTeamActivitySoundMuted(next);
-                  setMuted(next);
+                  setTeamActivitySoundMuted(!isTeamActivitySoundMuted());
                 }}
               >
-                {muted ? "Unmute sound" : "Mute sound"}
+                {isTeamActivitySoundMuted() ? "Unmute sound" : "Mute sound"}
               </button>
             </div>
             <button
@@ -118,13 +111,14 @@ export function TeamActivityToaster() {
             </button>
           </div>
         ),
-        { duration: 5500, position: "bottom-right", id }
+        { duration: 8000, position: "top-center", id }
       );
+
+      playTeamActivitySound();
     };
 
     const disconnect = connectTeamActivityStream(token, onEvent);
     return () => disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mute toggles sound only; must not reconnect SSE
   }, [token, canListen]);
 
   return null;

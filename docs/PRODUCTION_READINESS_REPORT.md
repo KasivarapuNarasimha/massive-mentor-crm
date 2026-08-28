@@ -236,7 +236,7 @@ Massive Mentor CRM is a **broad, multi-tenant SaaS product** with Super Admin, c
 ## Pre-launch checklist (must-do)
 
 - [ ] `git pull` latest; rebuild **API + web**; `prisma db push` / migrate  
-- [ ] Confirm env: `JWT_SECRET`, `DATABASE_URL`, `SMTP_*`, `RAZORPAY_*` (+ webhook secret), `APP_URL=https://crm.massigmentor.in`  
+- [ ] Confirm env: `JWT_SECRET`, `DATABASE_URL`, `SMTP_*`, `RAZORPAY_*` (+ webhook secret), `APP_URL=https://crm.massivementor.in`  
 - [ ] Nginx: API stream location + import timeouts; `nginx -t` + reload  
 - [ ] Smoke: login customer + admin; password reset email; Razorpay test payment  
 - [ ] Smoke: Super Admin plan change → CRM SSE update &lt; 3s  
