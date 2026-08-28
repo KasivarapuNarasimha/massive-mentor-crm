@@ -35,6 +35,8 @@ type PlanContextValue = {
   /** open | connecting | closed | error — for diagnostics */
   liveStatus: "idle" | "connecting" | "open" | "closed" | "error";
   loading: boolean;
+  /** False until first successful access/SSE apply — avoid flashing Trial on 429 */
+  accessKnown: boolean;
   can: (feature: FeatureKey) => boolean;
   requireFeature: (feature: FeatureKey) => boolean;
   openLock: (feature: FeatureKey) => void;
@@ -49,15 +51,18 @@ const FALLBACK_POLL_MS = 5 * 60_000;
 
 export function PlanProvider({ children }: { children: ReactNode }) {
   const { token, isAuthenticated } = useAuth();
+  // Do not default to Trial — that falsely labels paid workspaces when /billing/access 429s.
   const [tier, setTier] = useState<PlanTier>("trial");
   const [plan, setPlan] = useState<string | null>(null);
-  const [isTrial, setIsTrial] = useState(true);
+  const [isTrial, setIsTrial] = useState(false);
   const [planStatus, setPlanStatus] = useState<string | null>(null);
   const [licenseStatus, setLicenseStatus] = useState<string | null>(null);
   const [trialDaysRemaining, setTrialDaysRemaining] = useState<number | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [liveStatus, setLiveStatus] = useState<PlanContextValue["liveStatus"]>("idle");
   const [loading, setLoading] = useState(true);
+  /** True after at least one successful /billing/access (or SSE apply). */
+  const [accessKnown, setAccessKnown] = useState(false);
   const [lockFeature, setLockFeature] = useState<FeatureKey | null>(null);
   const refreshInFlight = useRef<Promise<void> | null>(null);
 
@@ -112,7 +117,9 @@ export function PlanProvider({ children }: { children: ReactNode }) {
         }>("/billing/access", token);
         if (res.success && res.data?.access) {
           applyAccess(res.data.access);
+          setAccessKnown(true);
         }
+        // On 429/network failure: keep last-known plan (do not flip to Trial).
       } finally {
         setLoading(false);
         refreshInFlight.current = null;
@@ -147,8 +154,15 @@ export function PlanProvider({ children }: { children: ReactNode }) {
             trialDaysRemaining: payload.trialDaysRemaining,
             isLocked: payload.isLocked,
           });
+          setAccessKnown(true);
         }
-        // Authoritative re-fetch (heals edge cases) + notify other UI
+        // Connect-time snapshots already carry access — do NOT refresh+emit
+        // (that re-fetches /billing/access and reloads the whole dashboard).
+        const isSnapshot =
+          payload.source === "snapshot" || payload.type === "subscription_snapshot";
+        if (isSnapshot) return;
+
+        // Real subscription changes: authoritative re-fetch + notify other UI
         void refresh().then(() => {
           emitDataChanged({ module: "billing", action: "update" });
         });
@@ -217,6 +231,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       isLocked,
       liveStatus,
       loading,
+      accessKnown,
       can,
       requireFeature,
       openLock,
@@ -227,6 +242,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       tier,
       plan,
       isTrial,
+      accessKnown,
       planStatus,
       licenseStatus,
       trialDaysRemaining,
@@ -268,6 +284,7 @@ export function usePlan(): PlanContextValue {
       isLocked: false,
       liveStatus: "idle",
       loading: false,
+      accessKnown: true,
       can: () => true,
       requireFeature: () => true,
       openLock: () => undefined,

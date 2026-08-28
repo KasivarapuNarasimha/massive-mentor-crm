@@ -525,7 +525,7 @@ const ERP_PHASE2_ITEMS: Array<NavItem & { moduleKey: string }> = [
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { user, logout, token } = useAuth();
   const { portal, workspaceRole, setWorkspaceRole, isLoading: portalLoading } = usePortal();
-  const { can, requireFeature, plan, isTrial, planStatus, licenseStatus } = usePlan();
+  const { can, requireFeature, plan, isTrial, planStatus, licenseStatus, accessKnown, loading: planLoading } = usePlan();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   /** Desktop collapse — icons-only rail */
@@ -1302,7 +1302,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             {!isDemoMode ? (
               <div
                 className={`hidden md:inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded border tracking-wide shrink-0 font-semibold capitalize ${
-                  isTrial
+                  !accessKnown || planLoading
+                    ? "border-border bg-muted text-muted-foreground"
+                    : isTrial
                     ? "mm-badge-primary"
                     : planStatus === "suspended" || licenseStatus === "expired"
                       ? "mm-badge-danger"
@@ -1311,8 +1313,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 data-testid="plan-badge"
                 title={`Plan: ${plan || "—"} · Status: ${planStatus || "—"} · License: ${licenseStatus || "—"}`}
               >
-                <span>{isTrial ? "Trial" : plan || "Plan"}</span>
-                {licenseStatus ? (
+                <span>
+                  {!accessKnown || planLoading
+                    ? "…"
+                    : isTrial
+                      ? "Trial"
+                      : plan || "Plan"}
+                </span>
+                {accessKnown && licenseStatus ? (
                   <span className="opacity-70 font-normal normal-case">· {licenseStatus}</span>
                 ) : null}
               </div>

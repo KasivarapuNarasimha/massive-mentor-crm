@@ -55,6 +55,14 @@ class ApiClient {
   private baseUrl: string;
   /** Last connectivity probe result (for banners). */
   lastNetworkError: string | null = null;
+  /**
+   * In-flight GET dedupe: identical authenticated GETs share one network call.
+   * Prevents dashboard providers from stampeding the same endpoint 3–5×.
+   */
+  private getInflight = new Map<string, Promise<ApiResponse<unknown>>>();
+  /** Short TTL cache so sequential callers (layout then PlanProvider) reuse results. */
+  private getRecent = new Map<string, { at: number; promise: Promise<ApiResponse<unknown>> }>();
+  private static GET_CACHE_TTL_MS = 2_000;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
@@ -224,6 +232,7 @@ class ApiClient {
     options: RequestOptions = {}
   ): Promise<ApiResponse<T>> {
     const { token, timeoutMs = DEFAULT_TIMEOUT_MS, ...fetchOptions } = options;
+    const method = String(fetchOptions.method || "GET").toUpperCase();
 
     const headers: HeadersInit = {
       "Content-Type": "application/json",
@@ -236,6 +245,64 @@ class ApiClient {
 
     const path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
     const url = `${this.baseUrl}${path}`;
+
+    // Share in-flight + recent GETs (no custom AbortSignal) across providers/components.
+    const canDedupe = method === "GET" && !fetchOptions.signal;
+    if (canDedupe) {
+      const key = `GET:${url}:auth:${token ? token.slice(-24) : "anon"}`;
+      const existing = this.getInflight.get(key);
+      if (existing) {
+        return existing as Promise<ApiResponse<T>>;
+      }
+      const recent = this.getRecent.get(key);
+      if (recent && Date.now() - recent.at < ApiClient.GET_CACHE_TTL_MS) {
+        return recent.promise as Promise<ApiResponse<T>>;
+      }
+      const shared = this.executeRequest<T>(url, path, {
+        ...fetchOptions,
+        method,
+        headers,
+        token,
+        timeoutMs,
+      })
+        .then((res) => {
+          // Only reuse successful responses briefly; never cache 429/errors.
+          if (res.success) {
+            this.getRecent.set(key, {
+              at: Date.now(),
+              promise: Promise.resolve(res) as Promise<ApiResponse<unknown>>,
+            });
+          } else {
+            this.getRecent.delete(key);
+          }
+          return res;
+        })
+        .finally(() => {
+          if (this.getInflight.get(key) === shared) {
+            this.getInflight.delete(key);
+          }
+        });
+      this.getInflight.set(key, shared as Promise<ApiResponse<unknown>>);
+      return shared;
+    }
+
+    return this.executeRequest<T>(url, path, {
+      ...fetchOptions,
+      method,
+      headers,
+      token,
+      timeoutMs,
+    });
+  }
+
+  private async executeRequest<T>(
+    url: string,
+    path: string,
+    options: RequestOptions & { headers: HeadersInit; method: string }
+  ): Promise<ApiResponse<T>> {
+    const { timeoutMs = DEFAULT_TIMEOUT_MS, headers, method, token: _ignoredToken, ...fetchOptions } =
+      options;
+    void _ignoredToken;
 
     const controller = new AbortController();
     const externalSignal = fetchOptions.signal;
@@ -253,6 +320,7 @@ class ApiClient {
     try {
       const response = await fetch(url, {
         ...fetchOptions,
+        method,
         headers,
         signal: controller.signal,
         cache: fetchOptions.cache ?? "no-store",

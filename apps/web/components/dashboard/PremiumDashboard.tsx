@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { api, API_BASE_URL } from "@/lib/api";
+import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/currency";
 import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { useDataVersion } from "@/lib/data-events";
@@ -258,7 +258,7 @@ export function PremiumDashboard() {
   const { currency } = useBusinessCurrency();
   const dataVersion = useDataVersion();
   const { portal } = usePortal();
-  const { plan, isTrial, tier } = usePlan();
+  const { plan, isTrial, tier, accessKnown } = usePlan();
   const [isDemoMode, setIsDemoMode] = useState(false);
   useEffect(() => {
     try {
@@ -329,19 +329,9 @@ export function PremiumDashboard() {
     if (!token) return;
     setLoading(true);
 
-    const headers = { Authorization: `Bearer ${token}` };
-
-    const safeJson = async (url: string) => {
-      try {
-        const r = await fetch(url, { headers });
-        return await r.json();
-      } catch {
-        return null;
-      }
-    };
-
     // Analytics: ONLY /reports/dashboard (full-tenant SQL/groupBy — no pageSize samples)
     // Lists (tasks/meetings/activity/AI): small recent slices for widgets only
+    // All via api.get so identical in-flight GETs are shared across the app.
     const [
       reportsRes,
       tasksRes,
@@ -356,9 +346,9 @@ export function PremiumDashboard() {
       api.get<ReportsDash>("/reports/dashboard", token),
       api.getCrmTasks("?pageSize=50", token),
       api.getCrmMeetings("?pageSize=30", token),
-      safeJson(`${API_BASE_URL}/automations/activity?pageSize=20`),
+      api.get<{ audit?: unknown[]; activities?: unknown[] }>("/automations/activity?pageSize=20", token),
       api.get<{ kpis?: FinanceKpis }>("/finance/dashboard", token),
-      safeJson(`${API_BASE_URL}/crm/ai/followup-engine?limit=8`),
+      api.get<{ recommendations?: unknown[]; items?: unknown[] }>("/crm/ai/followup-engine?limit=8", token),
       api.getMediaStats(token),
       api.getLeadAssignmentSummary(token),
       canSeeMemberActivity
@@ -384,42 +374,46 @@ export function PremiumDashboard() {
       }
       setDeals(stageList);
     }
+    // On 429/failure: keep prior reports/deals (do not zero the dashboard)
 
+    if (tasksRes.success && tasksRes.data) {
     const taskList =
       (tasksRes.data as { tasks?: Task[] })?.tasks ||
       (tasksRes.data as { items?: Task[] })?.items ||
       (Array.isArray(tasksRes.data) ? (tasksRes.data as Task[]) : []);
     setTasks(taskList);
+    }
 
+    if (meetingsRes.success && meetingsRes.data) {
     const meetingList =
       (meetingsRes.data as { meetings?: Meeting[] })?.meetings ||
       (meetingsRes.data as { items?: Meeting[] })?.items ||
       (Array.isArray(meetingsRes.data) ? (meetingsRes.data as Meeting[]) : []);
     setMeetings(meetingList);
+    }
 
-    const act =
-      activityRes?.data?.audit ||
-      activityRes?.data?.activities ||
-      activityRes?.data ||
-      [];
-    setActivities(Array.isArray(act) ? act.slice(0, 12) : []);
+    if (activityRes.success && activityRes.data) {
+      const rawAct = activityRes.data as {
+        audit?: Activity[];
+        activities?: Activity[];
+      };
+      const act = rawAct.audit || rawAct.activities || [];
+      if (Array.isArray(act)) setActivities(act.slice(0, 12));
+    }
 
     if (financeRes.success && financeRes.data) {
       const fk =
         (financeRes.data as { kpis?: FinanceKpis }).kpis ||
         (financeRes.data as FinanceKpis) ||
         null;
-      setFinance(fk && typeof fk === "object" ? fk : null);
-    } else {
-      setFinance(null);
+      if (fk && typeof fk === "object") setFinance(fk);
     }
 
-    const recs =
-      aiRes?.data?.recommendations ||
-      aiRes?.data?.items ||
-      aiRes?.data ||
-      [];
-    setAiRecs(Array.isArray(recs) ? recs.slice(0, 6) : []);
+    if (aiRes.success && aiRes.data) {
+      const rawAi = aiRes.data as { recommendations?: AiRec[]; items?: AiRec[] };
+      const recs = rawAi.recommendations || rawAi.items || [];
+      if (Array.isArray(recs)) setAiRecs(recs.slice(0, 6));
+    }
 
     if (mediaRes.success && mediaRes.data) {
       setMediaStats({
@@ -427,14 +421,10 @@ export function PremiumDashboard() {
         storageUsedLabel: mediaRes.data.storageUsedLabel,
         byKind: mediaRes.data.byKind,
       });
-    } else {
-      setMediaStats(null);
     }
 
     if (assignRes.success && assignRes.data) {
       setAssignmentSummary(assignRes.data);
-    } else {
-      setAssignmentSummary(null);
     }
 
     if (
@@ -444,8 +434,6 @@ export function PremiumDashboard() {
       memberActRes.data
     ) {
       setMemberActivity(memberActRes.data as MemberActivitySummary);
-    } else {
-      setMemberActivity(null);
     }
 
     setLoading(false);
@@ -523,10 +511,11 @@ export function PremiumDashboard() {
   const conversion = reports?.conversionRate ?? 0;
 
   const planLabel = useMemo(() => {
+    if (!accessKnown) return "…";
     if (plan) return plan.charAt(0).toUpperCase() + plan.slice(1);
     if (isTrial || tier === "trial") return "Trial";
     return tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : "Free";
-  }, [plan, isTrial, tier]);
+  }, [plan, isTrial, tier, accessKnown]);
 
   const companyName = portal?.businessName || "Your company";
 
@@ -730,12 +719,18 @@ export function PremiumDashboard() {
                 className={`mm-dash-hero-chip font-semibold ${
                   isDemoMode
                     ? "border-sky-500/35 bg-sky-500/10 text-sky-800 dark:text-sky-200"
+                    : !accessKnown
+                      ? "border-border bg-muted text-muted-foreground"
                     : isTrial
                       ? "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:text-amber-200"
                       : "border-emerald-500/35 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200"
                 }`}
               >
-                {isDemoMode ? "Demo · Sample data" : `${isTrial ? "Trial" : "Plan"} · ${planLabel}`}
+                {isDemoMode
+                  ? "Demo · Sample data"
+                  : !accessKnown
+                    ? "Plan · …"
+                    : `${isTrial ? "Trial" : "Plan"} · ${planLabel}`}
               </span>
               <span className="mm-dash-hero-chip tabular-nums">{todayDateLabel}</span>
             </div>

@@ -11,7 +11,7 @@ import { isDemoModeClient } from "@/lib/demo-session";
  * Never shown in Demo Mode (sample workspace is not a real trial).
  */
 export function TrialBanner() {
-  const { isTrial, trialDaysRemaining, plan, loading } = usePlan();
+  const { isTrial, trialDaysRemaining, plan, loading, accessKnown } = usePlan();
   const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export function TrialBanner() {
   }, []);
 
   if (isDemoMode) return null;
-  if (loading) return null;
+  if (loading || !accessKnown) return null;
   if (!isTrial || trialDaysRemaining == null) return null;
 
   // Product rule: free trial display capped at 3 days remaining

@@ -1,6 +1,14 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 
@@ -88,6 +96,10 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const seededRoleRef = useRef(false);
+  /** Skip one workspaceRole→refresh cycle after internal seed/clear. */
+  const skipRoleRefreshRef = useRef(false);
+
   const refreshPortal = useCallback(async () => {
     if (!token) {
       setPortal(null);
@@ -110,10 +122,14 @@ export function PortalProvider({ children }: { children: ReactNode }) {
             /* ignore */
           }
           if (workspaceRole && workspaceRole !== data.actualRole) {
+            seededRoleRef.current = true;
+            skipRoleRefreshRef.current = true;
             setWorkspaceRoleState(data.actualRole);
           }
-        } else if (!workspaceRole) {
-          // Seed once — avoid re-trigger loops by only setting when empty
+        } else if (!workspaceRole && !seededRoleRef.current) {
+          // Seed once without causing a second /portal/current fetch
+          seededRoleRef.current = true;
+          skipRoleRefreshRef.current = true;
           setWorkspaceRoleState(data.actualRole || data.role);
         }
         setPortal(data);
@@ -133,12 +149,15 @@ export function PortalProvider({ children }: { children: ReactNode }) {
         } catch {
           /* ignore */
         }
+        seededRoleRef.current = true;
+        skipRoleRefreshRef.current = true;
         setWorkspaceRoleState(null);
         const fallback = await api.getCurrentPortal(token);
         if (fallback.success && fallback.data) {
           setPortal(fallback.data as PortalState);
         }
       }
+      // On 429/network failure: keep last-known portal (do not clear modules).
     } finally {
       setIsLoading(false);
     }
@@ -150,8 +169,24 @@ export function PortalProvider({ children }: { children: ReactNode }) {
     } else {
       setPortal(null);
       setIsLoading(false);
+      seededRoleRef.current = false;
+      skipRoleRefreshRef.current = false;
     }
-  }, [isAuthenticated, token, workspaceRole, refreshPortal]);
+    // Intentionally omit workspaceRole from deps — see role effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed must not double-fetch
+  }, [isAuthenticated, token]);
+
+  // User-driven preview-role changes only (skip internal seed writes)
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+    if (!seededRoleRef.current) return;
+    if (skipRoleRefreshRef.current) {
+      skipRoleRefreshRef.current = false;
+      return;
+    }
+    void refreshPortal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceRole]);
 
   return (
     <PortalContext.Provider

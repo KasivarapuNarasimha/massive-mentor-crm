@@ -15,6 +15,7 @@ export type BillingStreamEvent = {
   trialEndsAt?: string | null;
   trialDaysRemaining?: number | null;
   action?: string;
+  /** "snapshot" on connect; omit/other for real plan changes */
   source?: string;
 };
 
@@ -35,6 +36,7 @@ export function connectBillingStream(
   const run = async () => {
     while (!closed && !ac.signal.aborted) {
       opts?.onStatus?.("connecting");
+      let httpStatus = 0;
       try {
         const url = `${API_BASE_URL}/billing/stream`;
         const res = await fetch(url, {
@@ -47,6 +49,7 @@ export function connectBillingStream(
           // Fetch cache mode is enough; do not send Cache-Control (CORS-forbidden).
           cache: "no-store",
         });
+        httpStatus = res.status;
 
         if (!res.ok || !res.body) {
           throw new Error(`stream HTTP ${res.status}`);
@@ -95,9 +98,10 @@ export function connectBillingStream(
       } catch {
         if (ac.signal.aborted || closed) break;
         opts?.onStatus?.("error");
-        // Exponential backoff, cap 30s
         attempt += 1;
-        const delay = Math.min(30_000, 1000 * Math.pow(2, Math.min(attempt, 4)));
+        // Back off harder on 429 so reconnects do not deepen the rate-limit window
+        const base = httpStatus === 429 ? 8_000 : 1_000;
+        const delay = Math.min(60_000, base * Math.pow(2, Math.min(attempt, 4)));
         await new Promise((r) => setTimeout(r, delay));
         continue;
       }
@@ -105,7 +109,7 @@ export function connectBillingStream(
       if (closed || ac.signal.aborted) break;
       opts?.onStatus?.("closed");
       // Brief pause before reconnect after clean close
-      await new Promise((r) => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 3_000));
     }
   };
 

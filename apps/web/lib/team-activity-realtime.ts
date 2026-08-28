@@ -16,22 +16,38 @@ export type TeamActivityStreamEvent = {
   message?: string;
 };
 
-/**
- * Subscribe to GET /api/automations/team-activity/stream (SSE via fetch + Bearer).
- * Mirrors billing-realtime.ts pattern.
- */
-export function connectTeamActivityStream(
-  token: string,
-  onEvent: (payload: TeamActivityStreamEvent) => void,
-  opts?: { onStatus?: (status: "connecting" | "open" | "closed" | "error") => void }
-): () => void {
+type StatusFn = (status: "connecting" | "open" | "closed" | "error") => void;
+
+type SharedTeamStream = {
+  token: string;
+  listeners: Set<(payload: TeamActivityStreamEvent) => void>;
+  statusListeners: Set<StatusFn>;
+  stop: () => void;
+};
+
+let sharedTeamStream: SharedTeamStream | null = null;
+
+function startSharedTeamStream(token: string): SharedTeamStream {
   const ac = new AbortController();
   let closed = false;
   let attempt = 0;
+  const listeners = new Set<(payload: TeamActivityStreamEvent) => void>();
+  const statusListeners = new Set<StatusFn>();
+
+  const emitStatus = (s: "connecting" | "open" | "closed" | "error") => {
+    statusListeners.forEach((fn) => {
+      try {
+        fn(s);
+      } catch {
+        /* ignore */
+      }
+    });
+  };
 
   const run = async () => {
     while (!closed && !ac.signal.aborted) {
-      opts?.onStatus?.("connecting");
+      emitStatus("connecting");
+      let httpStatus = 0;
       try {
         const url = `${API_BASE_URL}/automations/team-activity/stream`;
         const res = await fetch(url, {
@@ -41,15 +57,15 @@ export function connectTeamActivityStream(
             Accept: "text/event-stream",
           },
           signal: ac.signal,
-          // Fetch cache mode is enough; do not send Cache-Control (CORS-forbidden).
           cache: "no-store",
         });
+        httpStatus = res.status;
 
         if (!res.ok || !res.body) {
           throw new Error(`stream HTTP ${res.status}`);
         }
 
-        opts?.onStatus?.("open");
+        emitStatus("open");
         attempt = 0;
 
         const reader = res.body.getReader();
@@ -61,7 +77,6 @@ export function connectTeamActivityStream(
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
 
-          // Normalize CRLF from some proxies before framing
           buffer = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
           const parts = buffer.split("\n\n");
           buffer = parts.pop() || "";
@@ -79,7 +94,13 @@ export function connectTeamActivityStream(
             if (eventName !== "team_activity") continue;
             try {
               const payload = JSON.parse(dataLines.join("\n")) as TeamActivityStreamEvent;
-              onEvent(payload);
+              listeners.forEach((fn) => {
+                try {
+                  fn(payload);
+                } catch {
+                  /* ignore */
+                }
+              });
             } catch {
               /* ignore malformed frame */
             }
@@ -87,21 +108,58 @@ export function connectTeamActivityStream(
         }
       } catch {
         if (ac.signal.aborted || closed) break;
-        opts?.onStatus?.("error");
+        emitStatus("error");
         attempt += 1;
-        const delay = Math.min(30_000, 1000 * Math.pow(2, Math.min(attempt, 4)));
+        // Back off harder on rate-limit so reconnects do not deepen the 429 window.
+        const base = httpStatus === 429 ? 8_000 : 1_000;
+        const delay = Math.min(60_000, base * Math.pow(2, Math.min(attempt, 4)));
         await new Promise((r) => setTimeout(r, delay));
         continue;
       }
-      opts?.onStatus?.("closed");
-      await new Promise((r) => setTimeout(r, 2000));
+      emitStatus("closed");
+      // Clean close: brief pause (avoid tight reconnect loops)
+      await new Promise((r) => setTimeout(r, 3_000));
     }
   };
 
   void run();
+
+  return {
+    token,
+    listeners,
+    statusListeners,
+    stop: () => {
+      closed = true;
+      ac.abort();
+    },
+  };
+}
+
+/**
+ * Subscribe to GET /api/automations/team-activity/stream (SSE via fetch + Bearer).
+ * Multiple subscribers share one connection per token.
+ */
+export function connectTeamActivityStream(
+  token: string,
+  onEvent: (payload: TeamActivityStreamEvent) => void,
+  opts?: { onStatus?: StatusFn }
+): () => void {
+  if (!sharedTeamStream || sharedTeamStream.token !== token) {
+    sharedTeamStream?.stop();
+    sharedTeamStream = startSharedTeamStream(token);
+  }
+
+  const shared = sharedTeamStream;
+  shared.listeners.add(onEvent);
+  if (opts?.onStatus) shared.statusListeners.add(opts.onStatus);
+
   return () => {
-    closed = true;
-    ac.abort();
+    shared.listeners.delete(onEvent);
+    if (opts?.onStatus) shared.statusListeners.delete(opts.onStatus);
+    if (shared.listeners.size === 0 && sharedTeamStream === shared) {
+      shared.stop();
+      sharedTeamStream = null;
+    }
   };
 }
 
@@ -139,8 +197,6 @@ export function unlockTeamActivitySound(): void {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
-    // Always attempt resume from the gesture; Chrome may keep context suspended
-    // until resume() runs inside that user-activation window.
     if (ctx.state === "suspended") {
       void ctx.resume().catch(() => undefined);
     }
@@ -167,7 +223,6 @@ export function installTeamActivitySoundGestureUnlock(
 
   const unlock = (event: Event) => {
     // Let the Enable Sound button own its click (unlock + confirmation tone).
-    // Otherwise capture-phase unlock re-renders and can drop the button onClick.
     const target = event.target as Element | null;
     if (target?.closest?.("[data-mm-enable-sound]")) return;
 
@@ -196,8 +251,6 @@ export function isTeamActivitySoundUnlocked(): boolean {
 
 /**
  * True when the CRM has not yet received a user gesture to unlock Web Audio.
- * Chrome autoplay policy keeps AudioContext suspended until then; our play()
- * also no-ops until unlock so silence is intentional until Enable Sound / click.
  */
 export function needsTeamActivitySoundEnable(): boolean {
   if (typeof window === "undefined") return false;
@@ -229,7 +282,6 @@ export function playTeamActivitySound(): void {
     const ctx = getAudioContext();
     if (!ctx) return;
     if (ctx.state === "suspended") {
-      // Resume is async; schedule the tone after Chrome allows audio.
       void ctx
         .resume()
         .then(() => {
