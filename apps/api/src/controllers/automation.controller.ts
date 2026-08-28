@@ -87,7 +87,6 @@ export async function teamActivityStream(req: AuthenticatedRequest, res: Respons
       return res.status(401).json({ success: false, error: "Not authenticated" });
     }
     const { resolveActorRole } = await import("../services/tenant-scope.service.js");
-    const { getUserBusinessId } = await import("../services/field-engine.service.js");
     const role = await resolveActorRole(req.user.id);
     const adminOk = new Set([
       "ceo",
@@ -101,8 +100,16 @@ export async function teamActivityStream(req: AuthenticatedRequest, res: Respons
     if (!adminOk.has(role) && !role.includes("admin")) {
       return res.status(403).json({ success: false, error: "Insufficient permissions" });
     }
-    const businessId = await getUserBusinessId(req.user.id);
-    if (!businessId) {
+
+    const {
+      subscribeTeamActivity,
+      listTeamActivityListenBusinessIds,
+    } = await import("../services/team-activity-realtime.service.js");
+
+    // Listen on EVERY admin membership workspace (not only getUserBusinessId).
+    // Multi-business admins otherwise miss toasts while still receiving bell notifications.
+    const businessIds = await listTeamActivityListenBusinessIds(req.user.id);
+    if (!businessIds.length) {
       return res.status(400).json({ success: false, error: "No business context" });
     }
 
@@ -117,23 +124,37 @@ export async function teamActivityStream(req: AuthenticatedRequest, res: Respons
     const writeEvent = (event: string, data: unknown) => {
       res.write(`event: ${event}\n`);
       res.write(`data: ${JSON.stringify(data)}\n\n`);
+      // Push through Node / proxy buffers when flush is available (e.g. compression)
+      const flush = (res as { flush?: () => void }).flush;
+      if (typeof flush === "function") {
+        try {
+          flush.call(res);
+        } catch {
+          /* ignore */
+        }
+      }
     };
 
-    writeEvent("connected", { businessId, at: new Date().toISOString() });
-
-    const { subscribeTeamActivity } = await import(
-      "../services/team-activity-realtime.service.js"
-    );
-    const viewerId = req.user.id;
-    const unsub = subscribeTeamActivity(businessId, (payload) => {
-      // Never toast the actor about their own action
-      if (payload.actorUserId === viewerId) return;
-      writeEvent("team_activity", payload);
+    writeEvent("connected", {
+      businessId: businessIds[0],
+      businessIds,
+      at: new Date().toISOString(),
     });
+
+    const viewerId = req.user.id;
+    const unsubs = businessIds.map((businessId) =>
+      subscribeTeamActivity(businessId, (payload) => {
+        // Never toast the actor about their own action
+        if (payload.actorUserId === viewerId) return;
+        writeEvent("team_activity", payload);
+      })
+    );
 
     const heartbeat = setInterval(() => {
       try {
         res.write(`: heartbeat ${Date.now()}\n\n`);
+        const flush = (res as { flush?: () => void }).flush;
+        if (typeof flush === "function") flush.call(res);
       } catch {
         /* closed */
       }
@@ -141,7 +162,7 @@ export async function teamActivityStream(req: AuthenticatedRequest, res: Respons
 
     const cleanup = () => {
       clearInterval(heartbeat);
-      unsub();
+      for (const unsub of unsubs) unsub();
     };
     req.on("close", cleanup);
     req.on("error", cleanup);

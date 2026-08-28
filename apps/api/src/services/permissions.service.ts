@@ -369,6 +369,14 @@ export function moduleKeyForRoute(pathname: string): string | null {
 /** API path → module key (first matching prefix) */
 export function moduleKeyForApiPath(apiPath: string): string | null {
   const p = (apiPath.split("?")[0] || "").replace(/\/$/, "") || apiPath;
+  // Live team-activity SSE is admin chrome (like billing stream) — do not require
+  // the separate Activity module key, or toasts silently never connect.
+  if (
+    p === "/api/automations/team-activity/stream" ||
+    p.startsWith("/api/automations/team-activity/stream")
+  ) {
+    return null;
+  }
   // Billing stream / access always needed for lock screens
   if (p.startsWith("/api/billing")) {
     // Allow access/stream/overview for subscription UX even without billing module?

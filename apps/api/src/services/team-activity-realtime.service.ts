@@ -132,3 +132,59 @@ export function subscribeTeamActivity(
     bus.off(ch, listener);
   };
 }
+
+const ADMIN_ROLES = new Set([
+  "ceo",
+  "owner",
+  "business_admin",
+  "admin",
+  "super_admin",
+  "sales_manager",
+  "manager",
+]);
+
+/**
+ * Businesses this user should listen on for live team-activity toasts.
+ *
+ * IMPORTANT: Do NOT use only getUserBusinessId(). Multi-business admins may have
+ * a "primary" resolved business that differs from the workspace where teammates
+ * are acting — notifications still fan out by membership, so SSE must too.
+ */
+export async function listTeamActivityListenBusinessIds(
+  userId: string
+): Promise<string[]> {
+  const { prisma } = await import("../lib/prisma.js");
+  const members = await prisma.businessMember.findMany({
+    where: {
+      userId,
+      business: {
+        isDemo: false,
+        NOT: { portalKind: "demo" },
+        status: { not: "deleted" },
+      },
+    },
+    include: {
+      user: { select: { role: true } },
+      business: { select: { id: true, status: true } },
+    },
+  });
+
+  const ids: string[] = [];
+  for (const m of members) {
+    const role = String(m.role || m.user?.role || "").toLowerCase();
+    if (!ADMIN_ROLES.has(role) && !role.includes("admin")) continue;
+    ids.push(m.businessId);
+  }
+
+  // Fallback: include primary resolution so single-business tenants still work
+  // even if role fields are temporarily inconsistent.
+  try {
+    const { getUserBusinessId } = await import("./field-engine.service.js");
+    const primary = await getUserBusinessId(userId);
+    if (primary && !ids.includes(primary)) ids.push(primary);
+  } catch {
+    /* ignore */
+  }
+
+  return [...new Set(ids)];
+}

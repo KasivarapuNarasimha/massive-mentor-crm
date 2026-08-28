@@ -28,7 +28,7 @@ const ADMIN_ROLES = new Set([
  */
 export function TeamActivityToaster() {
   const { token, role, user } = useAuth();
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const seenRef = useRef<Set<string>>(new Set());
 
   const roleKey = String(role || user?.role || "").toLowerCase();
@@ -39,14 +39,16 @@ export function TeamActivityToaster() {
     setMuted(isTeamActivitySoundMuted());
   }, []);
 
-  // Unlock sound after first user gesture (browser autoplay policy)
+  // Unlock Web Audio after first user gesture (browser autoplay policy)
   useEffect(() => {
     const unlock = () => unlockTeamActivitySound();
     window.addEventListener("pointerdown", unlock, { once: true });
     window.addEventListener("keydown", unlock, { once: true });
+    window.addEventListener("touchstart", unlock, { once: true });
     return () => {
       window.removeEventListener("pointerdown", unlock);
       window.removeEventListener("keydown", unlock);
+      window.removeEventListener("touchstart", unlock);
     };
   }, []);
 
@@ -54,10 +56,11 @@ export function TeamActivityToaster() {
     if (!token || !canListen) return;
 
     const onEvent = (payload: TeamActivityStreamEvent) => {
-      const id = payload.eventId || `${payload.at}-${payload.actorUserId}-${payload.action}`;
+      const id =
+        payload.eventId ||
+        `${payload.at}-${payload.actorUserId}-${payload.action}-${payload.entityId}`;
       if (seenRef.current.has(id)) return;
       seenRef.current.add(id);
-      // Cap memory
       if (seenRef.current.size > 200) {
         const first = seenRef.current.values().next().value;
         if (first) seenRef.current.delete(first);
@@ -92,6 +95,7 @@ export function TeamActivityToaster() {
               <div className="text-[12px] text-muted-foreground mt-0.5 leading-snug break-words">
                 {message}
               </div>
+              <div className="mt-1 text-[10px] text-muted-foreground">Just now</div>
               <button
                 type="button"
                 className="mt-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
@@ -120,7 +124,8 @@ export function TeamActivityToaster() {
 
     const disconnect = connectTeamActivityStream(token, onEvent);
     return () => disconnect();
-  }, [token, canListen, muted]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mute toggles sound only; must not reconnect SSE
+  }, [token, canListen]);
 
   return null;
 }

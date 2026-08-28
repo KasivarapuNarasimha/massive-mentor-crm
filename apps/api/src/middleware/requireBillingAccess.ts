@@ -35,6 +35,15 @@ function isAllowedPath(path: string): boolean {
   ) {
     return true;
   }
+  // Team-activity SSE must stay reachable for multi-business admins whose
+  // "primary" resolved business may be locked/suspended while they still
+  // administer another active workspace (bell notifications already work).
+  if (
+    p === "/api/automations/team-activity/stream" ||
+    p.startsWith("/api/automations/team-activity/stream")
+  ) {
+    return true;
+  }
   return ALLOW_PREFIXES.some(
     (prefix) => p === prefix || p.startsWith(prefix + "/")
   );

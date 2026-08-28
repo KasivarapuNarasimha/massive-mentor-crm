@@ -105,6 +105,20 @@ export function connectTeamActivityStream(
 const SOUND_MUTE_KEY = "mm_team_activity_sound_muted";
 const SOUND_UNLOCK_KEY = "mm_team_activity_sound_unlocked";
 
+let sharedAudioCtx: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  const Ctx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctx) return null;
+  if (!sharedAudioCtx || sharedAudioCtx.state === "closed") {
+    sharedAudioCtx = new Ctx();
+  }
+  return sharedAudioCtx;
+}
+
 export function isTeamActivitySoundMuted(): boolean {
   if (typeof window === "undefined") return true;
   return localStorage.getItem(SOUND_MUTE_KEY) === "1";
@@ -115,9 +129,18 @@ export function setTeamActivitySoundMuted(muted: boolean): void {
   localStorage.setItem(SOUND_MUTE_KEY, muted ? "1" : "0");
 }
 
+/** Call from a user gesture so later team-activity tones may play. */
 export function unlockTeamActivitySound(): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(SOUND_UNLOCK_KEY, "1");
+  try {
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === "suspended") {
+      void ctx.resume().catch(() => undefined);
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function isTeamActivitySoundUnlocked(): boolean {
@@ -125,32 +148,29 @@ export function isTeamActivitySoundUnlocked(): boolean {
   return localStorage.getItem(SOUND_UNLOCK_KEY) === "1";
 }
 
-/** Short soft notification tone (Web Audio) — no looping, no external asset. */
+/** Short soft notification tone (Web Audio) — once per event, no loop, no external asset. */
 export function playTeamActivitySound(): void {
   if (typeof window === "undefined") return;
   if (isTeamActivitySoundMuted()) return;
   if (!isTeamActivitySoundUnlocked()) return;
   try {
-    const Ctx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return;
-    const ctx = new Ctx();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      void ctx.resume().catch(() => undefined);
+    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "sine";
     osc.frequency.setValueAtTime(880, ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.12);
     gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.07, ctx.currentTime + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.2);
-    osc.onended = () => {
-      void ctx.close().catch(() => undefined);
-    };
   } catch {
     /* autoplay / unsupported */
   }
