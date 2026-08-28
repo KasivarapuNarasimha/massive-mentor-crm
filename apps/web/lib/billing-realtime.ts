@@ -42,9 +42,9 @@ export function connectBillingStream(
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: "text/event-stream",
-            "Cache-Control": "no-cache",
           },
           signal: ac.signal,
+          // Fetch cache mode is enough; do not send Cache-Control (CORS-forbidden).
           cache: "no-store",
         });
 
