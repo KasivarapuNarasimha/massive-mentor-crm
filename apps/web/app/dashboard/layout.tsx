@@ -35,7 +35,10 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if ((!isLoading || forceReady) && !isAuthenticated) {
-      router.replace("/login");
+      // On demo.massivementor.in, /login is rewritten to /demo by middleware — go there directly.
+      const host = typeof window !== "undefined" ? window.location.hostname.toLowerCase() : "";
+      const loginPath = host.startsWith("demo.") ? "/demo" : "/login";
+      router.replace(loginPath);
     }
   }, [isAuthenticated, isLoading, forceReady, router]);
 
@@ -84,7 +87,8 @@ export default function DashboardLayout({
             ? localStorage.getItem("massive_mentor_token")
             : null;
         if (!t) {
-          router.replace("/login");
+          const host = window.location.hostname.toLowerCase();
+          router.replace(host.startsWith("demo.") ? "/demo" : "/login");
         }
       }
     };

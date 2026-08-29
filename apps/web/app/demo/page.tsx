@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { persistDemoSession } from "@/lib/demo-session";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 
@@ -10,7 +10,7 @@ const INPUT_CLASS =
   "portal-login-input w-full min-h-11 px-4 py-3 bg-background border border-border rounded-xl text-base sm:text-sm text-foreground placeholder:text-muted-foreground";
 
 export default function DemoLandingPage() {
-  const router = useRouter();
+  const { establishSession } = useAuth();
   const [info, setInfo] = useState<{
     message?: string;
     features?: string[];
@@ -42,7 +42,18 @@ export default function DemoLandingPage() {
       }
       const res = await api.demoLogin(email, password);
       if (res.success && res.data?.token) {
+        // Cookie + portal keys for middleware / demo banner
         persistDemoSession({ token: res.data.token, user: res.data.user });
+        // Critical: AuthProvider already bootstrapped on /demo with no token.
+        // Soft-nav to /dashboard would see isAuthenticated=false and bounce to /login → /demo.
+        establishSession(res.data.token, {
+          id: res.data.user.id,
+          email: res.data.user.email,
+          name: res.data.user.name,
+          role: "business_admin",
+          platformRole: "user",
+          businessId: res.data.user.businessId,
+        });
         let dest = "/dashboard";
         try {
           const next = new URLSearchParams(window.location.search).get("next");
@@ -50,7 +61,8 @@ export default function DemoLandingPage() {
         } catch {
           /* ignore */
         }
-        router.push(dest);
+        // Full navigation remounts dashboard tree with hydrated session (reliable on demo host).
+        window.location.assign(dest);
         return;
       }
       setError(res.error || "Invalid demo password.");

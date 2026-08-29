@@ -333,16 +333,42 @@ function coerceFieldValue(def: FieldDef, raw: unknown, errors: string[]): unknow
  *   still holds CRM data so imports remain visible after soft-delete churn
  */
 export async function getUserBusinessId(userId: string): Promise<string | null> {
+  // Demo portal tenants are excluded from customer resolution below. If this user has an
+  // active demo workspace with sample CRM data, and any customer shell is empty, prefer
+  // the demo business — otherwise Demo CRM APIs bind to an empty non-demo membership.
+  const demoMembership = await prisma.businessMember.findFirst({
+    where: {
+      userId,
+      business: { isDemo: true, portalKind: "demo", status: "active" },
+    },
+    select: { businessId: true },
+  });
+
   // Align with ensureDefaultBusiness — same resolution rules (no create)
   try {
     const { resolveExistingCustomerBusiness } = await import("./business.service.js");
     const resolved = await resolveExistingCustomerBusiness(userId);
-    if (resolved?.businessId) return resolved.businessId;
+    if (resolved?.businessId) {
+      if (demoMembership?.businessId) {
+        const [demoContacts, customerContacts] = await Promise.all([
+          prisma.contact.count({ where: { businessId: demoMembership.businessId } }),
+          prisma.contact.count({ where: { businessId: resolved.businessId } }),
+        ]);
+        if (demoContacts > 0 && customerContacts === 0) {
+          return demoMembership.businessId;
+        }
+      }
+      return resolved.businessId;
+    }
   } catch (err) {
     console.error(
       "[tenant] resolveExistingCustomerBusiness failed:",
       err instanceof Error ? err.message : err
     );
+  }
+
+  if (demoMembership?.businessId) {
+    return demoMembership.businessId;
   }
 
   // Soft-deleted fallback with CRM data (legacy recovery)

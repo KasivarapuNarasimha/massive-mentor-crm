@@ -53,6 +53,12 @@ interface AuthContextType {
   ) => Promise<{ success: boolean; error?: string }>;
   logout: (opts?: { redirect?: boolean }) => void;
   refreshUser: () => Promise<void>;
+  /**
+   * Apply an already-issued JWT (e.g. Demo portal login) into React auth state.
+   * Required because AuthProvider bootstraps once; writing localStorage alone does not
+   * mark the user authenticated for soft-navigations to /dashboard.
+   */
+  establishSession: (token: string, user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -452,6 +458,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const establishSession = useCallback((authToken: string, sessionUser: User) => {
+    localStorage.setItem(TOKEN_KEY, authToken);
+    localStorage.setItem(USER_KEY, JSON.stringify(sessionUser));
+    setToken(authToken);
+    setUser(sessionUser);
+    if (sessionUser.role) setRole(sessionUser.role);
+    setIsLoading(false);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -464,6 +479,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         refreshUser,
+        establishSession,
       }}
     >
       {children}

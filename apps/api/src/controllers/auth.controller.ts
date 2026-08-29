@@ -134,8 +134,31 @@ export async function getCurrentUser(req: AuthenticatedRequest, res: Response) {
       });
     }
 
-    // Phase 1: ensure tenant on every /me (idempotent backfill)
-    const business = await ensureDefaultBusiness(req.user.id);
+    // Demo portal JWT must bind to the demo workspace — never ensureDefaultBusiness
+    // (that creates/selects a customer shell and hides sample demo CRM data).
+    let business: {
+      id: string;
+      name: string;
+      role: string;
+      status?: string | null;
+      templateSlug?: string | null;
+      templateId?: string | null;
+    };
+    if (req.portal === "demo") {
+      const { ensureDemoWorkspace } = await import("../services/demo.service.js");
+      const demo = await ensureDemoWorkspace();
+      business = {
+        id: demo.business.id,
+        name: demo.business.name,
+        role: "business_admin",
+        status: demo.business.status,
+        templateSlug: demo.business.templateSlug,
+        templateId: demo.business.templateId,
+      };
+    } else {
+      // Phase 1: ensure tenant on every /me (idempotent backfill)
+      business = await ensureDefaultBusiness(req.user.id);
+    }
 
     // Currency: Business.settings (Super Admin provision) — not browser locale
     let currency = "INR";
