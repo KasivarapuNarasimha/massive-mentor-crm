@@ -129,6 +129,9 @@ export async function getBusinessDetail(businessId: string) {
       ? Math.max(0, Math.ceil((new Date(b.trialEndsAt).getTime() - Date.now()) / 86400000))
       : null;
 
+  const { parseBusinessModuleAccess } = await import("./permissions.service.js");
+  const moduleAccess = parseBusinessModuleAccess(b.settings);
+
   return {
     id: b.id,
     name: b.name,
@@ -153,6 +156,9 @@ export async function getBusinessDetail(businessId: string) {
     owner: b.owner,
     industry: profile?.industry || b.templateSlug || "—",
     phone: (profile as { location?: string } | null)?.location || null,
+    moduleAccess: moduleAccess
+      ? { customized: moduleAccess.customized, enabled: moduleAccess.enabled }
+      : { customized: false, enabled: [] as string[] },
     members: b.members.map((m) => {
       const perms = (m.permissions || {}) as {
         modules?: string[];
@@ -293,7 +299,182 @@ export async function createCustomerBusiness(input: {
     metadata: { ownerEmail: email, plan, reusedOwnerUser: reusedUser },
   });
 
+  // Seed business + owner module policy for templates with known defaults (e.g. Interiors)
+  const {
+    defaultModulesForTemplateSlug,
+    setBusinessModuleAccess,
+    setMemberModules,
+    alwaysOnModules,
+  } = await import("./permissions.service.js");
+  const templateDefaults = defaultModulesForTemplateSlug(resolved.templateSlug);
+  if (templateDefaults?.length) {
+    const enabled = Array.from(new Set([...templateDefaults, ...alwaysOnModules()]));
+    await setBusinessModuleAccess({
+      actorUserId: input.actorUserId,
+      businessId: business.id,
+      enabled,
+      customized: true,
+    });
+    await setMemberModules({
+      actorUserId: input.actorUserId,
+      businessId: business.id,
+      userId: userId,
+      role: "business_admin",
+      modules: enabled,
+      template: "business_admin",
+      customized: true,
+    }).catch(() => undefined);
+  }
+
   return getBusinessDetail(business.id);
+}
+
+/**
+ * Super Admin: update business name, type, and/or module allowlist.
+ * Does not delete CRM/ERP data. Template slug change does not wipe records.
+ */
+export async function updatePlatformBusiness(input: {
+  actorUserId: string;
+  businessId: string;
+  name?: string;
+  templateSlug?: string;
+  moduleAccess?: { enabled: string[]; customized?: boolean };
+  /** When true with templateSlug, re-apply that template's default module allowlist */
+  applyTemplateModuleDefaults?: boolean;
+}) {
+  const b = await prisma.business.findFirst({
+    where: { id: input.businessId, isDemo: false, portalKind: "customer" },
+  });
+  if (!b) throw new Error("Business not found");
+
+  const data: {
+    name?: string;
+    templateSlug?: string;
+    templateId?: string | null;
+  } = {};
+
+  if (typeof input.name === "string" && input.name.trim()) {
+    data.name = input.name.trim();
+  }
+
+  if (typeof input.templateSlug === "string" && input.templateSlug.trim()) {
+    const slug = input.templateSlug.trim();
+    const { resolveIndustryTemplate } = await import("./industry-template-resolve.service.js");
+    const resolved = await resolveIndustryTemplate({ templateSlug: slug });
+    data.templateSlug = resolved.templateSlug;
+    const tpl = await prisma.industryTemplate.findFirst({
+      where: { slug: resolved.templateSlug },
+      select: { id: true },
+    });
+    if (tpl) data.templateId = tpl.id;
+
+    await prisma.businessProfile
+      .updateMany({
+        where: { userId: b.ownerUserId },
+        data: {
+          industry: resolved.industryLabel,
+          ...(data.name ? { businessName: data.name } : {}),
+        },
+      })
+      .catch(() => undefined);
+  } else if (data.name) {
+    await prisma.businessProfile
+      .updateMany({
+        where: { userId: b.ownerUserId },
+        data: { businessName: data.name },
+      })
+      .catch(() => undefined);
+  }
+
+  if (Object.keys(data).length) {
+    await prisma.business.update({ where: { id: b.id }, data });
+  }
+
+  const {
+    setBusinessModuleAccess,
+    defaultModulesForTemplateSlug,
+    alwaysOnModules,
+  } = await import("./permissions.service.js");
+
+  if (input.moduleAccess && Array.isArray(input.moduleAccess.enabled)) {
+    await setBusinessModuleAccess({
+      actorUserId: input.actorUserId,
+      businessId: b.id,
+      enabled: input.moduleAccess.enabled,
+      customized: input.moduleAccess.customized !== false,
+    });
+  } else if (input.applyTemplateModuleDefaults && data.templateSlug) {
+    const defaults = defaultModulesForTemplateSlug(data.templateSlug);
+    if (defaults?.length) {
+      await setBusinessModuleAccess({
+        actorUserId: input.actorUserId,
+        businessId: b.id,
+        enabled: Array.from(new Set([...defaults, ...alwaysOnModules()])),
+        customized: true,
+      });
+    }
+  }
+
+  await recordAudit({
+    businessId: b.id,
+    actorUserId: input.actorUserId,
+    action: "platform_update_business",
+    entityType: "business",
+    entityId: b.id,
+    metadata: {
+      name: data.name,
+      templateSlug: data.templateSlug,
+      moduleAccessUpdated: !!input.moduleAccess,
+      applyTemplateModuleDefaults: !!input.applyTemplateModuleDefaults,
+    },
+  });
+
+  return getBusinessDetail(b.id);
+}
+
+/** Super Admin: update a member's display name (and optional role via permissions endpoint). */
+export async function updatePlatformBusinessUser(input: {
+  actorUserId: string;
+  businessId: string;
+  userId: string;
+  name?: string;
+  role?: string;
+}) {
+  const member = await prisma.businessMember.findUnique({
+    where: {
+      businessId_userId: { businessId: input.businessId, userId: input.userId },
+    },
+  });
+  if (!member) throw new Error("User is not a member of this business");
+
+  const userData: { name?: string | null; role?: string } = {};
+  if (typeof input.name === "string") {
+    userData.name = input.name.trim() || null;
+  }
+  if (typeof input.role === "string" && input.role.trim()) {
+    userData.role = input.role.trim();
+    await prisma.businessMember.update({
+      where: { id: member.id },
+      data: { role: userData.role },
+    });
+  }
+  if (Object.keys(userData).length) {
+    await prisma.user.update({
+      where: { id: input.userId },
+      data: userData,
+    });
+  }
+
+  await recordAudit({
+    businessId: input.businessId,
+    actorUserId: input.actorUserId,
+    action: "platform_update_user",
+    entityType: "user",
+    entityId: input.userId,
+    metadata: { name: userData.name, role: userData.role },
+  });
+
+  return getBusinessDetail(input.businessId);
 }
 
 export async function setBusinessStatus(

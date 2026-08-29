@@ -590,6 +590,84 @@ export async function permissionCatalog(_req: AuthenticatedRequest, res: Respons
   }
 }
 
+/** PATCH /api/platform/businesses/:id — name, business type, module allowlist */
+export async function updateBusiness(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const schema = z.object({
+      name: z.string().min(1).max(120).optional(),
+      templateSlug: z.string().min(1).max(80).optional(),
+      moduleAccess: z
+        .object({
+          enabled: z.array(z.string()),
+          customized: z.boolean().optional(),
+        })
+        .optional(),
+      applyTemplateModuleDefaults: z.boolean().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: parsed.error.errors[0]?.message || "Invalid input",
+      });
+    }
+    if (
+      !parsed.data.name &&
+      !parsed.data.templateSlug &&
+      !parsed.data.moduleAccess &&
+      !parsed.data.applyTemplateModuleDefaults
+    ) {
+      return res.status(400).json({ success: false, error: "No changes provided" });
+    }
+    const data = await platform.updatePlatformBusiness({
+      actorUserId: req.user.id,
+      businessId: String(req.params.id),
+      ...parsed.data,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Failed",
+    });
+  }
+}
+
+/** PATCH /api/platform/businesses/:id/users/:userId — name / role */
+export async function updateBusinessUser(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const schema = z.object({
+      name: z.string().max(120).optional(),
+      role: z.string().min(1).max(60).optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: parsed.error.errors[0]?.message || "Invalid input",
+      });
+    }
+    if (parsed.data.name === undefined && parsed.data.role === undefined) {
+      return res.status(400).json({ success: false, error: "No changes provided" });
+    }
+    const data = await platform.updatePlatformBusinessUser({
+      actorUserId: req.user.id,
+      businessId: String(req.params.id),
+      userId: String(req.params.userId),
+      name: parsed.data.name,
+      role: parsed.data.role,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Failed",
+    });
+  }
+}
+
 /** PATCH /api/platform/businesses/:id/users/:userId/permissions */
 export async function setUserPermissions(req: AuthenticatedRequest, res: Response) {
   try {

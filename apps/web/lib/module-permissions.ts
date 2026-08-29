@@ -82,28 +82,18 @@ export function canAccessPath(
   // Explicit empty grant list (should still include always-on from API)
   if (modules.length === 0) return false;
   if (modules.includes(key)) return true;
-  // Media Library is core CRM: allow when user has media, leads, or documents
+  // Trust portal.modules from API (already includes legacy auto-grants + business allowlist).
+  // Do not re-open WhatsApp/ERP via client-side umbrellas — that defeats Super Admin OFF.
   if (key === "media") {
-    return modules.includes("media") || modules.includes("leads") || modules.includes("documents");
+    return modules.includes("media");
   }
-  // WhatsApp Conversation Center — same sales access
   if (key === "whatsapp") {
-    return (
-      modules.includes("whatsapp") ||
-      modules.includes("media") ||
-      modules.includes("leads") ||
-      modules.includes("clients")
-    );
+    return modules.includes("whatsapp");
   }
-  // ERP shell: finance users keep access even before erp is granted on older memberships
   if (key === "erp") {
-    return (
-      modules.includes("erp") ||
-      modules.includes("finance") ||
-      modules.includes("approvals")
-    );
+    return modules.includes("erp");
   }
-  // Phase 2 ERP modules: specific grant OR parent erp/finance
+  // ERP submodules: explicit grant or parent erp key
   if (
     key === "erp_products" ||
     key === "erp_inventory" ||
@@ -111,7 +101,7 @@ export function canAccessPath(
     key === "erp_purchases" ||
     key === "erp_sales"
   ) {
-    return modules.includes(key) || modules.includes("erp") || modules.includes("finance");
+    return modules.includes(key) || modules.includes("erp");
   }
   return false;
 }

@@ -51,6 +51,7 @@ type BizDetail = {
   createdAt: string;
   owner?: { id: string; email: string; name: string | null };
   members: Member[];
+  moduleAccess?: { customized: boolean; enabled: string[] };
   stats: {
     leads: number;
     clients: number;
@@ -111,8 +112,16 @@ export default function AdminBusinessManagePage() {
   const [editUserId, setEditUserId] = useState<string | null>(null);
   const [editModules, setEditModules] = useState<string[]>([]);
   const [editRole, setEditRole] = useState("sales_executive");
+  const [editUserName, setEditUserName] = useState("");
   const [busy, setBusy] = useState(false);
   const [wl, setWl] = useState({ companyName: "", logoUrl: "", theme: "dark", customDomain: "" });
+  const [editBizName, setEditBizName] = useState("");
+  const [editTemplateSlug, setEditTemplateSlug] = useState("generic");
+  const [bizModules, setBizModules] = useState<string[]>([]);
+  const [bizModulesCustomized, setBizModulesCustomized] = useState(false);
+  const [industryCatalog, setIndustryCatalog] = useState<Array<{ slug: string; name: string }>>(
+    []
+  );
 
   const token = () => localStorage.getItem(PORTAL_TOKENS.admin) || "";
 
@@ -133,6 +142,11 @@ export default function AdminBusinessManagePage() {
       const d = res.data as unknown as BizDetail;
       setBiz(d);
       setPlan(String(d.plan || "trial"));
+      setEditBizName(d.name || "");
+      setEditTemplateSlug(d.templateSlug || "generic");
+      const ma = d.moduleAccess;
+      const customized = !!ma?.customized;
+      setBizModulesCustomized(customized);
       const white = (d.whiteLabel || {}) as Record<string, string>;
       setWl({
         companyName: white.companyName || "",
@@ -140,22 +154,46 @@ export default function AdminBusinessManagePage() {
         theme: white.theme || "dark",
         customDomain: white.customDomain || "",
       });
+      if (cat.success && cat.data) {
+        setCatalogModules(cat.data.modules || []);
+        setCatalogTemplates(cat.data.templates || []);
+        const se = (cat.data.templates || []).find((t) => t.roleKey === "sales_executive");
+        if (se?.modules?.length) setAddModules(se.modules);
+        if (customized && Array.isArray(ma?.enabled) && ma.enabled.length) {
+          setBizModules([...ma.enabled]);
+        } else {
+          // Not yet capped — show full catalog checked; Save enables business policy
+          setBizModules((cat.data.modules || []).map((m) => m.key));
+        }
+      } else if (customized && Array.isArray(ma?.enabled)) {
+        setBizModules([...ma.enabled]);
+      }
     } else toast.error(res.error || "Not found");
     if (hist.success && hist.data?.history) {
       setHistory(hist.data.history);
     }
-    if (cat.success && cat.data) {
+    if (!(res.success && res.data) && cat.success && cat.data) {
       setCatalogModules(cat.data.modules || []);
       setCatalogTemplates(cat.data.templates || []);
-      // Seed add-user modules from sales_executive template once
-      const se = (cat.data.templates || []).find((t) => t.roleKey === "sales_executive");
-      if (se?.modules?.length) setAddModules(se.modules);
     }
   }, [id]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    void api.getIndustryCatalog().then((res) => {
+      if (res.success && res.data?.templates) {
+        setIndustryCatalog(
+          res.data.templates.map((t: { slug: string; name: string }) => ({
+            slug: t.slug,
+            name: t.name,
+          }))
+        );
+      }
+    });
+  }, []);
 
   const runPlanAction = async (
     action:
@@ -270,6 +308,7 @@ export default function AdminBusinessManagePage() {
   const openEditPermissions = (m: Member) => {
     setEditUserId(m.userId);
     setEditRole(m.role || "sales_executive");
+    setEditUserName(m.name || "");
     setEditModules(
       m.modules && m.modules.length
         ? [...m.modules]
@@ -280,6 +319,19 @@ export default function AdminBusinessManagePage() {
   const saveEditPermissions = async () => {
     if (!editUserId) return;
     setBusy(true);
+    if (editUserName.trim() !== (biz?.members.find((x) => x.userId === editUserId)?.name || "")) {
+      const nameRes = await api.platformUpdateBusinessUser(
+        id,
+        editUserId,
+        { name: editUserName.trim() },
+        token()
+      );
+      if (!nameRes.success) {
+        setBusy(false);
+        toast.error(nameRes.error || "Failed to update name");
+        return;
+      }
+    }
     const res = await api.platformSetUserPermissions(
       id,
       editUserId,
@@ -296,6 +348,44 @@ export default function AdminBusinessManagePage() {
       toast.success("Permissions updated — user portal updates on next load");
       setEditUserId(null);
       load();
+    } else toast.error(res.error || "Failed");
+  };
+
+  const saveBusinessProfile = async () => {
+    if (!editBizName.trim()) {
+      toast.error("Business name is required");
+      return;
+    }
+    setBusy(true);
+    const res = await api.platformUpdateBusiness(
+      id,
+      {
+        name: editBizName.trim(),
+        templateSlug: editTemplateSlug || undefined,
+      },
+      token()
+    );
+    setBusy(false);
+    if (res.success) {
+      toast.success("Business profile saved");
+      void load();
+    } else toast.error(res.error || "Failed");
+  };
+
+  const saveBusinessModules = async () => {
+    setBusy(true);
+    const res = await api.platformUpdateBusiness(
+      id,
+      {
+        moduleAccess: { enabled: bizModules, customized: true },
+      },
+      token()
+    );
+    setBusy(false);
+    if (res.success) {
+      toast.success("Business module policy saved — applies to all members");
+      setBizModulesCustomized(true);
+      void load();
     } else toast.error(res.error || "Failed");
   };
 
@@ -419,17 +509,43 @@ export default function AdminBusinessManagePage() {
         </div>
       </div>
 
-      {/* Business Info */}
-      <section className="bg-card border border-border rounded-2xl p-5">
-        <h2 className="font-semibold mb-4">Business Info</h2>
+      {/* Business Info — editable */}
+      <section className="bg-card border border-border rounded-2xl p-5 space-y-4">
+        <h2 className="font-semibold">Business Info</h2>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="text-xs text-muted-foreground space-y-1">
+            Business name
+            <input
+              value={editBizName}
+              onChange={(e) => setEditBizName(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground min-h-11"
+            />
+          </label>
+          <label className="text-xs text-muted-foreground space-y-1">
+            Business type
+            <select
+              value={editTemplateSlug}
+              onChange={(e) => setEditTemplateSlug(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm text-foreground min-h-11"
+            >
+              {(industryCatalog.length
+                ? industryCatalog
+                : [{ slug: editTemplateSlug || "generic", name: editTemplateSlug || "generic" }]
+              ).map((t) => (
+                <option key={t.slug} value={t.slug}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
           {[
-            ["Business Name", biz.name],
             ["Owner", biz.owner?.name || "—"],
             ["Email", biz.owner?.email || biz.billingEmail || "—"],
             ["Phone", biz.phone || "—"],
             ["Industry", biz.industry || "—"],
-            ["Business Type", biz.templateSlug || "generic"],
+            ["Status", biz.status],
             ["Created", biz.createdAt ? new Date(biz.createdAt).toLocaleString() : "—"],
           ].map(([k, v]) => (
             <div key={k}>
@@ -437,6 +553,69 @@ export default function AdminBusinessManagePage() {
               <div className="text-foreground mt-0.5 break-all">{v}</div>
             </div>
           ))}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Changing business type updates the template label only — existing CRM/ERP data is not
+          deleted. Use Business Modules below to change access.
+        </p>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void saveBusinessProfile()}
+          className="min-h-11 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+        >
+          Save business profile
+        </button>
+      </section>
+
+      {/* Business-level module allowlist */}
+      <section className="bg-card border border-border rounded-2xl p-5 space-y-3">
+        <div>
+          <h2 className="font-semibold">Business Modules</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            ON/OFF for this entire business (all members). Example: turn ERP off and leave CRM on.
+            Per-user permissions below cannot grant modules that are off here. Existing data is never
+            deleted.
+            {bizModulesCustomized ? (
+              <span className="text-violet-600 dark:text-violet-300"> Policy active.</span>
+            ) : (
+              <span> Saving enables the business allowlist.</span>
+            )}
+          </p>
+        </div>
+        <ModuleCheckboxes selected={bizModules} onChange={setBizModules} />
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void saveBusinessModules()}
+            className="min-h-11 px-4 rounded-xl bg-violet-600 text-white text-sm font-medium disabled:opacity-50"
+          >
+            Save business modules
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setBizModules(catalogModules.map((m) => m.key));
+            }}
+            className="min-h-11 px-4 rounded-xl bg-white/10 text-sm disabled:opacity-50"
+          >
+            Select all
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setBizModules(
+                catalogModules.filter((m) => m.alwaysOn || m.category === "crm" || m.key === "dashboard" || m.key === "finance" || m.key === "reports" || m.key === "mentor" || m.key === "marketing" || m.key === "whatsapp" || m.key === "team" || m.key === "activity").map((m) => m.key)
+              );
+            }}
+            className="min-h-11 px-4 rounded-xl bg-white/10 text-sm disabled:opacity-50"
+            title="CRM-oriented preset (no ERP)"
+          >
+            CRM only (no ERP)
+          </button>
         </div>
       </section>
 
@@ -691,6 +870,15 @@ export default function AdminBusinessManagePage() {
               </div>
               {editUserId === m.userId && (
                 <div className="border-t border-border pt-3 space-y-2">
+                  <label className="block text-xs text-muted-foreground">
+                    User name
+                    <input
+                      value={editUserName}
+                      onChange={(e) => setEditUserName(e.target.value)}
+                      className="mt-1 w-full bg-card border border-border rounded-xl px-3 py-2 text-sm text-foreground"
+                      placeholder="Display name"
+                    />
+                  </label>
                   <label className="block text-xs text-muted-foreground">
                     Portal / role template
                     <select

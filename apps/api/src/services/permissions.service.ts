@@ -11,6 +11,45 @@ export type MemberPermissionsJson = {
   customized?: boolean;
 };
 
+/** Business-level module allowlist stored in Business.settings.moduleAccess */
+export type BusinessModuleAccess = {
+  customized: boolean;
+  enabled: string[];
+};
+
+/**
+ * Default module keys for Interior Design / Interiors businesses.
+ * Mapped onto existing MODULE_CATALOG (no phantom modules).
+ */
+export const INTERIORS_DEFAULT_MODULES: string[] = [
+  "dashboard",
+  "leads",
+  "clients",
+  "deals",
+  "documents",
+  "tasks",
+  "meetings",
+  "finance",
+  "team",
+  "marketing",
+  "whatsapp",
+  "reports",
+  "mentor",
+  "media",
+  "activity",
+  "profile",
+  "appearance",
+];
+
+/** Template slug → default business module allowlist (when Super Admin creates / resets). */
+export function defaultModulesForTemplateSlug(slug: string | null | undefined): string[] | null {
+  const s = (slug || "").trim().toLowerCase();
+  if (s === "interiors" || s === "interior_design" || s === "interior-design") {
+    return [...INTERIORS_DEFAULT_MODULES];
+  }
+  return null;
+}
+
 /** Built-in catalog — seeded to CrmModule; new modules = add here + seed */
 export const MODULE_CATALOG: Array<{
   key: string;
@@ -273,6 +312,94 @@ export function alwaysOnModules(): string[] {
   return MODULE_CATALOG.filter((m) => m.alwaysOn).map((m) => m.key);
 }
 
+export function parseBusinessModuleAccess(settings: unknown): BusinessModuleAccess | null {
+  if (!settings || typeof settings !== "object") return null;
+  const raw = (settings as { moduleAccess?: unknown }).moduleAccess;
+  if (!raw || typeof raw !== "object") return null;
+  const ma = raw as { customized?: unknown; enabled?: unknown };
+  if (!Array.isArray(ma.enabled)) return null;
+  const valid = new Set(MODULE_CATALOG.map((m) => m.key));
+  const enabled = Array.from(
+    new Set(
+      (ma.enabled as unknown[])
+        .filter((k): k is string => typeof k === "string" && valid.has(k))
+        .concat(alwaysOnModules())
+    )
+  );
+  return {
+    customized: ma.customized === true,
+    enabled,
+  };
+}
+
+export async function getBusinessModuleAccess(
+  businessId: string
+): Promise<BusinessModuleAccess | null> {
+  const b = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { settings: true },
+  });
+  return parseBusinessModuleAccess(b?.settings);
+}
+
+export async function isBusinessModulePolicyCustomized(
+  businessId: string
+): Promise<boolean> {
+  const access = await getBusinessModuleAccess(businessId);
+  return !!access?.customized;
+}
+
+/**
+ * Merge moduleAccess into Business.settings without wiping unrelated keys.
+ */
+export async function setBusinessModuleAccess(input: {
+  actorUserId: string;
+  businessId: string;
+  enabled: string[];
+  customized?: boolean;
+}): Promise<BusinessModuleAccess> {
+  const b = await prisma.business.findFirst({
+    where: { id: input.businessId, isDemo: false, portalKind: "customer" },
+    select: { id: true, settings: true },
+  });
+  if (!b) throw new Error("Business not found");
+
+  const valid = new Set(MODULE_CATALOG.map((m) => m.key));
+  const enabled = Array.from(
+    new Set([
+      ...input.enabled.filter((k) => valid.has(k)),
+      ...alwaysOnModules(),
+    ])
+  );
+  const moduleAccess: BusinessModuleAccess = {
+    customized: input.customized !== false,
+    enabled,
+  };
+
+  const prev =
+    b.settings && typeof b.settings === "object" && !Array.isArray(b.settings)
+      ? ({ ...(b.settings as Record<string, unknown>) } as Record<string, unknown>)
+      : {};
+  prev.moduleAccess = moduleAccess;
+
+  await prisma.business.update({
+    where: { id: b.id },
+    data: { settings: prev as object },
+  });
+
+  const { recordAudit } = await import("./audit.service.js");
+  await recordAudit({
+    businessId: input.businessId,
+    actorUserId: input.actorUserId,
+    action: "platform_set_business_module_access",
+    entityType: "business",
+    entityId: input.businessId,
+    metadata: { enabled, customized: moduleAccess.customized },
+  });
+
+  return moduleAccess;
+}
+
 /** Resolve modules for a role template key */
 export function modulesForTemplate(roleKey: string): string[] {
   const t =
@@ -283,7 +410,8 @@ export function modulesForTemplate(roleKey: string): string[] {
 
 /**
  * Effective module keys for a user in their business.
- * Priority: member.permissions.modules → template for role → sales_executive defaults.
+ * Priority: member.permissions.modules → template for role → sales_executive defaults,
+ * then intersect with business moduleAccess allowlist when customized.
  */
 export async function getMemberModuleKeys(
   userId: string,
@@ -301,11 +429,21 @@ export async function getMemberModuleKeys(
   const bid = businessId || (await getUserBusinessId(userId));
   if (!bid) return alwaysOnModules();
 
-  const member = await prisma.businessMember.findUnique({
-    where: { businessId_userId: { businessId: bid, userId } },
-  });
+  const [member, biz] = await Promise.all([
+    prisma.businessMember.findUnique({
+      where: { businessId_userId: { businessId: bid, userId } },
+    }),
+    prisma.business.findUnique({
+      where: { id: bid },
+      select: { settings: true },
+    }),
+  ]);
   const role = member?.role || user.role || "sales_executive";
   const parsed = parseMemberPermissions(member?.permissions);
+  const memberCustomized = !!parsed.customized;
+  const businessAccess = parseBusinessModuleAccess(biz?.settings);
+  const businessCustomized = !!businessAccess?.customized;
+
   let keys: string[];
   if (Array.isArray(parsed.modules) && parsed.modules.length > 0) {
     keys = Array.from(new Set([...parsed.modules, ...alwaysOnModules()]));
@@ -318,18 +456,37 @@ export async function getMemberModuleKeys(
     keys = modulesForTemplate(role);
   }
 
-  // Sales CRM users with leads always receive Media Library + WhatsApp Inbox
+  // Convenience auto-grants for sales CRM — never defeat an explicit Super Admin OFF
+  // (member customized without the module, or business allowlist excluding it).
+  const allowAuto = (key: string) => {
+    if (memberCustomized && Array.isArray(parsed.modules) && !parsed.modules.includes(key)) {
+      return false;
+    }
+    if (businessCustomized && businessAccess && !businessAccess.enabled.includes(key)) {
+      return false;
+    }
+    return true;
+  };
+
   if (
     (keys.includes("leads") || keys.includes("clients")) &&
-    !keys.includes("media")
+    !keys.includes("media") &&
+    allowAuto("media")
   ) {
     keys.push("media");
   }
   if (
     (keys.includes("leads") || keys.includes("clients") || keys.includes("media")) &&
-    !keys.includes("whatsapp")
+    !keys.includes("whatsapp") &&
+    allowAuto("whatsapp")
   ) {
     keys.push("whatsapp");
+  }
+
+  // Business-level allowlist caps every member (Super Admin “ERP vaddu” for the client)
+  if (businessCustomized && businessAccess) {
+    const allow = new Set([...businessAccess.enabled, ...alwaysOnModules()]);
+    keys = Array.from(new Set(keys.filter((k) => allow.has(k)).concat(alwaysOnModules())));
   }
 
   return keys;

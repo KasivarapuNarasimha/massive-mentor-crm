@@ -2202,6 +2202,38 @@ class ApiClient {
     });
   }
 
+  /** Super Admin: update business name, type, and/or business-level module allowlist */
+  async platformUpdateBusiness(
+    businessId: string,
+    body: {
+      name?: string;
+      templateSlug?: string;
+      moduleAccess?: { enabled: string[]; customized?: boolean };
+      applyTemplateModuleDefaults?: boolean;
+    },
+    token: string
+  ) {
+    return this.request(`/platform/businesses/${businessId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      token,
+    });
+  }
+
+  /** Super Admin: update member display name / role */
+  async platformUpdateBusinessUser(
+    businessId: string,
+    userId: string,
+    body: { name?: string; role?: string },
+    token: string
+  ) {
+    return this.request(`/platform/businesses/${businessId}/users/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      token,
+    });
+  }
+
   /** Role portal: menus, actions, home, permissions (config-driven).
    * Optional previewRole: Business Admin workspace role switch (not user switch).
    */

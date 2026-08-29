@@ -6,8 +6,10 @@ import { Response, NextFunction } from "express";
 import type { AuthenticatedRequest } from "./auth.js";
 import {
   getMemberModuleKeys,
+  isBusinessModulePolicyCustomized,
   moduleKeyForApiPath,
 } from "../services/permissions.service.js";
+import { getUserBusinessId } from "../services/field-engine.service.js";
 
 /** Explicit module key(s) required — any match allows. */
 export function requireModule(...moduleKeys: string[]) {
@@ -58,7 +60,10 @@ export async function requireModuleFromPath(
     const mod = moduleKeyForApiPath(apiPath);
     if (!mod) return next();
 
-    const keys = await getMemberModuleKeys(req.user.id);
+    const bid = await getUserBusinessId(req.user.id);
+    const keys = await getMemberModuleKeys(req.user.id, bid);
+    const policyCustomized = bid ? await isBusinessModulePolicyCustomized(bid) : false;
+
     if (mod === "__crm_contacts__") {
       if (keys.includes("leads") || keys.includes("clients")) return next();
       return res.status(403).json({
@@ -85,13 +90,12 @@ export async function requireModuleFromPath(
         required: ["mentor", "ai_sales"],
       });
     }
-    // Media Library is core CRM sharing: allow with media OR leads OR clients OR documents
+    // Media: explicit grant, or soft CRM sharing when business policy is not customized
     if (mod === "media") {
+      if (keys.includes("media")) return next();
       if (
-        keys.includes("media") ||
-        keys.includes("leads") ||
-        keys.includes("clients") ||
-        keys.includes("documents")
+        !policyCustomized &&
+        (keys.includes("leads") || keys.includes("clients") || keys.includes("documents"))
       ) {
         return next();
       }
@@ -99,16 +103,15 @@ export async function requireModuleFromPath(
         success: false,
         error: "You do not have permission to access this resource.",
         code: "MODULE_FORBIDDEN",
-        required: ["media", "leads"],
+        required: ["media"],
       });
     }
-    // WhatsApp Conversation Center — same sales access as media/leads
+    // WhatsApp: effective keys already include auto-grants when allowed; do not bypass business OFF
     if (mod === "whatsapp") {
+      if (keys.includes("whatsapp")) return next();
       if (
-        keys.includes("whatsapp") ||
-        keys.includes("media") ||
-        keys.includes("leads") ||
-        keys.includes("clients")
+        !policyCustomized &&
+        (keys.includes("media") || keys.includes("leads") || keys.includes("clients"))
       ) {
         return next();
       }
@@ -116,15 +119,15 @@ export async function requireModuleFromPath(
         success: false,
         error: "You do not have permission to access this resource.",
         code: "MODULE_FORBIDDEN",
-        required: ["whatsapp", "leads"],
+        required: ["whatsapp"],
       });
     }
-    // ERP Phase 1 shell — finance/approvals roles keep access before erp is granted
+    // ERP shell — finance umbrella only for legacy tenants without business module policy
     if (mod === "erp") {
+      if (keys.includes("erp")) return next();
       if (
-        keys.includes("erp") ||
-        keys.includes("finance") ||
-        keys.includes("approvals")
+        !policyCustomized &&
+        (keys.includes("finance") || keys.includes("approvals"))
       ) {
         return next();
       }
@@ -132,10 +135,10 @@ export async function requireModuleFromPath(
         success: false,
         error: "You do not have permission to access this resource.",
         code: "MODULE_FORBIDDEN",
-        required: ["erp", "finance"],
+        required: ["erp"],
       });
     }
-    // ERP Phase 2 ops modules — allow erp / finance umbrella grants
+    // ERP submodules — parent erp umbrella; finance only when no business policy
     if (
       mod === "erp_products" ||
       mod === "erp_inventory" ||
@@ -143,18 +146,13 @@ export async function requireModuleFromPath(
       mod === "erp_purchases" ||
       mod === "erp_sales"
     ) {
-      if (
-        keys.includes(mod) ||
-        keys.includes("erp") ||
-        keys.includes("finance")
-      ) {
-        return next();
-      }
+      if (keys.includes(mod) || keys.includes("erp")) return next();
+      if (!policyCustomized && keys.includes("finance")) return next();
       return res.status(403).json({
         success: false,
         error: "You do not have permission to access this resource.",
         code: "MODULE_FORBIDDEN",
-        required: [mod, "erp", "finance"],
+        required: [mod, "erp"],
       });
     }
     if (!keys.includes(mod)) {

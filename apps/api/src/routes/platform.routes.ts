@@ -34,6 +34,7 @@ router.get("/businesses", requirePlatformAdmin, ctrl.listBusinesses);
 router.post("/businesses", requirePlatformAdmin, ctrl.createBusiness);
 router.post("/businesses/bulk", requirePlatformAdmin, ctrl.bulkAction);
 router.get("/businesses/:id", requirePlatformAdmin, ctrl.getBusiness);
+router.patch("/businesses/:id", requirePlatformAdmin, ctrl.updateBusiness);
 router.post("/businesses/:id/suspend", requirePlatformAdmin, ctrl.suspendBusiness);
 router.post("/businesses/:id/activate", requirePlatformAdmin, ctrl.activateBusiness);
 router.post("/businesses/:id/extend-trial", requirePlatformAdmin, ctrl.extendTrial);
@@ -50,6 +51,7 @@ router.put("/businesses/:id/white-label", requirePlatformAdmin, ctrl.updateWhite
 router.get("/businesses/:id/usage", requirePlatformAdmin, ctrl.usage);
 router.get("/businesses/:id/export", requirePlatformAdmin, ctrl.exportBusiness);
 router.post("/businesses/:id/users", requirePlatformAdmin, ctrl.addUser);
+router.patch("/businesses/:id/users/:userId", requirePlatformAdmin, ctrl.updateBusinessUser);
 router.post("/businesses/:id/users/:userId/disable", requirePlatformAdmin, ctrl.disableUser);
 router.post("/businesses/:id/users/:userId/reset-password", requirePlatformAdmin, ctrl.resetPassword);
 router.patch(

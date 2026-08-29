@@ -20,6 +20,8 @@ const NAV = [
   { href: "/admin/appearance", label: "Appearance" },
 ];
 
+const SIDEBAR_WIDTH = "w-64"; // 16rem — matches prior admin aside
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -70,15 +72,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-dvh bg-background text-foreground flex">
-      <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card sticky top-0 h-dvh">
-        <div className="p-5 border-b border-border">
+      {/* Width reserve so fixed sidebar does not cover main content (CRM DashboardShell pattern) */}
+      <div className={`hidden lg:block shrink-0 ${SIDEBAR_WIDTH}`} aria-hidden />
+
+      <aside
+        className={`hidden lg:flex ${SIDEBAR_WIDTH} flex-col border-r border-border bg-card fixed left-0 top-0 z-30 h-dvh overflow-hidden`}
+      >
+        <div className="p-5 border-b border-border shrink-0">
           <div className="text-xs uppercase tracking-widest text-violet-500 dark:text-violet-400/90 mb-1">
             Platform
           </div>
           <div className="font-semibold text-foreground">Super Admin</div>
           <div className="text-xs text-muted-foreground mt-1 truncate">{email}</div>
         </div>
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 min-h-0 p-3 space-y-0.5 overflow-y-auto overscroll-contain">
           {NAV.map((item) => {
             const active =
               pathname === item.href ||
@@ -92,13 +99,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     ? "bg-violet-500/15 text-violet-700 dark:text-violet-200 font-medium"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
+                aria-current={active ? "page" : undefined}
               >
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <div className="p-3 border-t border-border space-y-2">
+        <div className="p-3 border-t border-border space-y-2 shrink-0">
           <ThemeToggle className="w-full" showLabel />
           <button
             type="button"
@@ -110,7 +118,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col min-h-dvh">
         <header className="lg:hidden sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur px-3 py-3 flex items-center justify-between gap-2">
           <div className="font-semibold text-sm text-foreground">Super Admin</div>
           <div className="flex items-center gap-1">
@@ -125,19 +133,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
         <nav className="lg:hidden flex gap-1 overflow-x-auto px-2 py-2 border-b border-border text-xs bg-card">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`shrink-0 px-3 py-2 rounded-lg ${
-                pathname === item.href
-                  ? "bg-violet-500/20 text-violet-700 dark:text-violet-200"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
+          {NAV.map((item) => {
+            const active =
+              pathname === item.href ||
+              (item.href !== "/admin" && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`shrink-0 px-3 py-2 rounded-lg ${
+                  active
+                    ? "bg-violet-500/20 text-violet-700 dark:text-violet-200"
+                    : "text-muted-foreground"
+                }`}
+                aria-current={active ? "page" : undefined}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-hidden bg-background">
           {children}
