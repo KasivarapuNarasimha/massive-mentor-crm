@@ -96,7 +96,7 @@ export function ResponsiveModal({
     size === "landscape" ? "sm:max-w-3xl" : size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg";
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 mm-fade-in"
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 mm-fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="mm-modal-title"
@@ -111,9 +111,9 @@ export function ResponsiveModal({
         className={[
           "relative z-10 w-full bg-card border border-border shadow-lg",
           "rounded-t-xl sm:rounded-lg",
-          "max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden",
+          "max-h-[min(92dvh,100dvh)] sm:max-h-[85vh] flex flex-col overflow-hidden",
           width,
-          "safe-bottom mm-fade-up",
+          "mm-fade-up",
         ].join(" ")}
       >
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border shrink-0">
@@ -133,7 +133,7 @@ export function ResponsiveModal({
           {children}
         </div>
         {footer ? (
-          <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60">
+          <div className="shrink-0 border-t border-border px-4 sm:px-5 pt-3 modal-footer-safe bg-background-secondary/60 relative z-10">
             {footer}
           </div>
         ) : null}

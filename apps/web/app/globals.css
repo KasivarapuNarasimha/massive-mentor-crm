@@ -289,6 +289,15 @@ body {
 .safe-bottom {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
 }
+
+/**
+ * Sticky modal footers (Cancel / Save) on mobile.
+ * Clears the iOS/Android home-indicator inset. Pair with modal overlay z-index
+ * above the fixed mobile tab bar (z-50) so buttons stay tappable.
+ */
+.modal-footer-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
 }

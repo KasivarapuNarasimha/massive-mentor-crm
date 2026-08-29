@@ -153,8 +153,8 @@ export default function DocumentsPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="relative w-full bg-card border border-border shadow-lg rounded-t-xl sm:rounded-lg max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden sm:max-w-3xl safe-bottom">
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 bg-black/50 dark:bg-black/60">
+          <div className="relative w-full bg-card border border-border shadow-lg rounded-t-xl sm:rounded-lg max-h-[min(92dvh,100dvh)] sm:max-h-[85vh] flex flex-col overflow-hidden sm:max-w-3xl">
             <div className="shrink-0 px-4 sm:px-5 py-3 border-b border-border">
               <h3 className="font-semibold text-base tracking-tight">
                 {editingDoc ? "Edit Document" : "Add Document"}
@@ -198,15 +198,15 @@ export default function DocumentsPage() {
                 </div>
               </form>
             </div>
-            <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60 flex gap-2">
-              <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1 touch-manipulation">
+            <div className="shrink-0 border-t border-border px-4 sm:px-5 pt-3 modal-footer-safe bg-background-secondary/60 flex gap-2 relative z-10">
+              <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1 touch-manipulation min-h-11">
                 Cancel
               </button>
               <button
                 type="submit"
                 form="document-form"
                 disabled={isSubmitting}
-                className={`mm-btn mm-btn-primary flex-1 touch-manipulation focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
+                className={`mm-btn mm-btn-primary flex-1 touch-manipulation focus-ring min-h-11 ${isSubmitting ? "mm-btn-loading" : ""}`}
               >
                 {isSubmitting ? "Saving..." : editingDoc ? "Update" : "Add"}
               </button>

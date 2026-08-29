@@ -2657,10 +2657,10 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Create/Edit Modal — landscape 2-column DynamicForm */}
+      {/* Create/Edit Modal — landscape desktop / scrollable body + sticky footer on mobile */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="relative w-full bg-card border border-border shadow-lg rounded-t-xl sm:rounded-lg max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden sm:max-w-3xl safe-bottom">
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center sm:p-4 bg-black/50 dark:bg-black/60">
+          <div className="relative w-full bg-card border border-border shadow-lg rounded-t-xl sm:rounded-lg max-h-[min(92dvh,100dvh)] sm:max-h-[85vh] flex flex-col overflow-hidden sm:max-w-3xl">
             <h2 className="text-base sm:text-lg font-semibold px-4 sm:px-5 py-3 shrink-0 border-b border-border">
               {editingLead ? "Edit Lead" : "New Lead"}
               {templateSlug ? (
@@ -2782,12 +2782,12 @@ export default function LeadsPage() {
                 </div>
               ) : null}
             </div>
-            <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60">
+            <div className="shrink-0 border-t border-border px-4 sm:px-5 pt-3 modal-footer-safe bg-background-secondary/60 relative z-10">
               <div className="flex gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 px-5 py-2.5 bg-muted hover:bg-white/20 border border-border rounded-md text-sm font-medium min-h-11"
+                  className="flex-1 px-5 py-2.5 bg-muted hover:bg-white/20 border border-border rounded-md text-sm font-medium min-h-11 touch-manipulation"
                 >
                   Cancel
                 </button>
@@ -2795,7 +2795,7 @@ export default function LeadsPage() {
                   type="submit"
                   form="lead-form"
                   disabled={isSubmitting}
-                  className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary-hover disabled:opacity-50 min-h-11"
+                  className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary-hover disabled:opacity-50 min-h-11 touch-manipulation"
                 >
                   {isSubmitting ? "Saving..." : editingLead ? "Update Lead" : "Create Lead"}
                 </button>
