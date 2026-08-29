@@ -265,7 +265,7 @@ export default function ErpPurchasesPage() {
   };
 
   const lineEditor = (lines: Line[], setLines: (next: Line[]) => void) => (
-    <div className="sm:col-span-2 space-y-2">
+    <div className="md:col-span-2 space-y-2">
       {lines.map((line) => (
         <div key={line.key} className="grid grid-cols-1 sm:grid-cols-8 gap-2 items-center">
           <select
@@ -281,7 +281,7 @@ export default function ErpPurchasesPage() {
             ))}
           </select>
           <input
-            className={`${ERP_INPUT} sm:col-span-2`}
+            className={`${ERP_INPUT} md:col-span-2`}
             type="number"
             min="0"
             step="0.0001"
@@ -290,7 +290,7 @@ export default function ErpPurchasesPage() {
             onChange={(e) => updateLine(lines, setLines, line.key, { qty: e.target.value })}
           />
           <input
-            className={`${ERP_INPUT} sm:col-span-2`}
+            className={`${ERP_INPUT} md:col-span-2`}
             type="number"
             min="0"
             step="0.01"
@@ -358,9 +358,9 @@ export default function ErpPurchasesPage() {
         <div className="space-y-4">
           <form
             onSubmit={createPo}
-            className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+            className="mm-card p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"
           >
-            <h2 className="sm:col-span-2 text-sm font-semibold">Create purchase order</h2>
+            <h2 className="md:col-span-2 text-sm font-semibold">Create purchase order</h2>
             <select
               className={ERP_INPUT}
               required
@@ -381,7 +381,7 @@ export default function ErpPurchasesPage() {
               onChange={(e) => setPoNotes(e.target.value)}
             />
             {lineEditor(poLines, setPoLines)}
-            <button type="submit" disabled={saving} className={`${ERP_BTN} sm:col-span-2`}>
+            <button type="submit" disabled={saving} className={`${ERP_BTN} md:col-span-2`}>
               {saving ? "Saving…" : "Create PO"}
             </button>
           </form>
@@ -439,9 +439,9 @@ export default function ErpPurchasesPage() {
         <div className="space-y-4">
           <form
             onSubmit={createGrn}
-            className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+            className="mm-card p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"
           >
-            <h2 className="sm:col-span-2 text-sm font-semibold">Create goods receipt</h2>
+            <h2 className="md:col-span-2 text-sm font-semibold">Create goods receipt</h2>
             <select
               className={ERP_INPUT}
               required
@@ -468,7 +468,7 @@ export default function ErpPurchasesPage() {
                 </option>
               ))}
             </select>
-            <button type="submit" disabled={saving} className={`${ERP_BTN} sm:col-span-2`}>
+            <button type="submit" disabled={saving} className={`${ERP_BTN} md:col-span-2`}>
               {saving ? "Saving…" : "Create GRN"}
             </button>
           </form>
@@ -509,9 +509,9 @@ export default function ErpPurchasesPage() {
         <div className="space-y-4">
           <form
             onSubmit={createReturn}
-            className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+            className="mm-card p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"
           >
-            <h2 className="sm:col-span-2 text-sm font-semibold">Create purchase return</h2>
+            <h2 className="md:col-span-2 text-sm font-semibold">Create purchase return</h2>
             <select
               className={ERP_INPUT}
               required
@@ -539,13 +539,13 @@ export default function ErpPurchasesPage() {
               ))}
             </select>
             <input
-              className={`${ERP_INPUT} sm:col-span-2`}
+              className={`${ERP_INPUT} md:col-span-2`}
               placeholder="Reason"
               value={retReason}
               onChange={(e) => setRetReason(e.target.value)}
             />
             {lineEditor(retLines, setRetLines)}
-            <button type="submit" disabled={saving} className={`${ERP_BTN} sm:col-span-2`}>
+            <button type="submit" disabled={saving} className={`${ERP_BTN} md:col-span-2`}>
               {saving ? "Saving…" : "Create return"}
             </button>
           </form>

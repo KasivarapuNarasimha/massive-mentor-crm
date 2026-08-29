@@ -399,8 +399,8 @@ export default function FinancePage() {
 
       {tab === "invoices" && (
         <div className="space-y-4">
-          <form onSubmit={createInvoice} className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <h3 className="sm:col-span-2 font-semibold">Create invoice</h3>
+          <form onSubmit={createInvoice} className="mm-card p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            <h3 className="md:col-span-2 font-semibold">Create invoice</h3>
             <input className={inputClass} placeholder="Client name" value={invForm.clientName} onChange={(e) => setInvForm({ ...invForm, clientName: e.target.value })} />
             <CurrencyAmountInput
               className={inputClass}
@@ -412,15 +412,15 @@ export default function FinancePage() {
             />
             <input className={inputClass} type="number" step="0.01" placeholder="Tax rate %" value={invForm.taxRate} onChange={(e) => setInvForm({ ...invForm, taxRate: e.target.value })} />
             <input className={inputClass} type="date" value={invForm.dueDate} onChange={(e) => setInvForm({ ...invForm, dueDate: e.target.value })} />
-            <input className={inputClass + " sm:col-span-2"} placeholder="Description" value={invForm.description} onChange={(e) => setInvForm({ ...invForm, description: e.target.value })} />
-            <div className="sm:col-span-2">
+            <input className={inputClass + " md:col-span-2"} placeholder="Description" value={invForm.description} onChange={(e) => setInvForm({ ...invForm, description: e.target.value })} />
+            <div className="md:col-span-2">
               <CustomFieldsFormSection
                 entity="invoice"
                 values={invCustomFields}
                 onChange={setInvCustomFields}
               />
             </div>
-            <button type="submit" className="sm:col-span-2 mm-btn mm-btn-primary">Save invoice</button>
+            <button type="submit" className="md:col-span-2 mm-btn mm-btn-primary">Save invoice</button>
           </form>
           <input className={inputClass} placeholder="Search invoices…" value={search} onChange={(e) => { setSearch(e.target.value); setInvPage(1); }} />
           <div className="space-y-2">
@@ -461,8 +461,8 @@ export default function FinancePage() {
 
       {tab === "expenses" && (
         <div className="space-y-4">
-          <form onSubmit={createExpense} className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <h3 className="sm:col-span-2 font-semibold">Record expense</h3>
+          <form onSubmit={createExpense} className="mm-card p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            <h3 className="md:col-span-2 font-semibold">Record expense</h3>
             <input className={inputClass} placeholder="Title" required value={expForm.title} onChange={(e) => setExpForm({ ...expForm, title: e.target.value })} />
             <CurrencyAmountInput
               className={inputClass}
@@ -474,14 +474,14 @@ export default function FinancePage() {
             />
             <input className={inputClass} placeholder="Category" value={expForm.category} onChange={(e) => setExpForm({ ...expForm, category: e.target.value })} />
             <input className={inputClass} placeholder="Vendor" value={expForm.vendor} onChange={(e) => setExpForm({ ...expForm, vendor: e.target.value })} />
-            <div className="sm:col-span-2">
+            <div className="md:col-span-2">
               <CustomFieldsFormSection
                 entity="expense"
                 values={expCustomFields}
                 onChange={setExpCustomFields}
               />
             </div>
-            <button type="submit" className="sm:col-span-2 mm-btn mm-btn-primary">Save expense</button>
+            <button type="submit" className="md:col-span-2 mm-btn mm-btn-primary">Save expense</button>
           </form>
           <div className="space-y-2">
             {expenses.map((ex) => (
@@ -500,8 +500,8 @@ export default function FinancePage() {
 
       {tab === "payments" && (
         <div className="space-y-4">
-          <form onSubmit={createPayment} className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <h3 className="sm:col-span-2 font-semibold">Record payment</h3>
+          <form onSubmit={createPayment} className="mm-card p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            <h3 className="md:col-span-2 font-semibold">Record payment</h3>
             <CurrencyAmountInput
               className={inputClass}
               placeholder="Amount"
@@ -519,14 +519,14 @@ export default function FinancePage() {
               <option value="other">Other</option>
             </select>
             <input className={inputClass} placeholder="Reference" value={payForm.reference} onChange={(e) => setPayForm({ ...payForm, reference: e.target.value })} />
-            <div className="sm:col-span-2">
+            <div className="md:col-span-2">
               <CustomFieldsFormSection
                 entity="payment"
                 values={payCustomFields}
                 onChange={setPayCustomFields}
               />
             </div>
-            <button type="submit" className="sm:col-span-2 mm-btn mm-btn-primary">Save payment</button>
+            <button type="submit" className="md:col-span-2 mm-btn mm-btn-primary">Save payment</button>
           </form>
           <div className="space-y-2">
             {payments.map((p) => (

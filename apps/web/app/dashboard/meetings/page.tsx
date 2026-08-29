@@ -250,74 +250,92 @@ export default function MeetingsPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border p-4 sm:p-5 rounded-t-xl sm:rounded-lg w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom shadow-lg">
-            <h3 className="font-semibold mb-4 text-base tracking-tight">{editingMeeting ? "Edit Meeting" : "Schedule Meeting"}</h3>
-            <form onSubmit={handleSubmit} className="space-y-3 adaptive-form">
-              <input
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Meeting title *"
-                className="mm-input"
-                required
-              />
-              <label className="mm-label">
-                Date & time *
-                <input
-                  type="datetime-local"
-                  value={formData.scheduledAt}
-                  onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
-                  className="mt-1 mm-input"
-                  required
-                />
-              </label>
-              <input
-                value={formData.durationMin}
-                onChange={(e) => setFormData({ ...formData, durationMin: e.target.value })}
-                placeholder="Duration min"
-                type="number"
-                className="mm-input"
-              />
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Notes"
-                className="mm-input min-h-20"
-              />
-              <input
-                value={formData.outcome}
-                onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
-                placeholder="Outcome"
-                className="mm-input"
-              />
-              <CustomFieldsFormSection
-                entity="meeting"
-                values={customFields}
-                onChange={setCustomFields}
-                disabled={isSubmitting}
-              />
-              <div className="flex gap-2 pt-1">
-                <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1">
-                  Cancel
-                </button>
-                <button
-                  type="submit"
+          <div className="relative w-full bg-card border border-border shadow-lg rounded-t-xl sm:rounded-lg max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden sm:max-w-3xl safe-bottom">
+            <div className="shrink-0 px-4 sm:px-5 py-3 border-b border-border">
+              <h3 className="font-semibold text-base tracking-tight">
+                {editingMeeting ? "Edit Meeting" : "Schedule Meeting"}
+              </h3>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4">
+              <form id="meeting-form" onSubmit={handleSubmit} className="adaptive-form space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="md:col-span-2">
+                    <input
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="Meeting title *"
+                      className="mm-input"
+                      required
+                    />
+                  </div>
+                  <label className="mm-label">
+                    Date & time *
+                    <input
+                      type="datetime-local"
+                      value={formData.scheduledAt}
+                      onChange={(e) => setFormData({ ...formData, scheduledAt: e.target.value })}
+                      className="mt-1 mm-input"
+                      required
+                    />
+                  </label>
+                  <label className="mm-label">
+                    Duration (min)
+                    <input
+                      value={formData.durationMin}
+                      onChange={(e) => setFormData({ ...formData, durationMin: e.target.value })}
+                      placeholder="Duration min"
+                      type="number"
+                      className="mt-1 mm-input"
+                    />
+                  </label>
+                  <div className="md:col-span-2">
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      placeholder="Notes"
+                      className="mm-input min-h-20"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <input
+                      value={formData.outcome}
+                      onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
+                      placeholder="Outcome"
+                      className="mm-input"
+                    />
+                  </div>
+                </div>
+                <CustomFieldsFormSection
+                  entity="meeting"
+                  values={customFields}
+                  onChange={setCustomFields}
                   disabled={isSubmitting}
-                  className={`mm-btn mm-btn-primary flex-1 focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
-                >
-                  {isSubmitting ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </form>
-            {editingMeeting?.id ? (
-              <div className="mt-4 pt-4 border-t border-border">
-                <NotesPanel
-                  entityType="meeting"
-                  entityId={editingMeeting.id}
-                  compact
-                  title="Attached notes"
                 />
-              </div>
-            ) : null}
+              </form>
+              {editingMeeting?.id ? (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <NotesPanel
+                    entityType="meeting"
+                    entityId={editingMeeting.id}
+                    compact
+                    title="Attached notes"
+                  />
+                </div>
+              ) : null}
+            </div>
+            <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60 flex gap-2">
+              <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1">
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="meeting-form"
+                disabled={isSubmitting}
+                className={`mm-btn mm-btn-primary flex-1 focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
+              >
+                {isSubmitting ? "Saving..." : "Save"}
+              </button>
+            </div>
           </div>
         </div>
       )}

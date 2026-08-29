@@ -154,52 +154,63 @@ export default function DocumentsPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border p-4 sm:p-5 rounded-t-xl sm:rounded-lg w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom shadow-lg">
-            <h3 className="font-semibold mb-4 text-base tracking-tight">{editingDoc ? "Edit Document" : "Add Document"}</h3>
-            <form onSubmit={handleSubmit} className="space-y-3 adaptive-form">
-              <input
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Document title *"
-                className="mm-input"
-                required
-              />
-              <input
-                value={formData.url}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                placeholder="URL or link"
-                className="mm-input"
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <select
-                  value={formData.entityType}
-                  onChange={(e) => setFormData({ ...formData, entityType: e.target.value })}
-                  className="mm-input"
-                >
-                  <option value="contact">contact</option>
-                  <option value="deal">deal</option>
-                  <option value="meeting">meeting</option>
-                </select>
-                <input
-                  value={formData.entityId}
-                  onChange={(e) => setFormData({ ...formData, entityId: e.target.value })}
-                  placeholder="Entity ID"
-                  className="mm-input"
-                />
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1 touch-manipulation">
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`mm-btn mm-btn-primary flex-1 touch-manipulation focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
-                >
-                  {isSubmitting ? "Saving..." : editingDoc ? "Update" : "Add"}
-                </button>
-              </div>
-            </form>
+          <div className="relative w-full bg-card border border-border shadow-lg rounded-t-xl sm:rounded-lg max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden sm:max-w-3xl safe-bottom">
+            <div className="shrink-0 px-4 sm:px-5 py-3 border-b border-border">
+              <h3 className="font-semibold text-base tracking-tight">
+                {editingDoc ? "Edit Document" : "Add Document"}
+              </h3>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4">
+              <form id="document-form" onSubmit={handleSubmit} className="adaptive-form">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="md:col-span-2">
+                    <input
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="Document title *"
+                      className="mm-input"
+                      required
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <input
+                      value={formData.url}
+                      onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                      placeholder="URL or link"
+                      className="mm-input"
+                    />
+                  </div>
+                  <select
+                    value={formData.entityType}
+                    onChange={(e) => setFormData({ ...formData, entityType: e.target.value })}
+                    className="mm-input"
+                  >
+                    <option value="contact">contact</option>
+                    <option value="deal">deal</option>
+                    <option value="meeting">meeting</option>
+                  </select>
+                  <input
+                    value={formData.entityId}
+                    onChange={(e) => setFormData({ ...formData, entityId: e.target.value })}
+                    placeholder="Entity ID"
+                    className="mm-input"
+                  />
+                </div>
+              </form>
+            </div>
+            <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60 flex gap-2">
+              <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1 touch-manipulation">
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="document-form"
+                disabled={isSubmitting}
+                className={`mm-btn mm-btn-primary flex-1 touch-manipulation focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
+              >
+                {isSubmitting ? "Saving..." : editingDoc ? "Update" : "Add"}
+              </button>
+            </div>
           </div>
         </div>
       )}

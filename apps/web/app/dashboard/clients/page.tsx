@@ -441,15 +441,17 @@ export default function ClientsPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="mm-card rounded-t-lg sm:rounded-lg w-full sm:max-w-lg max-h-[92dvh] flex flex-col overflow-hidden p-4 sm:p-5 safe-bottom">
-            <h2 className="mm-section-title text-base mb-2">{editingClient ? "Edit Client" : "New Client"}</h2>
-            {templateSlug ? (
-              <p className="mm-secondary mb-3">Fields from template: {templateSlug}</p>
-            ) : (
-              <div className="mb-3" />
-            )}
-            <div className="flex-1 overflow-y-auto space-y-3">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="relative w-full bg-card border border-border shadow-lg rounded-t-xl sm:rounded-lg max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden sm:max-w-3xl safe-bottom">
+            <div className="shrink-0 px-4 sm:px-5 py-3 border-b border-border">
+              <h2 className="mm-section-title text-base">
+                {editingClient ? "Edit Client" : "New Client"}
+              </h2>
+              {templateSlug ? (
+                <p className="mm-secondary mt-1">Fields from template: {templateSlug}</p>
+              ) : null}
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4 space-y-3">
               <DynamicForm
                 formId="client-form"
                 fields={fieldDefs}
@@ -565,7 +567,7 @@ export default function ClientsPage() {
                 </div>
               ) : null}
             </div>
-            <div className="flex gap-2 mt-4">
+            <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60 flex gap-2">
               <button
                 type="button"
                 onClick={closeModal}

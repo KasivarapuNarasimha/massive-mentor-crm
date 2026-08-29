@@ -205,7 +205,7 @@ export default function TeamPage() {
           <p className="mm-secondary">
             User joins this business. On login they only see the portal for their assigned role.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label className="mm-label">Name</label>
               <input

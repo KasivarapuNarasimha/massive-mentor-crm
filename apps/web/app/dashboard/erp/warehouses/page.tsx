@@ -83,9 +83,9 @@ export default function ErpWarehousesPage() {
 
       <form
         onSubmit={create}
-        className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+        className="mm-card p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"
       >
-        <h2 className="sm:col-span-2 text-sm font-semibold">New warehouse</h2>
+        <h2 className="md:col-span-2 text-sm font-semibold">New warehouse</h2>
         <input
           className={ERP_INPUT}
           placeholder="Code (e.g. MAIN)"
@@ -101,7 +101,7 @@ export default function ErpWarehousesPage() {
           onChange={(e) => setForm({ ...form, name: e.target.value })}
         />
         <input
-          className={`${ERP_INPUT} sm:col-span-2`}
+          className={`${ERP_INPUT} md:col-span-2`}
           placeholder="Address (optional)"
           value={form.address}
           onChange={(e) => setForm({ ...form, address: e.target.value })}
@@ -114,7 +114,7 @@ export default function ErpWarehousesPage() {
           />
           Set as default
         </label>
-        <button type="submit" disabled={saving} className={`${ERP_BTN} sm:col-span-2`}>
+        <button type="submit" disabled={saving} className={`${ERP_BTN} md:col-span-2`}>
           {saving ? "Saving…" : "Create warehouse"}
         </button>
       </form>

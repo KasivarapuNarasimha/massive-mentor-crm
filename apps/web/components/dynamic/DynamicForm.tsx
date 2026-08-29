@@ -4,6 +4,7 @@ import { DynamicField } from "@/components/dynamic/DynamicField";
 import type { FieldDef } from "@/lib/business-config";
 import { formFields } from "@/lib/business-config";
 import { parseAmount } from "@/lib/currency";
+import { FormGrid, FormGridItem, isFormFieldFullWidth } from "@/components/ui/FormLayout";
 
 type Props = {
   fields: FieldDef[];
@@ -17,6 +18,7 @@ type Props = {
 
 /**
  * Builds a form entirely from FieldDef metadata.
+ * Uses shared landscape 2-column FormGrid (full-width for long text).
  */
 export function DynamicForm({
   fields,
@@ -30,15 +32,12 @@ export function DynamicForm({
   const visible = formFields(fields);
 
   return (
-    <form id={formId} onSubmit={onSubmit} className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <form id={formId} onSubmit={onSubmit} className="adaptive-form">
+      <FormGrid>
         {visible.map((field) => {
-          const fullWidth =
-            field.type === "textarea" ||
-            field.key === "description" ||
-            field.key === "feedback";
+          const fullWidth = isFormFieldFullWidth({ key: field.key, type: field.type });
           return (
-            <div key={field.key} className={fullWidth ? "sm:col-span-2" : undefined}>
+            <FormGridItem key={field.key} fullWidth={fullWidth}>
               <DynamicField
                 field={field}
                 value={values[field.key]}
@@ -46,10 +45,10 @@ export function DynamicForm({
                 statusOptions={statusOptions}
                 disabled={disabled}
               />
-            </div>
+            </FormGridItem>
           );
         })}
-      </div>
+      </FormGrid>
     </form>
   );
 }

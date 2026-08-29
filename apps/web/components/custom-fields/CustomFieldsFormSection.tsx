@@ -6,6 +6,7 @@ import type { CustomFieldEntity, FieldDef } from "@/lib/business-config";
 import { entityFieldsFromConfig, formFields, type BusinessConfigDTO } from "@/lib/business-config";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { FormGrid, FormGridItem, isFormFieldFullWidth } from "@/components/ui/FormLayout";
 
 type Props = {
   entity: CustomFieldEntity;
@@ -70,21 +71,23 @@ export function CustomFieldsFormSection({
   return (
     <div className={`rounded-md border border-border bg-background/50 p-3 space-y-3 ${className}`}>
       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <FormGrid>
         {visible.map((field) => {
-          const fullWidth = field.type === "textarea" || field.type === "multiselect";
+          const fullWidth =
+            isFormFieldFullWidth({ key: field.key, type: field.type }) ||
+            field.type === "multiselect";
           return (
-            <div key={field.key} className={fullWidth ? "sm:col-span-2" : undefined}>
+            <FormGridItem key={field.key} fullWidth={fullWidth}>
               <DynamicField
                 field={field}
                 value={values[field.key]}
                 disabled={disabled}
                 onChange={(key, value) => onChange({ ...values, [key]: value })}
               />
-            </div>
+            </FormGridItem>
           );
         })}
-      </div>
+      </FormGrid>
     </div>
   );
 }

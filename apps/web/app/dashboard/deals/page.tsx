@@ -723,74 +723,78 @@ export default function DealsPage() {
       )}
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="mm-card rounded-t-lg sm:rounded-lg w-full sm:max-w-md max-h-[92dvh] overflow-y-auto p-4 sm:p-5 safe-bottom">
-            <h2 className="mm-section-title text-base mb-4">{editingDeal ? "Edit Deal" : "New Deal"}</h2>
-            <form onSubmit={handleSubmit} className="space-y-3 adaptive-form">
-              <div>
-                <label className="mm-label">Title *</label>
-                <input
-                  value={formData.title}
-                  onChange={(e) => handleChange("title", e.target.value)}
-                  className="mm-input"
-                  required
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="relative w-full bg-card border border-border shadow-lg rounded-t-xl sm:rounded-lg max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden sm:max-w-3xl safe-bottom">
+            <div className="shrink-0 px-4 sm:px-5 py-3 border-b border-border">
+              <h2 className="mm-section-title text-base">{editingDeal ? "Edit Deal" : "New Deal"}</h2>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4">
+              <form id="deal-form" onSubmit={handleSubmit} className="adaptive-form space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="md:col-span-2">
+                    <label className="mm-label">Title *</label>
+                    <input
+                      value={formData.title}
+                      onChange={(e) => handleChange("title", e.target.value)}
+                      className="mm-input"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mm-label">Value</label>
+                    <CurrencyAmountInput
+                      value={formData.value}
+                      onValueChange={(raw) => handleChange("value", raw)}
+                      className="mm-input"
+                      placeholder="e.g. 1,00,000"
+                    />
+                  </div>
+                  <div>
+                    <label className="mm-label">Stage</label>
+                    <select
+                      value={formData.stage}
+                      onChange={(e) => handleChange("stage", e.target.value)}
+                      className="mm-input"
+                    >
+                      {STAGES.map((s) => (
+                        <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mm-label">Deal summary notes</label>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => handleChange("notes", e.target.value)}
+                      className="mm-input h-24"
+                      placeholder="Short notes saved on this deal record"
+                    />
+                  </div>
+                </div>
+                <CustomFieldsFormSection
+                  entity="deal"
+                  values={customFields}
+                  onChange={setCustomFields}
+                  disabled={isSubmitting}
                 />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="mm-label">Value</label>
-                  <CurrencyAmountInput
-                    value={formData.value}
-                    onValueChange={(raw) => handleChange("value", raw)}
-                    className="mm-input"
-                    placeholder="e.g. 1,00,000"
+              </form>
+              {editingDeal?.id ? (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <NotesPanel
+                    entityType="deal"
+                    entityId={editingDeal.id}
+                    compact
+                    title="Attached notes"
                   />
                 </div>
-                <div>
-                  <label className="mm-label">Stage</label>
-                  <select
-                    value={formData.stage}
-                    onChange={(e) => handleChange("stage", e.target.value)}
-                    className="mm-input"
-                  >
-                    {STAGES.map((s) => (
-                      <option key={s} value={s}>{STAGE_LABELS[s]}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="mm-label">Deal summary notes</label>
-                <textarea
-                  value={formData.notes}
-                  onChange={(e) => handleChange("notes", e.target.value)}
-                  className="mm-input h-24"
-                  placeholder="Short notes saved on this deal record"
-                />
-              </div>
-              <CustomFieldsFormSection
-                entity="deal"
-                values={customFields}
-                onChange={setCustomFields}
-                disabled={isSubmitting}
-              />
-              <div className="flex gap-2 pt-1">
-                <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1 touch-manipulation">Cancel</button>
-                <button type="submit" disabled={isSubmitting} className={`mm-btn mm-btn-primary flex-1 touch-manipulation ${isSubmitting ? "mm-btn-loading" : ""}`}>
-                  {isSubmitting ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </form>
-            {editingDeal?.id ? (
-              <div className="mt-4 pt-4 border-t border-border">
-                <NotesPanel
-                  entityType="deal"
-                  entityId={editingDeal.id}
-                  compact
-                  title="Attached notes"
-                />
-              </div>
-            ) : null}
+              ) : null}
+            </div>
+            <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60 flex gap-2">
+              <button type="button" onClick={closeModal} className="mm-btn mm-btn-secondary flex-1 touch-manipulation">Cancel</button>
+              <button type="submit" form="deal-form" disabled={isSubmitting} className={`mm-btn mm-btn-primary flex-1 touch-manipulation ${isSubmitting ? "mm-btn-loading" : ""}`}>
+                {isSubmitting ? "Saving..." : "Save"}
+              </button>
+            </div>
           </div>
         </div>
       )}

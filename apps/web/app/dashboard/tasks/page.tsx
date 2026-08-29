@@ -313,98 +313,103 @@ export default function TasksPage() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div className="bg-card border border-border p-4 sm:p-5 rounded-t-xl sm:rounded-lg w-full sm:max-w-md max-h-[92dvh] overflow-y-auto safe-bottom shadow-lg">
-            <h3 className="font-semibold mb-4 text-base tracking-tight">
-              {editingTask ? "Edit Task" : "New Task"}
-            </h3>
-            {editingTask && (editingTask.contactId || editingTask.dealId) ? (
-              <p className="mm-secondary mb-3">
-                {editingTask.contactId ? "Linked to a lead/contact. " : ""}
-                {editingTask.dealId ? "Linked to a deal." : ""}
-              </p>
-            ) : null}
-            <form onSubmit={handleSubmit} className="space-y-3 adaptive-form">
-              <label className="mm-label">
-                <span className="mm-required">Title</span>
-                <input
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="e.g. Call client about proposal"
-                  className="mt-1 mm-input focus-ring"
-                  required
-                  autoFocus
-                />
-              </label>
-              <label className="mm-label">
-                Description
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Optional notes"
-                  className="mt-1 mm-input focus-ring min-h-24"
-                />
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="mm-label">
-                  Due date
-                  <input
-                    type="date"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="mt-1 mm-input focus-ring"
-                  />
-                </label>
-                <label className="mm-label">
-                  Status
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    aria-label="Task status"
-                    className="mt-1 mm-input"
-                  >
-                    <option value="todo">todo</option>
-                    <option value="in_progress">in_progress</option>
-                    <option value="done">done</option>
-                  </select>
-                </label>
-              </div>
-              <label className="mm-label">
-                Priority
-                <select
-                  value={formData.priority}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                  className="mt-1 mm-input"
-                  aria-label="Priority"
-                >
-                  <option value="low">low</option>
-                  <option value="medium">medium</option>
-                  <option value="high">high</option>
-                </select>
-              </label>
-              <CustomFieldsFormSection
-                entity="task"
-                values={customFields}
-                onChange={setCustomFields}
-                disabled={isSubmitting}
-              />
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="mm-btn mm-btn-secondary flex-1"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
+          <div className="relative w-full bg-card border border-border shadow-lg rounded-t-xl sm:rounded-lg max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden sm:max-w-3xl safe-bottom">
+            <div className="shrink-0 px-4 sm:px-5 py-3 border-b border-border">
+              <h3 className="font-semibold text-base tracking-tight">
+                {editingTask ? "Edit Task" : "New Task"}
+              </h3>
+              {editingTask && (editingTask.contactId || editingTask.dealId) ? (
+                <p className="mm-secondary mt-1">
+                  {editingTask.contactId ? "Linked to a lead/contact. " : ""}
+                  {editingTask.dealId ? "Linked to a deal." : ""}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4">
+              <form id="task-form" onSubmit={handleSubmit} className="adaptive-form space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                  <label className="mm-label md:col-span-2">
+                    <span className="mm-required">Title</span>
+                    <input
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="e.g. Call client about proposal"
+                      className="mt-1 mm-input focus-ring"
+                      required
+                      autoFocus
+                    />
+                  </label>
+                  <label className="mm-label md:col-span-2">
+                    Description
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Optional notes"
+                      className="mt-1 mm-input focus-ring min-h-24"
+                    />
+                  </label>
+                  <label className="mm-label">
+                    Due date
+                    <input
+                      type="date"
+                      value={formData.dueDate}
+                      onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                      className="mt-1 mm-input focus-ring"
+                    />
+                  </label>
+                  <label className="mm-label">
+                    Status
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      aria-label="Task status"
+                      className="mt-1 mm-input"
+                    >
+                      <option value="todo">todo</option>
+                      <option value="in_progress">in_progress</option>
+                      <option value="done">done</option>
+                    </select>
+                  </label>
+                  <label className="mm-label">
+                    Priority
+                    <select
+                      value={formData.priority}
+                      onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                      className="mt-1 mm-input"
+                      aria-label="Priority"
+                    >
+                      <option value="low">low</option>
+                      <option value="medium">medium</option>
+                      <option value="high">high</option>
+                    </select>
+                  </label>
+                </div>
+                <CustomFieldsFormSection
+                  entity="task"
+                  values={customFields}
+                  onChange={setCustomFields}
                   disabled={isSubmitting}
-                  className={`mm-btn mm-btn-primary flex-1 focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
-                  aria-busy={isSubmitting}
-                >
-                  {isSubmitting ? "Saving…" : editingTask ? "Update" : "Create"}
-                </button>
-              </div>
-            </form>
+                />
+              </form>
+            </div>
+            <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60 flex gap-2">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="mm-btn mm-btn-secondary flex-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="task-form"
+                disabled={isSubmitting}
+                className={`mm-btn mm-btn-primary flex-1 focus-ring ${isSubmitting ? "mm-btn-loading" : ""}`}
+                aria-busy={isSubmitting}
+              >
+                {isSubmitting ? "Saving…" : editingTask ? "Update" : "Create"}
+              </button>
+            </div>
           </div>
         </div>
       )}

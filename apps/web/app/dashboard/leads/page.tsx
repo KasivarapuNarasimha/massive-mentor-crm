@@ -2657,11 +2657,11 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Create/Edit Modal — DynamicForm from BusinessConfig fields */}
+      {/* Create/Edit Modal — landscape 2-column DynamicForm */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-lg w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-            <h2 className="text-xl font-semibold p-6 flex-shrink-0 border-b border-border">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/60 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div className="relative w-full bg-card border border-border shadow-lg rounded-t-xl sm:rounded-lg max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden sm:max-w-3xl safe-bottom">
+            <h2 className="text-base sm:text-lg font-semibold px-4 sm:px-5 py-3 shrink-0 border-b border-border">
               {editingLead ? "Edit Lead" : "New Lead"}
               {templateSlug ? (
                 <span className="block text-xs font-normal text-muted-foreground mt-1">
@@ -2669,7 +2669,7 @@ export default function LeadsPage() {
                 </span>
               ) : null}
             </h2>
-            <div className="flex-1 overflow-y-auto px-6 pt-4 pb-6">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4">
               <DynamicForm
                 formId="lead-form"
                 fields={fieldDefs}
@@ -2771,23 +2771,23 @@ export default function LeadsPage() {
                   )}
                 </div>
               )}
+              {editingLead?.id ? (
+                <div className="mt-4 pt-4 border-t border-border">
+                  <NotesPanel
+                    entityType="contact"
+                    entityId={editingLead.id}
+                    compact
+                    title="Attached notes"
+                  />
+                </div>
+              ) : null}
             </div>
-            {editingLead?.id ? (
-              <div className="px-6 pb-4 flex-shrink-0 border-t border-border pt-4">
-                <NotesPanel
-                  entityType="contact"
-                  entityId={editingLead.id}
-                  compact
-                  title="Attached notes"
-                />
-              </div>
-            ) : null}
-            <div className="p-6 flex-shrink-0 border-t border-border">
-              <div className="flex gap-3">
+            <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60">
+              <div className="flex gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="flex-1 px-5 py-2.5 bg-muted hover:bg-white/20 border border-white/20 rounded-md text-sm font-medium"
+                  className="flex-1 px-5 py-2.5 bg-muted hover:bg-white/20 border border-border rounded-md text-sm font-medium min-h-11"
                 >
                   Cancel
                 </button>
@@ -2795,7 +2795,7 @@ export default function LeadsPage() {
                   type="submit"
                   form="lead-form"
                   disabled={isSubmitting}
-                  className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary-hover disabled:opacity-50"
+                  className="flex-1 px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary-hover disabled:opacity-50 min-h-11"
                 >
                   {isSubmitting ? "Saving..." : editingLead ? "Update Lead" : "Create Lead"}
                 </button>

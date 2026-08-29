@@ -141,9 +141,9 @@ export default function ErpVendorsPage() {
 
       <form
         onSubmit={save}
-        className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+        className="mm-card p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"
       >
-        <h2 className="sm:col-span-2 text-sm font-semibold">
+        <h2 className="md:col-span-2 text-sm font-semibold">
           {editingId ? "Edit vendor" : "New vendor"}
         </h2>
         <input
@@ -185,13 +185,13 @@ export default function ErpVendorsPage() {
           onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })}
         />
         <input
-          className={`${ERP_INPUT} sm:col-span-2`}
+          className={`${ERP_INPUT} md:col-span-2`}
           placeholder="Address"
           value={form.address}
           onChange={(e) => setForm({ ...form, address: e.target.value })}
         />
         <input
-          className={`${ERP_INPUT} sm:col-span-2`}
+          className={`${ERP_INPUT} md:col-span-2`}
           placeholder="Notes"
           value={form.notes}
           onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -204,7 +204,7 @@ export default function ErpVendorsPage() {
           />
           Active
         </label>
-        <div className="sm:col-span-2">
+        <div className="md:col-span-2">
           <CustomFieldsFormSection
             entity="vendor"
             values={customFields}
@@ -212,7 +212,7 @@ export default function ErpVendorsPage() {
             disabled={saving}
           />
         </div>
-        <div className="sm:col-span-2 flex flex-wrap gap-2">
+        <div className="md:col-span-2 flex flex-wrap gap-2">
           <button type="submit" disabled={saving} className={ERP_BTN}>
             {saving ? "Saving…" : editingId ? "Update vendor" : "Create vendor"}
           </button>

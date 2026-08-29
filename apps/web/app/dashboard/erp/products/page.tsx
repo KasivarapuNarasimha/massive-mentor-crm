@@ -313,11 +313,11 @@ export default function ErpProductsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <form
           onSubmit={createProduct}
-          className="mm-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-3"
+          className="mm-card p-4 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"
         >
-          <h2 className="sm:col-span-2 text-sm font-semibold">New product</h2>
+          <h2 className="md:col-span-2 text-sm font-semibold">New product</h2>
           {renderFields(form, setForm)}
-          <div className="sm:col-span-2">
+          <div className="md:col-span-2">
             <CustomFieldsFormSection
               entity="product"
               values={createCustomFields}
@@ -325,7 +325,7 @@ export default function ErpProductsPage() {
               disabled={saving}
             />
           </div>
-          <button type="submit" disabled={saving} className={`${ERP_BTN} sm:col-span-2`}>
+          <button type="submit" disabled={saving} className={`${ERP_BTN} md:col-span-2`}>
             {saving && !editing ? "Saving…" : "Create product"}
           </button>
         </form>
@@ -426,6 +426,7 @@ export default function ErpProductsPage() {
       <ResponsiveModal
         open={!!editing}
         onClose={closeEdit}
+        size="landscape"
         title={editing ? `Edit product · ${editing.sku}` : "Edit product"}
         footer={
           <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
@@ -446,16 +447,16 @@ export default function ErpProductsPage() {
         <form
           id="erp-edit-product-form"
           onSubmit={saveEdit}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4"
         >
           {inventoryFieldsLocked ? (
-            <p className="sm:col-span-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+            <p className="md:col-span-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
               Type and Track Inventory are locked because this product already has stock
               movements.
             </p>
           ) : null}
           {renderFields(editForm, setEditForm, { lockInventoryFields: inventoryFieldsLocked })}
-          <div className="sm:col-span-2">
+          <div className="md:col-span-2">
             <CustomFieldsFormSection
               entity="product"
               values={editCustomFields}

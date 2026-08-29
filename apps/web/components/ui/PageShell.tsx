@@ -81,14 +81,19 @@ export function ResponsiveModal({
   title,
   children,
   footer,
+  size = "md",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** md = compact dialogs; lg = medium; landscape = wide CRM create/edit (~3xl) */
+  size?: "md" | "lg" | "landscape";
 }) {
   if (!open) return null;
+  const width =
+    size === "landscape" ? "sm:max-w-3xl" : size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg";
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 mm-fade-in"
@@ -106,8 +111,8 @@ export function ResponsiveModal({
         className={[
           "relative z-10 w-full bg-card border border-border shadow-lg",
           "rounded-t-xl sm:rounded-lg",
-          "max-h-[92dvh] sm:max-h-[90vh] flex flex-col",
-          "sm:max-w-lg",
+          "max-h-[92dvh] sm:max-h-[85vh] flex flex-col overflow-hidden",
+          width,
           "safe-bottom mm-fade-up",
         ].join(" ")}
       >
@@ -124,7 +129,9 @@ export function ResponsiveModal({
             ×
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4">{children}</div>
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4">
+          {children}
+        </div>
         {footer ? (
           <div className="shrink-0 border-t border-border px-4 sm:px-5 py-3 safe-bottom bg-background-secondary/60">
             {footer}
