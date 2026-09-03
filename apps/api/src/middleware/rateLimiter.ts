@@ -1,6 +1,7 @@
 import rateLimit from "express-rate-limit";
 import type { Request } from "express";
 import type { AuthenticatedRequest } from "./auth.js";
+import { verifyToken } from "../services/auth.service.js";
 import { getSharedRateLimitStore } from "../lib/rate-limit-store.js";
 
 /**
@@ -97,7 +98,7 @@ export const mentorChatLimiter = rateLimit({
 });
 
 /**
- * Paths under /api that must NOT share the general IP bucket.
+ * Paths under /api that must NOT share the general bucket.
  * Auth entrypoints keep their dedicated limiters (loginLimiter, etc.).
  * When mounted via app.use("/api", …), req.path is relative to the mount.
  */
@@ -116,7 +117,35 @@ function isAuthEntrypointPath(req: Request): boolean {
   return candidates.some((c) => authPaths.has(c));
 }
 
-/** General API rate limit — mitigates abuse / scraping */
+/**
+ * Separate authenticated traffic from unauthenticated IP traffic without a
+ * database lookup on every request. `verifyToken` validates the signature and
+ * expiry; invalid, expired, or absent credentials always remain in the IP
+ * bucket. Customer tokens are user-scoped today; support-mode tokens also
+ * carry the impersonated business scope.
+ */
+/** Exported for focused unit tests — do not use outside rate-limit wiring. */
+export function apiRateLimitKey(req: Request): string {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.slice("Bearer ".length).trim();
+      const claims = verifyToken(token);
+      if (claims.userId) {
+        const businessScope = claims.supportBusinessId?.trim() || "user-scope";
+        return `user:${claims.userId}:business:${businessScope}`;
+      }
+    } catch {
+      // Invalid or expired credentials must not bypass public IP limiting.
+    }
+  }
+  return `ip:${req.ip || "unknown"}`;
+}
+
+/**
+ * General API rate limit — authenticated requests are isolated by verified
+ * user (and support business scope); unauthenticated traffic stays IP-based.
+ */
 export const apiGeneralLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: isDev ? 2000 : 300,
@@ -128,6 +157,7 @@ export const apiGeneralLimiter = rateLimit({
   legacyHeaders: false,
   store: store("api"),
   validate: false,
+  keyGenerator: apiRateLimitKey,
   skip: (req) => {
     const p = req.path || "";
     if (p === "/health" || p === "/ready") return true;

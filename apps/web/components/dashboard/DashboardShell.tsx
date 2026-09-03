@@ -30,6 +30,10 @@ import { TeamActivityToaster } from "@/components/team/TeamActivityToaster";
 const NAV_H = "3.5rem"; // 56px
 const FIELD_BAR_H = "2.75rem"; // 44px — slightly denser strip
 const DEMO_BANNER_H = "2rem";
+const NOTIFICATION_POLL_MS = 8_000;
+
+/** One DashboardShell poller per browser JavaScript context. */
+let notificationPollOwner: symbol | null = null;
 
 interface NavItem {
   /** Stable unique React key (menu key preferred over href) */
@@ -553,6 +557,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [manualExpandedSubs, setManualExpandedSubs] = useState<Record<string, boolean>>({});
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const notificationPollOwnerRef = useRef(Symbol("notification-poll-owner"));
+  const notificationRequestInFlightRef = useRef(false);
 
   // Reset manual expands when navigating so only the active sub-module stays open
   useEffect(() => {
@@ -613,12 +619,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     };
   }, [userMenuOpen]);
 
-  const loadNotifs = useCallback((opts?: { showLoading?: boolean }) => {
+  const loadNotifs = useCallback(async (opts?: { showLoading?: boolean }) => {
     if (!token) return;
+    // Poll, visibility, panel-open, and data-change refreshes can coincide.
+    // Keep one request active so they cannot multiply into parallel polls.
+    if (notificationRequestInFlightRef.current) return;
+    notificationRequestInFlightRef.current = true;
     // Only show full-panel loading on first empty load — never for poll/refresh
     if (opts?.showLoading) setNotifLoading(true);
-    api
-      .get<{
+    try {
+      const res = await api.get<{
         notifications?: Array<{
           id: string;
           title: string;
@@ -629,49 +639,59 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           entityType?: string;
         }>;
         unreadCount?: number;
-      }>("/automations/notifications?pageSize=30", token)
-      .then((res) => {
-        if (res.success && res.data) {
-          const d = res.data;
-          // Support both { notifications } and accidental nested shapes
-          const raw = d as Record<string, unknown>;
-          type Notif = {
-            id: string;
-            title: string;
-            message: string;
-            isRead: boolean;
-            type?: string;
-            createdAt?: string;
-            entityType?: string;
-          };
-          const list: Notif[] = Array.isArray(d.notifications)
-            ? d.notifications
-            : Array.isArray(raw.items)
-              ? (raw.items as Notif[])
-              : [];
-          setNotifications(list);
-          setUnreadCount(
-            typeof d.unreadCount === "number"
-              ? d.unreadCount
-              : list.filter((n) => !n.isRead).length
-          );
-          setNotifError(null);
-        } else {
-          setNotifError(res.error || "Failed to load notifications");
-        }
-      })
-      .catch((err) => {
-        setNotifError(err instanceof Error ? err.message : "Network error");
-      })
-      .finally(() => setNotifLoading(false));
+      }>("/automations/notifications?pageSize=30", token);
+      if (res.success && res.data) {
+        const d = res.data;
+        // Support both { notifications } and accidental nested shapes
+        const raw = d as Record<string, unknown>;
+        type Notif = {
+          id: string;
+          title: string;
+          message: string;
+          isRead: boolean;
+          type?: string;
+          createdAt?: string;
+          entityType?: string;
+        };
+        const list: Notif[] = Array.isArray(d.notifications)
+          ? d.notifications
+          : Array.isArray(raw.items)
+            ? (raw.items as Notif[])
+            : [];
+        setNotifications(list);
+        setUnreadCount(
+          typeof d.unreadCount === "number"
+            ? d.unreadCount
+            : list.filter((n) => !n.isRead).length
+        );
+        setNotifError(null);
+      } else {
+        setNotifError(res.error || "Failed to load notifications");
+      }
+    } catch (err) {
+      setNotifError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      notificationRequestInFlightRef.current = false;
+      setNotifLoading(false);
+    }
   }, [token]);
 
   useEffect(() => {
     if (!token) return;
+    const owner = notificationPollOwnerRef.current;
+    if (notificationPollOwner && notificationPollOwner !== owner) return;
+    notificationPollOwner = owner;
 
     loadNotifs({ showLoading: true });
     // Poll + refresh when CRM data changes (create lead/deal/task/meeting)
-    const pollId = setInterval(() => loadNotifs(), 8000);
+    const pollId = setInterval(() => {
+      if (!document.hidden) void loadNotifs();
+    }, NOTIFICATION_POLL_MS);
+    const onVisibilityChange = () => {
+      // Pause polling while hidden; refresh once when the user returns.
+      if (!document.hidden) void loadNotifs();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     const unsub = subscribeDataChanged(() => {
       // Small delay so server has committed the Notification row after create
       setTimeout(() => loadNotifs(), 150);
@@ -701,6 +721,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     return () => {
       clearInterval(pollId);
       unsub();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (notificationPollOwner === owner) notificationPollOwner = null;
     };
   }, [token, loadNotifs]);
 

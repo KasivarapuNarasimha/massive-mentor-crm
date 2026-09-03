@@ -271,7 +271,8 @@ import { requireBillingAccess } from "./middleware/requireBillingAccess.js";
 import { ensureSubscriptionPlans } from "./services/subscription-plan.service.js";
 import { runDailyBillingJobs } from "./services/saas-billing.service.js";
 
-// General API abuse protection
+// General API abuse protection: verified Bearer tokens receive a user-scoped
+// bucket; unauthenticated or invalid-token traffic remains IP-scoped.
 app.use("/api", apiGeneralLimiter);
 
 // SaaS trial/subscription gate (allows /api/billing/* and auth; webhook is public)
