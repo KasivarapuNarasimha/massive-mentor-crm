@@ -45,9 +45,31 @@ export async function notifyUser(
     message: string;
     entityType?: string;
     entityId?: string;
+    /**
+     * Event businessId — required for team_activity push ACL re-check.
+     * Not stored on Notification row; used only by PushDispatcher.
+     * NEVER treat DevicePushToken.businessId as authorization.
+     */
+    businessId?: string | null;
   }
 ) {
-  return createNotification({ userId, ...opts });
+  const row = await createNotification({ userId, ...opts });
+  // Fire-and-forget push (background wake-up). Inbox + SSE/poll remain primary for foreground.
+  void import("./push/push-dispatcher.service.js")
+    .then(({ dispatchPushForNotification }) =>
+      dispatchPushForNotification({
+        userId,
+        type: opts.type,
+        title: opts.title,
+        message: opts.message,
+        entityType: opts.entityType,
+        entityId: opts.entityId,
+        businessId: opts.businessId,
+        notificationId: row.id,
+      })
+    )
+    .catch(() => undefined);
+  return row;
 }
 
 export async function getNotifications(

@@ -168,6 +168,9 @@ async function fanOutTeamActivity(
       message,
       entityType: input.entityType,
       entityId: input.entityId,
+      // Event businessId for push ACL re-check (membership + canViewTeamActivity).
+      // Never authorize from DevicePushToken.businessId.
+      businessId,
     }).catch(() => undefined);
   }
 }

@@ -12,6 +12,11 @@ import React, {
 import { api } from "@/lib/api";
 import { User } from "@/types/api";
 import { isCurrencyCode, setAppCurrency } from "@/lib/currency";
+import {
+  nativeClearSessionKeys,
+  nativeGetItem,
+  nativeSetItem,
+} from "@/lib/native-secure-storage";
 
 export type LoginResult =
   | { success: true }
@@ -87,6 +92,13 @@ function clearSessionStorage() {
   } catch {
     /* ignore */
   }
+  // Native Preferences mirror (Capacitor) — fire-and-forget
+  void nativeClearSessionKeys([
+    ...SESSION_KEYS,
+    "massive_mentor_demo_mode",
+    "massive_mentor_demo_token",
+    "massive_mentor_demo_user",
+  ]);
   try {
     // Dynamic import avoided — cookie clear must be sync on logout.
     document.cookie = "mm_demo_session=; Path=/; Max-Age=0; SameSite=Lax";
@@ -130,10 +142,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = !!user && !!token;
 
   const logout = useCallback((opts?: { redirect?: boolean }) => {
-    // Best-effort: revoke enterprise session + location event
+    // Best-effort: revoke enterprise session + location event + native push install
     const t = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
     if (t) {
       void (async () => {
+        try {
+          const { revokeNativePushOnLogout } = await import("@/lib/native-push");
+          await revokeNativePushOnLogout(t);
+        } catch {
+          /* ignore */
+        }
         try {
           await api.logout(t);
         } catch {
@@ -185,8 +203,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           /* ignore */
         }
 
-        const storedToken = localStorage.getItem(TOKEN_KEY);
-        const storedUser = localStorage.getItem(USER_KEY);
+        // Prefer Capacitor Preferences on native; falls back to localStorage in browsers
+        const storedToken =
+          (await nativeGetItem(TOKEN_KEY)) || localStorage.getItem(TOKEN_KEY);
+        const storedUser =
+          (await nativeGetItem(USER_KEY)) || localStorage.getItem(USER_KEY);
 
         if (!storedToken || !storedUser) {
           if (!cancelled) setIsLoading(false);
@@ -332,8 +353,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.success && response.data) {
         const { user: loggedInUser, token: authToken } = response.data;
 
-        localStorage.setItem(TOKEN_KEY, authToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(loggedInUser));
+        void nativeSetItem(TOKEN_KEY, authToken);
+        void nativeSetItem(USER_KEY, JSON.stringify(loggedInUser));
 
         setToken(authToken);
         setUser(loggedInUser);
@@ -419,8 +440,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.success && response.data) {
         const { user: newUser, token: authToken } = response.data;
 
-        localStorage.setItem(TOKEN_KEY, authToken);
-        localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+        void nativeSetItem(TOKEN_KEY, authToken);
+        void nativeSetItem(USER_KEY, JSON.stringify(newUser));
 
         setToken(authToken);
         setUser(newUser);
@@ -452,15 +473,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.getCurrentUser(token);
     if (response.success && response.data?.user) {
       setUser(response.data.user);
-      localStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
+      void nativeSetItem(USER_KEY, JSON.stringify(response.data.user));
     } else if (!response.success) {
       logout({ redirect: true });
     }
   };
 
   const establishSession = useCallback((authToken: string, sessionUser: User) => {
-    localStorage.setItem(TOKEN_KEY, authToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(sessionUser));
+    void nativeSetItem(TOKEN_KEY, authToken);
+    void nativeSetItem(USER_KEY, JSON.stringify(sessionUser));
     setToken(authToken);
     setUser(sessionUser);
     if (sessionUser.role) setRole(sessionUser.role);

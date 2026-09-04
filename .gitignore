@@ -41,4 +41,17 @@ Thumbs.db
 .vercel
 .turbo/
 .tmp-export-verify/
-apps/api/.tmp-export-verify/storage/media/ 
+apps/api/.tmp-export-verify/storage/media/
+
+# Capacitor / Android — never commit secrets or local build junk
+apps/mobile/android/app/google-services.json
+apps/mobile/android/local.properties
+apps/mobile/android/.gradle/
+apps/mobile/android/**/build/
+apps/mobile/ios/App/Pods/
+apps/mobile/ios/DerivedData/
+*.jks
+*.keystore
+*.p8
+*.p12
+.pnpm-store/

@@ -25,7 +25,10 @@ import { canAccessPath, filterNavByModules } from "@/lib/module-permissions";
 import { NAV_HIERARCHY, findActiveSubModuleId, type NavMainKey } from "@/lib/nav-hierarchy";
 import { FeatureSearch } from "@/components/dashboard/FeatureSearch";
 import { canViewTeamActivity } from "@/lib/team-activity-access";
+import { emitTeamActivityFromNotification } from "@/lib/team-activity-events";
 import { TeamActivityToaster } from "@/components/team/TeamActivityToaster";
+import { installCapacitorBridge } from "@/lib/capacitor-bridge";
+import { ensureNativePushRegistration } from "@/lib/native-push";
 
 /** Layout chrome heights — enterprise density (header ~56px) */
 const NAV_H = "3.5rem"; // 56px
@@ -560,6 +563,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const notifRef = useRef<HTMLDivElement>(null);
   const notificationPollOwnerRef = useRef(Symbol("notification-poll-owner"));
   const notificationRequestInFlightRef = useRef(false);
+  /** Dedupe team_activity rows when reusing the existing bell poll as SSE fallback */
+  const seenTeamActivityNotifIdsRef = useRef<Set<string>>(new Set());
+  const teamActivityNotifPrimedRef = useRef(false);
 
   // Reset manual expands when navigating so only the active sub-module stays open
   useEffect(() => {
@@ -594,6 +600,27 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   };
 
   const routeFeature = featureForRoute(pathname || "/dashboard");
+
+  // Capacitor native bridge (no-op in browsers)
+  useEffect(() => {
+    let dispose: (() => void) | undefined;
+    void installCapacitorBridge().then((d) => {
+      dispose = d;
+    });
+    return () => {
+      dispose?.();
+    };
+  }, []);
+
+  // Push registration AFTER authenticated dashboard is useful — not on cold first-launch login screen.
+  // Foreground realtime stays SSE + 8s notification poll; push is for background/killed.
+  useEffect(() => {
+    if (!token || !user) return;
+    void ensureNativePushRegistration({
+      authToken: token,
+      businessId: portal?.businessId || null,
+    });
+  }, [token, user, portal?.businessId]);
 
   // Close user menu on outside click or Escape
   useEffect(() => {
@@ -667,6 +694,35 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         const list = allowTeamActivity
           ? rawList
           : rawList.filter((n) => n.type !== "team_activity");
+
+        // SSE fallback feed: emit only NEW team_activity rows for BA/CEO.
+        // Reuses this existing poll — does not start a second network loop.
+        // Skip the first snapshot so historical inbox rows do not toast on load.
+        if (allowTeamActivity) {
+          const seen = seenTeamActivityNotifIdsRef.current;
+          for (const n of rawList) {
+            if (n.type !== "team_activity" || !n.id) continue;
+            if (!teamActivityNotifPrimedRef.current) {
+              seen.add(n.id);
+              continue;
+            }
+            if (seen.has(n.id)) continue;
+            seen.add(n.id);
+            if (seen.size > 300) {
+              const first = seen.values().next().value;
+              if (first) seen.delete(first);
+            }
+            emitTeamActivityFromNotification({
+              id: n.id,
+              title: n.title,
+              message: n.message,
+              entityType: n.entityType,
+              createdAt: n.createdAt,
+            });
+          }
+          teamActivityNotifPrimedRef.current = true;
+        }
+
         setNotifications(list);
         setUnreadCount(
           allowTeamActivity && typeof d.unreadCount === "number"

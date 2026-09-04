@@ -18,6 +18,7 @@ const ALLOW_PREFIXES = [
   "/api/profile",
   "/api/portal",
   "/api/templates",
+  "/api/devices", // push token register/refresh/revoke (mobile shell)
   "/health",
   "/ready",
   "/api/platform",

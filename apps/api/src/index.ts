@@ -320,6 +320,9 @@ app.use("/api/approvals", requireAuthMw, requireModuleFromPath, approvalRoutes);
 // billing/access + stream exempt inside requireModuleFromPath
 app.use("/api/billing", requireAuthMw, requireModuleFromPath, billingRoutes);
 app.use("/api/security", requireAuthMw, requireModuleFromPath, securityRoutes);
+// Device push tokens (Capacitor / FCM) — auth only; no extra CRM module gate
+import devicePushRoutes from "./routes/device-push.routes.js";
+app.use("/api/devices", devicePushRoutes);
 // Public media share links (token-gated, no session) — must mount before auth-wrapped /api/media
 import {
   publicShareFile as mediaPublicShareFile,

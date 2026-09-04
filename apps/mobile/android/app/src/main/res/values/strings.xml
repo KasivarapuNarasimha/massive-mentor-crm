@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Massive Mentor CRM</string>
+    <string name="title_activity_main">Massive Mentor CRM</string>
+    <string name="package_name">in.massivementor.crm</string>
+    <string name="custom_url_scheme">in.massivementor.crm</string>
+</resources>

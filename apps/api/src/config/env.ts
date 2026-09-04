@@ -118,6 +118,14 @@ const envSchema = z.object({
 
   /// Optional Redis for distributed rate limiting (falls back to PostgreSQL store)
   REDIS_URL: z.string().optional(),
+
+  // —— Push notifications (FCM) — never commit secrets; optional in local/dev ——
+  /// Absolute/relative path to Firebase service account JSON
+  FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional(),
+  /// Inline service account JSON (prefer PATH in production)
+  FIREBASE_SERVICE_ACCOUNT_JSON: z.string().optional(),
+  /// Optional override; otherwise read from service account project_id
+  FIREBASE_PROJECT_ID: z.string().optional(),
 });
 
 // Custom refinement for AI provider key validation

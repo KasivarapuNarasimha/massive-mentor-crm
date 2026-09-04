@@ -378,6 +378,12 @@ export async function setBusinessUserDisabled(opts: {
     } catch {
       /* non-fatal */
     }
+    try {
+      const { disableDevicePushTokensForUser } = await import("./device-push.service.js");
+      await disableDevicePushTokensForUser(opts.userId, "user_disabled");
+    } catch {
+      /* non-fatal */
+    }
   }
 
   await recordAudit({

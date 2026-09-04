@@ -1,0 +1,23 @@
+{
+  "_comment": "Place the real google-services.json from Firebase Console at apps/mobile/android/app/google-services.json. Do NOT commit secrets. Enable Cloud Messaging (FCM) for Android app id in.massivementor.crm.",
+  "project_info": {
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "YOUR_FIREBASE_PROJECT_ID",
+    "storage_bucket": "YOUR_PROJECT.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:YOUR_PROJECT_NUMBER:android:YOUR_APP_HASH",
+        "android_client_info": {
+          "package_name": "in.massivementor.crm"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "YOUR_ANDROID_API_KEY"
+        }
+      ]
+    }
+  ]
+}

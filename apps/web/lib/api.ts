@@ -2052,6 +2052,47 @@ class ApiClient {
     });
   }
 
+  /** Capacitor / FCM — register or refresh device push token */
+  async registerDevicePushToken(
+    body: {
+      installId: string;
+      platform: "android" | "ios" | "web";
+      token: string;
+      provider?: "fcm" | "apns";
+      appId?: string;
+      businessId?: string | null;
+    },
+    token: string
+  ) {
+    return this.post<{
+      id: string;
+      installId: string;
+      platform: string;
+      provider: string;
+      appId: string;
+      enabled: boolean;
+      lastSeenAt: string;
+      businessId: string | null;
+    }>("/devices/push-token", body, token);
+  }
+
+  /** Capacitor — revoke current install (logout) */
+  async revokeDevicePushToken(
+    body: {
+      installId?: string;
+      appId?: string;
+      allDevices?: boolean;
+      reason?: string;
+    },
+    token: string
+  ) {
+    return this.request<{ revoked: number }>("/devices/push-token", {
+      method: "DELETE",
+      body: JSON.stringify(body),
+      token,
+    });
+  }
+
   /**
    * Multipart file upload (CSV/Excel import). Do not set Content-Type manually. Never throws.
    * Large imports use a long timeout so the browser does not abort mid-write and show a false
