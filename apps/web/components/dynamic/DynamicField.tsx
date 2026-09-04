@@ -52,9 +52,13 @@ export function DynamicField({ field, value, onChange, statusOptions, disabled }
 
   // Status select uses pipeline options when this is the status field
   if (field.coreMap === "status" || field.key === "status") {
-    const opts = statusOptions?.length
-      ? statusOptions
-      : activeFieldOptions(field.options).map((o) => ({ key: o.value, label: o.label }));
+    let opts = statusOptions?.length
+      ? statusOptions.slice()
+      : activeFieldOptions(field.options, str).map((o) => ({ key: o.value, label: o.label }));
+    // Keep current value visible even if archived / missing from active list
+    if (str && !opts.some((o) => o.key === str)) {
+      opts = [...opts, { key: str, label: str }];
+    }
     return (
       <div>
         {label}

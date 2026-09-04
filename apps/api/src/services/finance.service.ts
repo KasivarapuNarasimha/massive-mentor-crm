@@ -696,13 +696,69 @@ export async function createPayment(
   });
 
   const currency = await resolveBusinessCurrency(userId, businessId);
+  const amountLabel = formatCurrency(toMoneyNumber(amount), currency);
   await notifyUser(userId, {
     type: "payment_reminder",
     title: "Payment Recorded",
-    message: `Payment of ${formatCurrency(toMoneyNumber(amount), currency)} recorded`,
+    message: `Payment of ${amountLabel} recorded`,
     entityType: "payment",
     entityId: payment.id,
   });
+
+  // One Activity event for CRM history (Lead/Deal) + Team Activity — no fabricated past
+  try {
+    const { logActivity } = await import("./activity.service.js");
+    let contactId: string | null = null;
+    let dealId: string | null = null;
+    let title = amountLabel;
+    if (input.invoiceId) {
+      const inv = await prisma.invoice.findFirst({
+        where: { id: input.invoiceId, businessId },
+        select: { contactId: true, sourceType: true, sourceId: true, number: true, clientName: true },
+      });
+      if (inv) {
+        title = inv.number ? `${amountLabel} · ${inv.number}` : amountLabel;
+        if (inv.contactId) contactId = inv.contactId;
+        if (inv.sourceType === "deal" && inv.sourceId) dealId = inv.sourceId;
+        if (inv.sourceType === "client" && inv.sourceId) contactId = inv.sourceId;
+      }
+    }
+    // Prefer deal entity when payment is deal-sourced; else contact; else skip CRM entity link
+    if (dealId) {
+      await logActivity({
+        userId,
+        businessId,
+        entityType: "deal",
+        entityId: dealId,
+        action: "payment_recorded",
+        details: {
+          title,
+          summary: `Payment recorded: ${title}`,
+          changes: [{ field: "payment", oldValue: null, newValue: toMoneyNumber(amount) }],
+          paymentId: payment.id,
+          invoiceId: input.invoiceId || null,
+          contactId,
+        },
+      });
+    } else if (contactId) {
+      await logActivity({
+        userId,
+        businessId,
+        entityType: "contact",
+        entityId: contactId,
+        action: "payment_recorded",
+        details: {
+          title,
+          summary: `Payment recorded: ${title}`,
+          changes: [{ field: "payment", oldValue: null, newValue: toMoneyNumber(amount) }],
+          paymentId: payment.id,
+          invoiceId: input.invoiceId || null,
+        },
+      });
+    }
+  } catch (err) {
+    console.error("[createPayment] activity log failed", err);
+  }
 
   return { ...payment, amount: toMoneyNumber(payment.amount) };
 }

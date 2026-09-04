@@ -816,6 +816,148 @@ class ApiClient {
   }
 
   /** Admin team CRM activity rollup (real tracked metrics only; calls unavailable) */
+  /** Lead / contact chronological history (tenant-scoped Activity) */
+  async getContactHistory(
+    token: string | null | undefined,
+    contactId: string,
+    params?: {
+      from?: string;
+      to?: string;
+      action?: string;
+      search?: string;
+      page?: number;
+      pageSize?: number;
+    }
+  ) {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    if (params?.action) q.set("action", params.action);
+    if (params?.search) q.set("search", params.search);
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.pageSize) q.set("pageSize", String(params.pageSize));
+    const qs = q.toString();
+    return this.get<{
+      items: Array<{
+        id: string;
+        actorUserId: string;
+        actorName: string;
+        actorEmail: string | null;
+        entityType: string;
+        entityId: string;
+        action: string;
+        summary: string;
+        changes: Array<{
+          field: string;
+          oldValue?: unknown;
+          newValue?: unknown;
+          oldLabel?: string | null;
+          newLabel?: string | null;
+        }>;
+        details: Record<string, unknown>;
+        createdAt: string;
+      }>;
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+    }>(`/crm/contacts/${encodeURIComponent(contactId)}/history${qs ? `?${qs}` : ""}`, token);
+  }
+
+  /** Deal chronological history */
+  async getDealHistory(
+    token: string | null | undefined,
+    dealId: string,
+    params?: {
+      from?: string;
+      to?: string;
+      action?: string;
+      search?: string;
+      page?: number;
+      pageSize?: number;
+    }
+  ) {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    if (params?.action) q.set("action", params.action);
+    if (params?.search) q.set("search", params.search);
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.pageSize) q.set("pageSize", String(params.pageSize));
+    const qs = q.toString();
+    return this.get<{
+      items: Array<{
+        id: string;
+        actorUserId: string;
+        actorName: string;
+        actorEmail: string | null;
+        entityType: string;
+        entityId: string;
+        action: string;
+        summary: string;
+        changes: Array<Record<string, unknown>>;
+        details: Record<string, unknown>;
+        createdAt: string;
+      }>;
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+    }>(`/crm/deals/${encodeURIComponent(dealId)}/history${qs ? `?${qs}` : ""}`, token);
+  }
+
+  /** Team member chronological Activity timeline */
+  async getMemberActivityTimeline(
+    token: string | null | undefined,
+    memberUserId: string,
+    params?: {
+      from?: string;
+      to?: string;
+      action?: string;
+      search?: string;
+      entityType?: string;
+      page?: number;
+      pageSize?: number;
+    }
+  ) {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    if (params?.action) q.set("action", params.action);
+    if (params?.search) q.set("search", params.search);
+    if (params?.entityType) q.set("entityType", params.entityType);
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.pageSize) q.set("pageSize", String(params.pageSize));
+    const qs = q.toString();
+    return this.get<{
+      member: {
+        userId: string;
+        name: string | null;
+        email: string | null;
+        role: string | null;
+      };
+      items: Array<{
+        id: string;
+        actorUserId: string;
+        actorName: string;
+        action: string;
+        summary: string;
+        changes: Array<Record<string, unknown>>;
+        entityType: string;
+        entityId: string;
+        createdAt: string;
+      }>;
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+      actionCounts: Record<string, number>;
+    }>(
+      `/leads/member-activity/${encodeURIComponent(memberUserId)}/timeline${qs ? `?${qs}` : ""}`,
+      token
+    );
+  }
+
   async getMemberActivitySummary(token?: string | null, sinceDays = 30) {
     const q = sinceDays ? `?sinceDays=${encodeURIComponent(String(sinceDays))}` : "";
     return this.get<{
@@ -2145,6 +2287,92 @@ class ApiClient {
         token,
       }
     );
+  }
+
+  /** Safe edits for coreMap / standard fields (no type/key changes) */
+  async updateStandardField(token: string, key: string, body: Record<string, unknown>) {
+    return this.request<{ field: unknown }>(
+      `/custom-fields/standard/${encodeURIComponent(key)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+        token,
+      }
+    );
+  }
+
+  async listLeadPipelineStatuses(token: string, params?: { includeInactive?: boolean }) {
+    const q = new URLSearchParams();
+    if (params?.includeInactive) q.set("includeInactive", "1");
+    const qs = q.toString();
+    return this.get<{
+      pipeline: {
+        key: string;
+        label: string;
+        entity: string;
+        defaultStatusKey?: string;
+      };
+      statuses: Array<{
+        key: string;
+        label: string;
+        color?: string;
+        order?: number;
+        active?: boolean;
+        isWon?: boolean;
+        isLost?: boolean;
+      }>;
+    }>(`/custom-fields/pipelines/lead/statuses${qs ? `?${qs}` : ""}`, token);
+  }
+
+  async addLeadPipelineStatus(
+    token: string,
+    body: { label: string; key?: string; color?: string; order?: number }
+  ) {
+    return this.post<{ status: unknown }>("/custom-fields/pipelines/lead/statuses", body, token);
+  }
+
+  async updateLeadPipelineStatus(
+    token: string,
+    statusKey: string,
+    body: Record<string, unknown>
+  ) {
+    return this.request<{ status: unknown }>(
+      `/custom-fields/pipelines/lead/statuses/${encodeURIComponent(statusKey)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+        token,
+      }
+    );
+  }
+
+  async archiveLeadPipelineStatus(token: string, statusKey: string) {
+    return this.request<{ status: unknown }>(
+      `/custom-fields/pipelines/lead/statuses/${encodeURIComponent(statusKey)}`,
+      {
+        method: "DELETE",
+        token,
+      }
+    );
+  }
+
+  async reorderLeadPipelineStatuses(token: string, keys: string[]) {
+    return this.request<{ statuses: unknown[] }>(
+      "/custom-fields/pipelines/lead/statuses/reorder",
+      {
+        method: "PUT",
+        body: JSON.stringify({ keys }),
+        token,
+      }
+    );
+  }
+
+  async setLeadPipelineDefaultStatus(token: string, defaultStatusKey: string) {
+    return this.request<{ defaultStatusKey: string }>("/custom-fields/pipelines/lead", {
+      method: "PATCH",
+      body: JSON.stringify({ defaultStatusKey }),
+      token,
+    });
   }
 
   async listIndustryTemplates(token: string) {

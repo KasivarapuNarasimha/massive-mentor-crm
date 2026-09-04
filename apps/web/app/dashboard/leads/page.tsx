@@ -26,6 +26,7 @@ import {
   type PipelineStatus,
   contactFieldsFromConfig,
   leadStatusesFromConfig,
+  leadDefaultStatusKey,
   getContactFieldValue,
   FALLBACK_CONTACT_FIELDS,
   FALLBACK_LEAD_STATUSES,
@@ -42,6 +43,7 @@ import { useBusinessCurrency } from "@/lib/use-business-currency";
 import { friendlyError, SuccessMsg } from "@/lib/user-messages";
 import { NotesPanel } from "@/components/crm/NotesPanel";
 import { CustomFieldsDetailPanel } from "@/components/custom-fields/CustomFieldsDetailPanel";
+import { ActivityHistoryPanel } from "@/components/activity/ActivityHistoryPanel";
 
 interface Contact {
   id: string;
@@ -586,11 +588,25 @@ export default function LeadsPage() {
     () => leadFilterColumns(fieldDefs, templateSlug),
     [fieldDefs, templateSlug]
   );
-  // Always telecalling defaults + config merge (leadStatusesFromConfig never empty)
+  // Active statuses only (archived hidden). Forms pass keepValue separately.
   const statusOptions: PipelineStatus[] = useMemo(() => {
     const fromConfig = leadStatusesFromConfig(bizConfig);
     return fromConfig.length ? fromConfig : FALLBACK_LEAD_STATUSES;
   }, [bizConfig]);
+
+  const formStatusOptions: PipelineStatus[] = useMemo(() => {
+    const keep =
+      editingLead?.status != null && editingLead.status !== ""
+        ? String(editingLead.status)
+        : null;
+    const fromConfig = leadStatusesFromConfig(bizConfig, { keepValue: keep });
+    return fromConfig.length ? fromConfig : FALLBACK_LEAD_STATUSES;
+  }, [bizConfig, editingLead?.status]);
+
+  const defaultLeadStatus = useMemo(
+    () => leadDefaultStatusKey(bizConfig),
+    [bizConfig]
+  );
 
   const isTransportError = (msg?: string) =>
     !!msg &&
@@ -1011,7 +1027,11 @@ export default function LeadsPage() {
 
   const openCreate = () => {
     setEditingLead(null);
-    setFormValues(contactToFormValues(fieldDefs, { status: statusOptions[0]?.key || "new" }));
+    setFormValues(
+      contactToFormValues(fieldDefs, {
+        status: defaultLeadStatus || statusOptions[0]?.key || "new",
+      })
+    );
     setFormAssigneeId("");
     setTeamSearch("");
     setShowModal(true);
@@ -2676,7 +2696,7 @@ export default function LeadsPage() {
                 values={formValues}
                 onChange={handleFormChange}
                 onSubmit={handleSubmit}
-                statusOptions={statusOptions.map((s) => ({ key: s.key, label: s.label }))}
+                statusOptions={formStatusOptions.map((s) => ({ key: s.key, label: s.label }))}
                 disabled={isSubmitting}
               />
               {editingLead ? (
@@ -2690,6 +2710,16 @@ export default function LeadsPage() {
                       {}) as Record<string, unknown>
                   }
                 />
+              ) : null}
+              {editingLead ? (
+                <div className="mt-4">
+                  <ActivityHistoryPanel
+                    token={token}
+                    mode="contact"
+                    contactId={editingLead.id}
+                    title="Lead History"
+                  />
+                </div>
               ) : null}
               <div className="mt-4 p-3 bg-background border border-border rounded-md">
                 <label className="block text-xs text-muted-foreground mb-1.5 tracking-wide">

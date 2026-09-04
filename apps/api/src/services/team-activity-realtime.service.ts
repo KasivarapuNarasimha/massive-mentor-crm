@@ -30,6 +30,11 @@ const MEANINGFUL = new Set([
   "email_sent",
   "task_completed",
   "auto_created_from_lead",
+  "note_added",
+  "assigned",
+  "won",
+  "lost",
+  "payment_recorded",
 ]);
 
 export function isMeaningfulTeamActivity(action: string, entityType: string): boolean {
@@ -41,7 +46,8 @@ export function isMeaningfulTeamActivity(action: string, entityType: string): bo
     et === "task" ||
     et === "meeting" ||
     et === "lead" ||
-    et === "client"
+    et === "client" ||
+    et === "note"
   );
 }
 
@@ -94,6 +100,42 @@ export function formatTeamActivityCopy(opts: {
       message: detailTitle
         ? `${name} sent an email for ${label}: ${detailTitle}`
         : `${name} sent an email`,
+    };
+  }
+  if (opts.action === "note_added") {
+    return {
+      title: "New Team Activity",
+      message: detailTitle
+        ? `${name} added a note on ${label}: ${detailTitle}`
+        : `${name} added a note`,
+    };
+  }
+  if (opts.action === "assigned") {
+    return {
+      title: "New Team Activity",
+      message: detailTitle
+        ? `${name} changed assignment on ${label}: ${detailTitle}`
+        : `${name} changed a ${label} assignment`,
+    };
+  }
+  if (opts.action === "won") {
+    return {
+      title: "New Team Activity",
+      message: detailTitle ? `${name} won deal: ${detailTitle}` : `${name} won a deal`,
+    };
+  }
+  if (opts.action === "lost") {
+    return {
+      title: "New Team Activity",
+      message: detailTitle ? `${name} marked deal lost: ${detailTitle}` : `${name} lost a deal`,
+    };
+  }
+  if (opts.action === "payment_recorded") {
+    return {
+      title: "New Team Activity",
+      message: detailTitle
+        ? `${name} recorded a payment${detailTitle ? ` (${detailTitle})` : ""}`
+        : `${name} recorded a payment`,
     };
   }
   if (opts.action === "task_completed") {

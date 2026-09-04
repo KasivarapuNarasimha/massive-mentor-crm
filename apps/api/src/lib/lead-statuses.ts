@@ -15,7 +15,12 @@ export type LeadStatusDef = {
   isWon?: boolean;
   isLost?: boolean;
   isCallResult?: boolean;
+  /** Soft-archive without rewriting Contact.status values */
+  active?: boolean;
 };
+
+/** Keys that cannot be deleted, archived, or remapped */
+export const IMMUTABLE_LEAD_STATUS_KEYS = new Set(["won", "lost"]);
 
 /**
  * Final product list (15 statuses) — Lead dropdown + Deal Kanban columns.
@@ -98,23 +103,29 @@ export function leadStatusLabel(status: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+export type LeadStatusConfigInput = {
+  key: string;
+  label?: string;
+  color?: string;
+  order?: number;
+  isWon?: boolean;
+  isLost?: boolean;
+  active?: boolean;
+};
+
 /**
- * Merge BusinessConfig with unified defaults (always ensure all 15 exist).
+ * Soft-merge BusinessConfig pipeline statuses with unified defaults.
+ * Config may add statuses, rename labels, reorder, and archive (active:false).
+ * Keys are stable — renames are label-only (never rewrite Contact.status).
+ * won/lost keys are always present and cannot be archived away.
  */
 export function mergeLeadStatusesWithCanonical(
-  fromConfig: Array<{
-    key: string;
-    label: string;
-    color?: string;
-    order?: number;
-    isWon?: boolean;
-    isLost?: boolean;
-  }>
+  fromConfig: LeadStatusConfigInput[]
 ): LeadStatusDef[] {
   const byKey = new Map<string, LeadStatusDef>();
 
   for (const s of UNIFIED_PIPELINE_STATUSES) {
-    byKey.set(s.key, { ...s });
+    byKey.set(s.key, { ...s, active: true });
   }
 
   for (const s of fromConfig) {
@@ -122,30 +133,32 @@ export function mergeLeadStatusesWithCanonical(
     const nk = normalizeStatusKey(s.key);
     const existing = byKey.get(nk);
     if (existing) {
+      const immutable = IMMUTABLE_LEAD_STATUS_KEYS.has(nk);
       byKey.set(nk, {
         ...existing,
-        label:
-          s.label && s.label.toLowerCase() !== "proposal"
-            ? s.label
-            : existing.label,
+        label: s.label?.trim() ? s.label.trim() : existing.label,
         color: s.color || existing.color,
-        isWon: s.isWon ?? existing.isWon,
-        isLost: s.isLost ?? existing.isLost,
-        order: existing.order,
+        // Soft: respect tenant order when provided
+        order: typeof s.order === "number" ? s.order : existing.order,
+        active: immutable ? true : s.active !== false,
+        isWon: nk === "won" ? true : s.isWon ?? existing.isWon,
+        isLost: nk === "lost" ? true : s.isLost ?? existing.isLost,
       });
     } else {
+      // Custom / extra status from BusinessConfig
       byKey.set(nk, {
         key: nk,
-        label: s.label || s.key,
-        order: s.order ?? 50,
+        label: (s.label || s.key).trim() || nk,
+        order: typeof s.order === "number" ? s.order : 50 + byKey.size,
         color: s.color,
         isWon: s.isWon,
         isLost: s.isLost,
+        active: s.active !== false,
       });
     }
   }
 
-  // Prefer "Proposal Sent" label for proposal
+  // Prefer "Proposal Sent" label for proposal when still generic
   if (byKey.has("proposal")) {
     const p = byKey.get("proposal")!;
     if (!p.label || p.label.toLowerCase() === "proposal") {
@@ -153,7 +166,33 @@ export function mergeLeadStatusesWithCanonical(
     }
   }
 
+  // won/lost always present
+  for (const key of IMMUTABLE_LEAD_STATUS_KEYS) {
+    const hit = byKey.get(key);
+    if (!hit) {
+      const canonical = UNIFIED_PIPELINE_STATUSES.find((x) => x.key === key)!;
+      byKey.set(key, { ...canonical, active: true });
+    } else {
+      byKey.set(key, {
+        ...hit,
+        key,
+        active: true,
+        isWon: key === "won" ? true : hit.isWon,
+        isLost: key === "lost" ? true : hit.isLost,
+      });
+    }
+  }
+
   return [...byKey.values()].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+/** Active statuses for pickers; keepValue stays visible even if archived */
+export function activeLeadStatuses(
+  statuses: LeadStatusDef[],
+  keepValue?: string | null
+): LeadStatusDef[] {
+  const keep = keepValue != null && keepValue !== "" ? normalizeStatusKey(keepValue) : null;
+  return statuses.filter((s) => s.active !== false || (keep != null && s.key === keep));
 }
 
 export function isWonStatusKey(status: string): boolean {

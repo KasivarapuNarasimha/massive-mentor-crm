@@ -49,6 +49,9 @@ import {
   listAssignableMembersHandler,
   leadAssignmentSummaryHandler,
   memberActivitySummaryHandler,
+  memberActivityTimelineHandler,
+  contactHistoryHandler,
+  dealHistoryHandler,
   adminLeadVisibilitySearchHandler,
   sendTeamDailyReportHandler,
   listLeadAssignmentsHandler,
@@ -67,6 +70,7 @@ router.post("/leads/bulk-assign", requireAuth, bulkAssignLeadsHandler);
 router.get("/leads/assignable-members", requireAuth, listAssignableMembersHandler);
 router.get("/leads/assignment-summary", requireAuth, leadAssignmentSummaryHandler);
 router.get("/leads/member-activity-summary", requireAuth, memberActivitySummaryHandler);
+router.get("/leads/member-activity/:userId/timeline", requireAuth, memberActivityTimelineHandler);
 router.get("/leads/admin-visibility-search", requireAuth, adminLeadVisibilitySearchHandler);
 router.post("/leads/team-daily-report/send", requireAuth, sendTeamDailyReportHandler);
 router.get("/leads/assignments", requireAuth, listLeadAssignmentsHandler);
@@ -80,6 +84,7 @@ router.post("/leads/send-email", requireAuth, sendLeadEmailHandler);
 // =====================
 router.get("/contacts", requireAuth, listContacts);
 router.post("/contacts", requireAuth, createContactHandler);
+router.get("/contacts/:id/history", requireAuth, contactHistoryHandler);
 router.get("/contacts/:id", requireAuth, getContact);
 router.put("/contacts/:id", requireAuth, updateContactHandler);
 router.delete(
@@ -94,6 +99,7 @@ router.delete(
 // =====================
 router.get("/deals", requireAuth, listDeals);
 router.post("/deals", requireAuth, createDealHandler);
+router.get("/deals/:id/history", requireAuth, dealHistoryHandler);
 router.put("/deals/:id", requireAuth, updateDealHandler);
 router.delete(
   "/deals/:id",

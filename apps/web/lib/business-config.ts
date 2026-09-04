@@ -100,6 +100,8 @@ export type PipelineStatus = {
   isWon?: boolean;
   isLost?: boolean;
   order?: number;
+  /** Soft-archive — hide from new picks unless current value */
+  active?: boolean;
 };
 
 export type PipelineDef = {
@@ -107,7 +109,12 @@ export type PipelineDef = {
   label: string;
   entity: string;
   statuses: PipelineStatus[];
+  /** Default Contact.status for new leads */
+  defaultStatusKey?: string;
 };
+
+/** won/lost keys cannot be deleted or archived */
+export const IMMUTABLE_LEAD_STATUS_KEYS = new Set(["won", "lost"]);
 
 export type BusinessConfigDTO = {
   version: number;
@@ -152,37 +159,44 @@ export function filterFields(fields: FieldDef[]): FieldDef[] {
 }
 
 /**
- * Lead statuses for UI: unified 15-status list + BusinessConfig extras.
- * Always returns a usable list even when config is missing.
+ * Soft-merge lead statuses: config can add, rename labels, reorder, archive.
+ * Renames are label-only (Contact.status keys are never rewritten).
+ * won/lost keys always remain.
  */
-export function leadStatusesFromConfig(config: BusinessConfigDTO | null | undefined): PipelineStatus[] {
+export function leadStatusesFromConfig(
+  config: BusinessConfigDTO | null | undefined,
+  opts?: { includeInactive?: boolean; keepValue?: string | null }
+): PipelineStatus[] {
   const pipelines = (config?.pipelines || []) as PipelineDef[];
   const lead =
     pipelines.find((p) => p.entity === "contact" && p.key === "lead") ||
     pipelines.find((p) => p.entity === "contact");
-  const fromConfig = lead?.statuses?.length
-    ? lead.statuses.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    : [];
+  const fromConfig = lead?.statuses?.length ? lead.statuses.slice() : [];
 
-  // Start with unified product defaults (required 15-status order)
   const byKey = new Map<string, PipelineStatus>();
   for (const req of FALLBACK_LEAD_STATUSES) {
-    byKey.set(req.key, { ...req });
+    byKey.set(req.key, { ...req, active: true });
   }
 
-  // Overlay / add BusinessConfig (custom labels + extra statuses)
   for (const s of fromConfig) {
     if (!s?.key) continue;
     const existing = byKey.get(s.key);
     if (existing) {
+      const immutable = IMMUTABLE_LEAD_STATUS_KEYS.has(s.key);
       byKey.set(s.key, {
         ...existing,
         label: s.label || existing.label,
         color: s.color || existing.color,
-        order: existing.order,
+        order: typeof s.order === "number" ? s.order : existing.order,
+        active: immutable ? true : s.active !== false,
+        isWon: s.key === "won" ? true : s.isWon ?? existing.isWon,
+        isLost: s.key === "lost" ? true : s.isLost ?? existing.isLost,
       });
     } else {
-      byKey.set(s.key, { ...s });
+      byKey.set(s.key, {
+        ...s,
+        active: s.active !== false,
+      });
     }
   }
 
@@ -190,7 +204,37 @@ export function leadStatusesFromConfig(config: BusinessConfigDTO | null | undefi
     byKey.set("proposal", { ...byKey.get("proposal")!, label: "Proposal Sent" });
   }
 
-  return [...byKey.values()].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  for (const key of IMMUTABLE_LEAD_STATUS_KEYS) {
+    const hit = byKey.get(key);
+    if (!hit) {
+      const fb = FALLBACK_LEAD_STATUSES.find((x) => x.key === key)!;
+      byKey.set(key, { ...fb, active: true });
+    } else {
+      byKey.set(key, { ...hit, key, active: true });
+    }
+  }
+
+  let list = [...byKey.values()].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  if (!opts?.includeInactive) {
+    const keep =
+      opts?.keepValue != null && opts.keepValue !== "" ? String(opts.keepValue) : null;
+    list = list.filter((s) => s.active !== false || (keep != null && s.key === keep));
+  }
+  return list;
+}
+
+/** Default status key for new leads from BusinessConfig lead pipeline */
+export function leadDefaultStatusKey(
+  config: BusinessConfigDTO | null | undefined
+): string {
+  const pipelines = (config?.pipelines || []) as PipelineDef[];
+  const lead =
+    pipelines.find((p) => p.entity === "contact" && p.key === "lead") ||
+    pipelines.find((p) => p.entity === "contact");
+  const active = leadStatusesFromConfig(config);
+  const preferred = lead?.defaultStatusKey;
+  if (preferred && active.some((s) => s.key === preferred)) return preferred;
+  return active[0]?.key || "new";
 }
 
 /** Read a display value from contact core columns or customFields */

@@ -2,7 +2,12 @@ import { prisma } from "../lib/prisma.js";
 import { z } from "zod";
 import { getAIService } from "./ai.service.js";
 import { sanitizePromptInput } from "../utils/sanitize.js";
-import { logActivity } from "./activity.service.js";
+import {
+  logActivity,
+  buildContactUpdateDetails,
+  type ActivityFieldChange,
+} from "./activity.service.js";
+import { leadStatusLabel } from "../lib/lead-statuses.js";
 import { notifyUser } from "./notification.service.js";
 import { scheduleFollowupRefresh } from "./followup-engine.service.js";
 
@@ -637,18 +642,85 @@ export async function updateContact(
     (parsed.notes !== undefined);
 
   if (meaningfulUpdate) {
+    const changes: ActivityFieldChange[] = [];
+    if (statusChanged) {
+      changes.push({
+        field: "status",
+        oldValue: existing.status,
+        newValue: finalContact.status,
+        oldLabel: leadStatusLabel(existing.status),
+        newLabel: leadStatusLabel(finalContact.status),
+      });
+    }
+    if (assigneeChanged) {
+      changes.push({
+        field: "assignedTo",
+        oldValue: prevAssignee,
+        newValue: nextAssignee,
+      });
+    }
+    if (applied.core.name !== undefined && String(applied.core.name) !== String(existing.name || "")) {
+      changes.push({
+        field: "name",
+        oldValue: existing.name,
+        newValue: applied.core.name,
+      });
+    }
+    if (applied.core.phone !== undefined && String(applied.core.phone || "") !== String(existing.phone || "")) {
+      changes.push({
+        field: "phone",
+        oldValue: existing.phone,
+        newValue: applied.core.phone,
+      });
+    }
+    if (applied.core.email !== undefined && String(applied.core.email || "") !== String(existing.email || "")) {
+      changes.push({
+        field: "email",
+        oldValue: existing.email,
+        newValue: applied.core.email,
+      });
+    }
+    if (
+      applied.core.company !== undefined &&
+      String(applied.core.company || "") !== String(existing.company || "")
+    ) {
+      changes.push({
+        field: "company",
+        oldValue: existing.company,
+        newValue: applied.core.company,
+      });
+    }
+    if (parsed.source !== undefined && String(parsed.source || "") !== String(existing.source || "")) {
+      changes.push({
+        field: "source",
+        oldValue: existing.source,
+        newValue: parsed.source,
+      });
+    }
+    if (parsed.priority !== undefined && String(parsed.priority || "") !== String(existing.priority || "")) {
+      changes.push({
+        field: "priority",
+        oldValue: existing.priority,
+        newValue: parsed.priority,
+      });
+    }
+
     await logActivity({
       userId,
+      businessId: finalContact.businessId || resolvedBusinessId || null,
       entityType: "contact",
       entityId: finalContact.id,
-      action: "updated",
-      details: {
+      action: assigneeChanged && !statusChanged && changes.length === 1 ? "assigned" : "updated",
+      details: buildContactUpdateDetails({
         title: finalContact.name,
-        status: finalContact.status,
+        changes,
         previousStatus: existing.status,
+        status: finalContact.status,
         statusChanged,
         assigneeChanged,
-      },
+        previousAssignee: prevAssignee,
+        nextAssignee,
+      }),
     }).catch(() => undefined);
     await recordAudit({
       businessId: finalContact.businessId || resolvedBusinessId || null,
@@ -661,6 +733,7 @@ export async function updateContact(
         previousStatus: existing.status,
         statusChanged,
         assigneeChanged,
+        changes,
       },
     }).catch(() => undefined);
   }
@@ -1756,6 +1829,61 @@ export async function updateDeal(userId: string, id: string, input: Partial<Deal
     console.error("[updateDeal] finance CRM sync failed", err);
   }
 
+  // Persistent Activity for Deal History + Team Activity (single event, no duplicate systems)
+  const titleChanged =
+    parsed.title !== undefined && String(parsed.title) !== String(existing.title || "");
+  const valueChanged =
+    parsed.value !== undefined &&
+    String(parsed.value ?? "") !== String(existing.value ?? "");
+  const meaningfulDealUpdate = stageChanged || titleChanged || valueChanged || parsed.notes !== undefined;
+  if (meaningfulDealUpdate) {
+    const { leadStatusLabel } = await import("../lib/lead-statuses.js");
+    const isWon = /^(won|closed_won)$/i.test(nextStage);
+    const isLost = /^(lost|closed_lost)$/i.test(nextStage);
+    const action = stageChanged && isWon ? "won" : stageChanged && isLost ? "lost" : "updated";
+    const changes: ActivityFieldChange[] = [];
+    if (stageChanged) {
+      changes.push({
+        field: "stage",
+        oldValue: existing.stage,
+        newValue: nextStage,
+        oldLabel: leadStatusLabel(existing.stage),
+        newLabel: leadStatusLabel(nextStage),
+      });
+    }
+    if (titleChanged) {
+      changes.push({ field: "title", oldValue: existing.title, newValue: updated.title });
+    }
+    if (valueChanged) {
+      changes.push({
+        field: "value",
+        oldValue: existing.value != null ? String(existing.value) : null,
+        newValue: updated.value != null ? String(updated.value) : null,
+      });
+    }
+    await logActivity({
+      userId,
+      businessId: updated.businessId || null,
+      entityType: "deal",
+      entityId: updated.id,
+      action,
+      details: {
+        title: updated.title,
+        summary: stageChanged
+          ? `Stage: ${leadStatusLabel(existing.stage)} → ${leadStatusLabel(nextStage)}`
+          : `Updated deal "${updated.title}"`,
+        changes,
+        previousStage: existing.stage,
+        stage: nextStage,
+        stageChanged,
+        contactId: updated.contactId,
+        conversion: !!pipelineSync?.contactConvertedToClient,
+      },
+    }).catch(() => undefined);
+    // Intentionally one Activity row only (powers Deal History + Team Activity SSE).
+    // Lead History includes linked deal events via getEntityActivityHistory join.
+  }
+
   scheduleFollowupRefresh(userId);
   return { deal: updated, pipelineSync };
 }
@@ -2120,7 +2248,7 @@ export async function createNote(userId: string, input: NoteInput) {
   const parsed = noteSchema.parse(input);
   await assertNoteEntityAccess(userId, parsed.entityType, parsed.entityId);
 
-  return prisma.note.create({
+  const note = await prisma.note.create({
     data: {
       userId,
       entityType: parsed.entityType,
@@ -2128,6 +2256,41 @@ export async function createNote(userId: string, input: NoteInput) {
       content: parsed.content,
     },
   });
+
+  let parentTitle = "";
+  let businessId: string | null = null;
+  if (parsed.entityType === "contact") {
+    const c = await prisma.contact.findUnique({
+      where: { id: parsed.entityId },
+      select: { name: true, businessId: true },
+    });
+    parentTitle = c?.name || "";
+    businessId = c?.businessId || null;
+  }
+
+  await logActivity({
+    userId,
+    businessId,
+    entityType: "contact",
+    entityId: parsed.entityId,
+    action: "note_added",
+    details: {
+      title: parentTitle,
+      summary: parentTitle
+        ? `Note added on "${parentTitle}"`
+        : "Note added",
+      noteId: note.id,
+      changes: [
+        {
+          field: "note",
+          oldValue: null,
+          newValue: parsed.content.slice(0, 200),
+        },
+      ],
+    },
+  }).catch(() => undefined);
+
+  return note;
 }
 
 export async function updateNote(userId: string, id: string, input: Partial<NoteInput>) {
@@ -2136,7 +2299,7 @@ export async function updateNote(userId: string, id: string, input: Partial<Note
 
   const parsed = noteSchema.partial().parse(input);
 
-  return prisma.note.update({
+  const note = await prisma.note.update({
     where: { id },
     data: {
       entityType: parsed.entityType ?? existing.entityType,
@@ -2144,6 +2307,42 @@ export async function updateNote(userId: string, id: string, input: Partial<Note
       content: parsed.content ?? existing.content,
     },
   });
+
+  if (parsed.content !== undefined && parsed.content !== existing.content) {
+    let parentTitle = "";
+    let businessId: string | null = null;
+    const entityType = note.entityType;
+    const entityId = note.entityId;
+    if (entityType === "contact") {
+      const c = await prisma.contact.findUnique({
+        where: { id: entityId },
+        select: { name: true, businessId: true },
+      });
+      parentTitle = c?.name || "";
+      businessId = c?.businessId || null;
+    }
+    await logActivity({
+      userId,
+      businessId,
+      entityType: entityType === "contact" ? "contact" : entityType,
+      entityId,
+      action: "note_edited",
+      details: {
+        title: parentTitle,
+        summary: parentTitle ? `Note edited on "${parentTitle}"` : "Note edited",
+        noteId: note.id,
+        changes: [
+          {
+            field: "note",
+            oldValue: existing.content.slice(0, 200),
+            newValue: String(parsed.content).slice(0, 200),
+          },
+        ],
+      },
+    }).catch(() => undefined);
+  }
+
+  return note;
 }
 
 export async function deleteNote(userId: string, id: string) {

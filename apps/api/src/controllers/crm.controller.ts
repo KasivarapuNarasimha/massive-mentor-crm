@@ -427,6 +427,91 @@ export async function memberActivitySummaryHandler(req: AuthenticatedRequest, re
   }
 }
 
+function historyDate(q: unknown): Date | undefined {
+  if (!q) return undefined;
+  const d = new Date(String(q));
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+/** GET /api/crm/contacts/:id/history — Lead chronological activity timeline */
+export async function contactHistoryHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { getEntityActivityHistory } = await import("../services/activity.service.js");
+    const data = await getEntityActivityHistory(req.user.id, "contact", id, {
+      from: historyDate(req.query.from),
+      to: historyDate(req.query.to),
+      action: req.query.action ? String(req.query.action) : undefined,
+      search: req.query.search ? String(req.query.search) : undefined,
+      page: req.query.page ? parseInt(String(req.query.page), 10) : 1,
+      pageSize: req.query.pageSize ? parseInt(String(req.query.pageSize), 10) : 50,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    console.error("Contact history error:", error);
+    const status =
+      error && typeof error === "object" && "status" in error
+        ? Number((error as { status: number }).status) || 500
+        : 500;
+    const message = error instanceof Error ? error.message : "Failed to load lead history";
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
+/** GET /api/crm/deals/:id/history — Deal chronological activity timeline */
+export async function dealHistoryHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { getEntityActivityHistory } = await import("../services/activity.service.js");
+    const data = await getEntityActivityHistory(req.user.id, "deal", id, {
+      from: historyDate(req.query.from),
+      to: historyDate(req.query.to),
+      action: req.query.action ? String(req.query.action) : undefined,
+      search: req.query.search ? String(req.query.search) : undefined,
+      page: req.query.page ? parseInt(String(req.query.page), 10) : 1,
+      pageSize: req.query.pageSize ? parseInt(String(req.query.pageSize), 10) : 50,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    console.error("Deal history error:", error);
+    const status =
+      error && typeof error === "object" && "status" in error
+        ? Number((error as { status: number }).status) || 500
+        : 500;
+    const message = error instanceof Error ? error.message : "Failed to load deal history";
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
+/** GET /api/leads/member-activity/:userId/timeline — Team member chronological history */
+export async function memberActivityTimelineHandler(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const memberUserId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    const { getMemberActivityTimeline } = await import("../services/activity.service.js");
+    const data = await getMemberActivityTimeline(req.user.id, memberUserId, {
+      from: historyDate(req.query.from),
+      to: historyDate(req.query.to),
+      action: req.query.action ? String(req.query.action) : undefined,
+      search: req.query.search ? String(req.query.search) : undefined,
+      entityType: req.query.entityType ? String(req.query.entityType) : undefined,
+      page: req.query.page ? parseInt(String(req.query.page), 10) : 1,
+      pageSize: req.query.pageSize ? parseInt(String(req.query.pageSize), 10) : 50,
+    });
+    res.json({ success: true, data });
+  } catch (error: unknown) {
+    console.error("Member activity timeline error:", error);
+    const status =
+      error && typeof error === "object" && "status" in error
+        ? Number((error as { status: number }).status) || 500
+        : 500;
+    const message = error instanceof Error ? error.message : "Failed to load member history";
+    res.status(status).json({ success: false, error: message });
+  }
+}
+
 /** GET /api/leads/admin-visibility-search — Admin lead search (reuses CRM list filters) */
 export async function adminLeadVisibilitySearchHandler(req: AuthenticatedRequest, res: Response) {
   try {

@@ -84,6 +84,8 @@ export const pipelineStatusSchema = z.object({
   isWon: z.boolean().optional(),
   isLost: z.boolean().optional(),
   order: z.number(),
+  /** Soft-archive — hide from new picks; stored Contact.status keys stay intact */
+  active: z.boolean().optional(),
 });
 
 export const pipelineDefSchema = z.object({
@@ -91,6 +93,8 @@ export const pipelineDefSchema = z.object({
   label: z.string().min(1),
   entity: z.enum(["contact", "deal"]),
   statuses: z.array(pipelineStatusSchema).min(1),
+  /** Default Contact.status key for new leads */
+  defaultStatusKey: z.string().min(1).optional(),
 });
 
 export const widgetFilterSchema = z.object({

@@ -16,6 +16,7 @@ import {
   UNIFIED_PIPELINE_STATUSES,
   pipelineStatusLabel,
 } from "@/lib/pipeline-statuses";
+import { ActivityHistoryPanel } from "@/components/activity/ActivityHistoryPanel";
 
 const AnalyticsDashboard = lazy(() =>
   import("@/components/dashboard/AnalyticsDashboard").then((m) => ({
@@ -291,6 +292,7 @@ export function PremiumDashboard() {
     null
   );
   const [memberActivity, setMemberActivity] = useState<MemberActivitySummary | null>(null);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [visSearch, setVisSearch] = useState("");
   const [visStatus, setVisStatus] = useState("");
   const [visAssignee, setVisAssignee] = useState("");
@@ -1200,7 +1202,15 @@ export function PremiumDashboard() {
                         memberActivity!.byMember.map((m) => (
                           <tr
                             key={m.userId}
-                            className="border-b border-border/60 last:border-0"
+                            className={`border-b border-border/60 last:border-0 cursor-pointer hover:bg-muted/20 ${
+                              selectedMemberId === m.userId ? "bg-sky-500/10" : ""
+                            }`}
+                            onClick={() =>
+                              setSelectedMemberId((prev) =>
+                                prev === m.userId ? null : m.userId
+                              )
+                            }
+                            title="View complete activity history"
                           >
                             <td className="px-4 py-2.5">
                               <div className="font-medium text-foreground">{m.name}</div>
@@ -1209,6 +1219,11 @@ export function PremiumDashboard() {
                                   {m.email}
                                 </div>
                               ) : null}
+                              <div className="text-[10px] text-sky-300/80 mt-0.5">
+                                {selectedMemberId === m.userId
+                                  ? "Hide history"
+                                  : "View history"}
+                              </div>
                             </td>
                             <td className="px-4 py-2.5 text-right tabular-nums font-semibold">
                               {m.leadsAssigned.toLocaleString()}
@@ -1266,6 +1281,16 @@ export function PremiumDashboard() {
                     ) : null}
                   </table>
                 </div>
+                {selectedMemberId ? (
+                  <div className="mt-4">
+                    <ActivityHistoryPanel
+                      token={token}
+                      mode="member"
+                      memberUserId={selectedMemberId}
+                      title="Team Member History"
+                    />
+                  </div>
+                ) : null}
                 {memberActivity?.unavailableMetrics?.length ? (
                   <p className="text-[11px] text-muted-foreground mt-3">
                     {memberActivity.unavailableMetrics.map((u) => u.reason).join(" ")} Lead edits

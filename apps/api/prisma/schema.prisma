@@ -324,6 +324,7 @@ model Business {
   tasks     Task[]
   meetings  Meeting[]
   auditLogs AuditLog[]
+  activities Activity[]
   locationEvents     LocationEvent[]
   fieldWorkSessions  FieldWorkSession[]
   meetingAttendances MeetingAttendance[]
@@ -1366,11 +1367,21 @@ model Activity {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  entityType  String   // "contact" | "deal" | "task" | ...
+  /// Tenant scope (nullable for legacy rows; backfilled / set on write going forward)
+  businessId  String?
+  business    Business? @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  entityType  String   // "contact" | "deal" | "task" | "note" | ...
   entityId    String
-  action      String   // "created" | "updated" | "email_sent" | "whatsapp_sent" | ...
-  details     Json?    // e.g. { "oldStatus": "...", "newStatus": "..." }
+  action      String   // "created" | "updated" | "note_added" | "email_sent" | ...
+  details     Json?    // { summary, changes[{field,oldValue,newValue,oldLabel,newLabel}], title, ... }
   createdAt   DateTime @default(now())
+
+  @@index([businessId, createdAt])
+  @@index([businessId, entityType, entityId, createdAt])
+  @@index([businessId, userId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Notification {

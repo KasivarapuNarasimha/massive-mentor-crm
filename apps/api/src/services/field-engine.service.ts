@@ -63,47 +63,98 @@ export async function getEntityFieldDefs(
 }
 
 export async function getLeadPipelineStatuses(
-  businessId: string | null | undefined
-): Promise<Array<{ key: string; label: string; color?: string }>> {
-  const { UNIFIED_PIPELINE_STATUSES, mergeLeadStatusesWithCanonical } = await import(
+  businessId: string | null | undefined,
+  opts?: { includeInactive?: boolean; keepValue?: string | null }
+): Promise<
+  Array<{
+    key: string;
+    label: string;
+    color?: string;
+    order?: number;
+    active?: boolean;
+    isWon?: boolean;
+    isLost?: boolean;
+  }>
+> {
+  const { mergeLeadStatusesWithCanonical, activeLeadStatuses } = await import(
     "../lib/lead-statuses.js"
   );
-  if (!businessId) {
-    return UNIFIED_PIPELINE_STATUSES.map((s) => ({
+
+  const toRows = (
+    rows: Array<{
+      key: string;
+      label: string;
+      color?: string;
+      order?: number;
+      active?: boolean;
+      isWon?: boolean;
+      isLost?: boolean;
+    }>
+  ) =>
+    rows.map((s) => ({
       key: s.key,
       label: s.label,
       color: s.color,
+      order: s.order,
+      active: s.active !== false,
+      isWon: s.isWon,
+      isLost: s.isLost,
     }));
+
+  let merged = mergeLeadStatusesWithCanonical([]);
+
+  if (businessId) {
+    const config = await getBusinessConfig(businessId);
+    const pipelines = config?.pipelines as
+      | Array<{
+          key: string;
+          entity: string;
+          defaultStatusKey?: string;
+          statuses?: Array<{
+            key: string;
+            label: string;
+            color?: string;
+            order?: number;
+            active?: boolean;
+            isWon?: boolean;
+            isLost?: boolean;
+          }>;
+        }>
+      | null
+      | undefined;
+    if (Array.isArray(pipelines)) {
+      const lead =
+        pipelines.find((p) => p.entity === "contact" && p.key === "lead") ||
+        pipelines.find((p) => p.entity === "contact");
+      const fromConfig = lead?.statuses?.length ? lead.statuses : [];
+      merged = mergeLeadStatusesWithCanonical(fromConfig);
+    }
   }
+
+  const filtered = opts?.includeInactive
+    ? merged
+    : activeLeadStatuses(merged, opts?.keepValue);
+  return toRows(filtered);
+}
+
+/** Lead pipeline defaultStatusKey from BusinessConfig (falls back to first active / new) */
+export async function getLeadDefaultStatusKey(
+  businessId: string | null | undefined
+): Promise<string> {
+  if (!businessId) return "new";
   const config = await getBusinessConfig(businessId);
-  if (!config?.pipelines) {
-    return UNIFIED_PIPELINE_STATUSES.map((s) => ({
-      key: s.key,
-      label: s.label,
-      color: s.color,
-    }));
-  }
-  const pipelines = config.pipelines as Array<{
-    key: string;
-    entity: string;
-    statuses?: Array<{ key: string; label: string; color?: string; order?: number }>;
-  }>;
-  if (!Array.isArray(pipelines)) {
-    return UNIFIED_PIPELINE_STATUSES.map((s) => ({
-      key: s.key,
-      label: s.label,
-      color: s.color,
-    }));
-  }
-  const lead =
-    pipelines.find((p) => p.entity === "contact" && p.key === "lead") ||
-    pipelines.find((p) => p.entity === "contact");
-  const fromConfig = lead?.statuses?.length ? lead.statuses : [];
-  return mergeLeadStatusesWithCanonical(fromConfig).map((s) => ({
-    key: s.key,
-    label: s.label,
-    color: s.color,
-  }));
+  const pipelines = config?.pipelines as
+    | Array<{ key: string; entity: string; defaultStatusKey?: string }>
+    | null
+    | undefined;
+  const lead = Array.isArray(pipelines)
+    ? pipelines.find((p) => p.entity === "contact" && p.key === "lead") ||
+      pipelines.find((p) => p.entity === "contact")
+    : null;
+  const statuses = await getLeadPipelineStatuses(businessId);
+  const preferred = lead?.defaultStatusKey;
+  if (preferred && statuses.some((s) => s.key === preferred)) return preferred;
+  return statuses[0]?.key || "new";
 }
 
 /**

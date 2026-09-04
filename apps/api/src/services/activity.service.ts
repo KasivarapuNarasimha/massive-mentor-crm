@@ -1,17 +1,93 @@
 import { prisma } from "../lib/prisma.js";
 
+/** Field-level change snapshot for Lead History (labels frozen at write time). */
+export type ActivityFieldChange = {
+  field: string;
+  oldValue?: unknown;
+  newValue?: unknown;
+  oldLabel?: string | null;
+  newLabel?: string | null;
+};
+
 export interface LogActivityInput {
   userId: string;
   entityType: string;
   entityId: string;
   action: string;
   details?: Record<string, unknown>;
+  /** When known, prefer explicit tenant scope (avoids extra lookup). */
+  businessId?: string | null;
+}
+
+async function resolveActivityBusinessId(
+  userId: string,
+  entityType: string,
+  entityId: string,
+  explicit?: string | null
+): Promise<string | null> {
+  if (explicit) return explicit;
+  const et = (entityType || "").toLowerCase();
+  try {
+    if (et === "contact" || et === "lead" || et === "client") {
+      const c = await prisma.contact.findUnique({
+        where: { id: entityId },
+        select: { businessId: true },
+      });
+      if (c?.businessId) return c.businessId;
+    }
+    if (et === "deal") {
+      const d = await prisma.deal.findUnique({
+        where: { id: entityId },
+        select: { businessId: true },
+      });
+      if (d?.businessId) return d.businessId;
+    }
+    if (et === "task") {
+      const t = await prisma.task.findUnique({
+        where: { id: entityId },
+        select: { businessId: true },
+      });
+      if (t?.businessId) return t.businessId;
+    }
+    if (et === "meeting") {
+      const m = await prisma.meeting.findUnique({
+        where: { id: entityId },
+        select: { businessId: true },
+      });
+      if (m?.businessId) return m.businessId;
+    }
+    if (et === "note") {
+      const n = await prisma.note.findUnique({
+        where: { id: entityId },
+        select: { entityType: true, entityId: true },
+      });
+      if (n?.entityId) {
+        return resolveActivityBusinessId(userId, n.entityType, n.entityId, null);
+      }
+    }
+  } catch {
+    /* ignore lookup failures */
+  }
+  try {
+    const { getUserBusinessId } = await import("./field-engine.service.js");
+    return (await getUserBusinessId(userId)) || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function logActivity(input: LogActivityInput) {
+  const businessId = await resolveActivityBusinessId(
+    input.userId,
+    input.entityType,
+    input.entityId,
+    input.businessId
+  );
+
   const row = await prisma.activity.create({
     data: {
       userId: input.userId,
+      businessId: businessId || undefined,
       entityType: input.entityType,
       entityId: input.entityId,
       action: input.action,
@@ -20,12 +96,16 @@ export async function logActivity(input: LogActivityInput) {
   });
 
   // Fan-out to Admin team-activity toasts (best-effort; never fail CRM write)
-  void fanOutTeamActivity(input, row.id).catch(() => undefined);
+  void fanOutTeamActivity(input, row.id, businessId).catch(() => undefined);
 
   return row;
 }
 
-async function fanOutTeamActivity(input: LogActivityInput, activityId: string): Promise<void> {
+async function fanOutTeamActivity(
+  input: LogActivityInput,
+  activityId: string,
+  resolvedBusinessId?: string | null
+): Promise<void> {
   const {
     isMeaningfulTeamActivity,
     formatTeamActivityCopy,
@@ -34,7 +114,8 @@ async function fanOutTeamActivity(input: LogActivityInput, activityId: string): 
   if (!isMeaningfulTeamActivity(input.action, input.entityType)) return;
 
   const { getUserBusinessId } = await import("./field-engine.service.js");
-  const businessId = await getUserBusinessId(input.userId);
+  const businessId =
+    resolvedBusinessId || (await getUserBusinessId(input.userId));
   if (!businessId) return;
 
   const actor = await prisma.user.findUnique({
@@ -98,6 +179,7 @@ async function fanOutTeamActivity(input: LogActivityInput, activityId: string): 
   }
 }
 
+/** Legacy: viewer-scoped activity (kept for /api/automations/activity). */
 export async function getActivityTimeline(
   userId: string,
   entityType?: string,
@@ -116,7 +198,339 @@ export async function getActivityTimeline(
     where,
     orderBy: { createdAt: "desc" },
     take: limit,
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+    },
   });
+}
+
+export type ActivityHistoryFilters = {
+  from?: Date;
+  to?: Date;
+  action?: string;
+  search?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+function parseHistoryPage(opts?: ActivityHistoryFilters) {
+  const page = opts?.page && opts.page > 0 ? opts.page : 1;
+  const pageSize = opts?.pageSize ? Math.min(200, Math.max(1, opts.pageSize)) : 50;
+  return { page, pageSize, skip: (page - 1) * pageSize };
+}
+
+function createdAtFilter(opts?: ActivityHistoryFilters) {
+  if (!opts?.from && !opts?.to) return undefined;
+  return {
+    ...(opts.from ? { gte: opts.from } : {}),
+    ...(opts.to ? { lte: opts.to } : {}),
+  };
+}
+
+/**
+ * Lead/Contact chronological history — all actors in the tenant.
+ * Does not fabricate events; only returns persisted Activity rows.
+ */
+export async function getEntityActivityHistory(
+  actorUserId: string,
+  entityType: string,
+  entityId: string,
+  opts?: ActivityHistoryFilters
+) {
+  const { getUserBusinessId } = await import("./field-engine.service.js");
+  const businessId = await getUserBusinessId(actorUserId);
+  if (!businessId) {
+    throw Object.assign(new Error("No active business workspace"), { status: 400 });
+  }
+
+  // Tenant gate via entity ownership
+  const et = (entityType || "").toLowerCase();
+  if (et === "contact" || et === "lead" || et === "client") {
+    const contact = await prisma.contact.findFirst({
+      where: { id: entityId, businessId, deletedAt: null },
+      select: { id: true, name: true, type: true },
+    });
+    if (!contact) {
+      throw Object.assign(new Error("Contact not found or not accessible"), { status: 404 });
+    }
+  } else if (et === "deal") {
+    const deal = await prisma.deal.findFirst({
+      where: { id: entityId, businessId },
+      select: { id: true },
+    });
+    if (!deal) {
+      throw Object.assign(new Error("Deal not found or not accessible"), { status: 404 });
+    }
+  }
+
+  const { page, pageSize, skip } = parseHistoryPage(opts);
+  const createdAt = createdAtFilter(opts);
+
+  // Linked deal ids for Lead History (deal stage/won/lost/payment appear once on the deal row)
+  let linkedDealIds: string[] = [];
+  if (et === "contact" || et === "lead" || et === "client") {
+    const deals = await prisma.deal.findMany({
+      where: { businessId, contactId: entityId },
+      select: { id: true },
+      take: 200,
+    });
+    linkedDealIds = deals.map((d) => d.id);
+  }
+
+  const orClauses: Record<string, unknown>[] = [
+    { businessId, entityType: et === "lead" || et === "client" ? "contact" : entityType, entityId },
+    { businessId: null, entityType: et === "lead" || et === "client" ? "contact" : entityType, entityId },
+  ];
+  if (linkedDealIds.length) {
+    orClauses.push(
+      { businessId, entityType: "deal", entityId: { in: linkedDealIds } },
+      { businessId: null, entityType: "deal", entityId: { in: linkedDealIds } }
+    );
+  }
+
+  const where: Record<string, unknown> = {
+    OR: orClauses,
+    ...(createdAt ? { createdAt } : {}),
+    ...(opts?.action ? { action: opts.action } : {}),
+  };
+
+  const [totalDirect, itemsDirect] = await Promise.all([
+    prisma.activity.count({ where: where as never }),
+    prisma.activity.findMany({
+      where: where as never,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    }),
+  ]);
+
+  let items = itemsDirect;
+  if (opts?.search) {
+    const q = opts.search.toLowerCase();
+    items = items.filter((i) => {
+      const d = JSON.stringify(i.details || {}).toLowerCase();
+      return (
+        i.action.toLowerCase().includes(q) ||
+        i.user?.name?.toLowerCase().includes(q) ||
+        i.user?.email?.toLowerCase().includes(q) ||
+        d.includes(q)
+      );
+    });
+  }
+
+  return {
+    items: items.map(formatHistoryItem),
+    total: opts?.search ? items.length : totalDirect,
+    page,
+    pageSize,
+    totalPages: Math.max(
+      1,
+      Math.ceil((opts?.search ? items.length : totalDirect) / pageSize)
+    ),
+  };
+}
+
+/**
+ * Team member chronological timeline — tenant-scoped Activity by actor.
+ */
+export async function getMemberActivityTimeline(
+  actorUserId: string,
+  memberUserId: string,
+  opts?: ActivityHistoryFilters & { entityType?: string }
+) {
+  const { resolveActorRole } = await import("./tenant-scope.service.js");
+  const { getUserBusinessId } = await import("./field-engine.service.js");
+  const role = await resolveActorRole(actorUserId);
+  if (!MEMBER_ACTIVITY_ADMIN_ROLES.has(role) && !role.includes("admin")) {
+    throw Object.assign(new Error("Insufficient permissions to view team member history"), {
+      status: 403,
+    });
+  }
+  const businessId = await getUserBusinessId(actorUserId);
+  if (!businessId) {
+    throw Object.assign(new Error("No active business workspace"), { status: 400 });
+  }
+
+  const member = await prisma.businessMember.findFirst({
+    where: { businessId, userId: memberUserId },
+    include: { user: { select: { id: true, name: true, email: true, role: true } } },
+  });
+  if (!member?.user) {
+    throw Object.assign(new Error("Team member not found in this workspace"), { status: 404 });
+  }
+
+  const { page, pageSize, skip } = parseHistoryPage(opts);
+  const createdAt = createdAtFilter(opts);
+  const where: Record<string, unknown> = {
+    userId: memberUserId,
+    OR: [{ businessId }, { businessId: null }],
+    ...(createdAt ? { createdAt } : {}),
+    ...(opts?.action ? { action: opts.action } : {}),
+    ...(opts?.entityType ? { entityType: opts.entityType } : {}),
+  };
+
+  const [total, items] = await Promise.all([
+    prisma.activity.count({ where: where as never }),
+    prisma.activity.findMany({
+      where: where as never,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+    }),
+  ]);
+
+  let filtered = items;
+  if (opts?.search) {
+    const q = opts.search.toLowerCase();
+    filtered = items.filter((i) => {
+      const d = JSON.stringify(i.details || {}).toLowerCase();
+      return i.action.toLowerCase().includes(q) || d.includes(q) || i.entityType.includes(q);
+    });
+  }
+
+  // Counts from existing Activity (not fabricated)
+  const actionCounts = await prisma.activity.groupBy({
+    by: ["action"],
+    where: {
+      userId: memberUserId,
+      OR: [{ businessId }, { businessId: null }],
+      ...(createdAt ? { createdAt } : {}),
+    },
+    _count: { _all: true },
+  });
+
+  return {
+    member: {
+      userId: member.user.id,
+      name: member.user.name,
+      email: member.user.email,
+      role: member.role || member.user.role,
+    },
+    items: filtered.map(formatHistoryItem),
+    total: opts?.search ? filtered.length : total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil((opts?.search ? filtered.length : total) / pageSize)),
+    actionCounts: Object.fromEntries(actionCounts.map((r) => [r.action, r._count._all])),
+  };
+}
+
+function formatHistoryItem(row: {
+  id: string;
+  userId: string;
+  businessId?: string | null;
+  entityType: string;
+  entityId: string;
+  action: string;
+  details: unknown;
+  createdAt: Date;
+  user?: { id: string; name: string | null; email: string } | null;
+}) {
+  const details =
+    row.details && typeof row.details === "object" && !Array.isArray(row.details)
+      ? (row.details as Record<string, unknown>)
+      : {};
+  const actorName =
+    (row.user?.name && row.user.name.trim()) || row.user?.email || "Unknown";
+  const summary =
+    typeof details.summary === "string" && details.summary.trim()
+      ? details.summary.trim()
+      : buildFallbackSummary(actorName, row.action, row.entityType, details);
+
+  return {
+    id: row.id,
+    businessId: row.businessId || null,
+    actorUserId: row.userId,
+    actorName,
+    actorEmail: row.user?.email || null,
+    entityType: row.entityType,
+    entityId: row.entityId,
+    action: row.action,
+    summary,
+    changes: Array.isArray(details.changes) ? details.changes : [],
+    details,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function buildFallbackSummary(
+  actorName: string,
+  action: string,
+  entityType: string,
+  details: Record<string, unknown>
+): string {
+  const title =
+    (typeof details.title === "string" && details.title) ||
+    (typeof details.name === "string" && details.name) ||
+    "";
+  const label =
+    entityType === "contact" || entityType === "lead"
+      ? "lead"
+      : entityType === "client"
+        ? "client"
+        : entityType === "deal"
+          ? "deal"
+          : entityType === "task"
+            ? "follow-up"
+            : entityType === "note"
+              ? "note"
+              : entityType;
+  if (action === "created") {
+    return title ? `${actorName} created ${label} "${title}"` : `${actorName} created a ${label}`;
+  }
+  if (action === "updated" || action === "bulk_updated") {
+    if (details.statusChanged && details.previousStatus != null) {
+      return `${actorName} changed status: ${String(details.previousStatus)} → ${String(details.status ?? "")}`;
+    }
+    if (details.assigneeChanged) {
+      return `${actorName} changed assignment on ${label}${title ? ` "${title}"` : ""}`;
+    }
+    return title ? `${actorName} updated ${label} "${title}"` : `${actorName} updated a ${label}`;
+  }
+  if (action === "note_added") return `${actorName} added a note${title ? ` on "${title}"` : ""}`;
+  if (action === "note_edited") return `${actorName} edited a note${title ? ` on "${title}"` : ""}`;
+  if (action === "task_completed") return `${actorName} completed a follow-up${title ? `: ${title}` : ""}`;
+  return `${actorName} ${action.replace(/_/g, " ")} ${label}${title ? ` "${title}"` : ""}`;
+}
+
+/** Helper for CRM writes: build a status/assignee/field change payload. */
+export function buildContactUpdateDetails(opts: {
+  title: string;
+  changes: ActivityFieldChange[];
+  previousStatus?: string;
+  status?: string;
+  statusChanged?: boolean;
+  assigneeChanged?: boolean;
+  previousAssignee?: string | null;
+  nextAssignee?: string | null;
+}): Record<string, unknown> {
+  const summaryParts: string[] = [];
+  for (const c of opts.changes) {
+    const from = c.oldLabel ?? String(c.oldValue ?? "—");
+    const to = c.newLabel ?? String(c.newValue ?? "—");
+    summaryParts.push(`${c.field}: ${from} → ${to}`);
+  }
+  return {
+    title: opts.title,
+    summary: summaryParts.length
+      ? summaryParts.join("; ")
+      : opts.statusChanged
+        ? `Status: ${opts.previousStatus} → ${opts.status}`
+        : "Updated",
+    changes: opts.changes,
+    previousStatus: opts.previousStatus,
+    status: opts.status,
+    statusChanged: !!opts.statusChanged,
+    assigneeChanged: !!opts.assigneeChanged,
+    previousAssignee: opts.previousAssignee ?? null,
+    nextAssignee: opts.nextAssignee ?? null,
+  };
 }
 
 /** Business-wide audit trail from AuditLog (search/filter). */

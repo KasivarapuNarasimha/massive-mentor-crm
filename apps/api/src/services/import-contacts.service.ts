@@ -660,7 +660,7 @@ async function loadImportContext(userId: string) {
         );
       }
       fieldDefs = await getContactFieldDefs(businessId);
-      const pipeline = await getLeadPipelineStatuses(businessId);
+      const pipeline = await getLeadPipelineStatuses(businessId, { includeInactive: true });
       if (pipeline.length) {
         allowedStatuses = pipeline.map((s) => ({ key: s.key, label: s.label }));
       }

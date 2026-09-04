@@ -19,12 +19,16 @@ import {
   CustomFieldsFormSection,
   customFieldsFromRecord,
 } from "@/components/custom-fields/CustomFieldsFormSection";
+import { ActivityHistoryPanel } from "@/components/activity/ActivityHistoryPanel";
 import {
   normalizePipelineStatus,
   pipelineStatusLabel,
-  UNIFIED_PIPELINE_STATUSES,
-  UNIFIED_STATUS_KEYS,
 } from "@/lib/pipeline-statuses";
+import {
+  leadDefaultStatusKey,
+  leadStatusesFromConfig,
+  type BusinessConfigDTO,
+} from "@/lib/business-config";
 
 interface Deal {
   id: string;
@@ -43,22 +47,11 @@ interface Deal {
   updatedAt: string;
 }
 
-/** Unified 15-status Kanban (same vocabulary as Leads) */
-const STAGES = UNIFIED_STATUS_KEYS as readonly string[];
 type StageKey = string;
-
-const STAGE_LABELS: Record<string, string> = Object.fromEntries(
-  UNIFIED_PIPELINE_STATUSES.map((s) => [s.key, s.label])
-);
 
 /** Map any API/legacy Deal.stage onto exactly one Kanban column key. */
 function normalizeDealStage(raw: string | null | undefined): StageKey {
   return normalizePipelineStatus(raw);
-}
-
-function stageLabel(stage: string): string {
-  const k = normalizeDealStage(stage);
-  return STAGE_LABELS[k] || pipelineStatusLabel(k) || stage || "Unknown";
 }
 
 /** One card per id — keep the most recently updated row. */
@@ -88,6 +81,7 @@ export default function DealsPage() {
   const highlightStage = stageFromUrl ? normalizeDealStage(stageFromUrl) : null;
   const stageColRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [bizConfig, setBizConfig] = useState<BusinessConfigDTO | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"kanban" | "list">("kanban");
@@ -104,6 +98,56 @@ export default function DealsPage() {
   const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
+
+  /** Active configured stages + any archived/orphan stages still used by deals */
+  const stageDefs = useMemo(() => {
+    const configured = leadStatusesFromConfig(bizConfig, { includeInactive: true });
+    const byKey = new Map(configured.map((s) => [s.key, s]));
+    for (const d of deals) {
+      const k = normalizeDealStage(d.stage);
+      if (!byKey.has(k)) {
+        byKey.set(k, {
+          key: k,
+          label: pipelineStatusLabel(k) || k,
+          order: 999,
+          active: false,
+        });
+      }
+    }
+    return [...byKey.values()].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [bizConfig, deals]);
+
+  const STAGES = useMemo(() => {
+    // Kanban columns: active statuses, plus inactive only if deals currently sit there
+    const used = new Set(deals.map((d) => normalizeDealStage(d.stage)));
+    return stageDefs
+      .filter((s) => s.active !== false || used.has(s.key))
+      .map((s) => s.key);
+  }, [stageDefs, deals]);
+
+  const STAGE_LABELS = useMemo(
+    () => Object.fromEntries(stageDefs.map((s) => [s.key, s.label])),
+    [stageDefs]
+  );
+
+  const selectableStages = useMemo(() => {
+    const keep = editingDeal ? normalizeDealStage(editingDeal.stage) : null;
+    return leadStatusesFromConfig(bizConfig, { keepValue: keep }).map((s) => s.key);
+  }, [bizConfig, editingDeal]);
+
+  function stageLabel(stage: string): string {
+    const k = normalizeDealStage(stage);
+    return STAGE_LABELS[k] || pipelineStatusLabel(k) || stage || "Unknown";
+  }
+
+  useEffect(() => {
+    if (!token) return;
+    void api.getBusinessConfig(token).then((res) => {
+      if (res.success && res.data?.config) {
+        setBizConfig(res.data.config as BusinessConfigDTO);
+      }
+    });
+  }, [token]);
 
   useEffect(() => {
     if (!highlightStage || isLoading) return;
@@ -198,7 +242,7 @@ export default function DealsPage() {
     setFormData({
       title: "",
       value: "",
-      stage: "new",
+      stage: leadDefaultStatusKey(bizConfig) || "new",
       expectedClose: "",
       probability: "",
       notes: "",
@@ -533,8 +577,13 @@ export default function DealsPage() {
                           className="mm-input w-full text-xs"
                           aria-label={`Change stage for ${deal.title}`}
                         >
-                          {STAGES.map((s) => (
-                            <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                          {leadStatusesFromConfig(bizConfig, {
+                            keepValue: normalizeDealStage(deal.stage),
+                          }).map((s) => (
+                            <option key={s.key} value={s.key}>
+                              {s.label}
+                              {s.active === false ? " (archived)" : ""}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -549,7 +598,7 @@ export default function DealsPage() {
             ))}
           </div>
 
-          {/* Tablet/desktop: horizontal scroll for 15-status pipeline */}
+          {/* Tablet/desktop: horizontal scroll for configured pipeline */}
           <div className="hidden md:block overflow-x-auto pb-2">
             <div className="flex gap-2.5 min-w-max">
             {STAGES.map((stage) => (
@@ -756,8 +805,10 @@ export default function DealsPage() {
                       onChange={(e) => handleChange("stage", e.target.value)}
                       className="mm-input"
                     >
-                      {STAGES.map((s) => (
-                        <option key={s} value={s}>{STAGE_LABELS[s]}</option>
+                      {selectableStages.map((s) => (
+                        <option key={s} value={s}>
+                          {STAGE_LABELS[s] || pipelineStatusLabel(s) || s}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -779,12 +830,18 @@ export default function DealsPage() {
                 />
               </form>
               {editingDeal?.id ? (
-                <div className="mt-4 pt-4 border-t border-border">
+                <div className="mt-4 pt-4 border-t border-border space-y-4">
                   <NotesPanel
                     entityType="deal"
                     entityId={editingDeal.id}
                     compact
                     title="Attached notes"
+                  />
+                  <ActivityHistoryPanel
+                    token={token}
+                    mode="deal"
+                    dealId={editingDeal.id}
+                    title="Deal History"
                   />
                 </div>
               ) : null}
