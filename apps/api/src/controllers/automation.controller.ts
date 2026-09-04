@@ -87,24 +87,15 @@ export async function teamActivityStream(req: AuthenticatedRequest, res: Respons
       return res.status(401).json({ success: false, error: "Not authenticated" });
     }
     const { resolveActorRole } = await import("../services/tenant-scope.service.js");
-    const role = await resolveActorRole(req.user.id);
-    const adminOk = new Set([
-      "ceo",
-      "owner",
-      "business_admin",
-      "admin",
-      "super_admin",
-      "sales_manager",
-      "manager",
-    ]);
-    if (!adminOk.has(role) && !role.includes("admin")) {
-      return res.status(403).json({ success: false, error: "Insufficient permissions" });
-    }
-
     const {
+      canViewTeamActivity,
       subscribeTeamActivity,
       listTeamActivityListenBusinessIds,
     } = await import("../services/team-activity-realtime.service.js");
+    const role = await resolveActorRole(req.user.id);
+    if (!canViewTeamActivity(role)) {
+      return res.status(403).json({ success: false, error: "Insufficient permissions" });
+    }
 
     // Listen on EVERY admin membership workspace (not only getUserBusinessId).
     // Multi-business admins otherwise miss toasts while still receiving bell notifications.

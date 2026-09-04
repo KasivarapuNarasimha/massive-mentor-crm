@@ -15,6 +15,11 @@ export type FeatureCatalogEntry = {
   /** Extra search terms */
   aliases: string[];
   moduleKey: string | null;
+  /**
+   * When true, only Business Admin / CEO (Team Activity viewers) see this hit.
+   * Enforced in searchFeatures via opts.canViewTeamActivity.
+   */
+  requiresTeamActivityViewer?: boolean;
 };
 
 function buildCatalog(): FeatureCatalogEntry[] {
@@ -231,6 +236,7 @@ function buildCatalog(): FeatureCatalogEntry[] {
       subModuleId: "crm-dashboard",
       subModuleLabel: "Dashboard",
       aliases: ["team activity", "activity toast", "live activity", "team"],
+      requiresTeamActivityViewer: true,
     },
     {
       id: "alias-member-activity",
@@ -241,6 +247,7 @@ function buildCatalog(): FeatureCatalogEntry[] {
       subModuleId: "crm-dashboard",
       subModuleLabel: "Dashboard",
       aliases: ["member activity", "team member", "team members", "team"],
+      requiresTeamActivityViewer: true,
     },
     {
       id: "alias-lead-status",
@@ -304,13 +311,20 @@ export const FEATURE_CATALOG: FeatureCatalogEntry[] = buildCatalog();
 
 export function searchFeatures(
   query: string,
-  opts?: { modules?: string[] | null; canAccess?: (href: string) => boolean }
+  opts?: {
+    modules?: string[] | null;
+    canAccess?: (href: string) => boolean;
+    /** When false, hide Team Activity / Member Activity aliases */
+    canViewTeamActivity?: boolean;
+  }
 ): FeatureCatalogEntry[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
 
   const scored: Array<{ e: FeatureCatalogEntry; score: number }> = [];
   for (const e of FEATURE_CATALOG) {
+    // Default-deny: Team Activity aliases only when caller explicitly allows
+    if (e.requiresTeamActivityViewer && !opts?.canViewTeamActivity) continue;
     if (opts?.canAccess && !opts.canAccess(e.href.split("?")[0].split("#")[0])) continue;
     if (opts?.modules && e.moduleKey) {
       // Soft: if modules loaded and key known, require grant OR erp/finance umbrella for erp_*

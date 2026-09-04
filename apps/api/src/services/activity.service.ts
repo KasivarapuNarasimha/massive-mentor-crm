@@ -147,16 +147,9 @@ async function fanOutTeamActivity(
   };
   publishTeamActivity(payload);
 
-  // Persist inbox notifications for workspace admins (bell + toast via poll/SSE)
-  const ADMIN_ROLES = new Set([
-    "ceo",
-    "owner",
-    "business_admin",
-    "admin",
-    "super_admin",
-    "sales_manager",
-    "manager",
-  ]);
+  // Persist inbox notifications for Team Activity viewers only (BA / CEO aliases).
+  // Do not fan out team_activity to sales_manager / sales_executive / other roles.
+  const { canViewTeamActivity } = await import("./team-activity-realtime.service.js");
   const members = await prisma.businessMember.findMany({
     where: { businessId },
     include: {
@@ -168,7 +161,7 @@ async function fanOutTeamActivity(
     if (!m.user || m.user.isDisabled) continue;
     if (m.user.id === input.userId) continue; // don't notify the actor
     const role = (m.role || m.user.role || "").toLowerCase();
-    if (!ADMIN_ROLES.has(role) && !role.includes("admin")) continue;
+    if (!canViewTeamActivity(role)) continue;
     await notifyUser(m.user.id, {
       type: "team_activity",
       title,
@@ -343,8 +336,9 @@ export async function getMemberActivityTimeline(
 ) {
   const { resolveActorRole } = await import("./tenant-scope.service.js");
   const { getUserBusinessId } = await import("./field-engine.service.js");
+  const { canViewTeamActivity } = await import("./team-activity-realtime.service.js");
   const role = await resolveActorRole(actorUserId);
-  if (!MEMBER_ACTIVITY_ADMIN_ROLES.has(role) && !role.includes("admin")) {
+  if (!canViewTeamActivity(role)) {
     throw Object.assign(new Error("Insufficient permissions to view team member history"), {
       status: 403,
     });
@@ -588,7 +582,8 @@ export async function searchAuditLog(
   };
 }
 
-const MEMBER_ACTIVITY_ADMIN_ROLES = new Set([
+/** Broader admin set for Team lead visibility search (managers still allowed). */
+const DASHBOARD_VISIBILITY_ADMIN_ROLES = new Set([
   "ceo",
   "owner",
   "business_admin",
@@ -641,8 +636,9 @@ export async function getMemberActivitySummary(
 ): Promise<MemberActivitySummary> {
   const { resolveActorRole } = await import("./tenant-scope.service.js");
   const { getUserBusinessId } = await import("./field-engine.service.js");
+  const { canViewTeamActivity } = await import("./team-activity-realtime.service.js");
   const role = await resolveActorRole(actorUserId);
-  if (!MEMBER_ACTIVITY_ADMIN_ROLES.has(role) && !role.includes("admin")) {
+  if (!canViewTeamActivity(role)) {
     throw Object.assign(new Error("Insufficient permissions to view team activity"), {
       status: 403,
     });
@@ -891,7 +887,7 @@ export async function adminLeadVisibilitySearch(
 }> {
   const { resolveActorRole } = await import("./tenant-scope.service.js");
   const role = await resolveActorRole(actorUserId);
-  if (!MEMBER_ACTIVITY_ADMIN_ROLES.has(role) && !role.includes("admin")) {
+  if (!DASHBOARD_VISIBILITY_ADMIN_ROLES.has(role) && !role.includes("admin")) {
     throw Object.assign(new Error("Insufficient permissions for admin lead search"), {
       status: 403,
     });

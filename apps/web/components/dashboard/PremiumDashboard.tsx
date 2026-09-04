@@ -19,6 +19,7 @@ import {
 import { ActivityHistoryPanel } from "@/components/activity/ActivityHistoryPanel";
 import { FeatureSearch } from "@/components/dashboard/FeatureSearch";
 import { canAccessPath } from "@/lib/module-permissions";
+import { canViewTeamActivity } from "@/lib/team-activity-access";
 
 const AnalyticsDashboard = lazy(() =>
   import("@/components/dashboard/AnalyticsDashboard").then((m) => ({
@@ -336,6 +337,7 @@ export function PremiumDashboard() {
   } | null>(null);
 
   const roleKey = (role || user?.role || "").toLowerCase();
+  // Team lead visibility / assignment summary — managers still allowed
   const canSeeAssignmentSummary =
     [
       "ceo",
@@ -346,7 +348,8 @@ export function PremiumDashboard() {
       "sales_manager",
       "manager",
     ].includes(roleKey) || roleKey.includes("admin");
-  const canSeeMemberActivity = canSeeAssignmentSummary;
+  // Member Activity / Team Activity — Business Admin + CEO only
+  const canSeeMemberActivity = canViewTeamActivity(roleKey);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -769,6 +772,7 @@ export function PremiumDashboard() {
               size="lg"
               placeholder="Search CRM features, pages, actions…"
               canAccess={featureSearchCanAccess}
+              canViewTeamActivity={canSeeMemberActivity}
               modules={moduleKeys}
               className="w-full"
             />
@@ -865,8 +869,8 @@ export function PremiumDashboard() {
         </div>
       </section>
 
-      {/* Admin lead visibility search — reuses CRM list filters */}
-      {canSeeMemberActivity && (
+      {/* Admin lead visibility search — reuses CRM list filters (managers allowed) */}
+      {canSeeAssignmentSummary && (
         <section aria-labelledby="admin-visibility-heading" className="mt-1">
           <div className="mm-card p-4 sm:p-5">
             <div className="mb-3">

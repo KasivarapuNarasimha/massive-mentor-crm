@@ -9,6 +9,8 @@ type FeatureSearchProps = {
   canAccess: (href: string) => boolean;
   /** Portal module keys — soft filter inside catalog when provided */
   modules?: string[] | null;
+  /** Business Admin / CEO — Team Activity search aliases */
+  canViewTeamActivity?: boolean;
   /** Called after a result is chosen (e.g. close mobile sidebar) */
   onNavigate?: () => void;
   /** Compact mode for collapsed sidebar — icon only until opened */
@@ -22,6 +24,7 @@ type FeatureSearchProps = {
 export function FeatureSearch({
   canAccess,
   modules = null,
+  canViewTeamActivity = false,
   onNavigate,
   compact = false,
   size = "default",
@@ -35,14 +38,17 @@ export function FeatureSearch({
   const inputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const results = useMemo(
-    () =>
-      searchFeatures(query, {
-        modules,
-        canAccess: (href) => canAccess(href),
-      }),
-    [query, modules, canAccess]
-  );
+  const results = useMemo(() => {
+    const hits = searchFeatures(query, {
+      modules,
+      canAccess: (href) => canAccess(href),
+      canViewTeamActivity,
+    });
+    // Belt-and-suspenders: never surface Team Activity aliases without viewer grant
+    return canViewTeamActivity
+      ? hits
+      : hits.filter((e) => !e.requiresTeamActivityViewer);
+  }, [query, modules, canAccess, canViewTeamActivity]);
 
   const go = useCallback(
     (entry: FeatureCatalogEntry) => {

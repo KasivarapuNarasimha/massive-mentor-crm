@@ -1,6 +1,15 @@
 /**
  * In-process pub/sub for live team CRM activity toasts (Admin).
  * Pattern mirrors subscription-realtime.service.ts (single PM2 process).
+ *
+ * Visibility: Business Admin + CEO only.
+ *
+ * Role-key mapping (from portals / DEFAULT_ROLES — not inventing new roles):
+ * - CEO portal roles: ["ceo", "owner"]  → owner is CEO-equivalent
+ * - Business Admin portal roles: ["business_admin", "admin"] → admin is BA legacy alias
+ * - super_admin is platformRole (platform operator), NOT a tenant BA/CEO → excluded
+ *
+ * Sales Manager / Sales Executive and other roles must not subscribe or receive.
  */
 import { EventEmitter } from "node:events";
 
@@ -17,6 +26,21 @@ export type TeamActivityRealtimePayload = {
   title: string;
   message: string;
 };
+
+/**
+ * Roles allowed to view Team Activity / Member Activity / live toast+sound.
+ * Exact product requirement: Business Admin + CEO (with intentional key aliases only).
+ */
+export const TEAM_ACTIVITY_VIEWER_ROLES = new Set([
+  "ceo",
+  "owner", // CEO portal alias — same portal/dashboard as ceo
+  "business_admin",
+  "admin", // Business Admin legacy alias — same portal/dashboard as business_admin
+]);
+
+export function canViewTeamActivity(role: string | null | undefined): boolean {
+  return TEAM_ACTIVITY_VIEWER_ROLES.has(String(role || "").toLowerCase());
+}
 
 const bus = new EventEmitter();
 bus.setMaxListeners(500);
@@ -185,22 +209,15 @@ export function subscribeTeamActivity(
   };
 }
 
-const ADMIN_ROLES = new Set([
-  "ceo",
-  "owner",
-  "business_admin",
-  "admin",
-  "super_admin",
-  "sales_manager",
-  "manager",
-]);
-
 /**
  * Businesses this user should listen on for live team-activity toasts.
  *
  * IMPORTANT: Do NOT use only getUserBusinessId(). Multi-business admins may have
  * a "primary" resolved business that differs from the workspace where teammates
  * are acting — notifications still fan out by membership, so SSE must too.
+ *
+ * Only memberships where the member role is a Team Activity viewer are included.
+ * Do not fall back to primary business for non-viewers (that leaked SSE access).
  */
 export async function listTeamActivityListenBusinessIds(
   userId: string
@@ -224,18 +241,24 @@ export async function listTeamActivityListenBusinessIds(
   const ids: string[] = [];
   for (const m of members) {
     const role = String(m.role || m.user?.role || "").toLowerCase();
-    if (!ADMIN_ROLES.has(role) && !role.includes("admin")) continue;
+    if (!canViewTeamActivity(role)) continue;
     ids.push(m.businessId);
   }
 
-  // Fallback: include primary resolution so single-business tenants still work
-  // even if role fields are temporarily inconsistent.
-  try {
-    const { getUserBusinessId } = await import("./field-engine.service.js");
-    const primary = await getUserBusinessId(userId);
-    if (primary && !ids.includes(primary)) ids.push(primary);
-  } catch {
-    /* ignore */
+  // If the actor is a Team Activity viewer but membership role fields were empty,
+  // include primary business only after confirming resolveActorRole allows them.
+  if (ids.length === 0) {
+    try {
+      const { resolveActorRole } = await import("./tenant-scope.service.js");
+      const actorRole = await resolveActorRole(userId);
+      if (canViewTeamActivity(actorRole)) {
+        const { getUserBusinessId } = await import("./field-engine.service.js");
+        const primary = await getUserBusinessId(userId);
+        if (primary) ids.push(primary);
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   return [...new Set(ids)];

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
+import { canViewTeamActivity } from "@/lib/team-activity-access";
 import {
   connectTeamActivityStream,
   installTeamActivitySoundGestureUnlock,
@@ -15,19 +16,9 @@ import {
   type TeamActivityStreamEvent,
 } from "@/lib/team-activity-realtime";
 
-const ADMIN_ROLES = new Set([
-  "ceo",
-  "owner",
-  "business_admin",
-  "admin",
-  "super_admin",
-  "sales_manager",
-  "manager",
-]);
-
 /**
- * Cross-CRM live team activity toasts (Admin). Mounted in DashboardShell so it
- * works on every CRM route, not only /dashboard.
+ * Cross-CRM live team activity toasts (Business Admin / CEO only).
+ * Mounted in DashboardShell so it works on every CRM route, not only /dashboard.
  *
  * Sound: Chrome autoplay requires a user gesture before Web Audio can play.
  * We unlock on the first pointer/key/touch after mount, and also show a
@@ -40,8 +31,7 @@ export function TeamActivityToaster() {
   const [showEnableSound, setShowEnableSound] = useState(false);
 
   const roleKey = String(role || user?.role || "").toLowerCase();
-  const canListen =
-    ADMIN_ROLES.has(roleKey) || roleKey.includes("admin");
+  const canListen = canViewTeamActivity(roleKey);
 
   const refreshEnablePrompt = useCallback(() => {
     if (!canListen) {

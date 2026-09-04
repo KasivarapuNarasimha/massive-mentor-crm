@@ -24,6 +24,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { canAccessPath, filterNavByModules } from "@/lib/module-permissions";
 import { NAV_HIERARCHY, findActiveSubModuleId, type NavMainKey } from "@/lib/nav-hierarchy";
 import { FeatureSearch } from "@/components/dashboard/FeatureSearch";
+import { canViewTeamActivity } from "@/lib/team-activity-access";
 import { TeamActivityToaster } from "@/components/team/TeamActivityToaster";
 
 /** Layout chrome heights — enterprise density (header ~56px) */
@@ -527,7 +528,7 @@ const ERP_PHASE2_ITEMS: Array<NavItem & { moduleKey: string }> = [
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  const { user, logout, token } = useAuth();
+  const { user, logout, token, role: authRole } = useAuth();
   const { portal, workspaceRole, setWorkspaceRole, isLoading: portalLoading } = usePortal();
   const { can, requireFeature, plan, isTrial, planStatus, licenseStatus, accessKnown, loading: planLoading } = usePlan();
   const pathname = usePathname();
@@ -653,14 +654,22 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           createdAt?: string;
           entityType?: string;
         };
-        const list: Notif[] = Array.isArray(d.notifications)
+        const rawList: Notif[] = Array.isArray(d.notifications)
           ? d.notifications
           : Array.isArray(raw.items)
             ? (raw.items as Notif[])
             : [];
+        // Hide legacy team_activity inbox rows from non-viewers (BA/CEO only).
+        // Personal types (lead_assigned, reminders, etc.) are kept for all roles.
+        const allowTeamActivity = canViewTeamActivity(
+          authRole || workspaceRole || portal?.role || user?.role
+        );
+        const list = allowTeamActivity
+          ? rawList
+          : rawList.filter((n) => n.type !== "team_activity");
         setNotifications(list);
         setUnreadCount(
-          typeof d.unreadCount === "number"
+          allowTeamActivity && typeof d.unreadCount === "number"
             ? d.unreadCount
             : list.filter((n) => !n.isRead).length
         );
@@ -674,7 +683,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       notificationRequestInFlightRef.current = false;
       setNotifLoading(false);
     }
-  }, [token]);
+  }, [token, authRole, workspaceRole, portal?.role, user?.role]);
 
   useEffect(() => {
     if (!token) return;
@@ -1061,6 +1070,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const featureSearchCanAccess = useCallback(
     (href: string) => canAccessPath(href, moduleKeys, { loaded: true }),
     [moduleKeys]
+  );
+  // Prefer auth role (same source as TeamActivityToaster / PremiumDashboard)
+  const featureSearchCanViewTeamActivity = canViewTeamActivity(
+    authRole || workspaceRole || portal?.role || user?.role
   );
 
   /** Hierarchical CRM → Sub → Feature (and ERP / Settings). Only existing permissioned routes. */
@@ -1711,6 +1724,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <FeatureSearch
                   className="mb-3"
                   canAccess={featureSearchCanAccess}
+                  canViewTeamActivity={featureSearchCanViewTeamActivity}
                   modules={moduleKeys}
                   onNavigate={() => setSidebarOpen(false)}
                 />
@@ -1720,6 +1734,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   className="mb-3 flex justify-center"
                   compact
                   canAccess={featureSearchCanAccess}
+                  canViewTeamActivity={featureSearchCanViewTeamActivity}
                   modules={moduleKeys}
                   onNavigate={() => setSidebarOpen(false)}
                 />
