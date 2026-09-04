@@ -74,13 +74,13 @@ function ChartTooltip({ tip }: { tip: NonNullable<TooltipState> }) {
         boundary: tip.boundary,
       }}
     >
-      <div className="flex items-center gap-2 mb-1.5 pb-1.5 border-b border-white/10">
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: tip.color }} />
-        <span className="text-xs font-medium text-foreground truncate">{tip.point.name}</span>
+      <div className="flex items-center gap-2 mb-1.5 pb-1.5 border-b border-border">
+        <span className="w-2 h-2 rounded-full shrink-0 border border-border" style={{ background: tip.color }} />
+        <span className="text-xs font-medium text-popover-foreground truncate">{tip.point.name}</span>
       </div>
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <span className="shrink-0 text-muted-foreground text-xs">Value</span>
-        <span className="shrink-0 tabular-nums font-semibold text-emerald-400 text-right">
+        <span className="shrink-0 tabular-nums font-semibold text-emerald-600 dark:text-emerald-400 text-right">
           {fmt(tip.point.value)}
           <span className="text-muted-foreground font-normal text-xs ml-1.5">
             ({tip.pct.toFixed(1)}%)
@@ -90,7 +90,9 @@ function ChartTooltip({ tip }: { tip: NonNullable<TooltipState> }) {
       {trend != null && (
         <div
           className={`flex items-baseline justify-between gap-3 text-[11px] mt-1.5 ${
-            trend >= 0 ? "text-emerald-400/90" : "text-red-400/90"
+            trend >= 0
+              ? "text-emerald-600 dark:text-emerald-400/90"
+              : "text-red-600 dark:text-red-400/90"
           }`}
         >
           <span className="shrink-0 text-muted-foreground">Growth</span>

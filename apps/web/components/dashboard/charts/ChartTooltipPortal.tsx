@@ -260,9 +260,10 @@ export function ChartTooltipPortal({
       style={style}
       className={[
         "pointer-events-none box-border",
-        // Solid elevated panel — reads as floating popup, not in-chart chrome
-        "rounded-2xl border border-white/15 bg-zinc-950/98 text-left",
-        "px-3.5 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.55)] ring-1 ring-white/10 backdrop-blur-md",
+        // Theme-aware elevated panel (light: white + dark text; dark: dark surface + light text)
+        "rounded-2xl border border-border bg-popover text-popover-foreground text-left",
+        "px-3.5 py-3 shadow-lg ring-1 ring-black/5 dark:ring-white/10 backdrop-blur-md",
+        "dark:shadow-[0_12px_40px_rgba(0,0,0,0.55)]",
         className,
       ]
         .filter(Boolean)

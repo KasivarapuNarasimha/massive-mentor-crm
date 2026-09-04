@@ -221,10 +221,51 @@ function buildCatalog(): FeatureCatalogEntry[] {
       subModuleLabel: "Communication",
       aliases: ["wa", "whats app"],
     },
+    // Dashboard-linked / team activity (Member Activity lives on Dashboard)
+    {
+      id: "alias-team-activity",
+      label: "Team Activity",
+      href: "/dashboard#member-activity-heading",
+      main: "crm",
+      mainLabel: "CRM",
+      subModuleId: "crm-dashboard",
+      subModuleLabel: "Dashboard",
+      aliases: ["team activity", "activity toast", "live activity", "team"],
+    },
+    {
+      id: "alias-member-activity",
+      label: "Member Activity",
+      href: "/dashboard#member-activity-heading",
+      main: "crm",
+      mainLabel: "CRM",
+      subModuleId: "crm-dashboard",
+      subModuleLabel: "Dashboard",
+      aliases: ["member activity", "team member", "team members", "team"],
+    },
+    {
+      id: "alias-lead-status",
+      label: "Lead Status",
+      href: "/dashboard/settings/custom-fields",
+      main: "settings",
+      mainLabel: "Settings",
+      subModuleId: "settings-account",
+      subModuleLabel: "Account",
+      aliases: ["status", "pipeline status", "lead statuses", "configure status"],
+    },
+    {
+      id: "alias-deal-status",
+      label: "Deal Status / Stage",
+      href: "/dashboard/settings/custom-fields",
+      main: "settings",
+      mainLabel: "Settings",
+      subModuleId: "settings-account",
+      subModuleLabel: "Account",
+      aliases: ["deal status", "deal stage", "kanban status", "stage"],
+    },
   ];
 
   for (const e of extras) {
-    const basePath = e.href.split("?")[0];
+    const basePath = e.href.split("?")[0].split("#")[0];
     entries.push({
       ...e,
       moduleKey: e.moduleKey ?? moduleKeyForPath(basePath),
@@ -233,15 +274,22 @@ function buildCatalog(): FeatureCatalogEntry[] {
 
   // Built-in aliases for primary labels
   const boost: Record<string, string[]> = {
+    "crm-dashboard": ["home", "overview", "dash"],
     "crm-leads": ["lead", "prospect"],
     "crm-deals": ["pipeline", "opportunity", "deal"],
+    "crm-clients": ["contact", "contacts", "customer"],
+    "crm-activity": ["audit", "activity log", "activity"],
+    "crm-tasks": ["task", "follow up", "follow-ups"],
+    "crm-team": ["team", "roles", "employees"],
+    "settings-team": ["team", "roles", "employees", "attendance", "payroll"],
     "crm-whatsapp": ["whatsapp", "wa"],
     "crm-ai-sales": ["ai sales", "intelligence"],
     "crm-mentor": ["mentor", "assistant", "chat"],
-    "erp-finance-hub": ["finance", "books", "accounting"],
+    "erp-finance-hub": ["finance", "books", "accounting", "invoice", "invoices"],
     "erp-products": ["product", "sku", "catalog"],
     "erp-purchases": ["purchases", "procurement"],
     "erp-sales-orders": ["sales order", "so"],
+    "settings-custom-fields": ["custom fields", "standard fields", "lead status", "field config"],
     "settings-billing": ["subscription", "plan", "razorpay"],
   };
   for (const e of entries) {
@@ -263,7 +311,7 @@ export function searchFeatures(
 
   const scored: Array<{ e: FeatureCatalogEntry; score: number }> = [];
   for (const e of FEATURE_CATALOG) {
-    if (opts?.canAccess && !opts.canAccess(e.href.split("?")[0])) continue;
+    if (opts?.canAccess && !opts.canAccess(e.href.split("?")[0].split("#")[0])) continue;
     if (opts?.modules && e.moduleKey) {
       // Soft: if modules loaded and key known, require grant OR erp/finance umbrella for erp_*
       const mods = opts.modules;

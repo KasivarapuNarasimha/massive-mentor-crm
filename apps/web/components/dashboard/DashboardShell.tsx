@@ -48,7 +48,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     href: "/dashboard",
-    label: "Overview",
+    label: "Dashboard",
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1v-5m-6 0a1 1 0 001-1v-3" />
@@ -1110,6 +1110,26 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         )}
         <div className="space-y-0.5">
           {visibleSubs.map(({ sub, features }) => {
+            // Direct one-click items (e.g. CRM → Dashboard) — no Overview accordion
+            const directHref = sub.directHref;
+            if (directHref) {
+              const directPath = directHref.split("?")[0];
+              const direct =
+                features.find((f) => f.href.split("?")[0] === directPath) || features[0];
+              if (!direct) return null;
+              const item: NavItem = {
+                ...direct,
+                label: sub.label || direct.label,
+                href: directHref,
+                key: sub.id,
+              };
+              return (
+                <div key={sub.id} className="space-y-0.5">
+                  {renderNavLink(item)}
+                </div>
+              );
+            }
+
             const expanded = isSubExpanded(sub.id);
             // Collapsed rail: show feature icons flat (no accordion chrome)
             if (sidebarCollapsed) {

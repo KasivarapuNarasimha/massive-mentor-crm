@@ -17,6 +17,11 @@ export type NavSubModuleDef = {
   id: string;
   label: string;
   features: NavFeatureDef[];
+  /**
+   * When set, render as a one-click sidebar link (no accordion).
+   * `features` still feed Feature Search / catalog.
+   */
+  directHref?: string;
 };
 
 export type NavMainModuleDef = {
@@ -31,8 +36,10 @@ export const NAV_HIERARCHY: NavMainModuleDef[] = [
     label: "CRM",
     subModules: [
       {
-        id: "crm-overview",
-        label: "Overview",
+        id: "crm-dashboard",
+        label: "Dashboard",
+        /** One click → /dashboard (no Overview wrapper) */
+        directHref: "/dashboard",
         features: [{ id: "crm-dashboard", label: "Dashboard", href: "/dashboard" }],
       },
       {
@@ -190,7 +197,16 @@ export function findActiveSubModuleId(pathname: string): string | null {
         if (path === href || (href !== "/dashboard" && path.startsWith(href + "/"))) {
           if (!best || href.length > best.len) best = { id: sub.id, len: href.length };
         }
-        // Exact /dashboard only for overview
+        // Exact /dashboard only for CRM Dashboard direct link
+        if (href === "/dashboard" && (path === "/dashboard" || path === "/dashboard/")) {
+          if (!best || href.length >= (best?.len || 0)) best = { id: sub.id, len: href.length };
+        }
+      }
+      if (sub.directHref) {
+        const href = sub.directHref.split("?")[0];
+        if (path === href || (href !== "/dashboard" && path.startsWith(href + "/"))) {
+          if (!best || href.length > best.len) best = { id: sub.id, len: href.length };
+        }
         if (href === "/dashboard" && (path === "/dashboard" || path === "/dashboard/")) {
           if (!best || href.length >= (best?.len || 0)) best = { id: sub.id, len: href.length };
         }

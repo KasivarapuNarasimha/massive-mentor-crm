@@ -17,6 +17,8 @@ import {
   pipelineStatusLabel,
 } from "@/lib/pipeline-statuses";
 import { ActivityHistoryPanel } from "@/components/activity/ActivityHistoryPanel";
+import { FeatureSearch } from "@/components/dashboard/FeatureSearch";
+import { canAccessPath } from "@/lib/module-permissions";
 
 const AnalyticsDashboard = lazy(() =>
   import("@/components/dashboard/AnalyticsDashboard").then((m) => ({
@@ -260,6 +262,14 @@ export function PremiumDashboard() {
   const dataVersion = useDataVersion();
   const { portal } = usePortal();
   const { plan, isTrial, tier, accessKnown } = usePlan();
+  const moduleKeys = useMemo(
+    () => (Array.isArray(portal?.modules) ? portal.modules : null),
+    [portal?.modules]
+  );
+  const featureSearchCanAccess = useCallback(
+    (href: string) => canAccessPath(href, moduleKeys, { loaded: moduleKeys !== null }),
+    [moduleKeys]
+  );
   const [isDemoMode, setIsDemoMode] = useState(false);
   useEffect(() => {
     try {
@@ -267,6 +277,17 @@ export function PremiumDashboard() {
     } catch {
       setIsDemoMode(false);
     }
+  }, []);
+
+  // Honor deep-links like /dashboard#member-activity-heading from Feature Search
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash?.replace(/^#/, "");
+    if (!hash) return;
+    const t = window.setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 400);
+    return () => window.clearTimeout(t);
   }, []);
 
   const [loading, setLoading] = useState(true);
@@ -737,6 +758,20 @@ export function PremiumDashboard() {
               </span>
               <span className="mm-dash-hero-chip tabular-nums">{todayDateLabel}</span>
             </div>
+          </div>
+
+          {/* Global CRM feature search — same catalog as sidebar */}
+          <div className="mt-5 sm:mt-6 max-w-2xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+              Search CRM
+            </p>
+            <FeatureSearch
+              size="lg"
+              placeholder="Search CRM features, pages, actions…"
+              canAccess={featureSearchCanAccess}
+              modules={moduleKeys}
+              className="w-full"
+            />
           </div>
 
           {/* AI Executive Summary */}

@@ -92,7 +92,7 @@ function tipFromEvent(
 function MetricRow({
   label,
   value,
-  valueClass = "text-foreground",
+  valueClass = "text-popover-foreground",
 }: {
   label: string;
   value: string;
@@ -144,7 +144,7 @@ function ChartTooltip({
           className="h-2.5 w-2.5 rounded-sm shrink-0 border border-border"
           style={{ background: tip.color }}
         />
-        <span className="text-xs font-semibold text-foreground truncate tracking-tight">
+        <span className="text-xs font-semibold text-popover-foreground truncate tracking-tight">
           {tip.point.name}
         </span>
       </div>
@@ -152,16 +152,17 @@ function ChartTooltip({
         <MetricRow
           label="Count"
           value={fmtNum(tip.point.count ?? tip.point.value)}
+          valueClass="text-popover-foreground"
         />
         <MetricRow
           label="Share"
           value={`${tip.pct.toFixed(1)}%`}
-          valueClass="text-foreground"
+          valueClass="text-popover-foreground"
         />
         <MetricRow
           label="Revenue"
           value={fmtMoney(tip.point.revenue ?? 0, currency)}
-          valueClass="text-foreground"
+          valueClass="text-popover-foreground"
         />
         <MetricRow label="Growth" value={growthText} valueClass={growthClass} />
       </div>

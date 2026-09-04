@@ -13,6 +13,9 @@ type FeatureSearchProps = {
   onNavigate?: () => void;
   /** Compact mode for collapsed sidebar — icon only until opened */
   compact?: boolean;
+  /** Larger Dashboard hero search */
+  size?: "default" | "lg";
+  placeholder?: string;
   className?: string;
 };
 
@@ -21,6 +24,8 @@ export function FeatureSearch({
   modules = null,
   onNavigate,
   compact = false,
+  size = "default",
+  placeholder = "Search features…",
   className = "",
 }: FeatureSearchProps) {
   const router = useRouter();
@@ -158,9 +163,13 @@ export function FeatureSearch({
               if (hit) go(hit);
             }
           }}
-          placeholder="Search features…"
+          placeholder={placeholder}
           autoComplete="off"
-          className="w-full h-9 pl-8 pr-12 rounded-md bg-white dark:bg-card border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus-ring"
+          className={`w-full pl-8 pr-12 rounded-md bg-white dark:bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus-ring ${
+            size === "lg"
+              ? "h-11 sm:h-12 text-sm sm:text-[0.9375rem]"
+              : "h-9 text-xs"
+          }`}
           aria-autocomplete="list"
           aria-controls="mm-feature-search-results"
           aria-expanded={showPanel}
@@ -174,7 +183,9 @@ export function FeatureSearch({
         <div
           id="mm-feature-search-results"
           role="listbox"
-          className="absolute z-50 left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-md border border-border bg-card shadow-md py-1"
+          className={`absolute z-50 left-0 right-0 mt-1 overflow-y-auto rounded-md border border-border bg-card shadow-md py-1 ${
+            size === "lg" ? "max-h-80" : "max-h-72"
+          }`}
         >
           {results.length === 0 ? (
             <div className="px-3 py-3 text-xs text-muted-foreground">No matching features</div>
