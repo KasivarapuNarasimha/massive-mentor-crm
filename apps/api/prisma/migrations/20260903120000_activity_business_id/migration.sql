@@ -1,4 +1,4 @@
-﻿-- AlterTable
+-- AlterTable
 ALTER TABLE "Activity" ADD COLUMN IF NOT EXISTS "businessId" TEXT;
 
 -- CreateIndex
