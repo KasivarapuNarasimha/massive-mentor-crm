@@ -9,13 +9,13 @@ if(url.hostname!=="127.0.0.1"||url.username!=="mm_phasec"||url.password!=="phase
 const db=new PrismaClient({datasources:{db:{url:url.toString()}},log:[]});const emails=[];
 process.env.COMMERCIAL_DELIVERY_KEY=Buffer.alloc(32,11).toString("base64");process.env.COMMERCIAL_PUBLIC_URL="https://synthetic.example.invalid";
 const never=()=>{throw Error("LEGACY_REPAIR_PATH_FORBIDDEN")};
-let auditFail=false;
-const adapter=new Proxy(db,{get(target,key){if(key==="$transaction")return (fn,options)=>target.$transaction(tx=>fn(new Proxy(tx,{get(t,k){if(k==="auditLog"&&auditFail)return {create:async()=>{throw Error("SYNTHETIC_CRITICAL_AUDIT_FAILURE")}};const v=t[k];return typeof v==="function"?v.bind(t):v;}})),options);const v=target[key];return typeof v==="function"?v.bind(target):v;}});
+let auditFail=false,otpCounter=100000;
+const adapter=new Proxy(db,{get(target,key){if(key==="$transaction")return (fn,options)=>target.$transaction(tx=>fn(new Proxy(tx,{get(t,k){if(k==="auditLog"&&auditFail)return {create:async(args)=>{if(auditFail===true||auditFail===args.data.action)throw Error("SYNTHETIC_CRITICAL_AUDIT_FAILURE");return t.auditLog.create(args)}};const v=t[k];return typeof v==="function"?v.bind(t):v;}})),options);const v=target[key];return typeof v==="function"?v.bind(target):v;}});
 const baseLoad=loadWith({"../lib/prisma.js":{prisma:adapter},"./field-engine.service.js":{getUserBusinessId:never}});
-const delivery=baseLoad("services/commercial-delivery.service.ts"),load=loadWith({"../lib/prisma.js":{prisma:adapter},"./field-engine.service.js":{getUserBusinessId:never},"./commercial-delivery.service.js":{...delivery,sendCommercialEmail:async p=>{emails.push(p)}},"../services/auth.service.js":{verifyToken:token=>jwt.verify(token,"synthetic-jwt-signature-only-32-characters"),getUserById:userId=>db.user.findUnique({where:{id:userId}})}});
+const delivery=baseLoad("services/commercial-delivery.service.ts"),load=loadWith({"../lib/prisma.js":{prisma:adapter},"./field-engine.service.js":{getUserBusinessId:never},"./commercial-delivery.service.js":{...delivery,newOtp:()=>String(++otpCounter),sendCommercialEmail:async p=>{emails.push(p)}},"../services/auth.service.js":{verifyToken:token=>jwt.verify(token,"synthetic-jwt-signature-only-32-characters"),getUserById:userId=>db.user.findUnique({where:{id:userId}})}});
 const quotes=load("services/quotation.service.ts"),customer=load("services/quotation-customer.service.ts"),finance=load("services/commercial-finance.service.ts");
 const owner={userId:"phasec-owner",businessId:"phasec-A"},manager={userId:"phasec-manager",businessId:"phasec-A"},accountant={userId:"phasec-finance",businessId:"phasec-A"};
-const actions=["quotation.read","quotation.create","quotation.update","quotation.send","quotation.approve","invoice.read","invoice.issue","payment.read","payment.record","payment.reverse"];
+const actions=["quotation.read","quotation.create","quotation.update","quotation.send","quotation.approve","invoice.read","invoice.issue","payment.read","payment.record","payment.reverse","commercial.policy.manage"];
 const config={version:"v1",currency:{code:"INR",decimalPlaces:2},timezone:"Asia/Kolkata",approval:{mode:"enabled",percentageThreshold:"10"},zeroSubtotal:"require_approval"};
 const deliveryConfig={version:"v1",linkMinutes:60,otpMinutes:5,maxAttempts:3,maxResends:3,resendSeconds:30,invoiceDueDays:30,invoiceIssuerUserId:accountant.userId};
 let server,origin,legacyCalls=0;
@@ -26,17 +26,26 @@ async function send(q){const result=await customer.sendQuotation(owner,q.quotati
 async function otp(token,action="accepted"){await customer.requestCustomerOtp(token,{action});return emails.at(-1).text.match(/ is (\d{6})\./)[1];}
 async function accepted(){const q=await create(),token=await send(q),code=await otp(token);const result=await customer.verifyCustomerDecision(token,{action:"accepted",code});return {q,token,code,...result};}
 before(async()=>{
+ let stage="identity";try{
  const [identity]=await db.$queryRaw`SELECT current_database() AS db,current_user AS actor,current_setting('server_version_num')::int/10000 AS version,shobj_description(oid,'pg_database') AS marker FROM pg_database WHERE datname=current_database()`;
+ console.log("MM_IDENTITY_TYPES:"+typeof identity.version+":"+String(identity.marker===`MM_PHASEC_DISPOSABLE:${run}:${attempt}`));
  assert.deepEqual(identity,{db:expectedDb,actor:"mm_phasec",version:17,marker:`MM_PHASEC_DISPOSABLE:${run}:${attempt}`});
+ stage="users";
  for(const [userId,role] of [[owner.userId,"owner"],[manager.userId,"sales_manager"],[accountant.userId,"finance"],["phasec-foreign","owner"],["phasec-disabled","owner"]])await db.user.create({data:{id:userId,email:userId+"@example.invalid",passwordHash:"synthetic-not-login",role,isDisabled:userId==="phasec-disabled"}});
+ stage="businesses";
  for(const biz of ["phasec-A","phasec-B"])await db.business.create({data:{id:biz,name:"Synthetic "+biz,ownerUserId:owner.userId,isTrial:true,plan:"trial",planStatus:"trial",licenseStatus:"trial",trialStartDate:new Date(Date.now()-86400000),trialEndsAt:new Date(Date.now()+86400000*30),settings:{commercial:config,commercialDelivery:deliveryConfig,moduleAccess:{customized:true,enabled:["quotations","finance"]}}}});
+ stage="memberships";
  for(const [userId,role,businessId] of [[owner.userId,"owner","phasec-A"],[manager.userId,"sales_manager","phasec-A"],[accountant.userId,"finance","phasec-A"],["phasec-foreign","owner","phasec-B"],["phasec-disabled","owner","phasec-A"]])await db.businessMember.create({data:{userId,businessId,role,permissions:{customized:true,modules:["quotations","finance"],commercialActions:actions}}});
+ stage="team";
  await db.team.create({data:{id:"phasec-team",name:"Synthetic team",ownerId:manager.userId}});
  await db.teamMember.createMany({data:[{teamId:"phasec-team",userId:manager.userId,role:"manager"},{teamId:"phasec-team",userId:owner.userId,role:"sales_executive"}]});
+ stage="contacts";
  await db.contact.create({data:{id:"phasec-contact-A",businessId:owner.businessId,userId:owner.userId,name:"Synthetic customer",email:"synthetic@example.invalid",tags:[]}});
  await db.contact.create({data:{id:"phasec-contact-B",businessId:"phasec-B",userId:owner.userId,name:"Foreign synthetic",tags:[]}});
+ stage="http";
  const app=express();app.use(express.json({limit:"64kb"}));app.use("/api/quotations",load("routes/quotation.routes.ts").quotationRouter);app.use("/api/commercial",load("routes/commercial-finance.routes.ts").commercialFinanceRouter);app.use("/api/quotation-customer",load("routes/quotation-customer.routes.ts").quotationCustomerRouter);app.use((_r,res)=>{legacyCalls++;res.status(500).end()});
  server=app.listen(0,"127.0.0.1");await new Promise(r=>server.once("listening",r));origin="http://127.0.0.1:"+server.address().port;
+}catch(error){console.log("MM_SETUP_FAILURE:"+stage+":"+error.name+":"+String(error.code||"none"));const detail=String(error.message).match(/Argument `([A-Za-z]+)` is missing|Unknown argument `([A-Za-z]+)`/);if(detail)console.log("MM_SAFE_FIELD:"+(detail[1]||detail[2]));throw error;}
 });
 after(async()=>{if(server)await new Promise(r=>server.close(r));await db.$disconnect();});
 test("real PostgreSQL draft snapshots are complete/sealed and replay exactly once",async()=>{const i=input(),k=key(),a=await quotes.createQuotation(owner,k,i),b=await quotes.createQuotation(owner,k,i);assert.equal(a.quotationId,b.quotationId);assert.equal(await db.quotationRevisionItem.count({where:{snapshotId:a.snapshotId}}),1);await assert.rejects(quotes.createQuotation(owner,k,{...i,notes:"changed"}),/IDEMPOTENCY_KEY_CONFLICT/);});
@@ -69,4 +78,41 @@ for(const sealFirst of [false,true])test(`independent insertion cannot see uncom
  await creator;
  assert.equal(await db.quotationRevisionItem.count({where:{snapshotId:sid}}),1);
  await assert.rejects(db.quotationRevisionItem.create({data:{businessId:owner.businessId,snapshotId:sid,position:"1",description:"Post-commit synthetic",quantity:"1",unitPrice:"1",taxRate:"0",discountInput:{},calculation:{}}}),/COMMERCIAL_SNAPSHOT_SEALED/);
+});
+
+test("OTP expiry, resend throttle and stale code rejection",async()=>{
+ const q=await create(),token=await send(q),code=await otp(token);const a=await db.quotationCustomerAccess.findUnique({where:{tokenHash:delivery.tokenHash(token)}});
+ await assert.rejects(customer.requestCustomerOtp(token,{action:"accepted"}),/OTP_RESEND_LIMIT/);
+ await db.quotationOtpChallenge.update({where:{accessId:a.id},data:{lastSentAt:new Date(Date.now()-31000)}});const next=await otp(token);assert.notEqual(next,code);
+ await assert.rejects(customer.verifyCustomerDecision(token,{action:"accepted",code}),/OTP_INVALID/);
+ await db.quotationOtpChallenge.update({where:{accessId:a.id},data:{expiresAt:new Date(Date.now()-1000)}});await assert.rejects(customer.verifyCustomerDecision(token,{action:"accepted",code:next}),/OTP_UNAVAILABLE/);
+});
+test("attempt exhaustion persists and customer cannot change decision",async()=>{
+ const q=await create(),token=await send(q),code=await otp(token);const wrong=code==="000000"?"000001":"000000";
+ for(let i=0;i<3;i++)await assert.rejects(customer.verifyCustomerDecision(token,{action:"accepted",code:wrong}),/OTP_INVALID/);
+ await assert.rejects(customer.verifyCustomerDecision(token,{action:"accepted",code}),/OTP_UNAVAILABLE/);
+});
+test("critical acceptance audit failure rolls back invoice, consumption and challenge use",async()=>{
+ const q=await create(),token=await send(q),code=await otp(token),before=await db.invoice.count();auditFail="quotation.customer.accepted";
+ try{await assert.rejects(customer.verifyCustomerDecision(token,{action:"accepted",code}),/SYNTHETIC_CRITICAL_AUDIT_FAILURE/);}finally{auditFail=false;}
+ assert.equal(await db.invoice.count(),before);const a=await db.quotationCustomerAccess.findUnique({where:{tokenHash:delivery.tokenHash(token)}});assert.equal(a.consumedAt,null);assert.equal((await db.quotationOtpChallenge.findUnique({where:{accessId:a.id}})).usedAt,null);
+ const retry=await customer.verifyCustomerDecision(token,{action:"accepted",code});assert(retry.invoiceId);
+});
+test("foreign business cannot read or pay another tenant invoice",async()=>{
+ const a=await accepted(),foreign={userId:"phasec-foreign",businessId:"phasec-B"};await assert.rejects(finance.getCommercialInvoice(foreign,a.invoiceId),/COMMERCIAL_INVOICE_NOT_FOUND/);
+ await assert.rejects(finance.recordCommercialPayment(foreign,a.invoiceId,key(),{amount:"1",method:"cash",reference:null,notes:"synthetic",paidAt:new Date().toISOString()}),/COMMERCIAL_INVOICE_NOT_FOUND/);assert.equal(await db.payment.count({where:{invoiceId:a.invoiceId}}),0);
+});
+test("concurrent draft updates reject stale versions and retain original snapshot",async()=>{
+ const q=await create(),payload={...input(),expectedVersion:q.version,expectedRevisionVersion:q.revisionVersion};const results=await Promise.allSettled([quotes.editQuotationDraft(owner,q.quotationId,key(),{...payload,notes:"one"}),quotes.editQuotationDraft(owner,q.quotationId,key(),{...payload,notes:"two"})]);assert.equal(results.filter(r=>r.status==="fulfilled").length,1);for(const r of results)if(r.status==="rejected")assert.match(r.reason.message,/COMMERCIAL_TRANSACTION_CONFLICT|QUOTATION_VERSION_CONFLICT|DRAFT_VERSION_CONFLICT/);assert(await db.quotationPricingSnapshot.findUnique({where:{id:q.snapshotId}}));
+});
+test("billing denies locked business without resolver repairs or writes",async()=>{
+ const count=await db.quotation.count();await db.business.update({where:{id:owner.businessId},data:{isLocked:true}});
+ try{await assert.rejects(create(),/COMMERCIAL_BILLING_DENIED/);}finally{await db.business.update({where:{id:owner.businessId},data:{isLocked:false}});}assert.equal(await db.quotation.count(),count);
+});
+test("revoked explicit grant denies mutation; policy changes stale drafts but retain sent snapshots",async()=>{
+ const member=await db.businessMember.findUnique({where:{businessId_userId:{businessId:owner.businessId,userId:owner.userId}}});await db.businessMember.update({where:{id:member.id},data:{permissions:{...member.permissions,commercialActions:[]}}});
+ try{await assert.rejects(create(),/grant|Commercial|permission|Explicit/i);}finally{await db.businessMember.update({where:{id:member.id},data:{permissions:member.permissions}});}
+ const draft=await create("20"),sent=await create(),token=await send(sent),configuration=load("services/commercial-configuration.service.ts");
+ const changed=await configuration.setCommercialConfiguration(owner,key(),{expectedPolicyVersion:"v1",commercial:{...config,version:"v2"},commercialDelivery:deliveryConfig,reason:"Synthetic policy change"});assert.equal(changed.policyVersion,"v2");assert.equal((await db.quotationRevision.findUnique({where:{id:draft.revisionId}})).approvalState,"stale");assert.equal((await customer.viewCustomerQuotation(token)).pricing.grandTotal,"118.00");
+ await configuration.setCommercialConfiguration(owner,key(),{expectedPolicyVersion:"v2",commercial:{...config,version:"v3"},commercialDelivery:deliveryConfig,reason:"Synthetic next policy"});
 });
