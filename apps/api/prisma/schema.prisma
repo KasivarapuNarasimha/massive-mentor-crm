@@ -2559,3 +2559,143 @@ model SalesOrderItem {
   @@index([salesOrderId])
   @@index([businessId, productId])
 }
+
+// Phase C commercial foundation; SQL migration adds lifecycle/sealing invariants.
+// CRM/business/user IDs deliberately have no deletion-blocking legacy relations.
+model QuotationSequence {
+  businessId String
+  year Int
+  lastValue Int @default(0)
+  @@id([businessId, year], map: "pc_quotationsequence_pk")
+}
+
+model Quotation {
+  id String @id(map: "pc_quotation_pk") @default(cuid())
+  businessId String
+  number String
+  creatorUserId String
+  ownerUserId String
+  version Int @default(1)
+  currentDraftRevisionId String?
+  effectiveSentRevisionId String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  revisions QuotationRevision[] @relation("QuoteRevisions")
+  currentDraft QuotationRevision? @relation("CurrentDraft", fields: [businessId, id, currentDraftRevisionId], references: [businessId, quotationId, id], onDelete: NoAction, onUpdate: NoAction, map: "pc_quotation_f1")
+  effectiveSent QuotationRevision? @relation("EffectiveSent", fields: [businessId, id, effectiveSentRevisionId], references: [businessId, quotationId, id], onDelete: NoAction, onUpdate: NoAction, map: "pc_quotation_f2")
+  @@unique([businessId, id], map: "pc_quotation_u1")
+  @@unique([businessId, number], map: "pc_quotation_u2")
+  @@index([businessId, ownerUserId, createdAt], map: "pc_quotation_i1")
+}
+
+model QuotationRevision {
+  id String @id(map: "pc_quotationrevision_pk") @default(cuid())
+  businessId String
+  quotationId String
+  revisionNumber Int
+  version Int @default(1)
+  // SQL requires sent => sentAt, draft => no sentAt; historical terminal states
+  // may retain sentAt. SQL freezes every non-draft revision's content.
+  state String @default("draft")
+  approvalState String @default("unassessed")
+  contactId String
+  dealId String?
+  timezone String
+  currency String
+  issueDate DateTime @db.Timestamptz(3)
+  validUntil DateTime @db.Timestamptz(3)
+  terms String @db.Text
+  notes String @db.Text
+  currentSnapshotId String?
+  sentAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  quotation Quotation @relation("QuoteRevisions", fields: [businessId, quotationId], references: [businessId, id], onDelete: Restrict, onUpdate: Restrict, map: "pc_quotationrevision_f1")
+  draftPointers Quotation[] @relation("CurrentDraft")
+  sentPointers Quotation[] @relation("EffectiveSent")
+  snapshots QuotationPricingSnapshot[] @relation("RevisionSnapshots")
+  currentSnapshot QuotationPricingSnapshot? @relation("CurrentSnapshot", fields: [businessId, id, currentSnapshotId], references: [businessId, revisionId, id], onDelete: NoAction, onUpdate: NoAction, map: "pc_quotationrevision_f2")
+  @@unique([businessId, quotationId, id], map: "pc_quotationrevision_u1")
+  @@unique([businessId, id], map: "pc_quotationrevision_u2")
+  @@unique([businessId, quotationId, revisionNumber], map: "pc_quotationrevision_u3")
+  @@index([businessId, contactId], map: "pc_quotationrevision_i1")
+}
+
+model QuotationPricingSnapshot {
+  id String @id(map: "pc_quotationpricingsnapshot_pk") @default(cuid())
+  businessId String
+  revisionId String
+  revisionVersion Int
+  pricingVersion String
+  policyVersion String
+  policySnapshot Json
+  customerSnapshot Json
+  canonicalInput Json
+  pricingOutput Json
+  contentHash String
+  hashVersion String
+  expectedItemCount Int
+  sealedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  revision QuotationRevision @relation("RevisionSnapshots", fields: [businessId, revisionId], references: [businessId, id], onDelete: Restrict, onUpdate: Restrict, map: "pc_quotationpricingsnapshot_f1")
+  currentPointers QuotationRevision[] @relation("CurrentSnapshot")
+  items QuotationRevisionItem[]
+  approvals QuotationApprovalHistory[]
+  events QuotationEvent[]
+  @@unique([businessId, revisionId, id], map: "pc_quotationpricingsnapshot_u1")
+  @@unique([businessId, id], map: "pc_quotationpricingsnapshot_u2")
+  @@unique([businessId, revisionId, revisionVersion], map: "pc_quotationpricingsnapshot_u3")
+}
+
+model QuotationRevisionItem {
+  // Phase C items are free text. Product selection/linkage is intentionally deferred.
+  id String @id(map: "pc_quotationrevisionitem_pk") @default(cuid())
+  businessId String
+  snapshotId String
+  position String @db.VarChar(32)
+  description String @db.Text
+  quantity Decimal @db.Decimal(18,4)
+  unitPrice Decimal @db.Decimal(18,2)
+  taxRate Decimal @db.Decimal(8,4)
+  discountInput Json
+  calculation Json
+  snapshot QuotationPricingSnapshot @relation(fields: [businessId, snapshotId], references: [businessId, id], onDelete: Restrict, onUpdate: Restrict, map: "pc_quotationrevisionitem_f1")
+  @@unique([businessId, snapshotId, position], map: "pc_quotationrevisionitem_u1")
+}
+
+model QuotationApprovalHistory {
+  id String @id(map: "pc_quotationapprovalhistory_pk") @default(cuid())
+  businessId String
+  snapshotId String
+  actorUserId String
+  event String
+  reason String @db.Text
+  metadata Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  snapshot QuotationPricingSnapshot @relation(fields: [businessId, snapshotId], references: [businessId, id], onDelete: Restrict, onUpdate: Restrict, map: "pc_quotationapprovalhistory_f1")
+  @@index([businessId, snapshotId, createdAt], map: "pc_quotationapprovalhistory_i1")
+}
+
+model QuotationEvent {
+  id String @id(map: "pc_quotationevent_pk") @default(cuid())
+  businessId String
+  snapshotId String
+  actorUserId String
+  event String
+  metadata Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  snapshot QuotationPricingSnapshot @relation(fields: [businessId, snapshotId], references: [businessId, id], onDelete: Restrict, onUpdate: Restrict, map: "pc_quotationevent_f1")
+  @@index([businessId, snapshotId, createdAt], map: "pc_quotationevent_i1")
+}
+
+model CommercialMutationRequest {
+  id String @id(map: "pc_commercialmutationrequest_pk") @default(cuid())
+  businessId String
+  actorUserId String
+  operation String
+  key String @db.VarChar(128)
+  requestHash String
+  result Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([businessId, actorUserId, operation, key], map: "pc_commercialmutationrequest_u1")
+}
