@@ -340,3 +340,11 @@ export {
   TEAM_SCOPED_ROLES,
   BUSINESS_WIDE_ROLES,
 };
+
+/** Validated commercial/request context; type only, no resolver behavior change. */
+export type LeadWriteContext = {
+  userId: string;
+  businessId: string;
+  role: string;
+  permissions: unknown;
+};

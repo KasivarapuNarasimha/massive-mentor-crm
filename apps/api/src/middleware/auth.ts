@@ -2,6 +2,7 @@ import { Response, NextFunction } from "express";
 import { Request } from "express";
 import { verifyToken, getUserById, type PortalAudience } from "../services/auth.service.js";
 import type { TenantContext } from "../types/tenant.js";
+import type { LeadWriteContext } from "../services/tenant-scope.service.js";
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -12,6 +13,8 @@ export interface AuthenticatedRequest extends Request {
   };
   /** Populated when requireTenant runs (Phase 1+) */
   tenant?: TenantContext;
+  /** Server-validated, pinned context for protected CRM/lead requests. */
+  strictBusinessContext?: Readonly<LeadWriteContext>;
   /** JWT portal audience — customer | admin | demo */
   portal?: PortalAudience;
   supportMode?: boolean;

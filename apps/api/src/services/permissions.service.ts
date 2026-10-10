@@ -3,6 +3,7 @@
  * Super Admin assigns modules per BusinessMember; portals/menus/API enforce them.
  */
 import { prisma } from "../lib/prisma.js";
+import { Prisma } from "@prisma/client";
 import { getUserBusinessId } from "./field-engine.service.js";
 
 export type MemberPermissionsJson = {
@@ -591,11 +592,16 @@ export async function setMemberModules(input: {
   const modules = Array.from(
     new Set([
       ...input.modules.filter((k) => validKeys.has(k)),
+      // Dedicated commercial modules are administered only by the strict service.
+      ...(Array.isArray((member.permissions as { modules?: unknown } | null)?.modules) &&
+          ((member.permissions as { modules: unknown[] }).modules).includes("quotations") ? ["quotations"] : []),
       ...alwaysOnModules(),
     ])
   );
 
   const permissions: MemberPermissionsJson = {
+    ...(member.permissions && typeof member.permissions === "object" && !Array.isArray(member.permissions)
+      ? member.permissions : {}),
     modules,
     template: input.template || input.role || member.role,
     customized: input.customized !== false,
@@ -604,18 +610,27 @@ export async function setMemberModules(input: {
   const data: { permissions: object; role?: string } = {
     permissions: permissions as object,
   };
+  if (input.role) data.role = input.role;
+
+  const updated = await prisma.businessMember.update({
+    where: {
+      id: member.id,
+      updatedAt: member.updatedAt,
+      // Preserve grants without overwriting a competing same-millisecond update.
+      ...(member.permissions === null
+        ? { OR: [{ permissions: { equals: Prisma.DbNull } }, { permissions: { equals: Prisma.JsonNull } }] }
+        : { permissions: { equals: member.permissions as Prisma.InputJsonValue } }),
+    },
+    data,
+  });
+
+  // A stale permission edit must fail before legacy global-role synchronization.
   if (input.role) {
-    data.role = input.role;
     await prisma.user.update({
       where: { id: input.userId },
       data: { role: input.role },
     }).catch(() => undefined);
   }
-
-  const updated = await prisma.businessMember.update({
-    where: { id: member.id },
-    data,
-  });
 
   const { recordAudit } = await import("./audit.service.js");
   await recordAudit({
