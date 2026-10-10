@@ -77,7 +77,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: dca057d3184fa301c9d59ff5fcafe9a6fdba5428
+          ref: 8800fe8151f483727b4758851aa7ff0b6f47b318
           persist-credentials: false
           fetch-depth: 1
       - name: Verify source, hashes and environment-file exclusion
@@ -85,14 +85,14 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test "$(git rev-parse HEAD)" = dca057d3184fa301c9d59ff5fcafe9a6fdba5428
+          test "$(git rev-parse HEAD)" = 8800fe8151f483727b4758851aa7ff0b6f47b318
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
           0e8bdbe3bccf1aeedf411681ab7b1c639a52d7a3eceef2f533daa122e6af2bfc  apps/api/prisma/schema.prisma
           1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
           31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
           dd800fca8acdb7a71884963e1c36f5a9c1401480c9339d884e18f201f67d0f09  apps/api/scripts/commercial-application-run.sh
-          a4fc58b91d9fb6072307319cfb20d363263f56592039f00b730024efefbe2070  apps/api/scripts/commercial-workflow-postgres.test.cjs
+          cdb69088e5c7f17f21857dfcd5aa1e9391837e02ef4d5bb8677cfd7d560fb780  apps/api/scripts/commercial-workflow-postgres.test.cjs
           5cd7515bf66601f18a4ad886a1075aa95d8b3e0eb87e08fb140c068b1986bd98  apps/api/scripts/commercial-test-loader.cjs
           5c29b9659b56669ddf34b969e04dfac40f9c6d439e5ab452537974f1e5d4b4e2  apps/api/src/services/quotation.service.ts
           dcd2a626a51fc1eaba27299931977e25b70f5dc60c44fa5c9e673e24e035e27a  apps/api/src/services/quotation-customer.service.ts
@@ -101,6 +101,12 @@ jobs:
           6aadd750df584bb4086cecad9845b315b8369133cfcd1a80a3945f54e830a68a  apps/api/src/services/commercial-configuration.service.ts
           e5e26ea14e64ae8097845658c1f06c9de204b3b5fcee8906c51312d80cac4aa2  docs/phase-c-review/validation/concurrency.py
           4bf59fa3f3bd38b35696519894479217318b1e3e3e31fec8cc4d48d115ae87e3  pnpm-lock.yaml
+          db5ffb35ad255b046fe5dc21e7a291311f9e0090930b1365f3067651b7f3d6aa  apps/api/src/index.ts
+          f3e6a480eb22cd084ab9d294d15315daf6307a6b23db2cbb8cece140d46b5908  apps/api/src/routes/commercial.routes.ts
+          9cc4bf0fa1966a6ca457d2b2465f5a6868056e3152c39f17e8434dd602e6b2e0  apps/api/src/routes/quotation.routes.ts
+          fdecc06892ac9e45a4dfeaa9311cc048b80f912836d2218aa38b5487b28d30e6  apps/api/src/routes/quotation-customer.routes.ts
+          2c0d661c615b1d29d2fe9f15fc5ea8d1c95bfd0d217f6450dfba084f69b0a7ce  apps/api/src/routes/commercial-finance.routes.ts
+          425da14dec85ff48b0fefbd067da354a45f4a280dc38e5373f23403c1c1a112d  apps/web/app/commercial/page.tsx
           HASHES
           python3 - <<'PY'
           import pathlib,subprocess
