@@ -73,7 +73,10 @@ export async function transaction<T>(run:(tx:Tx)=>Promise<T>):Promise<T> {
   // No retry of a partially committed operation. Prisma aborts the entire transaction.
   try {return await prisma.$transaction(run,{isolationLevel:Prisma.TransactionIsolationLevel.Serializable,maxWait:5000,timeout:15000});}
   catch(e) {
-    if(e instanceof Prisma.PrismaClientKnownRequestError && ["P2034","P2002"].includes(e.code)) throw new CommercialDocumentError("COMMERCIAL_TRANSACTION_CONFLICT",409);
+    if(e instanceof Prisma.PrismaClientKnownRequestError &&
+      (["P2034","P2002"].includes(e.code) || (e.code==="P2010" && ["40001","40P01"].includes(String(e.meta?.code))))) {
+      throw new CommercialDocumentError("COMMERCIAL_TRANSACTION_CONFLICT",409);
+    }
     throw e;
   }
 }

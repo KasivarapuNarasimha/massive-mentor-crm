@@ -198,3 +198,13 @@ test("approval rejects revision content drift despite valid snapshot hash",async
   const f=await discountedFixture();f.state().revisions[0].terms="tampered";
   await assert.rejects(f.service.requestQuotationApproval({userId:"ownerA",businessId:"A"},"q1","submit",approvalInput(1)),/COMMERCIAL_REVISION_SNAPSHOT_MISMATCH/);assert.equal(f.state().approvals.length,0);
 });
+
+for(const state of ["40001","40P01"])test("raw PostgreSQL conflict "+state+" fails closed after transaction rollback",async()=>{
+ const original=new Prisma.PrismaClientKnownRequestError("Synthetic raw lock conflict",{code:"P2010",clientVersion:"6.19.3",meta:{code:state}});
+ let calls=0;const service=loader({"../lib/prisma.js":{prisma:{$transaction:async()=>{calls++;throw original}}},"./commercial-access.service.js":{},"./commercial-billing-access.service.js":{}})("services/quotation.service.ts");
+ await assert.rejects(service.transaction(async()=>null),error=>error.code==="COMMERCIAL_TRANSACTION_CONFLICT"&&error.status===409);assert.equal(calls,1);
+});
+test("unrelated raw SQL errors are not disguised as concurrency conflicts",async()=>{
+ const original=new Prisma.PrismaClientKnownRequestError("Synthetic constraint error",{code:"P2010",clientVersion:"6.19.3",meta:{code:"23514"}});
+ const service=loader({"../lib/prisma.js":{prisma:{$transaction:async()=>{throw original}}},"./commercial-access.service.js":{},"./commercial-billing-access.service.js":{}})("services/quotation.service.ts");await assert.rejects(service.transaction(async()=>null),error=>error===original);
+});
