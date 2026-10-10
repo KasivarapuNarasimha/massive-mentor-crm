@@ -288,6 +288,8 @@ export async function syncDealWonFinance(
     const businessId =
       deal.businessId || (await getUserBusinessId(userId));
     if (businessId) {
+      const commercialRevision = await prisma.quotationRevision.findFirst({where:{businessId,dealId:deal.id,state:{in:["sent","accepted"]},sentPointers:{some:{businessId}}},select:{id:true}});
+      if(commercialRevision) return {skipped:true,reason:"commercial_quotation" as const};
       const activeSo = await prisma.salesOrder.count({
         where: {
           businessId,

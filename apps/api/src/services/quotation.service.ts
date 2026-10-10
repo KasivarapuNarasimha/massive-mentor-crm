@@ -5,7 +5,7 @@ import { evaluateCommercialBillingAccess } from "./commercial-billing-access.ser
 import { calculateCommercialQuote, COMMERCIAL_PRICING_VERSION } from "./commercial-pricing.service.js";
 import { CommercialDocumentError, object, text, id, canonical, contentHash, COMMERCIAL_HASH_VERSION,
   parseCommercialConfiguration, commercialYear, normalizeQuoteInput, normalizeQuoteRequest, approvalRequired, reconcileCommercialSnapshot } from "./commercial-document.service.js";
-import type { CommercialAction } from "./commercial-policy.js";
+import { moduleForCommercialAction, type CommercialAction } from "./commercial-policy.js";
 import type { LeadWriteContext } from "./tenant-scope.service.js";
 
 type Tx=Prisma.TransactionClient;
@@ -20,7 +20,7 @@ const version=(value:unknown)=>{
   if(typeof value!=="number"||!Number.isSafeInteger(value)||value<1||value>=2147483647) throw new CommercialDocumentError("EXPECTED_VERSION_REQUIRED",409);
   return value;
 };
-async function authorize(tx:Tx,actor:QuoteActor,action:CommercialAction,ownerUserId?:string) {
+export async function authorize(tx:Tx,actor:QuoteActor,action:CommercialAction,ownerUserId?:string) {
   // Lock rows used by authorization. No repair/provisioning or root-client reads.
   await tx.$queryRaw`SELECT "id" FROM "Business" WHERE "id"=${actor.businessId} FOR SHARE`;
   const users=[...new Set([actor.userId,...(ownerUserId?[ownerUserId]:[])])].sort();
@@ -28,7 +28,7 @@ async function authorize(tx:Tx,actor:QuoteActor,action:CommercialAction,ownerUse
     await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id"=${user} FOR SHARE`;
     await tx.$queryRaw`SELECT "id" FROM "BusinessMember" WHERE "businessId"=${actor.businessId} AND "userId"=${user} FOR SHARE`;
   }
-  const context=await resolveCommercialActionAccess(actor.userId,actor.businessId,"quotations",action,tx);
+  const context=await resolveCommercialActionAccess(actor.userId,actor.businessId,moduleForCommercialAction(action),action,tx);
   if(!(await evaluateCommercialBillingAccess(context,tx)).allowed) throw new CommercialDocumentError("COMMERCIAL_BILLING_DENIED",402);
   if(ownerUserId) {
     const owner=await tx.businessMember.findUnique({where:{businessId_userId:{businessId:actor.businessId,userId:ownerUserId}},include:{user:{select:{isDisabled:true}}}});
@@ -55,7 +55,7 @@ async function configuration(tx:Tx,businessId:string) {
   const b=await tx.business.findUniqueOrThrow({where:{id:businessId},select:{settings:true}});
   return parseCommercialConfiguration((b.settings as {commercial?:unknown}|null)?.commercial);
 }
-async function visible(tx:Tx,context:Readonly<LeadWriteContext>,quote:{ownerUserId:string},revision:{contactId:string;dealId:string|null}) {
+export async function visible(tx:Tx,context:Readonly<LeadWriteContext>,quote:{ownerUserId:string},revision:{contactId:string;dealId:string|null}) {
   if(context.role==="sales_executive" && quote.ownerUserId!==context.userId) throw new CommercialAccessError("Quotation scope denied");
   if(context.role==="sales_executive"||context.role==="sales_manager") {
     const scope=await buildCommercialReferenceScope(context,tx);
@@ -65,11 +65,11 @@ async function visible(tx:Tx,context:Readonly<LeadWriteContext>,quote:{ownerUser
     await assertCommercialReferences(context.userId,context.businessId,{contactId:revision.contactId,dealId:revision.dealId},"quotations",tx,"quotation.read");
   }
 }
-async function audit(tx:Tx,actor:QuoteActor,quoteId:string,snapshotId:string,event:string,metadata:Prisma.InputJsonValue) {
+export async function audit(tx:Tx,actor:QuoteActor,quoteId:string,snapshotId:string,event:string,metadata:Prisma.InputJsonValue) {
   await tx.quotationEvent.create({data:{businessId:actor.businessId,snapshotId,actorUserId:actor.userId,event,metadata}});
   await tx.auditLog.create({data:{businessId:actor.businessId,actorUserId:actor.userId,action:event,entityType:"quotation",entityId:quoteId,metadata}});
 }
-async function transaction<T>(run:(tx:Tx)=>Promise<T>):Promise<T> {
+export async function transaction<T>(run:(tx:Tx)=>Promise<T>):Promise<T> {
   // No retry of a partially committed operation. Prisma aborts the entire transaction.
   try {return await prisma.$transaction(run,{isolationLevel:Prisma.TransactionIsolationLevel.Serializable,maxWait:5000,timeout:15000});}
   catch(e) {
@@ -77,7 +77,7 @@ async function transaction<T>(run:(tx:Tx)=>Promise<T>):Promise<T> {
     throw e;
   }
 }
-async function mutate(actor:QuoteActor,operation:string,key:unknown,input:unknown,action:CommercialAction,
+export async function mutate(actor:QuoteActor,operation:string,key:unknown,input:unknown,action:CommercialAction,
     run:(tx:Tx)=>Promise<unknown>) {
   const requestKey=id(key), requestHash=contentHash(input);
   return transaction(async tx=>{
@@ -166,6 +166,8 @@ export async function editQuotationDraft(actor:QuoteActor,quotationId:string,key
     if(!current) throw new CommercialDocumentError("QUOTATION_REVISION_REQUIRED",409);
     await visible(tx,context,quote,current);
     await tx.$queryRaw`SELECT "id" FROM "QuotationRevision" WHERE "businessId"=${actor.businessId} AND "id"=${current.id} FOR UPDATE`;
+    if(await tx.quotationCustomerAccess.findFirst({where:{businessId:actor.businessId,revisionId:current.id,revokedAt:null,deliveredAt:null}})) throw new CommercialDocumentError("CANCEL_PENDING_DELIVERY_BEFORE_EDIT",409);
+    if(await tx.quotationInvoiceConversion.findUnique({where:{businessId_quotationId:{businessId:actor.businessId,quotationId:quote.id}}})) throw new CommercialDocumentError("CONVERTED_QUOTATION_IMMUTABLE",409);
     const config=await configuration(tx,actor.businessId);
     let revision;
     if(newRevision) {
@@ -215,7 +217,7 @@ export async function listQuotations(actor:QuoteActor) {
   });
 }
 
-async function reconcileStoredItems(tx:Tx,snap:Parameters<typeof reconcileCommercialSnapshot>[0]&{id:string;businessId:string}) {
+export async function reconcileStoredItems(tx:Tx,snap:Parameters<typeof reconcileCommercialSnapshot>[0]&{id:string;businessId:string}) {
   const verified=reconcileCommercialSnapshot(snap);
   const items=await tx.quotationRevisionItem.findMany({where:{businessId:snap.businessId,snapshotId:snap.id}});
   const ordered=items.sort((a,b)=>BigInt(a.position)<BigInt(b.position)?-1:BigInt(a.position)>BigInt(b.position)?1:0);

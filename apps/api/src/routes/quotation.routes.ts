@@ -1,4 +1,4 @@
-import { Router, type Response, type NextFunction } from "express";
+import { Router, type Response } from "express";
 import { requireAuth, type AuthenticatedRequest } from "../middleware/auth.js";
 import { requireCommercialAccess } from "../middleware/requireCommercialAccess.js";
 import { requireCommercialBillingAccess } from "../middleware/requireCommercialBillingAccess.js";
@@ -6,6 +6,8 @@ import { CommercialAccessError } from "../services/commercial-access.service.js"
 import { CommercialDocumentError, id } from "../services/commercial-document.service.js";
 import { CommercialValueError } from "../lib/commercial-money.js";
 import { createQuotation, editQuotationDraft, getQuotation, listQuotations, requestQuotationApproval } from "../services/quotation.service.js";
+import { getCommercialConfiguration,setCommercialConfiguration } from "../services/commercial-configuration.service.js";
+import { sendQuotation,cancelQuotationDelivery } from "../services/quotation-customer.service.js";
 import type { CommercialAction } from "../services/commercial-policy.js";
 
 /** Deliberately unmounted until real HTTP/PostgreSQL authorization tests pass.
@@ -25,7 +27,7 @@ function key(req:AuthenticatedRequest) {
   if(count!==1||typeof req.headers["idempotency-key"]!=="string") throw new CommercialDocumentError("SINGLE_IDEMPOTENCY_KEY_REQUIRED",400);
   return req.headers["idempotency-key"];
 }
-const handle=(work:(req:AuthenticatedRequest)=>Promise<unknown>,status=200)=>async(req:AuthenticatedRequest,res:Response,_next:NextFunction)=>{
+const handle=(work:(req:AuthenticatedRequest)=>Promise<unknown>,status=200)=>async(req:AuthenticatedRequest,res:Response)=>{
   try {return res.status(status).json({success:true,data:await work(req)});}
   catch(error) {
     if(error instanceof CommercialDocumentError) return res.status(error.status).json({success:false,code:error.code});
@@ -36,6 +38,8 @@ const handle=(work:(req:AuthenticatedRequest)=>Promise<unknown>,status=200)=>asy
 };
 quotationRouter.get("/",...gate("quotation.read"),handle(req=>listQuotations(actor(req))));
 quotationRouter.post("/",...gate("quotation.create"),handle(req=>createQuotation(actor(req),key(req),req.body),201));
+quotationRouter.get("/configuration",...gate("commercial.policy.manage"),handle(req=>getCommercialConfiguration(actor(req))));
+quotationRouter.patch("/configuration",...gate("commercial.policy.manage"),handle(req=>setCommercialConfiguration(actor(req),key(req),req.body)));
 quotationRouter.get("/:id",...gate("quotation.read"),handle(req=>getQuotation(actor(req),id(req.params.id))));
 quotationRouter.patch("/:id",...gate("quotation.update"),handle(req=>editQuotationDraft(actor(req),id(req.params.id),key(req),req.body)));
 quotationRouter.post("/:id/revisions",...gate("quotation.update"),handle(req=>editQuotationDraft(actor(req),id(req.params.id),key(req),req.body,true),201));
@@ -43,5 +47,7 @@ quotationRouter.post("/:id/revisions",...gate("quotation.update"),handle(req=>ed
 quotationRouter.post("/:id/approval-request",...gate("quotation.update"),handle(req=>requestQuotationApproval(actor(req),id(req.params.id),key(req),req.body)));
 quotationRouter.post("/:id/approve",...gate("quotation.approve"),handle(req=>requestQuotationApproval(actor(req),id(req.params.id),key(req),req.body,"approved")));
 quotationRouter.post("/:id/reject-approval",...gate("quotation.approve"),handle(req=>requestQuotationApproval(actor(req),id(req.params.id),key(req),req.body,"rejected")));
+quotationRouter.post("/:id/cancel-delivery",...gate("quotation.update"),handle(req=>cancelQuotationDelivery(actor(req),id(req.params.id),key(req),req.body)));
+quotationRouter.post("/:id/send",...gate("quotation.send"),handle(req=>sendQuotation(actor(req),id(req.params.id),key(req),req.body)));
 // A commercial-prefix miss must never fall through to legacy repair-capable gates.
 quotationRouter.use((_req,res)=>res.status(404).json({success:false,code:"COMMERCIAL_ROUTE_NOT_FOUND"}));

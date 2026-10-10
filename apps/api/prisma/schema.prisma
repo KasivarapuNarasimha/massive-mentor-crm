@@ -2640,6 +2640,7 @@ model QuotationPricingSnapshot {
   revision QuotationRevision @relation("RevisionSnapshots", fields: [businessId, revisionId], references: [businessId, id], onDelete: Restrict, onUpdate: Restrict, map: "pc_quotationpricingsnapshot_f1")
   currentPointers QuotationRevision[] @relation("CurrentSnapshot")
   items QuotationRevisionItem[]
+  customerAccess QuotationCustomerAccess[]
   approvals QuotationApprovalHistory[]
   events QuotationEvent[]
   @@unique([businessId, revisionId, id], map: "pc_quotationpricingsnapshot_u1")
@@ -2698,4 +2699,88 @@ model CommercialMutationRequest {
   result Json
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@unique([businessId, actorUserId, operation, key], map: "pc_commercialmutationrequest_u1")
+}
+
+model QuotationCustomerAccess {
+  id String @id @default(cuid())
+  businessId String
+  snapshotId String
+  quotationId String
+  revisionId String
+  senderUserId String
+  tokenHash String @unique
+  policy Json
+  expiresAt DateTime @db.Timestamptz(3)
+  deliveredAt DateTime? @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  consumedAt DateTime? @db.Timestamptz(3)
+  decision String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  snapshot QuotationPricingSnapshot @relation(fields:[businessId,snapshotId],references:[businessId,id],onDelete:Restrict,onUpdate:Restrict)
+  deliveries CommercialDelivery[]
+  challenge QuotationOtpChallenge?
+  @@unique([businessId,id])
+  @@index([businessId,revisionId])
+}
+model QuotationOtpChallenge {
+  id String @id @default(cuid())
+  businessId String
+  accessId String @unique
+  version Int @default(1)
+  codeHash String
+  action String
+  attempts Int @default(0)
+  sendCount Int @default(1)
+  expiresAt DateTime @db.Timestamptz(3)
+  lastSentAt DateTime @db.Timestamptz(3)
+  deliveredAt DateTime? @db.Timestamptz(3)
+  usedAt DateTime? @db.Timestamptz(3)
+  access QuotationCustomerAccess @relation(fields:[businessId,accessId],references:[businessId,id],onDelete:Restrict,onUpdate:Restrict)
+  @@unique([businessId,id])
+  @@unique([businessId,accessId])
+}
+model CommercialDelivery {
+  id String @id @default(cuid())
+  businessId String
+  accessId String
+  kind String
+  challengeVersion Int?
+  payload String? @db.Text
+  state String @default("queued")
+  attempts Int @default(0)
+  leaseUntil DateTime? @db.Timestamptz(3)
+  deliveredAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  access QuotationCustomerAccess @relation(fields:[businessId,accessId],references:[businessId,id],onDelete:Restrict,onUpdate:Restrict)
+  @@index([businessId,accessId,state])
+}
+model QuotationInvoiceConversion {
+  id String @id @default(cuid())
+  businessId String
+  quotationId String
+  snapshotId String
+  revisionId String
+  invoiceId String @unique
+  customerSnapshot Json
+  pricingSnapshot Json
+  acceptedAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([businessId,quotationId])
+  @@unique([businessId,invoiceId])
+}
+model CommercialPaymentEntry {
+  id String @id @default(cuid())
+  businessId String
+  invoiceId String
+  paymentId String? @unique
+  actorUserId String
+  amount Decimal @db.Decimal(18,2)
+  method String
+  reference String?
+  notes String @db.Text
+  paidAt DateTime @db.Timestamptz(3)
+  reversalOfId String? @unique
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([businessId,id])
+  @@index([businessId,invoiceId,createdAt])
 }

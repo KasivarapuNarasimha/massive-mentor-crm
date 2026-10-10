@@ -1,3 +1,4 @@
+import { isCurrencyCode } from "../lib/currency.js";
 import { createHash } from "node:crypto";
 import { parseCommercialDecimal } from "../lib/commercial-money.js";
 import { calculateCommercialQuote, COMMERCIAL_PRICING_VERSION } from "./commercial-pricing.service.js";
@@ -55,7 +56,7 @@ export type CommercialConfiguration = {
 export function parseCommercialConfiguration(value: unknown): CommercialConfiguration {
   const row=object(value,["version","currency","timezone","approval","zeroSubtotal"]);
   const currency=object(row.currency,["code","decimalPlaces"]);
-  if(typeof currency.code!=="string" || !/^[A-Z]{3}$/.test(currency.code) || currency.decimalPlaces!==2) {
+  if(typeof currency.code!=="string" || !isCurrencyCode(currency.code) || currency.decimalPlaces!==2) {
     throw new CommercialDocumentError("COMMERCIAL_CURRENCY_CONFIGURATION_REQUIRED");
   }
   const timezone=id(row.timezone);

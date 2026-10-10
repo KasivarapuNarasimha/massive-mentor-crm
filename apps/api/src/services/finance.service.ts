@@ -345,6 +345,7 @@ export async function updateInvoice(
   const { businessId } = await assertFinanceAccess(userId);
   const existing = await prisma.invoice.findFirst({ where: { id, businessId } });
   if (!existing) throw new Error("Invoice not found");
+  if (existing.sourceType === "quotation") throw new Error("Use the commercial invoice/payment routes");
 
   const amount =
     input.amount !== undefined ? toDecimal(input.amount) : toDecimal(existing.amount);
@@ -417,6 +418,7 @@ export async function deleteInvoice(userId: string, id: string) {
   const { businessId } = await assertFinanceAccess(userId);
   const existing = await prisma.invoice.findFirst({ where: { id, businessId } });
   if (!existing) throw new Error("Invoice not found");
+  if (existing.sourceType === "quotation") throw new Error("Use the commercial invoice/payment routes");
   await prisma.payment.deleteMany({ where: { invoiceId: id } });
   await prisma.invoice.delete({ where: { id } });
   await recordAudit({
@@ -639,6 +641,7 @@ export async function createPayment(
       where: { id: input.invoiceId, businessId },
     });
     if (!inv) throw new Error("Invoice not found");
+    if (inv.sourceType === "quotation") throw new Error("Use the commercial payment route");
   }
 
   const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
@@ -767,6 +770,7 @@ export async function deletePayment(userId: string, id: string) {
   const { businessId } = await assertFinanceAccess(userId);
   const existing = await prisma.payment.findFirst({ where: { id, businessId } });
   if (!existing) throw new Error("Payment not found");
+  if (existing.invoiceId && await prisma.invoice.findFirst({where:{id:existing.invoiceId,businessId,sourceType:"quotation"}})) throw new Error("Use the commercial reversal route");
   await prisma.payment.delete({ where: { id } });
   await recordAudit({
     businessId,
