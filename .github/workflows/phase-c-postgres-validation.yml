@@ -1,0 +1,184 @@
+# Manual dispatch only. Database execution requires explicit owner authorization.
+name: Phase C disposable PostgreSQL validation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: phase-c-disposable-postgres
+  cancel-in-progress: false
+jobs:
+  provenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      started_at: ${{ steps.verify.outputs.started_at }}
+    steps:
+      - id: verify
+        name: Verify authenticated dispatcher before provisioning PostgreSQL
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const repo = 'KasivarapuNarasimha/massive-mentor-crm';
+            const path = '.github/workflows/phase-c-postgres-validation.yml';
+            const e = process.env;
+            if (e.GITHUB_REPOSITORY !== repo || e.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
+                e.GITHUB_REF !== 'refs/heads/main' || e.GITHUB_ACTOR !== 'KasivarapuNarasimha' ||
+                e.GITHUB_WORKFLOW_REF !== `${repo}/${path}@refs/heads/main` ||
+                e.RUNNER_ENVIRONMENT !== 'github-hosted') {
+              throw new Error('Dispatcher identity rejected');
+            }
+            const runId = Number(e.GITHUB_RUN_ID);
+            const attempt = Number(e.GITHUB_RUN_ATTEMPT);
+            if (!Number.isSafeInteger(runId) || runId < 1 ||
+                !Number.isSafeInteger(attempt) || attempt < 1) {
+              throw new Error('Run identity rejected');
+            }
+            const {data: run} = await github.rest.actions.getWorkflowRunAttempt({
+              ...context.repo, run_id: runId, attempt_number: attempt
+            });
+            const {data: workflow} = await github.rest.actions.getWorkflow({
+              ...context.repo, workflow_id: run.workflow_id
+            });
+            if (run.id !== runId || run.run_attempt !== attempt ||
+                run.repository.full_name !== repo || run.event !== 'workflow_dispatch' ||
+                run.head_branch !== 'main' || run.head_sha !== e.GITHUB_SHA ||
+                run.head_sha !== e.GITHUB_WORKFLOW_SHA || workflow.path !== path ||
+                run.actor.login !== 'KasivarapuNarasimha' ||
+                run.triggering_actor.login !== 'KasivarapuNarasimha' ||
+                run.status !== 'in_progress') {
+              throw new Error('Authenticated run metadata rejected');
+            }
+            const started = Date.parse(run.run_started_at);
+            if (!Number.isFinite(started) || started > Date.now() ||
+                Date.now() - started > 3600000) {
+              throw new Error('Run timestamp rejected');
+            }
+            core.setOutput('started_at', run.run_started_at);
+  validate:
+    needs: provenance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres@sha256:66aafa11cf15800a3c94763f7e11d1e7b2e37e5e84bc4ce027cb6e1e4bfaf4df
+        env:
+          POSTGRES_USER: mm_phasec
+          POSTGRES_PASSWORD: phasec_dummy_only
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U mm_phasec -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - name: Checkout fixed reviewed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: KasivarapuNarasimha/massive-mentor-crm
+          ref: ab24a13f3054d7de5618a49b8e4ac1c23e958705
+          persist-credentials: false
+          fetch-depth: 1
+          submodules: false
+          lfs: false
+      - name: Verify source and trusted artifact hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          test "$(git rev-parse HEAD)" = ab24a13f3054d7de5618a49b8e4ac1c23e958705
+          test -z "$(git status --porcelain)"
+          sha256sum --check --strict <<'HASHES'
+          21115f89396bc53f53403c6e40ac0e3d38f4982072d2286b81a598b6fae3b05c  docs/phase-c-review/README.md
+          74298a1c8752b76449b2a506284b47119a6639120bf591754cf74b43ce2e5e67  docs/phase-c-review/schema.diff
+          433e06c8b916e4334ffc13a0b5975b7aaa3743622d82a734a5a40dbf3f96d74c  docs/phase-c-review/schema.prisma.proposed
+          55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28  docs/phase-c-review/migration.sql.proposed
+          4bce8b28b433e3628a4f455825c90ac4efb650293d7d6b247cf8667d8a985aa8  docs/phase-c-review/validation/run.sh
+          769ae7c624c8cfb689f6f1b69c3db022f6227fba4e64dc2dfd89bd9c23d33311  docs/phase-c-review/validation/catalog-and-negative.sql
+          e5e26ea14e64ae8097845658c1f06c9de204b3b5fcee8906c51312d80cac4aa2  docs/phase-c-review/validation/concurrency.py
+          HASHES
+          bash -n docs/phase-c-review/validation/run.sh
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+          ast.parse(Path('docs/phase-c-review/validation/concurrency.py').read_text(encoding='utf-8'))
+          PY
+      - name: Execute harness without streaming raw errors
+        shell: bash
+        env:
+          MM_PHASEC_DISPOSABLE: 'YES'
+          MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}
+          MM_PHASEC_RUN_STARTED_AT: ${{ needs.provenance.outputs.started_at }}
+          MM_PHASEC_IMAGE_DIGEST: postgres@sha256:66aafa11cf15800a3c94763f7e11d1e7b2e37e5e84bc4ce027cb6e1e4bfaf4df
+          MM_PHASEC_IMAGE_ID: sha256:589f742565e4f6d22149176b032974f55f8201a8a37b71ed587ec5c6902e689f
+          MM_PHASEC_PROPOSAL_SHA256: 55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          python3 - <<'PY'
+          import os, signal, subprocess, tempfile
+          from pathlib import Path
+          report = Path(os.environ['RUNNER_TEMP']) / 'phase-c-evidence.txt'
+          command = ['bash', 'docs/phase-c-review/validation/run.sh',
+                     'docs/phase-c-review/migration.sql.proposed']
+          allowed = {
+              'Preflight: isolated PostgreSQL 17 and empty run-specific database verified',
+              'Cleanup: only fresh run-specific database removed',
+              'SQL suite complete; service authorization/hash/replay UNVERIFIED',
+              'PASS: catalog subset, tenant pointers, lifecycle, sealing and initial-send SQL checks',
+              'PASS: transactional DDL rollback and exact second-application rejection (SQL only)',
+              'PASS: incomplete commit, item count, revision version, presealed rejection',
+              'PASS: numeric bounds, position format/unique checks before sealing',
+              'PASS: both send/edit orderings (SQL predicates only)',
+              'PASS: concurrent pointer replacement/send (SQL protocol only)',
+              'PASS: actual snapshot-insert/send lock orderings (SQL only)',
+              'PASS: actual INSERT/UPDATE visibility negatives, creator sealing, postseal rejection and lock release',
+              'PASS: sequence race, tenant separation, commit/rollback lock release',
+              'PASS: duplicate revision-number race',
+              'PASS: same/different hash key conflicts and tenant independence; replay UNVERIFIED',
+              'PASS: synthetic critical-audit exception rollback; actual audit integration UNVERIFIED',
+          }
+          evidence = []
+          with tempfile.TemporaryFile() as raw:
+              proc = subprocess.Popen(command, stdout=raw, stderr=subprocess.STDOUT,
+                                      start_new_session=True)
+              try:
+                  code = proc.wait(timeout=900)
+              except subprocess.TimeoutExpired:
+                  os.killpg(proc.pid, signal.SIGTERM)
+                  try:
+                      proc.wait(timeout=45)
+                  except subprocess.TimeoutExpired:
+                      os.killpg(proc.pid, signal.SIGKILL)
+                      proc.wait(timeout=10)
+                  code = 124
+                  evidence.append('FAIL: validation timeout; runner teardown remains mandatory')
+              raw.seek(0)
+              for line in raw:
+                  value = line.decode('utf-8', errors='replace').rstrip()
+                  if value in allowed:
+                      evidence.append(value)
+          required = allowed
+          if code == 0 and not required.issubset(set(evidence)):
+              code = 1
+              evidence.append('FAIL: required completion/evidence markers missing')
+          evidence += [
+              f'Harness exit code: {code}',
+              'UNVERIFIED: both same-snapshot sealing lock orderings',
+              'UNVERIFIED: service authorization, tenant scope, policy freshness,',
+              'canonical hash/pricing, replay/409, real audit integration, OTP,',
+              'Finance conversion and service lifecycle/version validation.'
+          ]
+          text = '\n'.join(evidence) + '\n'
+          report.write_text(text, encoding='utf-8')
+          print(text, end='')
+          raise SystemExit(0 if code == 0 else 1)
+          PY
+      - name: Upload only sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: phase-c-sanitized-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/phase-c-evidence.txt
+          if-no-files-found: warn
+          retention-days: 7
