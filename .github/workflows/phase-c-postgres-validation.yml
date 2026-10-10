@@ -77,7 +77,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: cb32b88c24dc218cf7a2cb773d289882d80465b5
+          ref: 1c645406aec65dd0f2040511940c1c35aedfd70f
           persist-credentials: false
           fetch-depth: 1
       - name: Verify source, hashes and environment-file exclusion
@@ -85,14 +85,14 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test "$(git rev-parse HEAD)" = cb32b88c24dc218cf7a2cb773d289882d80465b5
+          test "$(git rev-parse HEAD)" = 1c645406aec65dd0f2040511940c1c35aedfd70f
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
           dff117f92a2c9dd4797365a8a224d80c0a8be151ba74c37673dfdce4060aa842  apps/api/prisma/schema.prisma
           1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
           09dc5562d7cf40676879f799165f2d9da05227c3bc9921373fb2b14223468780  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
           1643dc0f1c0a125ea3651c8b7881bb3f8bc5dd1d8fc60637a0290ef7f91ee589  apps/api/scripts/commercial-application-run.sh
-          4d76d7b791d98b91d64354ab28b775e8624d35221ca2efdf508ad6a6c349cfbf  apps/api/scripts/commercial-workflow-postgres.test.cjs
+          b46100246023c37a4fd7ed5a2d7c400250648f5de975365936a44dc5c13b43da  apps/api/scripts/commercial-workflow-postgres.test.cjs
           5cd7515bf66601f18a4ad886a1075aa95d8b3e0eb87e08fb140c068b1986bd98  apps/api/scripts/commercial-test-loader.cjs
           313e57b63e129315ad74aff2f614e974f03631034cafe430b77b04a29d5ed382  apps/api/src/services/quotation.service.ts
           f1c3e297e295407546c25c248dfaba3a452767f5f7647be355b375502fbfd8e7  apps/api/src/services/quotation-customer.service.ts
@@ -147,6 +147,7 @@ jobs:
                   code=124
           lines=output.read_text(errors='replace').splitlines()
           safe=[line for line in lines if re.fullmatch(r'(?:ok|not ok) \d+ - [A-Za-z0-9 /:;,.()_=-]+',line) or re.fullmatch(r'# (?:tests|suites|pass|fail|cancelled|skipped|todo) \d+',line)]
+          safe += [line for line in lines if re.fullmatch(r'# MM_(?:SETUP_FAILURE|IDENTITY_TYPES|SAFE_FIELD):[A-Za-z0-9_:]+',line)]
           codes=sorted(set(re.findall(r'\b(?:COMMERCIAL_[A-Z_]+|OTP_[A-Z_]+|SENT_REVISION_IMMUTABLE|P[0-9]{4})\b','\n'.join(lines))))
           safe += ['Safe failure classes: '+', '.join(codes),'Harness exit: '+str(code),'Exact competing same-snapshot trigger-lock orderings: UNVERIFIED']
           pathlib.Path('evidence/application-summary.txt').write_text('\n'.join(safe)+'\n')
