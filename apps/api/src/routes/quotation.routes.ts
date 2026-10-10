@@ -10,7 +10,7 @@ import { getCommercialConfiguration,setCommercialConfiguration } from "../servic
 import { sendQuotation,cancelQuotationDelivery } from "../services/quotation-customer.service.js";
 import type { CommercialAction } from "../services/commercial-policy.js";
 
-/** Deliberately unmounted until real HTTP/PostgreSQL authorization tests pass.
+/** Mounted after real HTTP/PostgreSQL authorization tests passed.
  * Must be mounted BEFORE legacy repair-capable billing/module middleware.
  */
 export const quotationRouter: Router=Router();

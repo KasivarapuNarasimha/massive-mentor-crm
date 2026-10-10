@@ -4,9 +4,9 @@ import { CommercialAccessError, resolveCommercialActionAccess, type CommercialMo
 import { isCommercialAction, moduleForCommercialAction } from "../services/commercial-policy.js";
 import { getStrictRequestContext, runWithStrictBusinessContext } from "../services/strict-request-context.service.js";
 
-/** Unmounted prerequisite. Use after requireAuth, outside legacy billing/module gates.
+/** Use after requireAuth, outside legacy billing/module gates.
  * x-business-id is an untrusted selector. No default action/module grants.
- * Future routers require a separate read-only billing gate before handlers.
+ * Commercial routers require the separate read-only billing gate before handlers.
  */
 export function requireCommercialAccess(module: CommercialModule, action: string) {
   if (!isCommercialAction(action) || moduleForCommercialAction(action) !== module) {

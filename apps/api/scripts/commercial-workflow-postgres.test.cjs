@@ -9,8 +9,9 @@ if(url.hostname!=="127.0.0.1"||url.username!=="mm_phasec"||url.password!=="phase
 const db=new PrismaClient({datasources:{db:{url:url.toString()}},log:[]});const emails=[];
 process.env.COMMERCIAL_DELIVERY_KEY=Buffer.alloc(32,11).toString("base64");process.env.COMMERCIAL_PUBLIC_URL="https://synthetic.example.invalid";
 const never=()=>{throw Error("LEGACY_REPAIR_PATH_FORBIDDEN")};
-let auditFail=false,otpCounter=100000;
-const adapter=new Proxy(db,{get(target,key){if(key==="$transaction")return (fn,options)=>target.$transaction(tx=>fn(new Proxy(tx,{get(t,k){if(k==="auditLog"&&auditFail)return {create:async(args)=>{if(auditFail===true||auditFail===args.data.action)throw Error("SYNTHETIC_CRITICAL_AUDIT_FAILURE");return t.auditLog.create(args)}};const v=t[k];return typeof v==="function"?v.bind(t):v;}})),options).catch(error=>{const names=(String(error.message)+" "+String(error.meta?.message||"")).match(/\b(?:[A-Z][A-Z_]{5,}|P[0-9]{4})\b/g)||[];console.log("MM_OPERATION_FAILURE:"+error.name+":"+String(error.code||"none")+":"+names.filter(x=>/^(COMMERCIAL_|QUOTATION_|DRAFT_|EXPLICIT_|OTP_|SENT_|SELF_|IDEMPOTENCY_|P[0-9])/.test(x)).join(":"));const field=error.meta?.field_name;if(typeof field==="string"&&/^[A-Za-z0-9_ ()]+$/.test(field))console.log("MM_CONSTRAINT:"+field.replace(/[ ()]/g,"_"));throw error;});const v=target[key];return typeof v==="function"?v.bind(target):v;}});
+let auditFail=false,otpCounter=100000,auditBarrier=null;
+function bounded(p,label,ms=8000){let timer;return Promise.race([p,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error("BARRIER_TIMEOUT_"+label)),ms)})]).finally(()=>clearTimeout(timer));}
+const adapter=new Proxy(db,{get(target,key){if(key==="$transaction")return (fn,options)=>target.$transaction(tx=>fn(new Proxy(tx,{get(t,k){if(k==="auditLog")return {create:async(args)=>{if(auditFail===true||auditFail===args.data.action)throw Error("SYNTHETIC_CRITICAL_AUDIT_FAILURE");const row=await t.auditLog.create(args);const gate=auditBarrier;if(gate&&gate.action===args.data.action){auditBarrier=null;gate.pid=(await t.$queryRaw`SELECT pg_backend_pid() AS pid`)[0].pid;gate.started.resolve();await bounded(gate.release.promise,"release");}return row;}};const v=t[k];return typeof v==="function"?v.bind(t):v;}})),options).catch(error=>{const names=(String(error.message)+" "+String(error.meta?.message||"")).match(/\b(?:[A-Z][A-Z_]{5,}|P[0-9]{4})\b/g)||[];console.log("MM_OPERATION_FAILURE:"+error.name+":"+String(error.code||"none")+":"+names.filter(x=>/^(COMMERCIAL_|QUOTATION_|DRAFT_|EXPLICIT_|OTP_|SENT_|SELF_|IDEMPOTENCY_|P[0-9])/.test(x)).join(":"));const field=error.meta?.field_name;if(typeof field==="string"&&/^[A-Za-z0-9_ ()]+$/.test(field))console.log("MM_CONSTRAINT:"+field.replace(/[ ()]/g,"_"));throw error;});const v=target[key];return typeof v==="function"?v.bind(target):v;}});
 const baseLoad=loadWith({"../lib/prisma.js":{prisma:adapter},"./field-engine.service.js":{getUserBusinessId:never}});
 const delivery=baseLoad("services/commercial-delivery.service.ts"),load=loadWith({"../lib/prisma.js":{prisma:adapter},"./field-engine.service.js":{getUserBusinessId:never},"./commercial-delivery.service.js":{...delivery,newOtp:()=>String(++otpCounter),sendCommercialEmail:async p=>{emails.push(p)}},"../services/auth.service.js":{verifyToken:token=>jwt.verify(token,"synthetic-jwt-signature-only-32-characters"),getUserById:userId=>db.user.findUnique({where:{id:userId}})}});
 const quotes=load("services/quotation.service.ts"),customer=load("services/quotation-customer.service.ts"),finance=load("services/commercial-finance.service.ts");
@@ -43,7 +44,7 @@ before(async()=>{
  await db.contact.create({data:{id:"phasec-contact-A",businessId:owner.businessId,userId:owner.userId,name:"Synthetic customer",email:"synthetic@example.invalid",tags:[]}});
  await db.contact.create({data:{id:"phasec-contact-B",businessId:"phasec-B",userId:owner.userId,name:"Foreign synthetic",tags:[]}});
  stage="http";
- const app=express();app.use(express.json({limit:"64kb"}));app.use("/api/quotations",load("routes/quotation.routes.ts").quotationRouter);app.use("/api/commercial",load("routes/commercial-finance.routes.ts").commercialFinanceRouter);app.use("/api/quotation-customer",load("routes/quotation-customer.routes.ts").quotationCustomerRouter);app.use((_r,res)=>{legacyCalls++;res.status(500).end()});
+ const app=express();app.use(express.json({limit:"64kb"}));load("routes/commercial.routes.ts").mountCommercialRoutes(app);app.use((_r,res)=>{legacyCalls++;res.status(500).end()});
  server=app.listen(0,"127.0.0.1");await new Promise(r=>server.once("listening",r));origin="http://127.0.0.1:"+server.address().port;
 }catch(error){console.log("MM_SETUP_FAILURE:"+stage+":"+error.name+":"+String(error.code||"none"));const detail=String(error.message).match(/Argument `([A-Za-z]+)` is missing|Unknown argument `([A-Za-z]+)`/);if(detail)console.log("MM_SAFE_FIELD:"+(detail[1]||detail[2]));throw error;}
 });
@@ -73,7 +74,7 @@ for(const sealFirst of [false,true])test(`independent insertion cannot see uncom
   if(!sealFirst)await tx.quotationPricingSnapshot.update({where:{id:sid},data:{sealedAt:new Date()}});
   await tx.quotationRevision.update({where:{id:q.revisionId},data:{currentSnapshotId:sid}});
  },{timeout:15000});
- await started.promise;
+ await bounded(Promise.race([started.promise,creator.then(()=>{throw Error("CREATOR_FINISHED_BEFORE_BARRIER")})]),"snapshot-start");
  try{await assert.rejects(db.quotationRevisionItem.create({data:{businessId:owner.businessId,snapshotId:sid,position:"1",description:"Concurrent synthetic",quantity:"1",unitPrice:"1",taxRate:"0",discountInput:{},calculation:{}}}),/COMMERCIAL_CONTENT_INSERT_FORBIDDEN/);}finally{release.resolve();}
  await creator;
  assert.equal(await db.quotationRevisionItem.count({where:{snapshotId:sid}}),1);
@@ -118,6 +119,40 @@ test("actual HTTP quotation-to-payment chain retains the request tenant across i
  const paid=await request("/api/commercial/invoices/"+invoiceId+"/payments","POST",{amount:"20",method:"cash",reference:null,notes:"Synthetic HTTP",paidAt:new Date().toISOString()},accountant,key());assert.equal(paid.status,200);assert.equal(paid.data.outstandingBalance,"98.00");
  assert.equal((await request("/api/commercial/invoices/"+invoiceId,"GET",undefined,accountant)).data.outstandingBalance,"98.00");assert.equal((await request("/api/commercial/reports","GET",undefined,accountant)).status,200);
  assert.equal((await request("/api/quotations/unknown/unknown","POST",{},owner,key())).status,404);assert.equal(legacyCalls,0);
+});
+
+test("real invoice sequence allocations are tenant-separated, rollback-safe and release locks",async()=>{
+ const sequence=load("services/invoice-sequence.service.ts"),allocate=(businessId)=>db.$transaction(tx=>sequence.nextFinanceInvoiceNumber(businessId,tx),{timeout:10000});
+ const numbers=await Promise.all(Array.from({length:6},()=>allocate("phasec-sequence-A")));assert.equal(new Set(numbers).size,6);assert(numbers.every(n=>/^INV-\d{4}-\d{5}$/.test(n)));const b=await allocate("phasec-sequence-B");assert(b.endsWith("00001"));
+ let rolled;await assert.rejects(db.$transaction(async tx=>{rolled=await sequence.nextFinanceInvoiceNumber("phasec-sequence-A",tx);throw Error("SYNTHETIC_OUTER_ROLLBACK");}),/SYNTHETIC_OUTER_ROLLBACK/);assert.equal(await allocate("phasec-sequence-A"),rolled);
+});
+test("replacement draft preserves effective sent revision until secure sending completes",async()=>{
+ const q=await create(),oldToken=await send(q),before=await db.quotation.findUnique({where:{id:q.quotationId}});const replacement=await quotes.editQuotationDraft(owner,q.quotationId,key(),{...input(),notes:"Replacement",expectedVersion:before.version},true);const pending=await db.quotation.findUnique({where:{id:q.quotationId}});assert.equal(pending.effectiveSentRevisionId,q.revisionId);assert.equal((await customer.viewCustomerQuotation(oldToken)).state,"sent");
+ const newToken=await send(replacement);await assert.rejects(customer.viewCustomerQuotation(oldToken),/QUOTATION_LINK_UNAVAILABLE/);assert.equal((await customer.viewCustomerQuotation(newToken)).state,"sent");assert.equal((await db.quotationRevision.findUnique({where:{id:q.revisionId}})).state,"superseded");
+});
+test("deal finance cannot create duplicate commercial revenue in either source path",async()=>{
+ const deal=await db.deal.create({data:{businessId:owner.businessId,userId:owner.userId,contactId:"phasec-contact-A",title:"Synthetic deal",value:"100"}});const i={...input(),dealId:deal.id};const q=await quotes.createQuotation(owner,key(),i),token=await send(q);
+ await assert.rejects(db.invoice.create({data:{businessId:owner.businessId,userId:owner.userId,number:"SYNTHETIC-BLOCKED",amount:"100",total:"100",sourceType:"deal",sourceId:deal.id}}),error=>error.code==="P2004"&&/COMMERCIAL_DEAL_FINANCE_ROUTE_REQUIRED/.test(error.message)||/COMMERCIAL_DEAL_FINANCE_ROUTE_REQUIRED/.test(error.meta?.message||""));
+ const oldDeal=await db.deal.create({data:{businessId:owner.businessId,userId:owner.userId,contactId:"phasec-contact-A",title:"Synthetic legacy deal",value:"100"}});await db.invoice.create({data:{businessId:owner.businessId,userId:owner.userId,number:"SYNTHETIC-LEGACY",amount:"100",total:"100",sourceType:"deal",sourceId:oldDeal.id}});const legacyQuote=await quotes.createQuotation(owner,key(),{...input(),dealId:oldDeal.id}),link=await send(legacyQuote),code=await otp(link);await assert.rejects(customer.verifyCustomerDecision(link,{action:"accepted",code}),/EXISTING_DEAL_FINANCE_RECONCILIATION_REQUIRED/);assert.equal(await db.quotationInvoiceConversion.count({where:{quotationId:legacyQuote.quotationId}}),0);assert.equal((await customer.viewCustomerQuotation(token)).state,"sent");
+});
+test("tenant composite invoice foreign key rejects an otherwise valid foreign conversion",async()=>{
+ const foreign={userId:"phasec-foreign",businessId:"phasec-B"},q=await quotes.createQuotation(foreign,key(),{...input(),contactId:"phasec-contact-B",ownerUserId:foreign.userId});const inv=await db.invoice.create({data:{businessId:owner.businessId,userId:owner.userId,number:"SYNTHETIC-FK",amount:"1",total:"1"}});
+ await assert.rejects(db.quotationInvoiceConversion.create({data:{businessId:foreign.businessId,quotationId:q.quotationId,revisionId:q.revisionId,snapshotId:q.snapshotId,invoiceId:inv.id,acceptedAt:new Date(),customerSnapshot:{},pricingSnapshot:{}}}),error=>error.code==="P2003"&&/businessId_invoiceId/.test(String(error.meta?.field_name)));assert.equal(await db.quotationInvoiceConversion.count({where:{quotationId:q.quotationId}}),0);
+});
+test("payment replay and actual critical audit rollback preserve mirror, ledger and balance",async()=>{
+ const a=await accepted(),k=key(),p={amount:"10",method:"cash",reference:null,notes:"Synthetic replay",paidAt:new Date().toISOString()};const first=await finance.recordCommercialPayment(accountant,a.invoiceId,k,p),again=await finance.recordCommercialPayment(accountant,a.invoiceId,k,p);assert.equal(again.paymentId,first.paymentId);await assert.rejects(finance.recordCommercialPayment(accountant,a.invoiceId,k,{...p,amount:"11"}),/IDEMPOTENCY_KEY_CONFLICT/);
+ const next=key();auditFail="commercial.payment.recorded";try{await assert.rejects(finance.recordCommercialPayment(accountant,a.invoiceId,next,p),/SYNTHETIC_CRITICAL_AUDIT_FAILURE/);}finally{auditFail=false;}assert.equal((await finance.getCommercialInvoice(accountant,a.invoiceId)).outstandingBalance,"108.00");assert.equal(await db.payment.count({where:{invoiceId:a.invoiceId}}),1);await finance.recordCommercialPayment(accountant,a.invoiceId,next,p);assert.equal((await finance.getCommercialInvoice(accountant,a.invoiceId)).outstandingBalance,"98.00");
+});
+
+for(const editFirst of [true,false])test(`barrier-controlled ${editFirst?"edit-before-send":"send-before-edit"} preserves immutable content and releases locks`,async()=>{
+ const q=await create(),gate={action:editFirst?"quotation.draft.updated":"quotation.delivery.queued",started:{},release:{}};gate.started.promise=new Promise(r=>gate.started.resolve=r);gate.release.promise=new Promise(r=>gate.release.resolve=r);auditBarrier=gate;
+ const edit=()=>quotes.editQuotationDraft(owner,q.quotationId,key(),{...input(),notes:"Committed edit",expectedVersion:q.version,expectedRevisionVersion:q.revisionVersion});const dispatch=()=>send(q);
+ const first=editFirst?edit():dispatch();first.catch(()=>{});let second;
+ try{await bounded(Promise.race([gate.started.promise,first.then(()=>{throw Error("FIRST_FINISHED_BEFORE_BARRIER")})]),"mutation-start");second=editFirst?dispatch():edit();second.catch(()=>{});
+  const deadline=Date.now()+5000;let blocked=false;while(Date.now()<deadline){const [row]=await db.$queryRaw`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND pid<>pg_backend_pid() AND pid<>${gate.pid}) AS blocked`;if(row.blocked){blocked=true;break;}await new Promise(r=>setTimeout(r,25));}assert(blocked,"Second independent transaction must actually wait on the first transaction");
+ }finally{gate.release.resolve();auditBarrier=null;}
+ const results=await Promise.allSettled([first,second]);assert.equal(results[0].status,"fulfilled");assert.equal(results[1].status,"rejected");assert.match(results[1].reason.message,/COMMERCIAL_TRANSACTION_CONFLICT|QUOTATION_VERSION_CONFLICT|CANCEL_PENDING_DELIVERY_BEFORE_EDIT/);
+ const r=await db.quotationRevision.findUnique({where:{id:q.revisionId}});assert.equal(r.state,editFirst?"draft":"sent");assert.equal(r.notes,editFirst?"Committed edit":"");await db.$transaction(tx=>tx.$queryRaw`SELECT "id" FROM "Quotation" WHERE "id"=${q.quotationId} FOR UPDATE NOWAIT`);
 });
 
 test("revoked explicit grant denies mutation; policy changes stale drafts but retain sent snapshots",async()=>{
