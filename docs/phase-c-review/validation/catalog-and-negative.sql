@@ -318,3 +318,12 @@ BEGIN
 END $$;
 SELECT pg_temp.assert_true((SELECT "state"='expired' FROM "QuotationRevision" WHERE "id"='ra'),'terminal matrix rollback');
 \echo SQL harness checks complete; real audit integration, lifecycle authorization and hash reconciliation UNVERIFIED
+
+-- BEFORE trigger rejects initial historical sentAt without a snapshot before CHECKs.
+SELECT pg_temp.reject('UPDATE "QuotationRevision" SET "state"=''expired'',"sentAt"=now(),"currentSnapshotId"=NULL WHERE "id"=''rb''',
+ 'P0001','historical timestamp without snapshot','COMMERCIAL_SENT_SNAPSHOT_INVALID');
+-- Explicit configured timezone arithmetic only; application validation remains unproven.
+SELECT pg_temp.assert_true(EXTRACT(YEAR FROM TIMESTAMPTZ '2029-12-31 18:29:59+00' AT TIME ZONE 'Asia/Kolkata')=2029,'before timezone year boundary');
+SELECT pg_temp.assert_true(EXTRACT(YEAR FROM TIMESTAMPTZ '2029-12-31 18:30:00+00' AT TIME ZONE 'Asia/Kolkata')=2030,'at timezone year boundary');
+SELECT pg_temp.assert_true(EXTRACT(YEAR FROM TIMESTAMPTZ '2030-01-01 00:00:00+00' AT TIME ZONE 'America/Los_Angeles')=2029,'different timezone year');
+\echo SQL timestamp/timezone probes complete; application numbering/timezone validation UNVERIFIED

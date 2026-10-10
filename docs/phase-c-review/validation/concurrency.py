@@ -3,6 +3,8 @@ No auth/hash/replay claims. Standalone invocation rechecks explicit disposable C
 No endpoints are discovered; no app env is loaded; no server is started.
 """
 import contextlib
+import hashlib
+from pathlib import Path
 import datetime
 import json
 import os
@@ -30,6 +32,8 @@ def safe_error_class(state, message):
         return "constraint:" + m.group(1)
     if state == "22003" and message == "numeric field overflow":
         return "numeric_field_overflow"
+    if state == "42P07" and message == 'relation "QuotationSequence" already exists':
+        return "duplicate_table:QuotationSequence"
     return "UNKNOWN"
 
 class SqlFailure(Exception):
@@ -318,6 +322,24 @@ def main(cid, db):
                          "(inet_client_addr() IS NULL)::text;")
         check(identity == [f"mm_phasec:{db}:17:true"], "DB identity")
 
+    # DDL rollback surrogate and exact second migration application, SQL only.
+    with sessions(cid, db, 2) as (s, observer):
+        s.sql('BEGIN; CREATE TABLE "mm_phasec_ddl_probe" (id integer);')
+        rejected(s, "DO $$ BEGIN RAISE EXCEPTION 'MM_PHASEC_SYNTHETIC_AUDIT_FAILURE'; END; $$;",
+                 "P0001", "MM_PHASEC_SYNTHETIC_AUDIT_FAILURE", observer,
+                 "SELECT to_regclass('public.mm_phasec_ddl_probe') IS NULL;", ["t"])
+    proposal = Path(__file__).resolve().parent.parent / "migration.sql.proposed"
+    proposal_bytes = proposal.read_bytes()
+    check(hashlib.sha256(proposal_bytes).hexdigest() == os.environ.get("MM_PHASEC_PROPOSAL_SHA256"),
+          "repeat migration proposal hash")
+    with sessions(cid, db, 2) as (s, observer):
+        query = "SELECT count(*) FROM pg_class WHERE relnamespace='public'::regnamespace AND relkind='r';"
+        check(observer.sql(query) == ["8"], "repeat migration initial catalog")
+        rejected(s, proposal_bytes.decode("utf-8"), "42P07", "duplicate_table:QuotationSequence",
+                 observer, query, ["8"])
+        observer.sql('BEGIN; SET LOCAL lock_timeout=\'500ms\'; LOCK TABLE "QuotationSequence" IN ACCESS EXCLUSIVE MODE; ROLLBACK;')
+    print("PASS: transactional DDL rollback and exact second-application rejection (SQL only)")
+
     # COMMIT-time deferred validation; failed commit must leave no fixture.
     for n, action in (
         ("incomplete", "commit"),
@@ -420,6 +442,30 @@ def main(cid, db):
         check(observer.sql(f'SELECT "effectiveSentRevisionId" FROM "Quotation" WHERE "id"=\'q{n}\';')
               == ["rpointer"], "effective pointer retained")
     print("PASS: concurrent pointer replacement/send (SQL protocol only)")
+
+    # Actual snapshot INSERT/send contention in both orderings; service auth unproven.
+    with sessions(cid, db) as (a, b, observer):
+        n = "contentfirst"
+        observer.sql(quote(n) + revision(n))
+        pa, pb = a.begin(), b.begin()
+        a.sql(snapshot(n) + item(n) + seal(n))
+        a.sql(f'UPDATE "QuotationRevision" SET "currentSnapshotId"=\'s{n}\' WHERE "id"=\'r{n}\';')
+        b.submit(send(n)); blocked(observer, pb, pa)
+        a.sql("COMMIT;")
+        check(b.finish() == ["r" + n], "send after content commit")
+        b.sql("COMMIT;")
+        check(observer.sql(f'SELECT "state" FROM "QuotationRevision" WHERE "id"=\'r{n}\';') == ["sent"], "content-first state")
+    with sessions(cid, db) as (a, b, observer):
+        n = "sendfirstcontent"
+        fixture(observer, n)
+        pa, pb = a.begin(), b.begin()
+        check(a.sql(send(n)) == ["r" + n], "send before content")
+        b.submit(snapshot(n, version=2, suffix="late")); blocked(observer, pb, pa)
+        a.sql("COMMIT;")
+        reject_pending(b, "P0001", "COMMERCIAL_CONTENT_INSERT_FORBIDDEN", observer,
+                       f'SELECT count(*) FROM "QuotationPricingSnapshot" WHERE "id"=\'s{n}late\';', ["0"])
+        check(observer.sql(f'SELECT count(*) FROM "QuotationPricingSnapshot" WHERE "revisionId"=\'r{n}\';') == ["1"], "original snapshot retained")
+    print("PASS: actual snapshot-insert/send lock orderings (SQL only)")
 
     # MVCC limitation: no legal committed unsealed snapshot exists (deferred
     # completion rejects commit). An unsealed row is visible ONLY to its creator.
