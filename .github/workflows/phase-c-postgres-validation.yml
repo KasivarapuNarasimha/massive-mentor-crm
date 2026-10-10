@@ -77,7 +77,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: 8800fe8151f483727b4758851aa7ff0b6f47b318
+          ref: f92bb8e013dcaa1304abf59acb368eda311969b5
           persist-credentials: false
           fetch-depth: 1
       - name: Verify source, hashes and environment-file exclusion
@@ -85,14 +85,14 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test "$(git rev-parse HEAD)" = 8800fe8151f483727b4758851aa7ff0b6f47b318
+          test "$(git rev-parse HEAD)" = f92bb8e013dcaa1304abf59acb368eda311969b5
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
           0e8bdbe3bccf1aeedf411681ab7b1c639a52d7a3eceef2f533daa122e6af2bfc  apps/api/prisma/schema.prisma
           1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
           31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
           dd800fca8acdb7a71884963e1c36f5a9c1401480c9339d884e18f201f67d0f09  apps/api/scripts/commercial-application-run.sh
-          cdb69088e5c7f17f21857dfcd5aa1e9391837e02ef4d5bb8677cfd7d560fb780  apps/api/scripts/commercial-workflow-postgres.test.cjs
+          82ff3570c5b62f446a9d4454f69245a9a78660921173b75cc1d62fa5318d7ec7  apps/api/scripts/commercial-workflow-postgres.test.cjs
           5cd7515bf66601f18a4ad886a1075aa95d8b3e0eb87e08fb140c068b1986bd98  apps/api/scripts/commercial-test-loader.cjs
           5c29b9659b56669ddf34b969e04dfac40f9c6d439e5ab452537974f1e5d4b4e2  apps/api/src/services/quotation.service.ts
           dcd2a626a51fc1eaba27299931977e25b70f5dc60c44fa5c9e673e24e035e27a  apps/api/src/services/quotation-customer.service.ts
@@ -106,7 +106,7 @@ jobs:
           9cc4bf0fa1966a6ca457d2b2465f5a6868056e3152c39f17e8434dd602e6b2e0  apps/api/src/routes/quotation.routes.ts
           fdecc06892ac9e45a4dfeaa9311cc048b80f912836d2218aa38b5487b28d30e6  apps/api/src/routes/quotation-customer.routes.ts
           2c0d661c615b1d29d2fe9f15fc5ea8d1c95bfd0d217f6450dfba084f69b0a7ce  apps/api/src/routes/commercial-finance.routes.ts
-          425da14dec85ff48b0fefbd067da354a45f4a280dc38e5373f23403c1c1a112d  apps/web/app/commercial/page.tsx
+          7bd5b961b29c7d80b9dcf290c85348168e50b154d66b2051a84978a6e549b1a9  apps/web/app/commercial/page.tsx
           HASHES
           python3 - <<'PY'
           import pathlib,subprocess
