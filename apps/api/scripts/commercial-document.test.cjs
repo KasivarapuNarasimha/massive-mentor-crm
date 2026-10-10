@@ -208,3 +208,13 @@ test("unrelated raw SQL errors are not disguised as concurrency conflicts",async
  const original=new Prisma.PrismaClientKnownRequestError("Synthetic constraint error",{code:"P2010",clientVersion:"6.19.3",meta:{code:"23514"}});
  const service=loader({"../lib/prisma.js":{prisma:{$transaction:async()=>{throw original}}},"./commercial-access.service.js":{},"./commercial-billing-access.service.js":{}})("services/quotation.service.ts");await assert.rejects(service.transaction(async()=>null),error=>error===original);
 });
+
+test("trusted issuer checks retain tenant and restore caller pin without trusting issuer role",async()=>{
+ let strict;const checked=[],tx={$queryRaw:async()=>[]};const load=loader({"../lib/prisma.js":{prisma:{}},"./commercial-access.service.js":{CommercialAccessError:class extends Error{},resolveCommercialActionAccess:async(u,b,m,a,client)=>{assert.equal(client,tx);const pin=strict.getStrictRequestContext(u);assert.equal(pin.businessId,b);checked.push([u,b,a]);if(u==="disabled")throw Error("exact membership denied");return {userId:u,businessId:b,role:"finance",permissions:{}};}},"./commercial-billing-access.service.js":{evaluateCommercialBillingAccess:async()=>({allowed:true})}});
+ strict=load("services/strict-request-context.service.ts");const service=load("services/quotation.service.ts"),actor={userId:"owner",businessId:"A"};
+ await strict.runWithStrictBusinessContext({...actor,role:"owner",permissions:{}},async()=>{
+  await service.authorizeInvoiceIssuer(tx,actor,"finance");assert.equal(strict.getStrictRequestContext(actor.userId).userId,"owner");
+  await assert.rejects(service.authorizeInvoiceIssuer(tx,actor,"disabled"),/exact membership denied/);assert.equal(strict.getStrictRequestContext(actor.userId).userId,"owner");
+  await assert.rejects(service.authorizeInvoiceIssuer(tx,{...actor,businessId:"B"},"finance"),/Pinned workspace mismatch/);
+ });assert.equal(strict.getStrictRequestContext(actor.userId),undefined);assert(checked.every(([,b])=>b==="A"));assert(checked.some(([u,,a])=>u==="finance"&&a==="invoice.issue"));
+});

@@ -1,5 +1,5 @@
 import {Prisma} from "@prisma/client";
-import {transaction,authorize,type QuoteActor} from "./quotation.service.js";
+import {transaction,authorize,authorizeInvoiceIssuer,type QuoteActor} from "./quotation.service.js";
 import {object,id,text,contentHash,CommercialDocumentError,parseCommercialConfiguration} from "./commercial-document.service.js";
 import {deliveryPolicy} from "./commercial-delivery.service.js";
 const json=(v:unknown)=>JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue;
@@ -18,7 +18,7 @@ export async function setCommercialConfiguration(actor:QuoteActor,key:unknown,in
   const b=await tx.business.findUniqueOrThrow({where:{id:actor.businessId},select:{settings:true,updatedAt:true}}),settings=(b.settings??{}) as Prisma.JsonObject;
   const current=settings.commercial as {version?:unknown}|undefined;
   if((current?.version??null)!==expected||policy.version===expected)throw new CommercialDocumentError("COMMERCIAL_POLICY_VERSION_CONFLICT",409);
-  await authorize(tx,{userId:delivery.invoiceIssuerUserId,businessId:actor.businessId},"invoice.issue");
+  await authorizeInvoiceIssuer(tx,actor,delivery.invoiceIssuerUserId,"commercial.policy.manage");
   const changed=await tx.business.updateMany({where:{id:actor.businessId,updatedAt:b.updatedAt},data:{settings:{...settings,commercial:json(row.commercial),commercialDelivery:json(row.commercialDelivery)}}});if(changed.count!==1)throw new CommercialDocumentError("COMMERCIAL_POLICY_VERSION_CONFLICT",409);
   const pending=await tx.quotationRevision.findMany({where:{businessId:actor.businessId,state:"draft",currentSnapshotId:{not:null}},orderBy:{id:"asc"}});
   for(const r of pending){await tx.quotationRevision.update({where:{id:r.id,businessId:actor.businessId},data:{approvalState:"stale"}});await tx.quotationApprovalHistory.create({data:{businessId:actor.businessId,snapshotId:r.currentSnapshotId!,actorUserId:actor.userId,event:"stale",reason:"Commercial policy changed",metadata:{policyVersion:policy.version}}});await tx.quotation.update({where:{id:r.quotationId,businessId:actor.businessId},data:{version:{increment:1}}});}

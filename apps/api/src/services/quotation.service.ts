@@ -6,6 +6,7 @@ import { calculateCommercialQuote, COMMERCIAL_PRICING_VERSION } from "./commerci
 import { CommercialDocumentError, object, text, id, canonical, contentHash, COMMERCIAL_HASH_VERSION,
   parseCommercialConfiguration, commercialYear, normalizeQuoteInput, normalizeQuoteRequest, approvalRequired, reconcileCommercialSnapshot } from "./commercial-document.service.js";
 import { moduleForCommercialAction, type CommercialAction } from "./commercial-policy.js";
+import { getStrictRequestContext, runWithStrictBusinessContext } from "./strict-request-context.service.js";
 import type { LeadWriteContext } from "./tenant-scope.service.js";
 
 type Tx=Prisma.TransactionClient;
@@ -42,6 +43,17 @@ export async function authorize(tx:Tx,actor:QuoteActor,action:CommercialAction,o
     }
   }
   return context;
+}
+/** Trusted business-configured issuer validation, not client impersonation.
+ * Revalidate the caller, retain the exact tenant, and restore its request pin after
+ * checking the issuer's own enabled membership/module/action in the same transaction.
+ */
+export async function authorizeInvoiceIssuer(tx:Tx,actor:QuoteActor,issuerUserId:string,callerAction:"quotation.send"|"commercial.policy.manage"="quotation.send") {
+  const pinned=getStrictRequestContext(actor.userId);
+  if(pinned&&pinned.businessId!==actor.businessId) throw new CommercialAccessError("Pinned workspace mismatch");
+  await authorize(tx,actor,callerAction);
+  return runWithStrictBusinessContext({userId:issuerUserId,businessId:actor.businessId,role:"",permissions:null},()=>
+    authorize(tx,{userId:issuerUserId,businessId:actor.businessId},"invoice.issue"));
 }
 async function references(tx:Tx,actor:QuoteActor,action:CommercialAction,contactId:string,dealId:string|null) {
   await tx.$queryRaw`SELECT "id" FROM "Contact" WHERE "businessId"=${actor.businessId} AND "id"=${contactId} FOR SHARE`;

@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
-import { authorize,transaction,mutate,audit,reconcileStoredItems,visible,type QuoteActor } from "./quotation.service.js";
+import { authorize,authorizeInvoiceIssuer,transaction,mutate,audit,reconcileStoredItems,visible,type QuoteActor } from "./quotation.service.js";
 import { CommercialDocumentError,object,id,text,canonical,parseCommercialConfiguration,approvalRequired } from "./commercial-document.service.js";
 import { deliveryPolicy,encryptDelivery,decryptDelivery,randomLink,tokenHash,newOtp,otpHash,verifyOtpHash,customerLink,sendCommercialEmail } from "./commercial-delivery.service.js";
 import { nextFinanceInvoiceNumber } from "./invoice-sequence.service.js";
@@ -25,7 +25,7 @@ async function lockedDraft(tx:Tx,actor:QuoteActor,quotationId:string,expectedVer
  if(approvalRequired(p.commercial,verified.output)&&r.approvalState!=="approved")conflict("QUOTATION_APPROVAL_REQUIRED");
  if(!approvalRequired(p.commercial,verified.output)&&r.approvalState!=="not_required"&&r.approvalState!=="approved")conflict("QUOTATION_APPROVAL_STATE_INVALID");
  if(new Prisma.Decimal(verified.output.grandTotal).lte(0))conflict("ZERO_TOTAL_INVOICE_POLICY_REQUIRED");
- await authorize(tx,{userId:p.delivery.invoiceIssuerUserId,businessId:actor.businessId},"invoice.issue");
+ await authorizeInvoiceIssuer(tx,actor,p.delivery.invoiceIssuerUserId);
  const customer=e.customerSnapshot as {email?:unknown};if(typeof customer.email!=="string"||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)||/[\r\n]/.test(customer.email))conflict("CUSTOMER_EMAIL_REQUIRED");
  return {q,r,s,p,verified,email:customer.email};
 }
@@ -136,7 +136,7 @@ export async function verifyCustomerDecision(token:unknown,input:unknown){
   if(c.usedAt)conflict("OTP_REPLAY_CONFLICT");
   let invoiceId:string|null=null;
   if(action==="accepted"){
-   await authorize(tx,{userId:policy.invoiceIssuerUserId,businessId:a.businessId},"invoice.issue");
+   await authorizeInvoiceIssuer(tx,{userId:a.senderUserId,businessId:a.businessId},policy.invoiceIssuerUserId);
    const prior=await tx.quotationInvoiceConversion.findUnique({where:{businessId_quotationId:{businessId:a.businessId,quotationId:q.id}}});if(prior)conflict("QUOTATION_ALREADY_CONVERTED");
    if(r.dealId){
     await tx.$queryRaw`SELECT "id" FROM "Deal" WHERE "businessId"=${a.businessId} AND "id"=${r.dealId} FOR UPDATE`;

@@ -109,6 +109,17 @@ test("billing denies locked business without resolver repairs or writes",async()
  const count=await db.quotation.count();await db.business.update({where:{id:owner.businessId},data:{isLocked:true}});
  try{await assert.rejects(create(),/COMMERCIAL_BILLING_DENIED/);}finally{await db.business.update({where:{id:owner.businessId},data:{isLocked:false}});}assert.equal(await db.quotation.count(),count);
 });
+test("actual HTTP quotation-to-payment chain retains the request tenant across issuer validation",async()=>{
+ const request=async(path,method="GET",body,who=owner,idem)=>{const token=who&&jwt.sign({userId:who.userId,tv:0,portal:"customer"},"synthetic-jwt-signature-only-32-characters");const r=await fetch(origin+path,{method,headers:{...(token?{authorization:"Bearer "+token,"x-business-id":who.businessId}:{}),...(body===undefined?{}:{"content-type":"application/json"}),...(idem?{"idempotency-key":idem}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(25000)});return {status:r.status,...await r.json()};};
+ const created=await request("/api/quotations","POST",input(),owner,key());assert.equal(created.status,201);const q=created.data;
+ const replayKey=key(),payload={expectedVersion:q.version,expectedRevisionVersion:q.revisionVersion,snapshotId:q.snapshotId};const sent=await request("/api/quotations/"+q.quotationId+"/send","POST",payload,owner,replayKey);assert.equal(sent.status,200);assert.equal(sent.data.state,"sent");
+ const token=emails.at(-1).text.match(/\/quotation\/review#([A-Za-z0-9_-]{43})/)[1];const view=await request("/api/quotation-customer/view","POST",{token},null);assert.equal(view.status,200);assert.equal(view.data.pricing.grandTotal,"118.00");
+ assert.equal((await request("/api/quotation-customer/otp","POST",{token,action:"accepted"},null)).status,200);const code=emails.at(-1).text.match(/ is (\d{6})\./)[1];const decision=await request("/api/quotation-customer/decision","POST",{token,action:"accepted",code},null);assert.equal(decision.status,200);const invoiceId=decision.data.invoiceId;
+ const paid=await request("/api/commercial/invoices/"+invoiceId+"/payments","POST",{amount:"20",method:"cash",reference:null,notes:"Synthetic HTTP",paidAt:new Date().toISOString()},accountant,key());assert.equal(paid.status,200);assert.equal(paid.data.outstandingBalance,"98.00");
+ assert.equal((await request("/api/commercial/invoices/"+invoiceId,"GET",undefined,accountant)).data.outstandingBalance,"98.00");assert.equal((await request("/api/commercial/reports","GET",undefined,accountant)).status,200);
+ assert.equal((await request("/api/quotations/unknown/unknown","POST",{},owner,key())).status,404);assert.equal(legacyCalls,0);
+});
+
 test("revoked explicit grant denies mutation; policy changes stale drafts but retain sent snapshots",async()=>{
  const member=await db.businessMember.findUnique({where:{businessId_userId:{businessId:owner.businessId,userId:owner.userId}}});await db.businessMember.update({where:{id:member.id},data:{permissions:{...member.permissions,commercialActions:[]}}});
  try{await assert.rejects(create(),/grant|Commercial|permission|Explicit/i);}finally{await db.businessMember.update({where:{id:member.id},data:{permissions:member.permissions}});}
