@@ -155,6 +155,16 @@ for(const editFirst of [true,false])test(`barrier-controlled ${editFirst?"edit-b
  const r=await db.quotationRevision.findUnique({where:{id:q.revisionId}});assert.equal(r.state,editFirst?"draft":"sent");assert.equal(r.notes,editFirst?"Committed edit":"");await db.$transaction(tx=>tx.$queryRaw`SELECT "id" FROM "Quotation" WHERE "id"=${q.quotationId} FOR UPDATE NOWAIT`);
 });
 
+test("concurrent multi-business HTTP requests keep separate pinned tenants with no membership repair",async()=>{
+ const member=await db.businessMember.create({data:{businessId:"phasec-B",userId:owner.userId,role:"owner",permissions:{customized:true,modules:["quotations","finance"],commercialActions:actions}}});const count=await db.businessMember.count();
+ try{const token=jwt.sign({userId:owner.userId,tv:0,portal:"customer"},"synthetic-jwt-signature-only-32-characters"),results=await Promise.all(["phasec-A","phasec-B"].map(async businessId=>{const r=await fetch(origin+"/api/quotations",{method:"POST",headers:{authorization:"Bearer "+token,"x-business-id":businessId,"idempotency-key":key(),"content-type":"application/json"},body:JSON.stringify({...input(),contactId:businessId==="phasec-A"?"phasec-contact-A":"phasec-contact-B"}),signal:AbortSignal.timeout(10000)});assert.equal(r.status,201);const body=await r.json();const q=await db.quotation.findUnique({where:{id:body.data.quotationId}});assert.equal(q.businessId,businessId);return q.id;}));assert.equal(new Set(results).size,2);assert.equal(await db.businessMember.count(),count);assert.equal(legacyCalls,0);
+ }finally{await db.businessMember.delete({where:{id:member.id}});}
+});
+test("inactive/deleted business and null-business customer fail before commercial writes",async()=>{
+ const count=await db.quotation.count();for(const status of ["inactive","deleted"]){await db.business.update({where:{id:owner.businessId},data:{status}});try{await assert.rejects(create(),/Active exact workspace membership required/);}finally{await db.business.update({where:{id:owner.businessId},data:{status:"active"}});}}
+ const c=await db.contact.create({data:{userId:owner.userId,businessId:null,name:"Synthetic legacy",tags:[]}});await assert.rejects(quotes.createQuotation(owner,key(),{...input(),contactId:c.id}),/Customer unavailable in this workspace/);assert.equal(await db.quotation.count(),count);
+});
+
 test("revoked explicit grant denies mutation; policy changes stale drafts but retain sent snapshots",async()=>{
  const member=await db.businessMember.findUnique({where:{businessId_userId:{businessId:owner.businessId,userId:owner.userId}}});await db.businessMember.update({where:{id:member.id},data:{permissions:{...member.permissions,commercialActions:[]}}});
  try{await assert.rejects(create(),/grant|Commercial|permission|Explicit/i);}finally{await db.businessMember.update({where:{id:member.id},data:{permissions:member.permissions}});}

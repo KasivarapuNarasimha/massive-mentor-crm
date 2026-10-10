@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { resolveCommercialActionAccess, assertCommercialReferences, buildCommercialReferenceScope, CommercialAccessError } from "./commercial-access.service.js";
 import { evaluateCommercialBillingAccess } from "./commercial-billing-access.service.js";
-import { calculateCommercialQuote, COMMERCIAL_PRICING_VERSION } from "./commercial-pricing.service.js";
+import { COMMERCIAL_PRICING_VERSION } from "./commercial-pricing.service.js";
 import { CommercialDocumentError, object, text, id, canonical, contentHash, COMMERCIAL_HASH_VERSION,
   parseCommercialConfiguration, commercialYear, normalizeQuoteInput, normalizeQuoteRequest, approvalRequired, reconcileCommercialSnapshot } from "./commercial-document.service.js";
 import { moduleForCommercialAction, type CommercialAction } from "./commercial-policy.js";
