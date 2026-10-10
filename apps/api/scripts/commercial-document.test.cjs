@@ -72,6 +72,7 @@ function fixture({auditFail=false,deny=false}={}) {
   const calls=[];
   const tx={
     async $queryRaw(){calls.push("SELECT lock");return []},
+    async $executeRaw(){calls.push("SELECT advisory lock");return 1},
     business:{async findUniqueOrThrow(){return {settings:{commercial:config()}}}},
     businessMember:{async findUnique(){return {user:{isDisabled:false}}}},
     contact:{async findFirstOrThrow(){return {id:"contactA",name:"Synthetic",email:"test@example.invalid",phone:null,company:null}}},
@@ -128,7 +129,7 @@ async function httpFixture(change=()=>{}) {
   const member=(where)=>state.member&&where.businessId_userId.businessId==="A"?{role:"owner",permissions:{modules:state.modules,commercialActions:state.actions},user:{isDisabled:state.disabled},business:biz}:null;
   // Extend the transaction fixture with real authorization SELECT adapters.
   const tx={
-    async $queryRaw(){return []},businessMember:{async findUnique({where}){return member(where)},create:never,update:never,upsert:never},
+    async $queryRaw(){return []},async $executeRaw(){return 1},businessMember:{async findUnique({where}){return member(where)},create:never,update:never,upsert:never},
     business:{async findUnique(){return biz},async findUniqueOrThrow(){return biz},update:never},
     contact:{async findFirst({where}){return where.businessId==="A"&&where.id==="contactA"?{id:"contactA"}:null},async findFirstOrThrow(){return {id:"contactA",name:"Synthetic",email:null,phone:null,company:null}}},
     deal:{async findFirst({where}){return where.businessId==="A"&&where.id==="dealA"?{id:"dealA",contactId:"contactA"}:null}},

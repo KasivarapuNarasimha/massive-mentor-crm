@@ -82,7 +82,7 @@ export async function deliverCommercialMessage(deliveryId:string,actor?:QuoteAct
   }else{
    const c=await tx.quotationOtpChallenge.findUnique({where:{accessId:d.accessId}});
    if(c&&c.version===d.challengeVersion&&!c.usedAt)await tx.quotationOtpChallenge.update({where:{id:c.id},data:{deliveredAt:new Date()}});
-   await audit(tx,{businessId:d.businessId,userId:"customer"},d.access.quotationId,d.access.snapshotId,"quotation.otp.delivered",{deliveryId:d.id});
+   await customerAudit(tx,d.access,"quotation.otp.delivered",{deliveryId:d.id});
   }
   await tx.commercialDelivery.update({where:{id:deliveryId},data:{state:"delivered",payload:null,leaseUntil:null,deliveredAt:new Date()}});
  });
