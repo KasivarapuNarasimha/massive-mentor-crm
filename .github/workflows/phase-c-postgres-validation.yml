@@ -1,0 +1,164 @@
+# Manual dispatch only. Database execution requires explicit owner authorization.
+name: Phase C application PostgreSQL validation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: phase-c-disposable-postgres
+  cancel-in-progress: false
+jobs:
+  provenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      started_at: ${{ steps.verify.outputs.started_at }}
+    steps:
+      - id: verify
+        name: Verify authenticated dispatcher before provisioning PostgreSQL
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const repo = 'KasivarapuNarasimha/massive-mentor-crm';
+            const path = '.github/workflows/phase-c-postgres-validation.yml';
+            const e = process.env;
+            if (e.GITHUB_REPOSITORY !== repo || e.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
+                e.GITHUB_REF !== 'refs/heads/codex/phase-c-validation-source' || e.GITHUB_ACTOR !== 'KasivarapuNarasimha' ||
+                e.GITHUB_WORKFLOW_REF !== `${repo}/${path}@refs/heads/codex/phase-c-validation-source` ||
+                e.RUNNER_ENVIRONMENT !== 'github-hosted') {
+              throw new Error('Dispatcher identity rejected');
+            }
+            const runId = Number(e.GITHUB_RUN_ID);
+            const attempt = Number(e.GITHUB_RUN_ATTEMPT);
+            if (!Number.isSafeInteger(runId) || runId < 1 ||
+                !Number.isSafeInteger(attempt) || attempt < 1) {
+              throw new Error('Run identity rejected');
+            }
+            const {data: run} = await github.rest.actions.getWorkflowRunAttempt({
+              ...context.repo, run_id: runId, attempt_number: attempt
+            });
+            const {data: workflow} = await github.rest.actions.getWorkflow({
+              ...context.repo, workflow_id: run.workflow_id
+            });
+            if (run.id !== runId || run.run_attempt !== attempt ||
+                run.repository.full_name !== repo || run.event !== 'workflow_dispatch' ||
+                run.head_branch !== 'codex/phase-c-validation-source' || run.head_sha !== e.GITHUB_SHA ||
+                run.head_sha !== e.GITHUB_WORKFLOW_SHA || workflow.path !== path ||
+                run.actor.login !== 'KasivarapuNarasimha' ||
+                run.triggering_actor.login !== 'KasivarapuNarasimha' ||
+                run.status !== 'in_progress') {
+              throw new Error('Authenticated run metadata rejected');
+            }
+            const started = Date.parse(run.run_started_at);
+            if (!Number.isFinite(started) || started > Date.now() ||
+                Date.now() - started > 3600000) {
+              throw new Error('Run timestamp rejected');
+            }
+            core.setOutput('started_at', run.run_started_at);
+  validate:
+    needs: provenance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres@sha256:66aafa11cf15800a3c94763f7e11d1e7b2e37e5e84bc4ce027cb6e1e4bfaf4df
+        env:
+          POSTGRES_USER: mm_phasec
+          POSTGRES_PASSWORD: phasec_dummy_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U mm_phasec -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - name: Checkout fixed application checkpoint
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: KasivarapuNarasimha/massive-mentor-crm
+          ref: cb32b88c24dc218cf7a2cb773d289882d80465b5
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify source, hashes and environment-file exclusion
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          test "$(git rev-parse HEAD)" = cb32b88c24dc218cf7a2cb773d289882d80465b5
+          test -z "$(git status --porcelain)"
+          sha256sum --check --strict <<'HASHES'
+          dff117f92a2c9dd4797365a8a224d80c0a8be151ba74c37673dfdce4060aa842  apps/api/prisma/schema.prisma
+          1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
+          09dc5562d7cf40676879f799165f2d9da05227c3bc9921373fb2b14223468780  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
+          1643dc0f1c0a125ea3651c8b7881bb3f8bc5dd1d8fc60637a0290ef7f91ee589  apps/api/scripts/commercial-application-run.sh
+          4d76d7b791d98b91d64354ab28b775e8624d35221ca2efdf508ad6a6c349cfbf  apps/api/scripts/commercial-workflow-postgres.test.cjs
+          5cd7515bf66601f18a4ad886a1075aa95d8b3e0eb87e08fb140c068b1986bd98  apps/api/scripts/commercial-test-loader.cjs
+          313e57b63e129315ad74aff2f614e974f03631034cafe430b77b04a29d5ed382  apps/api/src/services/quotation.service.ts
+          f1c3e297e295407546c25c248dfaba3a452767f5f7647be355b375502fbfd8e7  apps/api/src/services/quotation-customer.service.ts
+          55badfc654fe05c6878d2f29bf569948ea65cf63f71d4a7f454836c0e7beb60d  apps/api/src/services/commercial-finance.service.ts
+          09d557e9adbcf11d160e7323f22cea871993c7cad9030b2f3479ab0f82d7b57d  apps/api/src/services/commercial-delivery.service.ts
+          5f5f8b0a020477d97fc5bbaea32891fde20cd37e8fb95a1cf0d8319078c8daf2  apps/api/src/services/commercial-configuration.service.ts
+          e5e26ea14e64ae8097845658c1f06c9de204b3b5fcee8906c51312d80cac4aa2  docs/phase-c-review/validation/concurrency.py
+          4bf59fa3f3bd38b35696519894479217318b1e3e3e31fec8cc4d48d115ae87e3  pnpm-lock.yaml
+          HASHES
+          python3 - <<'PY'
+          import pathlib,subprocess
+          for name in subprocess.check_output(['git','ls-files'],text=True).splitlines():
+              base=pathlib.PurePosixPath(name).name
+              if base.startswith('.env') and not (base.endswith('.example') or base.endswith('.template')):
+                  raise SystemExit('Unexpected environment file in source')
+          PY
+      - name: Fixed Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - name: Frozen dependencies without lifecycle scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          npm install --global pnpm@9.15.0 --ignore-scripts --no-audit --no-fund
+          test "$(pnpm --version)" = 9.15.0
+          pnpm install --frozen-lockfile --ignore-scripts
+          test -z "$(git status --porcelain)"
+      - name: Execute disposable application tests with sanitized evidence
+        shell: bash
+        env:
+          MM_PHASEC_DISPOSABLE: 'YES'
+          MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}
+          MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}
+          MM_PHASEC_RUN_STARTED_AT: ${{ needs.provenance.outputs.started_at }}
+          MM_PHASEC_IMAGE_DIGEST: postgres@sha256:66aafa11cf15800a3c94763f7e11d1e7b2e37e5e84bc4ce027cb6e1e4bfaf4df
+          MM_PHASEC_IMAGE_ID: sha256:589f742565e4f6d22149176b032974f55f8201a8a37b71ed587ec5c6902e689f
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          mkdir -p evidence
+          python3 - <<'PY'
+          import os,pathlib,re,subprocess
+          output=pathlib.Path(os.environ['RUNNER_TEMP'],'phasec-application-private.log')
+          with output.open('w') as log:
+              try:
+                  result=subprocess.run(['timeout','--signal=TERM','--kill-after=15','600','bash','apps/api/scripts/commercial-application-run.sh'],stdout=log,stderr=subprocess.STDOUT,timeout=630)
+                  code=result.returncode
+              except subprocess.TimeoutExpired:
+                  code=124
+          lines=output.read_text(errors='replace').splitlines()
+          safe=[line for line in lines if re.fullmatch(r'(?:ok|not ok) \d+ - [A-Za-z0-9 /:;,.()_=-]+',line) or re.fullmatch(r'# (?:tests|suites|pass|fail|cancelled|skipped|todo) \d+',line)]
+          codes=sorted(set(re.findall(r'\b(?:COMMERCIAL_[A-Z_]+|OTP_[A-Z_]+|SENT_REVISION_IMMUTABLE|P[0-9]{4})\b','\n'.join(lines))))
+          safe += ['Safe failure classes: '+', '.join(codes),'Harness exit: '+str(code),'Exact competing same-snapshot trigger-lock orderings: UNVERIFIED']
+          pathlib.Path('evidence/application-summary.txt').write_text('\n'.join(safe)+'\n')
+          print('\n'.join(safe))
+          if code or not any(re.fullmatch(r'# fail 0',line) for line in lines):
+              raise SystemExit(1)
+          PY
+      - name: Upload sanitized evidence only
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: phase-c-application-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/application-summary.txt
+          retention-days: 7
+          if-no-files-found: error
