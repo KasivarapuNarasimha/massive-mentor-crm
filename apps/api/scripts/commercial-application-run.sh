@@ -29,7 +29,8 @@ import os,pathlib
 s=pathlib.Path('apps/api/prisma/schema.prisma').read_text()
 marker='// Phase C commercial foundation; SQL migration adds lifecycle/sealing invariants.'
 assert s.count(marker)==1
-pathlib.Path(os.environ['RUNNER_TEMP'],'phasec-legacy.prisma').write_text(s.split(marker)[0])
+legacy=s.split(marker)[0].replace('  commercialConversion QuotationInvoiceConversion?\n','').replace('  @@unique([businessId,id])\n','')
+pathlib.Path(os.environ['RUNNER_TEMP'],'phasec-legacy.prisma').write_text(legacy)
 PY
 node apps/api/node_modules/prisma/build/index.js migrate diff --from-empty --to-schema-datamodel "$RUNNER_TEMP/phasec-legacy.prisma" --script > "$RUNNER_TEMP/phasec-legacy.sql"
 pg "$db" < "$RUNNER_TEMP/phasec-legacy.sql" > /dev/null

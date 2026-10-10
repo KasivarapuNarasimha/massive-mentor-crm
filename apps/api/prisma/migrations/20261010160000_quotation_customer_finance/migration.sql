@@ -35,10 +35,12 @@ CREATE TABLE "CommercialDelivery" (
  "leaseUntil" TIMESTAMPTZ(3),"deliveredAt" TIMESTAMPTZ(3),"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
  FOREIGN KEY ("businessId","accessId") REFERENCES "QuotationCustomerAccess"("businessId","id") ON DELETE RESTRICT ON UPDATE RESTRICT);
 CREATE INDEX "CommercialDelivery_businessId_accessId_state_idx" ON "CommercialDelivery"("businessId","accessId","state");
+ALTER TABLE "Invoice" ADD CONSTRAINT "Invoice_businessId_id_key" UNIQUE("businessId","id");
 CREATE TABLE "QuotationInvoiceConversion" (
  "id" TEXT PRIMARY KEY,"businessId" TEXT NOT NULL,"quotationId" TEXT NOT NULL,"snapshotId" TEXT NOT NULL,"revisionId" TEXT NOT NULL,"invoiceId" TEXT NOT NULL UNIQUE,
  "customerSnapshot" JSONB NOT NULL,"pricingSnapshot" JSONB NOT NULL,"acceptedAt" TIMESTAMPTZ(3) NOT NULL,"createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
  UNIQUE("businessId","quotationId"),UNIQUE("businessId","invoiceId"),
+ FOREIGN KEY ("businessId","invoiceId") REFERENCES "Invoice"("businessId","id") ON DELETE RESTRICT ON UPDATE RESTRICT,
  FOREIGN KEY ("businessId","revisionId","snapshotId") REFERENCES "QuotationPricingSnapshot"("businessId","revisionId","id") ON DELETE RESTRICT ON UPDATE RESTRICT,
  FOREIGN KEY ("businessId","quotationId","revisionId") REFERENCES "QuotationRevision"("businessId","quotationId","id") ON DELETE RESTRICT ON UPDATE RESTRICT);
 CREATE TABLE "CommercialPaymentEntry" (

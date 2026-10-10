@@ -1525,7 +1525,9 @@ model Invoice {
   payments    Payment[]
   /// Optional reverse link when Invoice was created from a Sales Order post
   salesOrders SalesOrder[]
+  commercialConversion QuotationInvoiceConversion?
 
+  @@unique([businessId,id])
   @@unique([businessId, number])
   /// One Finance revenue document per CRM source (prevents Deal+Client double count)
   @@unique([businessId, sourceType, sourceId])
@@ -2765,6 +2767,7 @@ model QuotationInvoiceConversion {
   pricingSnapshot Json
   acceptedAt DateTime @db.Timestamptz(3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
+  invoice Invoice @relation(fields:[businessId,invoiceId],references:[businessId,id],onDelete:Restrict,onUpdate:Restrict)
   @@unique([businessId,quotationId])
   @@unique([businessId,invoiceId])
 }

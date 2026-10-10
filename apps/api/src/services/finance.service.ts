@@ -148,7 +148,7 @@ export async function getFinanceDashboard(userId: string) {
   // Best-effort currency normalization without full table scan of values
   await Promise.all([
     prisma.invoice.updateMany({
-      where: { businessId, currency: { not: currency } },
+      where: { businessId, currency: { not: currency }, OR:[{sourceType:null},{sourceType:{not:"quotation"}}] },
       data: { currency },
     }),
     prisma.expense.updateMany({

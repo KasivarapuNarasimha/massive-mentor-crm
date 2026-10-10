@@ -82,7 +82,7 @@ export async function mutate(actor:QuoteActor,operation:string,key:unknown,input
   const requestKey=id(key), requestHash=contentHash(input);
   return transaction(async tx=>{
     await authorize(tx,actor,action);
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${actor.businessId}),hashtext(${actor.userId+":"+operation+":"+requestKey}))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${actor.businessId}),hashtext(${actor.userId+":"+operation+":"+requestKey}))`;
     const prior=await tx.commercialMutationRequest.findUnique({where:{businessId_actorUserId_operation_key:{businessId:actor.businessId,actorUserId:actor.userId,operation,key:requestKey}}});
     if(prior) {
       if(prior.requestHash!==requestHash) throw new CommercialDocumentError("IDEMPOTENCY_KEY_CONFLICT",409);

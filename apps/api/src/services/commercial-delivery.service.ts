@@ -14,7 +14,7 @@ export function tokenHash(token:unknown){if(typeof token!=="string"||!/^[A-Za-z0
 export function newOtp(){return String(randomInt(0,1000000)).padStart(6,"0");}
 export function otpHash(accessId:string,version:number,action:string,code:string){return createHmac("sha256",encryptionKey()).update(JSON.stringify([accessId,version,action,code])).digest("hex");}
 export function verifyOtpHash(expected:string,actual:string){if(!/^[0-9a-f]{64}$/.test(expected)||!/^[0-9a-f]{64}$/.test(actual))return false;return timingSafeEqual(Buffer.from(expected,"hex"),Buffer.from(actual,"hex"));}
-export function customerLink(token:string){const raw=process.env.COMMERCIAL_PUBLIC_URL;if(!raw)throw new CommercialDocumentError("COMMERCIAL_PUBLIC_URL_REQUIRED",503);const url=new URL(raw);if(url.protocol!=="https:"||url.username||url.password||url.search||url.hash)throw new CommercialDocumentError("INVALID_COMMERCIAL_PUBLIC_URL",503);url.pathname=url.pathname.replace(/\/$/,"")+"/quotation/"+token;return url.toString();}
+export function customerLink(token:string){const raw=process.env.COMMERCIAL_PUBLIC_URL;if(!raw)throw new CommercialDocumentError("COMMERCIAL_PUBLIC_URL_REQUIRED",503);const url=new URL(raw);if(url.protocol!=="https:"||url.username||url.password||url.search||url.hash)throw new CommercialDocumentError("INVALID_COMMERCIAL_PUBLIC_URL",503);url.pathname=url.pathname.replace(/\/$/,"")+"/quotation/review";url.hash=token;return url.toString();}
 /** Dedicated transport: never logs message bodies/tokens, even in development. */
 export async function sendCommercialEmail(payload:{to:string;subject:string;text:string}) {
  const host=process.env.SMTP_HOST,user=process.env.SMTP_USER,pass=process.env.SMTP_PASS,from=process.env.SMTP_FROM;
