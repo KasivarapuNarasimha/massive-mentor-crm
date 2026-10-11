@@ -71,8 +71,8 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       return {
         message: `Found ${res.total} contact(s)`,
         data: { total: res.total, items: res.items.slice(0, 10) },
-        fields: res.items.slice(0, 5).map((c: any) => ({
-          label: c.name || c.company || c.id,
+        fields: res.items.slice(0, 5).map((c) => ({
+          label: (c.name as string) || (c.company as string) || (c.id as string),
           value: [c.type, c.status, c.phone].filter(Boolean).join(" · "),
         })),
         actions: [{ label: "Open Leads", href: "/dashboard/leads" }],
@@ -500,7 +500,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
         title: args.title || undefined,
         value: args.value,
         stage: args.stage || undefined,
-      })) as any;
+      })) as Partial<Awaited<ReturnType<typeof updateDeal>>["deal"]> & { deal?: Awaited<ReturnType<typeof updateDeal>>["deal"] };
       const deal = updated.deal || updated;
       return {
         message: "Deal updated",
@@ -541,7 +541,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
     execute: async (ctx, args) => {
       const updated = (await updateDeal(ctx.userId, (args.deal as { id: string }).id, {
         stage: args.stage,
-      })) as any;
+      })) as Partial<Awaited<ReturnType<typeof updateDeal>>["deal"]> & { deal?: Awaited<ReturnType<typeof updateDeal>>["deal"] };
       const deal = updated.deal || updated;
       return {
         message: `Deal moved to ${args.stage}`,
@@ -1202,7 +1202,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
         sellingPrice: args.sellingPrice,
         reorderLevel: args.reorderLevel != null ? Number(args.reorderLevel) : undefined,
         trackInventory: true,
-      })) as any;
+      })) as unknown as Awaited<ReturnType<typeof createProduct>>["product"] & { product?: Awaited<ReturnType<typeof createProduct>>["product"] };
       const product = created.product || created;
       // optional opening stock
       if (args.stock != null && ctx.businessId) {

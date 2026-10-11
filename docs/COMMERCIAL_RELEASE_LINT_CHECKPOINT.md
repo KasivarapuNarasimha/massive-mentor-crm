@@ -41,3 +41,11 @@ No production access, migrations, schema/config/workflow changes or deployment. 
 
 - mm-release-verified-regressions.log: SHA256 fb9f02c72cfdd1d3d40af747cb3e85a1547f79c0e8241106296e6128dd78ed38
 - mm-release-final-lint.json: SHA256 96e5d24aade5973052972122b3116a6b6f21beb674d7c1a706df5c39afb75dae
+
+## Follow-up registry and artifact verification
+
+Four additional registry diagnostics were corrected with type-only assertions and inference. All legacy fallback expressions remain intact. The unchanged byte-identical emitted-JavaScript test and restore/preservation suite pass: 14/14. Full API lint now reports one remaining no-explicit-any error at registry.ts:51 (heterogeneous ActionDef argument boundary). No suppression or recommended rule change. Final API TypeScript --noEmit --incremental false: PASS. Whitespace check: PASS.
+
+Run #16 ZIP verification completed in a separate owned temporary inspection directory: ZIP CRC, fixed published SHA256 647a76d633eb1cdc8ad1f1b57208d960489ff016810a0cd512b892595298f563, source 1bc44ba9d9a0951645df42a853bc5799650865ef, inner tar SHA256 8d61dc51b6111a3ba34c5c46bed817020edfad692e3af8efd8430855da4fda26, every manifest hash/inventory/path/link, source safety/schema/package hashes. Original ZIP unchanged. Secret exclusion/pattern scan is not exhaustive secret certification.
+
+Full actual-artifact/PM2/populated-history rollback remains UNVERIFIED. Existing manual workflow has integration/packaging gates only. No compatible fallback Linux artifact is verified. Authenticated browser access is available; new rollback workflow activation/execution still needs its reviewed source/artifact/PM2 pins and explicit authorization. No workflow was created/activated in this follow-up. SMTP remains unavailable pending approved non-production configuration and synthetic recipient. Production NO-GO; no production/database operations.
