@@ -63,6 +63,9 @@ importers:
         specifier: ^3.24.3
         version: 3.25.76
     devDependencies:
+      '@eslint/js':
+        specifier: 9.39.5
+        version: 9.39.5
       '@types/bcryptjs':
         specifier: ^2.4.6
         version: 2.4.6
@@ -84,9 +87,18 @@ importers:
       '@types/nodemailer':
         specifier: ^6.4.17
         version: 6.4.24
+      '@typescript-eslint/eslint-plugin':
+        specifier: 8.64.0
+        version: 8.64.0(@typescript-eslint/parser@8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: 8.64.0
+        version: 8.64.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
       eslint:
         specifier: ^9.25.1
         version: 9.39.5(jiti@2.7.0)
+      globals:
+        specifier: 14.0.0
+        version: 14.0.0
       prisma:
         specifier: ^6.6.0
         version: 6.19.3(typescript@5.9.3)
