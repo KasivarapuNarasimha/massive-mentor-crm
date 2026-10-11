@@ -10,7 +10,7 @@ python3 docs/phase-c-review/validation/concurrency.py --storage-only "$MM_PHASEC
 db="mm_phasecapp_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
 [[ ${#db} -le 63 ]] || exit 2
 pg(){ timeout 45 docker --context default exec -i "$MM_PHASEC_CONTAINER_ID" env -i PATH=/usr/local/bin:/usr/bin:/bin PGHOST=/var/run/postgresql PGPORT=5432 PGUSER=mm_phasec PGPASSWORD=phasec_dummy_only PGCONNECT_TIMEOUT=5 PGOPTIONS='-c statement_timeout=20000 -c lock_timeout=5000 -c idle_in_transaction_session_timeout=25000' psql -X -qAt -v ON_ERROR_STOP=1 -d "$1"; }
-[[ $(printf "SELECT current_user||':'||current_database()||':'||(current_setting('server_version_num')::int/10000)::text||':'||(inet_client_addr() IS NULL)::text;" | pg postgres) == mm_phasec:postgres:17:true ]] || exit 2
+[[ $(printf "SELECT current_user||':'||current_database()||':'||current_setting('server_version_num')||':'||(inet_client_addr() IS NULL)::text;" | pg postgres) == mm_phasec:postgres:160015:true ]] || exit 2
 [[ $(printf "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname='%s');" "$db" | pg postgres) == f ]] || exit 2
 created=0
 cleanup(){ code=$?;trap - EXIT;if [[ $created == 1 ]];then printf 'DROP DATABASE "%s" WITH (FORCE);' "$db" | pg postgres >/dev/null 2>&1 || code=1;fi;exit "$code"; }

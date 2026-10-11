@@ -28,9 +28,9 @@ async function otp(token,action="accepted"){await customer.requestCustomerOtp(to
 async function accepted(){const q=await create(),token=await send(q),code=await otp(token);const result=await customer.verifyCustomerDecision(token,{action:"accepted",code});return {q,token,code,...result};}
 before(async()=>{
  let stage="identity";try{
- const [identity]=await db.$queryRaw`SELECT current_database() AS db,current_user AS actor,current_setting('server_version_num')::int/10000 AS version,shobj_description(oid,'pg_database') AS marker FROM pg_database WHERE datname=current_database()`;
+ const [identity]=await db.$queryRaw`SELECT current_database() AS db,current_user AS actor,current_setting('server_version_num')::int AS version,shobj_description(oid,'pg_database') AS marker FROM pg_database WHERE datname=current_database()`;
  console.log("MM_IDENTITY_TYPES:"+typeof identity.version+":"+String(identity.marker===`MM_PHASEC_DISPOSABLE:${run}:${attempt}`));
- assert.deepEqual(identity,{db:expectedDb,actor:"mm_phasec",version:17,marker:`MM_PHASEC_DISPOSABLE:${run}:${attempt}`});
+ assert.deepEqual(identity,{db:expectedDb,actor:"mm_phasec",version:160015,marker:`MM_PHASEC_DISPOSABLE:${run}:${attempt}`});
  stage="users";
  for(const [userId,role] of [[owner.userId,"owner"],[manager.userId,"sales_manager"],[accountant.userId,"finance"],["phasec-foreign","owner"],["phasec-disabled","owner"]])await db.user.create({data:{id:userId,email:userId+"@example.invalid",passwordHash:"synthetic-not-login",role,isDisabled:userId==="phasec-disabled"}});
  stage="businesses";

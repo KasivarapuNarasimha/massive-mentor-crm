@@ -318,9 +318,9 @@ def main(cid, db):
     preflight(cid, db)
     with sessions(cid, db, 1) as (s,):
         identity = s.sql("SELECT current_user||':'||current_database()||':'||"
-                         "(current_setting('server_version_num')::int/10000)::text||':'||"
+                         "current_setting('server_version_num')||':'||"
                          "(inet_client_addr() IS NULL)::text;")
-        check(identity == [f"mm_phasec:{db}:17:true"], "DB identity")
+        check(identity == [f"mm_phasec:{db}:160015:true"], "DB identity")
 
     # DDL rollback surrogate and exact second migration application, SQL only.
     with sessions(cid, db, 2) as (s, observer):

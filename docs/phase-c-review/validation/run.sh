@@ -3,7 +3,7 @@
 # Explicit inputs: proposal argument; MM_PHASEC_CONTAINER_ID from CI service ID;
 # independently approved MM_PHASEC_IMAGE_ID sha256 and MM_PHASEC_PROPOSAL_SHA256; MM_PHASEC_DISPOSABLE=YES.
 # Also require MM_PHASEC_IMAGE_DIGEST and authenticated MM_PHASEC_RUN_STARTED_AT.
-# Service contract: PG17, mm_phasec user, dummy password phasec_dummy_only, only a fresh Docker-created anonymous data volume.
+# Service contract: exact PostgreSQL 16.15, mm_phasec user, dummy password phasec_dummy_only, only a fresh Docker-created anonymous data volume.
 set -euo pipefail
 set +x
 umask 077
@@ -39,10 +39,10 @@ pg() {
  psql -X -qAt -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -d "$1"
 }
 identity=$(pg postgres <<'SQL'
-SELECT current_user||':'||current_database()||':'||(current_setting('server_version_num')::int/10000)::text||':'||(inet_client_addr() IS NULL)::text;
+SELECT current_user||':'||current_database()||':'||current_setting('server_version_num')||':'||(inet_client_addr() IS NULL)::text;
 SQL
 )
-[[ $identity == mm_phasec:postgres:17:true ]] || exit 2
+[[ $identity == mm_phasec:postgres:160015:true ]] || exit 2
 exists=$(printf "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname='%s');\n" "$db" | pg postgres)
 [[ $exists == f ]] || { echo 'FAIL: disposable DB already exists'; exit 2; }
 created=0
@@ -67,7 +67,7 @@ SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHER
 SQL
 )
 [[ $empty == 0 ]] || exit 2
-echo 'Preflight: isolated PostgreSQL 17 and empty run-specific database verified'
+echo 'Preflight: isolated PostgreSQL 16.15 and empty run-specific database verified'
 pg "$db" < "$proposal" >/dev/null
 pg "$db" < "$here/catalog-and-negative.sql"
 timeout 420 python3 "$here/concurrency.py" "$cid" "$db"
