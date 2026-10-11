@@ -62,7 +62,7 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres@sha256:66aafa11cf15800a3c94763f7e11d1e7b2e37e5e84bc4ce027cb6e1e4bfaf4df
+        image: postgres@sha256:ec9f656f17c8b4dfebf49e58cf5c46d493d4846d4ea6d8b85d0637f68ee33bfc
         env:
           POSTGRES_USER: mm_phasec
           POSTGRES_PASSWORD: phasec_dummy_only
@@ -77,7 +77,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: 43fdf21f109e2a0d29a2e6a14553ae0d6e1d4d71
+          ref: 653f48a97c7b247147cbc6ede654c242e09e6ccd
           persist-credentials: false
           fetch-depth: 1
       - name: Verify source, hashes and environment-file exclusion
@@ -85,21 +85,21 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test "$(git rev-parse HEAD)" = 43fdf21f109e2a0d29a2e6a14553ae0d6e1d4d71
+          test "$(git rev-parse HEAD)" = 653f48a97c7b247147cbc6ede654c242e09e6ccd
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
           0e8bdbe3bccf1aeedf411681ab7b1c639a52d7a3eceef2f533daa122e6af2bfc  apps/api/prisma/schema.prisma
           1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
           31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
-          dd800fca8acdb7a71884963e1c36f5a9c1401480c9339d884e18f201f67d0f09  apps/api/scripts/commercial-application-run.sh
-          45e568212d01f31dccc79d5b9470753b1c74f362a5016231a73efc5aa734ca72  apps/api/scripts/commercial-workflow-postgres.test.cjs
+          f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
+          5dcbd9b9cc1d5ae09913bee2f7875bf6041fe2cda2fdef80f15360878aa14b03  apps/api/scripts/commercial-workflow-postgres.test.cjs
           5cd7515bf66601f18a4ad886a1075aa95d8b3e0eb87e08fb140c068b1986bd98  apps/api/scripts/commercial-test-loader.cjs
           db747fbb97353c25b3fe2085a96574fad84f6e0b4c714106b1262c9ba746a877  apps/api/src/services/quotation.service.ts
           dcd2a626a51fc1eaba27299931977e25b70f5dc60c44fa5c9e673e24e035e27a  apps/api/src/services/quotation-customer.service.ts
           55badfc654fe05c6878d2f29bf569948ea65cf63f71d4a7f454836c0e7beb60d  apps/api/src/services/commercial-finance.service.ts
           d70dd6072c4d708d49cc2245f64c04f7477675323be176b3407f390dca2ee93c  apps/api/src/services/commercial-delivery.service.ts
           6aadd750df584bb4086cecad9845b315b8369133cfcd1a80a3945f54e830a68a  apps/api/src/services/commercial-configuration.service.ts
-          e5e26ea14e64ae8097845658c1f06c9de204b3b5fcee8906c51312d80cac4aa2  docs/phase-c-review/validation/concurrency.py
+          6583fc4c8f3a05c080510e9fe2b0a1802c8458ca1d4e421953fa847c23fc11b1  docs/phase-c-review/validation/concurrency.py
           4bf59fa3f3bd38b35696519894479217318b1e3e3e31fec8cc4d48d115ae87e3  pnpm-lock.yaml
           db5ffb35ad255b046fe5dc21e7a291311f9e0090930b1365f3067651b7f3d6aa  apps/api/src/index.ts
           f3e6a480eb22cd084ab9d294d15315daf6307a6b23db2cbb8cece140d46b5908  apps/api/src/routes/commercial.routes.ts
@@ -109,6 +109,9 @@ jobs:
           731f0563a5805e2108797bbcf94ab5975f57a24be1db3280ad02b4e624a7f6e6  apps/web/app/commercial/page.tsx
           d8ac32eb28ccdb758821792d6d3af0ca16fc3117168c75b09c4412cedffeb86d  apps/api/src/services/finance.service.ts
           adb31681579a4589701fd1529b8d29b48848e4836c340dbddaaa5bb431680381  apps/web/app/dashboard/finance/page.tsx
+          55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28  docs/phase-c-review/migration.sql.proposed
+          661384b2effc41bae5ae71db57813521babea9e5e7f2c608b0d654317e46a752  docs/phase-c-review/validation/run.sh
+          769ae7c624c8cfb689f6f1b69c3db022f6227fba4e64dc2dfd89bd9c23d33311  docs/phase-c-review/validation/catalog-and-negative.sql
           HASHES
           python3 - <<'PY'
           import pathlib,subprocess
@@ -137,8 +140,9 @@ jobs:
           MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}
           MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}
           MM_PHASEC_RUN_STARTED_AT: ${{ needs.provenance.outputs.started_at }}
-          MM_PHASEC_IMAGE_DIGEST: postgres@sha256:66aafa11cf15800a3c94763f7e11d1e7b2e37e5e84bc4ce027cb6e1e4bfaf4df
-          MM_PHASEC_IMAGE_ID: sha256:589f742565e4f6d22149176b032974f55f8201a8a37b71ed587ec5c6902e689f
+          MM_PHASEC_IMAGE_DIGEST: postgres@sha256:ec9f656f17c8b4dfebf49e58cf5c46d493d4846d4ea6d8b85d0637f68ee33bfc
+          MM_PHASEC_PROPOSAL_SHA256: 55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28
+          MM_PHASEC_IMAGE_ID: sha256:e8538db784b854a9baac5c1be6d059dcf0db257af2d94c8c5807b5fc15f11222
         run: |
           set -euo pipefail
           set +x
@@ -146,6 +150,16 @@ jobs:
           mkdir -p evidence
           python3 - <<'PY'
           import os,pathlib,re,subprocess
+          sql_output=pathlib.Path(os.environ['RUNNER_TEMP'],'phasec-sql-private.log')
+          with sql_output.open('w') as log:
+              sql_result=subprocess.run(['timeout','--signal=TERM','--kill-after=15','600','bash','docs/phase-c-review/validation/run.sh','docs/phase-c-review/migration.sql.proposed'],stdout=log,stderr=subprocess.STDOUT,timeout=630)
+          sql_lines=sql_output.read_text(errors='replace').splitlines()
+          sql_safe=[line for line in sql_lines if re.fullmatch(r'(?:PASS|UNVERIFIED|Preflight): [A-Za-z0-9 /:;,.()_=\-]+',line)]
+          sql_safe += ['SQL harness exit: '+str(sql_result.returncode)]
+          pathlib.Path('evidence/sql-summary.txt').write_text('\n'.join(sql_safe)+'\n')
+          print('\n'.join(sql_safe))
+          if sql_result.returncode:
+              raise SystemExit(1)
           output=pathlib.Path(os.environ['RUNNER_TEMP'],'phasec-application-private.log')
           with output.open('w') as log:
               try:
@@ -168,6 +182,6 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: phase-c-application-evidence-${{ github.run_id }}-${{ github.run_attempt }}
-          path: evidence/application-summary.txt
+          path: evidence/*-summary.txt
           retention-days: 7
           if-no-files-found: error
