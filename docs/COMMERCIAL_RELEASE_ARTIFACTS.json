@@ -7,7 +7,7 @@
   "mergedSchemaSha256": "3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e",
   "productionExecution": false,
   "emailBrowser": "PENDING",
-  "apiLint": "BLOCKED: existing missing ESLint 9 configuration",
+  "apiLint": "FAILED: configured recommended rules; 124 errors across 39 API files",
   "migrations": {
     "20261010140000_quotation_foundation": "1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9",
     "20261010160000_quotation_customer_finance": "31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1",
@@ -33,5 +33,27 @@
     "Web": "PASS",
     "WebPages": 63,
     "productionFontAdaptation": false
+  },
+  "linuxRelease": {
+    "sourceCommit": "1bc44ba",
+    "sourceCommitFull": "1bc44ba9d9a0951645df42a853bc5799650865ef",
+    "dispatcherCommit": "1bf44dc8cdf6194f512002168849acefacea5be8",
+    "run": "https://github.com/KasivarapuNarasimha/massive-mentor-crm/actions/runs/38137011527",
+    "result": "SUCCESS",
+    "node": "22.16.0",
+    "platform": "linux-x64",
+    "artifactId": "11701121837",
+    "artifactName": "phase-c-linux-release-38137011527-1",
+    "githubArtifactDigest": "sha256:647a76d633eb1cdc8ad1f1b57208d960489ff016810a0cd512b892595298f563",
+    "archiveChecksums": "Recorded in artifact SHA256SUMS and RELEASE.json; independent local download verification pending",
+    "localDownload": "TIMED OUT; no independent local archive checksum claimed",
+    "retentionDays": 14,
+    "apiBuild": "PASS",
+    "webBuild": "PASS",
+    "prismaGeneration": "PASS",
+    "artifactLinkIsolation": "PASS",
+    "filesystemRollback": "PASS",
+    "compatiblePriorArtifactPm2DatabaseRollback": "UNVERIFIED",
+    "productionDeployment": "NOT AUTHORIZED / NOT EXECUTED"
   }
 }
