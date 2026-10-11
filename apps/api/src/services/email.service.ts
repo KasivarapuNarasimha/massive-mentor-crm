@@ -51,6 +51,43 @@ function smtpConfigured(): boolean {
   return ok;
 }
 
+/** Classify provider errors for safe ops logs (never includes secrets). */
+export function classifySmtpError(message: string): {
+  kind:
+    | "auth"
+    | "config"
+    | "recipient"
+    | "timeout"
+    | "tls"
+    | "rejected"
+    | "unknown";
+  safeMessage: string;
+} {
+  const msg = String(message || "");
+  if (/not configured|SMTP credentials incomplete|SMTP_HOST|SMTP_USER|SMTP_PASS/i.test(msg)) {
+    return { kind: "config", safeMessage: "SMTP environment variables missing or incomplete" };
+  }
+  if (/535|authentication failed|Invalid login|username rejected/i.test(msg)) {
+    return {
+      kind: "auth",
+      safeMessage: "SMTP authentication failed (535) — mailbox username/password rejected by provider",
+    };
+  }
+  if (/550|551|553|RCPT TO failed|invalid recipient|user unknown/i.test(msg)) {
+    return { kind: "recipient", safeMessage: "SMTP rejected recipient address" };
+  }
+  if (/timeout|ETIMEDOUT|ESOCKETTIMEDOUT/i.test(msg)) {
+    return { kind: "timeout", safeMessage: "SMTP connection timed out" };
+  }
+  if (/CERT|SSL|TLS|UNABLE_TO_VERIFY|self.signed/i.test(msg)) {
+    return { kind: "tls", safeMessage: "SMTP TLS/certificate error" };
+  }
+  if (/552|554|message not accepted|DATA not accepted|MAIL FROM failed/i.test(msg)) {
+    return { kind: "rejected", safeMessage: "SMTP server rejected the message" };
+  }
+  return { kind: "unknown", safeMessage: msg.slice(0, 180) };
+}
+
 function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
   if (!domain) return "***";
@@ -382,17 +419,31 @@ export async function sendEmail(input: SendEmailInput): Promise<{ delivered: boo
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown error";
-    console.error("[email] SMTP send FAILED:", msg);
+    const classified = classifySmtpError(msg);
     console.error(
-      "[email] Hostinger tip: use smtp.hostinger.com, port 465 (SSL) or 587 (STARTTLS), " +
-        "SMTP_USER=full mailbox email, SMTP_PASS=mailbox password, SMTP_FROM=same domain."
+      `[email] SMTP send FAILED kind=${classified.kind}: ${classified.safeMessage}`
     );
+    if (classified.kind === "auth") {
+      console.error(
+        "[email] ACTION: In Hostinger hPanel → Emails → manage mailbox → reset/copy password, " +
+          "set SMTP_PASS in apps/api/.env (quote if special chars), then: pm2 restart massive-mentor-api --update-env"
+      );
+    } else {
+      console.error(
+        "[email] Hostinger tip: smtp.hostinger.com, port 465 (SSL) or 587 (STARTTLS), " +
+          "SMTP_USER=full mailbox email, SMTP_PASS=mailbox password, SMTP_FROM=same domain."
+      );
+    }
     if (!isProd) {
       console.error(
         "[email] Development fallback: use the PASSWORD RESET link printed ABOVE in this terminal."
       );
     }
-    throw new Error(`SMTP send failed: ${msg}`);
+    // Preserve auth marker so callers can map to SMTP_AUTH_FAILED without scraping raw provider text.
+    if (classified.kind === "auth") {
+      throw new Error(`SMTP_AUTH_FAILED: ${classified.safeMessage}`);
+    }
+    throw new Error(`SMTP send failed: ${classified.safeMessage}`);
   }
 }
 

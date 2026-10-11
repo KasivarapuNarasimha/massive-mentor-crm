@@ -10,7 +10,9 @@ import {
   buildCrmScope,
   buildOwnedEntityScope,
   andTenant,
+  resolveLeadWriteContext,
 } from "./tenant-scope.service.js";
+import { getStrictRequestContext, runWithStrictBusinessContext } from "./strict-request-context.service.js";
 import { toMoneyNumber, type MoneyInput } from "../lib/money.js";
 
 export type FollowupActionType =
@@ -535,6 +537,7 @@ function analyzeDealOnly(ctx: {
 }
 
 async function loadBusinessId(userId: string): Promise<string | null> {
+  if (getStrictRequestContext(userId)) return (await resolveLeadWriteContext(userId)).businessId;
   const m = await prisma.businessMember.findFirst({
     where: { userId },
     orderBy: { createdAt: "asc" },
@@ -1087,9 +1090,12 @@ export async function mapRecommendationsForContacts(
 
 /** Fire-and-forget refresh after CRM mutations */
 export function scheduleFollowupRefresh(userId: string) {
+  const context = getStrictRequestContext(userId);
   setImmediate(() => {
-    refreshFollowupEngine(userId, { force: true }).catch((e) =>
+    const refresh = () => refreshFollowupEngine(userId, { force: true }).catch((e) =>
       console.error("[followup-engine] background refresh failed", e)
     );
+    if (context) runWithStrictBusinessContext(context, refresh);
+    else refresh();
   });
 }

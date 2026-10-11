@@ -19,10 +19,15 @@ export default function AdminForgotPasswordPage() {
     try {
       const res = await api.platformForgotPassword(email.trim());
       if (!res.success) {
-        toast.error(
-          res.error ||
-            "We could not send the reset email. Please try again or contact support."
-        );
+        // Surface backend codes so ops can distinguish auth/config vs transient failures.
+        const code = res.code || "";
+        const fallback =
+          code === "SMTP_AUTH_FAILED"
+            ? "Email server rejected mailbox login. Update SMTP credentials on the API server and restart it."
+            : code === "SMTP_NOT_CONFIGURED"
+              ? "Email is not configured on the server. Contact your administrator."
+              : "We could not send the reset email. Please try again or contact support.";
+        toast.error(res.error || fallback);
         return;
       }
       setSent(true);

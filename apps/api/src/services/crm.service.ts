@@ -241,6 +241,13 @@ export type ContactListFilters = {
    * Use "unassigned" / "__unassigned__" for leads with no assignee.
    */
   assignedTo?: string;
+  /**
+   * New vs Old leads (import-batch based).
+   * - new = importBatchId is the latest ImportBatch for the actor's business
+   * - old = importBatchId is null OR any previous batch
+   * - all / omitted = no age filter
+   */
+  leadAge?: "all" | "new" | "old";
   limit?: number;
   page?: number;
   pageSize?: number;
@@ -285,36 +292,127 @@ export async function buildContactListWhere(
   }
 
   const scope = await buildCrmScope(userId);
-  const extra: Record<string, unknown> = {};
 
-  if (filters?.type) extra.type = filters.type;
-  if (filters?.status) extra.status = filters.status;
+  /**
+   * Strict composition order (never OR visibility with age filters):
+   * 1) existing tenant + RBAC/assignment scope (scope.where)
+   * 2) list filters (type/status/search/assignee/trash)
+   * 3) leadAge new/old ImportBatch restriction ONLY as an additional AND
+   */
+  const clauses: Record<string, unknown>[] = [scope.where];
+
+  if (filters?.type) clauses.push({ type: filters.type });
+  if (filters?.status) clauses.push({ status: filters.status });
   if (filters?.assignedTo !== undefined && filters.assignedTo !== null) {
     const a = String(filters.assignedTo).trim();
     if (a === "unassigned" || a === "__unassigned__" || a === "null") {
-      extra.assignedTo = null;
+      clauses.push({ assignedTo: null });
     } else if (a) {
-      extra.assignedTo = a;
+      clauses.push({ assignedTo: a });
     }
   }
   if (filters?.search) {
     const term = filters.search;
-    extra.OR = [
-      { name: { contains: term, mode: "insensitive" } },
-      { email: { contains: term, mode: "insensitive" } },
-      { company: { contains: term, mode: "insensitive" } },
-      { phone: { contains: term, mode: "insensitive" } },
-    ];
+    clauses.push({
+      OR: [
+        { name: { contains: term, mode: "insensitive" } },
+        { email: { contains: term, mode: "insensitive" } },
+        { company: { contains: term, mode: "insensitive" } },
+        { phone: { contains: term, mode: "insensitive" } },
+      ],
+    });
   }
 
   // Soft-delete isolation: active lists never return trash unless requested
   if (filters?.trashOnly) {
-    extra.deletedAt = { not: null };
+    clauses.push({ deletedAt: { not: null } });
   } else if (!filters?.includeDeleted) {
-    extra.deletedAt = null;
+    clauses.push({ deletedAt: null });
   }
 
-  return andTenant(scope.where, extra);
+  // New / Old — additive only; never replaces or widens scope.where
+  const leadAge = filters?.leadAge;
+  if (leadAge === "new" || leadAge === "old") {
+    const businessId = scope.businessId;
+    let latestId: string | null = null;
+    if (businessId) {
+      const latest = await prisma.importBatch.findFirst({
+        where: { businessId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      latestId = latest?.id ?? null;
+    }
+    if (leadAge === "new") {
+      if (!latestId) {
+        // No imports yet → empty set (still under visibility scope)
+        clauses.push({ id: "__no_import_batch__" });
+      } else {
+        clauses.push({ importBatchId: latestId });
+      }
+    } else if (latestId) {
+      // old: null (legacy/manual) OR any prior batch — AND with visibility
+      clauses.push({
+        OR: [{ importBatchId: null }, { importBatchId: { not: latestId } }],
+      });
+    }
+    // leadAge=old with no batches: all visible leads are old → no extra clause
+  }
+
+  if (clauses.length === 1) return clauses[0]!;
+  return { AND: clauses };
+}
+
+/** Latest import batch id for a business (for New/Old counts). */
+export async function getLatestImportBatchId(
+  businessId: string | null | undefined
+): Promise<string | null> {
+  if (!businessId) return null;
+  const latest = await prisma.importBatch.findFirst({
+    where: { businessId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  return latest?.id ?? null;
+}
+
+/**
+ * All / New / Old counts under the SAME tenant+RBAC scope as the leads list.
+ * Age tabs ignore assignee/status/search so counts stay stable, but never
+ * broaden beyond existing visibility (scope is always applied first).
+ */
+export async function countLeadsByImportAge(userId: string): Promise<{
+  all: number;
+  new: number;
+  old: number;
+}> {
+  // Visibility-only base (type=lead, active) — includes buildCrmScope
+  const visibilityBase = await buildContactListWhere(userId, { type: "lead" });
+  const scope = await buildCrmScope(userId);
+  const latestId = await getLatestImportBatchId(scope.businessId);
+
+  const [all, newest, old] = await Promise.all([
+    prisma.contact.count({ where: visibilityBase as never }),
+    latestId
+      ? prisma.contact.count({
+          where: { AND: [visibilityBase, { importBatchId: latestId }] } as never,
+        })
+      : Promise.resolve(0),
+    latestId
+      ? prisma.contact.count({
+          where: {
+            AND: [
+              visibilityBase,
+              {
+                OR: [{ importBatchId: null }, { importBatchId: { not: latestId } }],
+              },
+            ],
+          } as never,
+        })
+      : prisma.contact.count({ where: visibilityBase as never }),
+  ]);
+
+  return { all, new: newest, old };
 }
 
 /** Exact count used by Dashboard KPI cards — same query as Leads list total. */
@@ -329,7 +427,11 @@ export async function countContacts(
 export async function getContacts(
   userId: string,
   filters?: ContactListFilters
-): Promise<PaginatedResult<Record<string, unknown>>> {
+): Promise<
+  PaginatedResult<Record<string, unknown>> & {
+    ageCounts?: { all: number; new: number; old: number };
+  }
+> {
   const where = (await buildContactListWhere(userId, filters)) as never;
   const page = filters?.page && filters.page > 0 ? filters.page : 1;
   // Legacy: large limit without page still supported for import UIs
@@ -343,7 +445,8 @@ export async function getContacts(
   const sortDir = filters?.sortDir === "asc" ? "asc" : "desc";
   const { skip, take } = skipTake(page, pageSize);
 
-  const [total, items] = await Promise.all([
+  const wantAgeCounts = filters?.type === "lead";
+  const [total, items, ageCounts] = await Promise.all([
     prisma.contact.count({ where }),
     prisma.contact.findMany({
       where,
@@ -354,9 +457,13 @@ export async function getContacts(
         deals: { take: 3, orderBy: { createdAt: "desc" } },
       },
     }),
+    wantAgeCounts ? countLeadsByImportAge(userId) : Promise.resolve(undefined),
   ]);
 
-  return paginated(items as Record<string, unknown>[], total, page, pageSize);
+  return {
+    ...paginated(items as Record<string, unknown>[], total, page, pageSize),
+    ...(ageCounts ? { ageCounts } : {}),
+  };
 }
 
 export async function getContactById(userId: string, id: string) {

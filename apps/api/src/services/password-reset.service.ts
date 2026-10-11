@@ -58,7 +58,11 @@ function portalLabel(portal: ResetPortal): string {
 export class PasswordResetEmailError extends Error {
   constructor(
     message: string,
-    public readonly code: "SMTP_NOT_CONFIGURED" | "SMTP_SEND_FAILED" | "TOKEN_CREATE_FAILED"
+    public readonly code:
+      | "SMTP_NOT_CONFIGURED"
+      | "SMTP_AUTH_FAILED"
+      | "SMTP_SEND_FAILED"
+      | "TOKEN_CREATE_FAILED"
   ) {
     super(message);
     this.name = "PasswordResetEmailError";
@@ -182,6 +186,7 @@ export async function requestPasswordReset(opts: {
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // Never log reset URLs / tokens / SMTP passwords — message is already sanitized upstream.
     console.error(
       `[password-reset] EMAIL DELIVERY FAILED to=${maskEmailAddr(user.email)}:`,
       msg
@@ -195,11 +200,23 @@ export async function requestPasswordReset(opts: {
       .catch(() => undefined);
 
     const isConfig = /not configured|SMTP_HOST|SMTP_USER|SMTP_PASS/i.test(msg);
+    const isAuth =
+      /535|authentication failed|Invalid login|SMTP_AUTH_FAILED|username rejected/i.test(msg);
+    if (isConfig) {
+      throw new PasswordResetEmailError(
+        "Email is not configured on the server. Please contact support or your administrator.",
+        "SMTP_NOT_CONFIGURED"
+      );
+    }
+    if (isAuth) {
+      throw new PasswordResetEmailError(
+        "The email server rejected the mailbox login. Update SMTP_USER/SMTP_PASS for the Hostinger mailbox (team@…), then restart the API.",
+        "SMTP_AUTH_FAILED"
+      );
+    }
     throw new PasswordResetEmailError(
-      isConfig
-        ? "Email is not configured on the server. Please contact support or your administrator."
-        : "We could not send the reset email. Please try again in a few minutes or contact support.",
-      isConfig ? "SMTP_NOT_CONFIGURED" : "SMTP_SEND_FAILED"
+      "We could not send the reset email. Please try again in a few minutes or contact support.",
+      "SMTP_SEND_FAILED"
     );
   }
 

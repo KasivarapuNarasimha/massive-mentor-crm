@@ -342,6 +342,7 @@ model Business {
   billingPayments    BillingPayment[]
   integrations       Integration[]
   leadAssignmentBatches LeadAssignmentBatch[]
+  importBatches      ImportBatch[]
   mediaFolders       MediaFolder[]
   mediaAssets        MediaAsset[]
   mediaKits          MediaKit[]
@@ -389,6 +390,25 @@ model Business {
 // ─── Enterprise Lead Assignment History ─────────────────────────────────────
 
 /// One bulk / single assignment operation (history is append-only; edits audited)
+/// One row per CSV/Excel import run — used for New vs Old lead identification.
+model ImportBatch {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  actorUserId String
+  filename    String?
+  /// Newly created contacts in this run
+  createdCount Int     @default(0)
+  /// Existing contacts updated (not stamped as new)
+  updatedCount Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  contacts Contact[]
+
+  @@index([businessId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
 model LeadAssignmentBatch {
   id          String   @id @default(cuid())
   /// Display sequence per workspace (Assignment #N)
@@ -963,6 +983,11 @@ model Contact {
   deletedAt       DateTime?
   deletedByUserId String?
 
+  /// Set only when this contact was first created by a CSV/Excel import batch.
+  /// Null = legacy / manual / never imported as new. Not updated on re-import match.
+  importBatchId   String?
+  importBatch     ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -980,6 +1005,8 @@ model Contact {
   @@index([businessId, status])
   @@index([businessId, type, status])
   @@index([assignedTo])
+  @@index([businessId, importBatchId])
+  @@index([importBatchId])
 }
 
 model AiGeneration {

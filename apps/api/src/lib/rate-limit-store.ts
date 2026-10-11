@@ -21,6 +21,13 @@ let tableReady: Promise<void> | null = null;
 async function ensurePgTable(): Promise<void> {
   if (!tableReady) {
     tableReady = (async () => {
+      if (process.env.MM_SAFE_STARTUP === "1") {
+        // Require the existing store; never provision schema during controlled cutover.
+        await prisma.$queryRawUnsafe(
+          `SELECT key, total_hits, reset_time FROM ${TABLE} LIMIT 0`
+        );
+        return;
+      }
       // Bound DDL so a stuck DB cannot hang the first API request forever
       const ddl = Promise.all([
         prisma.$executeRawUnsafe(`

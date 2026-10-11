@@ -10,6 +10,20 @@ import {
   moduleKeyForApiPath,
 } from "../services/permissions.service.js";
 import { getUserBusinessId } from "../services/field-engine.service.js";
+import { resolveLeadWriteContext } from "../services/tenant-scope.service.js";
+import { runWithStrictBusinessContext } from "../services/strict-request-context.service.js";
+
+/** Deliberate method/path allowlist; unrelated legacy routes retain their gate. */
+export function strictModuleForRoute(method: string, apiPath: string): string | null {
+  const path = apiPath.replace(/\/+$/, "");
+  if (method === "POST" && /^\/api\/crm\/contacts$/i.test(path)) return "__crm_contacts__";
+  if (method === "PUT" && /^\/api\/crm\/contacts\/[^/]+$/i.test(path)) return "__crm_contacts__";
+  if (method === "POST" && /^\/api\/(?:leads|crm\/leads)\/(?:bulk-edit|bulk-delete|bulk-assign)$/i.test(path)) return "leads";
+  if (method === "GET" && /^\/api\/(?:leads|crm\/leads)\/(?:assignable-members|assignments(?:\/[^/]+)?)$/i.test(path)) return "leads";
+  if (method === "POST" && /^\/api\/(?:leads|crm\/leads)\/assignments\/[^/]+\/move$/i.test(path)) return "leads";
+  if (method === "POST" && /^\/api\/ai-command\/(?:run|confirm)$/i.test(path)) return "__ai_any__";
+  return null;
+}
 
 /** Explicit module key(s) required — any match allows. */
 export function requireModule(...moduleKeys: string[]) {
@@ -52,11 +66,26 @@ export async function requireModuleFromPath(
     if (!req.user?.id) {
       return res.status(401).json({ success: false, error: "Not authenticated" });
     }
-    if (req.user.platformRole === "super_admin") {
-      return next();
-    }
     const path = req.originalUrl || req.path || "";
-    const apiPath = path.startsWith("/api") ? path.split("?")[0] : `/api${path.split("?")[0]}`;
+    const apiPath = /^\/api(?:\/|$)/i.test(path) ? path.split("?")[0] : `/api${path.split("?")[0]}`;
+    const strictModule = strictModuleForRoute(req.method, apiPath);
+    if (strictModule) {
+      let context;
+      try {
+        context = await resolveLeadWriteContext(req.user.id);
+      } catch {
+        return res.status(403).json({ success: false, error: "Active membership in an active workspace required", code: "STRICT_WORKSPACE_FORBIDDEN" });
+      }
+      const keys = await getMemberModuleKeys(req.user.id, context.businessId, context);
+      const required = strictModule === "__crm_contacts__" ? ["leads", "clients"] :
+        strictModule === "__ai_any__" ? ["mentor", "ai_sales", "marketing", "swot", "roadmap"] : [strictModule];
+      if (!required.some(key => keys.includes(key))) {
+        return res.status(403).json({ success: false, error: "You do not have permission to access this resource.", code: "MODULE_FORBIDDEN", required });
+      }
+      req.strictBusinessContext = Object.freeze({ ...context });
+      return runWithStrictBusinessContext(req.strictBusinessContext, next);
+    }
+    if (req.user.platformRole === "super_admin") return next();
     const mod = moduleKeyForApiPath(apiPath);
     if (!mod) return next();
 

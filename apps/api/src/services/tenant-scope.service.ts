@@ -154,14 +154,21 @@ export async function getManagedTeamUserIds(
   return [...ids];
 }
 
-function contactVisibilityWhere(visibleUserIds: string[]): Record<string, unknown> {
-  return {
-    OR: [
-      { userId: { in: visibleUserIds } },
-      { assignedTo: { in: visibleUserIds } },
-    ],
-  };
+function contactVisibilityWhere(
+  visibleUserIds: string[],
+  opts?: { includeUnassigned?: boolean }
+): Record<string, unknown> {
+  const or: Record<string, unknown>[] = [
+    { userId: { in: visibleUserIds } },
+    { assignedTo: { in: visibleUserIds } },
+  ];
+  // Managers with a team still need the workspace unassigned pool.
+  if (opts?.includeUnassigned) {
+    or.push({ assignedTo: null });
+  }
+  return { OR: or };
 }
+
 
 /**
  * Multi-tenant + role data isolation for **Contact** (Lead/Client).
@@ -193,8 +200,11 @@ export async function buildCrmScope(userId: string): Promise<CrmScope> {
 
   // Sales Manager / manager — team-scoped (NOT full business).
   // Must run BEFORE any role.includes("admin") checks.
+  // No Team hierarchy → only own created/assigned leads (same as single-member team).
+  // Never fall back to business-wide — that exposed other assignees' leads.
   if (TEAM_SCOPED_ROLES.has(role)) {
     const visibleUserIds = await getManagedTeamUserIds(userId, businessId);
+    const hasTeamHierarchy = visibleUserIds.length > 1;
     return {
       businessId,
       role,
@@ -202,22 +212,27 @@ export async function buildCrmScope(userId: string): Promise<CrmScope> {
       ownDataOnly: true,
       visibleUserIds,
       where: {
-        AND: [tenant, contactVisibilityWhere(visibleUserIds)],
+        AND: [
+          tenant,
+          contactVisibilityWhere(visibleUserIds, {
+            // Unassigned pool only when a real team exists (managers triage inbox)
+            includeUnassigned: hasTeamHierarchy,
+          }),
+        ],
       },
     };
   }
 
-  // Sales Executive / support executive — self only
+  // Sales Executive / support executive — ONLY leads currently assigned to them.
   if (OWN_DATA_ONLY_ROLES.has(role)) {
-    const visibleUserIds = [userId];
     return {
       businessId,
       role,
       userId,
       ownDataOnly: true,
-      visibleUserIds,
+      visibleUserIds: [userId],
       where: {
-        AND: [tenant, contactVisibilityWhere(visibleUserIds)],
+        AND: [tenant, { assignedTo: userId }],
       },
     };
   }
@@ -248,7 +263,7 @@ export async function buildCrmScope(userId: string): Promise<CrmScope> {
     ownDataOnly: true,
     visibleUserIds,
     where: {
-      AND: [tenant, contactVisibilityWhere(visibleUserIds)],
+      AND: [tenant, { assignedTo: userId }],
     },
   };
 }

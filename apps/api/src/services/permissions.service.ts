@@ -4,6 +4,8 @@
  */
 import { prisma } from "../lib/prisma.js";
 import { getUserBusinessId } from "./field-engine.service.js";
+import { getStrictRequestContext } from "./strict-request-context.service.js";
+import type { LeadWriteContext } from "./tenant-scope.service.js";
 
 export type MemberPermissionsJson = {
   modules?: string[];
@@ -415,18 +417,24 @@ export function modulesForTemplate(roleKey: string): string[] {
  */
 export async function getMemberModuleKeys(
   userId: string,
-  businessId?: string | null
+  businessId?: string | null,
+  strictContext: Readonly<LeadWriteContext> | undefined = getStrictRequestContext(userId)
 ): Promise<string[]> {
+  if (strictContext && (strictContext.userId !== userId ||
+      (businessId && businessId !== strictContext.businessId))) {
+    throw new Error("Strict workspace mismatch");
+  }
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { platformRole: true, role: true },
+    select: { platformRole: true, role: true, isDisabled: true },
   });
+  if (strictContext && (!user || user.isDisabled)) throw new Error("Active workspace membership required");
   if (!user) return alwaysOnModules();
-  if (user.platformRole === "super_admin") {
+  if (!strictContext && user.platformRole === "super_admin") {
     return MODULE_CATALOG.map((m) => m.key);
   }
 
-  const bid = businessId || (await getUserBusinessId(userId));
+  const bid = strictContext ? strictContext.businessId : businessId || (await getUserBusinessId(userId));
   if (!bid) return alwaysOnModules();
 
   const [member, biz] = await Promise.all([
@@ -435,10 +443,13 @@ export async function getMemberModuleKeys(
     }),
     prisma.business.findUnique({
       where: { id: bid },
-      select: { settings: true },
+      select: { settings: true, status: true },
     }),
   ]);
-  const role = member?.role || user.role || "sales_executive";
+  if (strictContext && (!member || !member.role || biz?.status !== "active")) {
+    throw new Error("Active workspace membership required");
+  }
+  const role = strictContext ? member!.role.trim().toLowerCase() : member?.role || user.role || "sales_executive";
   const parsed = parseMemberPermissions(member?.permissions);
   const memberCustomized = !!parsed.customized;
   const businessAccess = parseBusinessModuleAccess(biz?.settings);

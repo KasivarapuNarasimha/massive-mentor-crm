@@ -6,6 +6,9 @@
 import { Response, NextFunction } from "express";
 import type { AuthenticatedRequest } from "./auth.js";
 import { verifyToken } from "../services/auth.service.js";
+import { strictModuleForRoute } from "./requireModule.js";
+import { resolveLeadWriteContext } from "../services/tenant-scope.service.js";
+import { runWithStrictBusinessContext } from "../services/strict-request-context.service.js";
 import {
   evaluateBillingAccess,
   enforceLockIfNeeded,
@@ -102,10 +105,12 @@ export async function requireBillingAccess(
 
     if (!userId) return next();
 
-    const access = await evaluateBillingAccess(userId);
+    const strict = strictModuleForRoute(req.method, path.split("?")[0]) !== null;
+    const checkAccess = async () => {
+    const access = await evaluateBillingAccess(userId!, { readOnly: strict });
     if (access.allowed) return next();
 
-    await enforceLockIfNeeded(access);
+    if (!strict) await enforceLockIfNeeded(access);
 
     return res.status(402).json({
       success: false,
@@ -115,6 +120,14 @@ export async function requireBillingAccess(
       access,
       redirectTo: "/subscription-required",
     });
+    };
+    if (!strict) return await checkAccess();
+    let context;
+    try { context = await resolveLeadWriteContext(userId); }
+    catch { return res.status(403).json({ success: false, error: "Active membership in an active workspace required", code: "STRICT_WORKSPACE_FORBIDDEN" }); }
+    req.strictBusinessContext = Object.freeze({ ...context });
+    return await runWithStrictBusinessContext(req.strictBusinessContext, checkAccess);
+
   } catch (err) {
     console.error("[requireBillingAccess]", err);
     // Fail closed — never unlock CRM when subscription evaluation errors

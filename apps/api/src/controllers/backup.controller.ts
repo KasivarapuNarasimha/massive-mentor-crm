@@ -1,3 +1,4 @@
+import { assertRestoreEnabled, RestoreDisabledError } from "../services/restore-safety.js";
 import { Response } from "express";
 import fs from "node:fs";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
@@ -103,6 +104,7 @@ export async function platformDeleteBackup(req: AuthenticatedRequest, res: Respo
 
 export async function platformRequestRestore(req: AuthenticatedRequest, res: Response) {
   try {
+    assertRestoreEnabled();
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const scope = req.body?.scope === "business" ? "business" : "full";
     const result = await backup.requestRestore({
@@ -123,12 +125,16 @@ export async function platformRequestRestore(req: AuthenticatedRequest, res: Res
       },
     });
   } catch (e) {
+    if (e instanceof RestoreDisabledError) {
+      return res.status(503).json({ success: false, error: e.code, message: e.message });
+    }
     res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
   }
 }
 
 export async function platformConfirmRestore(req: AuthenticatedRequest, res: Response) {
   try {
+    assertRestoreEnabled();
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const token = String(req.body?.confirmationToken || "");
     if (!token) return res.status(400).json({ success: false, error: "confirmationToken required" });
@@ -139,6 +145,9 @@ export async function platformConfirmRestore(req: AuthenticatedRequest, res: Res
     });
     res.status(202).json({ success: true, data: { status: "running" } });
   } catch (e) {
+    if (e instanceof RestoreDisabledError) {
+      return res.status(503).json({ success: false, error: e.code, message: e.message });
+    }
     res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
   }
 }
@@ -237,6 +246,7 @@ export async function tenantCreateBackup(req: AuthenticatedRequest, res: Respons
 
 export async function tenantRequestRestore(req: AuthenticatedRequest, res: Response) {
   try {
+    assertRestoreEnabled();
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const tenant = await resolveTenantContext(req.user.id);
     if (!isBusinessAdminRole(tenant.businessRole) && req.user.role !== "admin") {
@@ -261,12 +271,16 @@ export async function tenantRequestRestore(req: AuthenticatedRequest, res: Respo
       },
     });
   } catch (e) {
+    if (e instanceof RestoreDisabledError) {
+      return res.status(503).json({ success: false, error: e.code, message: e.message });
+    }
     res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
   }
 }
 
 export async function tenantConfirmRestore(req: AuthenticatedRequest, res: Response) {
   try {
+    assertRestoreEnabled();
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const tenant = await resolveTenantContext(req.user.id);
     const restores = await backup.listRestores(20);
@@ -281,6 +295,9 @@ export async function tenantConfirmRestore(req: AuthenticatedRequest, res: Respo
     });
     res.status(202).json({ success: true, data: { status: "running" } });
   } catch (e) {
+    if (e instanceof RestoreDisabledError) {
+      return res.status(503).json({ success: false, error: e.code, message: e.message });
+    }
     res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
   }
 }

@@ -1,6 +1,7 @@
 import type { FieldDef } from "../types/template-manifest.js";
 import { getBusinessConfig } from "./template.service.js";
 import { prisma } from "../lib/prisma.js";
+import { getStrictRequestContext } from "./strict-request-context.service.js";
 
 export type CoreContactFields = {
   name?: string;
@@ -384,6 +385,8 @@ function coerceFieldValue(def: FieldDef, raw: unknown, errors: string[]): unknow
  *   still holds CRM data so imports remain visible after soft-delete churn
  */
 export async function getUserBusinessId(userId: string): Promise<string | null> {
+  const strictContext = getStrictRequestContext(userId);
+  if (strictContext) return strictContext.businessId;
   // Demo portal tenants are excluded from customer resolution below. If this user has an
   // active demo workspace with sample CRM data, and any customer shell is empty, prefer
   // the demo business — otherwise Demo CRM APIs bind to an empty non-demo membership.

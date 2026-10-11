@@ -1,3 +1,4 @@
+import { assertRestoreEnabled, RestoreDisabledError } from "../services/restore-safety.js";
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
@@ -311,10 +312,14 @@ export async function backupDb(req: AuthenticatedRequest, res: Response) {
 
 export async function restoreDb(req: AuthenticatedRequest, res: Response) {
   try {
+    assertRestoreEnabled();
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     // Demo restore - accept json, in real would validate and insert
     res.json({ success: true, message: "Restore demo success (no real DB change)" });
   } catch (error: unknown) {
+    if (error instanceof RestoreDisabledError) {
+      return res.status(503).json({ success: false, error: error.code, message: error.message });
+    }
     res.status(500).json({ success: false, error: "Restore failed" });
   }
 }

@@ -346,11 +346,14 @@ export async function smartBulkAssignLeads(
     assignees = [m];
   }
 
+  // Normal Equal Distribution (all_members) must NEVER touch already-owned leads.
+  // Only unassigned (assignedTo IS NULL) leads are eligible. Explicit "redistribute
+  // existing" is a separate future action — not part of normal equal distribution.
   const { targetIds, matched, requested } = await collectTargetLeadIds(actorUserId, {
     scope: input.scope === "reassign" ? "ids" : input.scope,
     ids: input.ids,
     limit: input.limit,
-    assignedTo: input.filterAssignedTo,
+    assignedTo: mode === "all_members" ? "unassigned" : input.filterAssignedTo,
     search: input.search,
     status: input.status,
   });

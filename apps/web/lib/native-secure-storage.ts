@@ -10,6 +10,12 @@
  * AuthProvider bootstrap can prefer Preferences on native and clear both on logout.
  *
  * Does NOT send tokens to native Java/Kotlin app code beyond the Capacitor plugin.
+ *
+ * IMPORTANT: Never return the Capacitor Preferences plugin proxy from an async
+ * function. Cap plugin proxies are thenable; awaiting a function that returns
+ * the proxy triggers Preferences.then(), which is unimplemented on Android
+ * ("Preferences.then() is not implemented on android"). Always import then
+ * call Preferences.set/get/remove directly on the awaited import result.
  */
 "use client";
 
@@ -26,11 +32,6 @@ function isNativeCapacitor(): boolean {
   }
 }
 
-async function prefs() {
-  const { Preferences } = await import("@capacitor/preferences");
-  return Preferences;
-}
-
 export async function nativeSetItem(key: string, value: string): Promise<void> {
   if (typeof window === "undefined") return;
   try {
@@ -40,8 +41,8 @@ export async function nativeSetItem(key: string, value: string): Promise<void> {
   }
   if (!isNativeCapacitor()) return;
   try {
-    const P = await prefs();
-    await P.set({ key: PREF_PREFIX + key, value });
+    const { Preferences } = await import("@capacitor/preferences");
+    await Preferences.set({ key: PREF_PREFIX + key, value });
   } catch {
     /* Preferences unavailable — localStorage already written */
   }
@@ -51,8 +52,8 @@ export async function nativeGetItem(key: string): Promise<string | null> {
   if (typeof window === "undefined") return null;
   if (isNativeCapacitor()) {
     try {
-      const P = await prefs();
-      const { value } = await P.get({ key: PREF_PREFIX + key });
+      const { Preferences } = await import("@capacitor/preferences");
+      const { value } = await Preferences.get({ key: PREF_PREFIX + key });
       if (value != null && value !== "") {
         // Keep localStorage in sync for code paths that still read it synchronously
         try {
@@ -82,8 +83,8 @@ export async function nativeRemoveItem(key: string): Promise<void> {
   }
   if (!isNativeCapacitor()) return;
   try {
-    const P = await prefs();
-    await P.remove({ key: PREF_PREFIX + key });
+    const { Preferences } = await import("@capacitor/preferences");
+    await Preferences.remove({ key: PREF_PREFIX + key });
   } catch {
     /* ignore */
   }

@@ -16,6 +16,7 @@ import { prisma } from "../lib/prisma.js";
 import { env } from "../config/env.js";
 import { recordAudit } from "./audit.service.js";
 import { sendEmail } from "./email.service.js";
+import { assertRestoreEnabled } from "./restore-safety.js";
 
 const gzip = promisify(zlib.gzip);
 const gunzip = promisify(zlib.gunzip);
@@ -540,6 +541,7 @@ export async function requestRestore(opts: {
   /** Caller-confirmed phrase for full restore */
   confirmPhrase?: string;
 }): Promise<{ restoreId: string; confirmationToken: string; expiresAt: Date }> {
+  assertRestoreEnabled();
   const rec = await getBackup(opts.backupId);
   if (!rec || rec.status === "failed") throw new Error("Backup not available");
   if (rec.type === "business" && opts.scope === "full") {
@@ -597,6 +599,7 @@ export async function confirmRestore(opts: {
   confirmationToken: string;
   actorUserId: string;
 }): Promise<void> {
+  assertRestoreEnabled();
   const restore = await prisma.backupRestoreRecord.findUnique({ where: { id: opts.restoreId } });
   if (!restore) throw new Error("Restore request not found");
   if (restore.status !== "pending_confirm") throw new Error("Restore not awaiting confirmation");
@@ -688,6 +691,7 @@ async function restoreBusinessData(
   payload: Record<string, unknown>,
   onProgress?: (p: number) => Promise<void>
 ) {
+  assertRestoreEnabled();
   const tables = (payload.tables || {}) as Record<string, unknown>;
   // Safety: if payload is business-scoped, ensure IDs match
   const payloadBizId = (payload.businessId as string) || (tables.business as { id?: string })?.id;
@@ -768,6 +772,7 @@ async function restoreFullData(
   payload: Record<string, unknown>,
   onProgress?: (p: number) => Promise<void>
 ) {
+  assertRestoreEnabled();
   // Full restore is intentionally cautious: restore businesses + CRM tables via upsert, not drop-all.
   const tables = (payload.tables || {}) as Record<string, unknown>;
   await onProgress?.(30);

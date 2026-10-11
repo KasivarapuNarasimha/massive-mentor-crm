@@ -98,9 +98,13 @@ export default function TenantBackupsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Backups</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Business-only backups. You cannot access other tenants. Restore requires confirmation.
+          Business-only backups. You cannot access other tenants.
         </p>
       </div>
+
+      <p role="status" className="text-sm text-amber-300">
+        Restore temporarily disabled for safety maintenance.
+      </p>
 
       <button
         type="button"
@@ -117,7 +121,8 @@ export default function TenantBackupsPage() {
           <code className="text-xs break-all block">{pending.confirmationToken}</code>
           <button
             type="button"
-            disabled={busy}
+            disabled
+            title="Restore temporarily disabled for safety maintenance."
             onClick={confirmRestore}
             className="px-3 py-2 rounded-lg bg-amber-500 text-white text-sm font-semibold"
           >
@@ -146,7 +151,8 @@ export default function TenantBackupsPage() {
             </div>
             <button
               type="button"
-              disabled={busy || r.status === "running" || r.status === "failed"}
+              disabled
+              title="Restore temporarily disabled for safety maintenance."
               onClick={() => restore(r.id)}
               className="text-sm text-emerald-300 underline disabled:opacity-40"
             >

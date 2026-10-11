@@ -4,6 +4,7 @@
  */
 import { prisma } from "../lib/prisma.js";
 import { getUserBusinessId } from "./field-engine.service.js";
+import { resolveLeadWriteContext } from "./tenant-scope.service.js";
 
 export type BillingAccess = {
   allowed: boolean;
@@ -114,7 +115,7 @@ async function normalizeStandardTrial(biz: {
   };
 }
 
-export async function evaluateBillingAccess(userId: string): Promise<BillingAccess> {
+export async function evaluateBillingAccess(userId: string, options: { readOnly?: boolean } = {}): Promise<BillingAccess> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { platformRole: true },
@@ -132,7 +133,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
     };
   }
 
-  const businessId = await getUserBusinessId(userId);
+  const businessId = options.readOnly ? (await resolveLeadWriteContext(userId)).businessId : await getUserBusinessId(userId);
   if (!businessId) {
     // No business yet — allow profile onboarding paths only (caller decides)
     return {
@@ -192,7 +193,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
     (bizRaw.planStatus === "active" ||
       bizRaw.planStatus === "past_due" ||
       bizRaw.licenseStatus === "active");
-  if (looksPaidPlan && bizRaw.isTrial) {
+  if (!options.readOnly && looksPaidPlan && bizRaw.isTrial) {
     console.warn(
       `[billing-access] healing stuck isTrial=true on paid plan businessId=${bizRaw.id} plan=${bizRaw.plan} planStatus=${bizRaw.planStatus}`
     );
@@ -249,7 +250,7 @@ export async function evaluateBillingAccess(userId: string): Promise<BillingAcce
   // Normalize 3-day free trial (repair inflated remaining days from bad data)
   // Skip when already on a paid active plan (even if isTrial was stale — healed above)
   const trialNorm =
-    looksPaidPlan && !bizRaw.isTrial
+    options.readOnly || (looksPaidPlan && !bizRaw.isTrial)
       ? {
           trialDays: bizRaw.trialDays,
           trialEndsAt: bizRaw.trialEndsAt,

@@ -405,6 +405,12 @@ server = app.listen(PORT, () => {
   console.log(`   Health: http://localhost:${PORT}/health`);
   console.log(`   Ready:  http://localhost:${PORT}/ready`);
 
+  // Explicit cutover mode: keep HTTP/request behavior, suppress automatic boot work.
+  if (process.env.MM_SAFE_STARTUP === "1") {
+    log.info("startup.side-effects-suppressed");
+    return;
+  }
+
   seedIndustryTemplates().catch((err) => {
     console.error("[templates] boot seed failed:", err instanceof Error ? err.message : err);
   });

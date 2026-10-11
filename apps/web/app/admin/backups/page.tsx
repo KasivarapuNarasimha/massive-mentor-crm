@@ -275,14 +275,16 @@ export default function AdminBackupsPage() {
           {r.type === "business" && (
             <button
               type="button"
-              className="text-xs text-amber-300 underline"
+              className="text-xs text-amber-300 underline disabled:opacity-40"
+              disabled
+              title="Restore temporarily disabled for safety maintenance."
               onClick={() => requestRestore(r.id, "business", r.businessId === "—" ? undefined : r.businessId)}
             >
               Restore biz
             </button>
           )}
           {r.type === "full" && (
-            <button type="button" className="text-xs text-amber-300 underline" onClick={() => requestRestore(r.id, "full")}>
+            <button type="button" disabled title="Restore temporarily disabled for safety maintenance." className="text-xs text-amber-300 underline disabled:opacity-40" onClick={() => requestRestore(r.id, "full")}>
               Restore full
             </button>
           )}
@@ -330,9 +332,13 @@ export default function AdminBackupsPage() {
       <div>
         <h1 className="text-2xl font-semibold">Backup &amp; Restore</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Encrypted platform and per-business backups. Restore requires verification + one-time confirmation.
+          Encrypted platform and per-business backups.
         </p>
       </div>
+
+      <p role="status" className="text-sm text-amber-300">
+        Restore temporarily disabled for safety maintenance.
+      </p>
 
       <div className="flex flex-wrap gap-3 items-end">
         <button
@@ -367,6 +373,7 @@ export default function AdminBackupsPage() {
             Full restore phrase (type exactly <code className="text-amber-300">RESTORE PLATFORM</code>)
           </label>
           <input
+            disabled
             value={confirmPhrase}
             onChange={(e) => setConfirmPhrase(e.target.value)}
             className="px-3 py-2 rounded-xl bg-card border border-border text-sm w-full max-w-md"
@@ -385,7 +392,8 @@ export default function AdminBackupsPage() {
           </code>
           <button
             type="button"
-            disabled={busy}
+            disabled
+            title="Restore temporarily disabled for safety maintenance."
             onClick={confirmRestore}
             className="px-4 py-2 rounded-xl bg-amber-500 text-white font-semibold text-sm"
           >
