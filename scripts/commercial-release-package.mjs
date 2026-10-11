@@ -31,7 +31,9 @@ const bundle=path.join(root,'bundle'); fs.mkdirSync(bundle);
 stage='copy';
 const copy=p=>{assert(fs.existsSync(p),`Required artifact absent: ${p}`);const target=path.join(bundle,p);fs.mkdirSync(path.dirname(target),{recursive:true});fs.cpSync(p,target,{recursive:true,dereference:false});};
 // Explicit application allowlist: no .env, uploads, backup, storage or source tree.
-for(const p of ['package.json','pnpm-lock.yaml','pnpm-workspace.yaml','apps/api/package.json','apps/web/package.json','apps/api/dist','apps/api/prisma','apps/web/.next','apps/web/public']) copy(p);
+for(const p of ['package.json','pnpm-lock.yaml','pnpm-workspace.yaml','apps/api/package.json','apps/web/package.json','apps/api/dist','apps/api/prisma','apps/web/.next']) copy(p);
+// The reviewed source has no tracked public directory; it is optional, not a build artifact.
+if(fs.existsSync('apps/web/public'))copy('apps/web/public');
 fs.rmSync(path.join(bundle,'apps/web/.next/cache'),{recursive:true,force:true});
 stage='production-dependencies';
 run('pnpm',['install','--prod','--offline','--frozen-lockfile','--ignore-scripts'],{cwd:bundle,timeout:300000});
