@@ -3,15 +3,19 @@
  * Uses Postgres advisory locks + InvoiceSequence row upsert.
  */
 import { prisma } from "../lib/prisma.js";
+import type { Prisma } from "@prisma/client";
 
 /**
  * Next number for tenant finance invoices: INV-YYYY-00001 (unique per business).
  */
-export async function nextFinanceInvoiceNumber(businessId: string): Promise<string> {
+export async function nextFinanceInvoiceNumber(
+  businessId: string, transaction?: Prisma.TransactionClient
+): Promise<string> {
   const year = new Date().getFullYear();
   const key = `finance:${businessId}:${year}`;
 
-  const seq = await prisma.$transaction(async (tx) => {
+  // Preserve existing callers; future issuance can allocate inside its own transaction.
+  const allocate = async (tx: Prisma.TransactionClient) => {
     // Serialize concurrent generators for this key
     await tx.$executeRawUnsafe(
       `SELECT pg_advisory_xact_lock(hashtext($1::text))`,
@@ -27,7 +31,8 @@ export async function nextFinanceInvoiceNumber(businessId: string): Promise<stri
     return tx.invoiceSequence.create({
       data: { key, lastValue: 1, prefix: `INV-${year}-`, businessId },
     });
-  });
+  };
+  const seq = transaction ? await allocate(transaction) : await prisma.$transaction(allocate);
 
   return `${seq.prefix}${String(seq.lastValue).padStart(5, "0")}`;
 }

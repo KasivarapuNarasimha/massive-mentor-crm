@@ -1,5 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { getUserBusinessId } from "./field-engine.service.js";
+import { resolveStrictBusinessId } from "./strict-business-resolution.service.js";
+import { getStrictRequestContext } from "./strict-request-context.service.js";
 
 /** Roles that only see contacts assigned to them or created by them */
 const OWN_DATA_ONLY_ROLES = new Set([
@@ -31,6 +33,30 @@ const BUSINESS_WIDE_ROLES = new Set([
   "viewer",
 ]);
 
+export type LeadWriteContext = {
+  userId: string;
+  businessId: string;
+  role: string;
+  permissions: unknown;
+};
+
+/** Mutation context: never borrow another business's role or permissions. */
+export async function resolveLeadWriteContext(userId: string): Promise<LeadWriteContext> {
+  const businessId = getStrictRequestContext(userId)?.businessId || await resolveStrictBusinessId(userId);
+  if (!businessId) throw new Error("Active workspace required");
+  const member = await prisma.businessMember.findFirst({
+    where: { businessId, userId },
+    include: {
+      user: { select: { isDisabled: true } },
+      business: { select: { status: true } },
+    },
+  });
+  if (!member || member.user.isDisabled || member.business.status !== "active") {
+    throw new Error("Active membership in the resolved workspace required");
+  }
+  return { userId, businessId, role: member.role.trim().toLowerCase(), permissions: member.permissions };
+}
+
 export type CrmScope = {
   businessId: string | null;
   role: string;
@@ -54,6 +80,7 @@ export type CrmScope = {
  * Falls back to any membership / user.role for single-business and legacy users.
  */
 export async function resolveActorRole(userId: string): Promise<string> {
+  if (getStrictRequestContext(userId)) return (await resolveLeadWriteContext(userId)).role;
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { role: true, platformRole: true },
@@ -181,10 +208,12 @@ function contactVisibilityWhere(
  * ⚠️ Do NOT use this where clause on Deal / Task / Meeting / Document —
  * those models have no `assignedTo` field. Use `buildOwnedEntityScope` instead.
  */
-export async function buildCrmScope(userId: string): Promise<CrmScope> {
-  const businessId = await getUserBusinessId(userId);
-  const role = await resolveActorRole(userId);
-  const tenant = tenantWhereClause(userId, businessId);
+export async function buildCrmScope(userId: string, context?: LeadWriteContext): Promise<CrmScope> {
+  if (!context && getStrictRequestContext(userId)) context = await resolveLeadWriteContext(userId);
+  if (context && context.userId !== userId) throw new Error("Workspace actor mismatch");
+  const businessId = context ? context.businessId : await getUserBusinessId(userId);
+  const role = context ? context.role : await resolveActorRole(userId);
+  const tenant = context ? { businessId: context.businessId } : tenantWhereClause(userId, businessId);
 
   // Super admin platform ops may still be bound to a customer business via membership
   if (role === "super_admin" && !businessId) {

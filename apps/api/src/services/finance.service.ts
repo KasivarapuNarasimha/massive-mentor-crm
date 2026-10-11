@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { getUserBusinessId } from "./field-engine.service.js";
 import { resolveActorRole } from "./tenant-scope.service.js";
@@ -86,6 +87,11 @@ export async function getFinanceDashboard(userId: string) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const yearStart = new Date(now.getFullYear(), 0, 1);
 
+  // Preserve legacy records; frozen quotation currencies must not be relabelled or
+  // summed into another currency. The commercial report retains separate currencies.
+  const invoiceScope:Prisma.InvoiceWhereInput={businessId,OR:[{sourceType:null},{sourceType:{not:"quotation"}},{sourceType:"quotation",currency}]};
+  const paymentScope:Prisma.PaymentWhereInput={businessId,OR:[{invoiceId:null},{invoice:{is:invoiceScope}}]};
+  const openStatuses=["sent","overdue","draft"];
   // SQL aggregates only — never load entire finance tables into memory
   const [
     invoiceAgg,
@@ -97,20 +103,22 @@ export async function getFinanceDashboard(userId: string) {
     monthPayAgg,
     yearPayAgg,
     monthExpAgg,
+    openPaymentAgg,
+    foreignCommercialCount,
   ] = await Promise.all([
     prisma.invoice.aggregate({
-      where: { businessId },
+      where: invoiceScope,
       _sum: { total: true, taxAmount: true },
       _count: { _all: true },
     }),
     prisma.invoice.aggregate({
-      where: { businessId, status: "paid" },
+      where: {...invoiceScope, status: "paid"},
       _count: { _all: true },
     }),
     prisma.invoice.aggregate({
       where: {
-        businessId,
-        status: { in: ["sent", "overdue", "draft"] },
+        ...invoiceScope,
+        status: { in: openStatuses },
       },
       _sum: { total: true },
     }),
@@ -120,35 +128,37 @@ export async function getFinanceDashboard(userId: string) {
       _count: { _all: true },
     }),
     prisma.payment.aggregate({
-      where: { businessId },
+      where: paymentScope,
       _sum: { amount: true },
       _count: { _all: true },
     }),
     prisma.invoice.count({
       where: {
-        businessId,
+        ...invoiceScope,
         status: { in: ["sent", "overdue"] },
         dueDate: { lt: now },
       },
     }),
     prisma.payment.aggregate({
-      where: { businessId, paidAt: { gte: monthStart } },
+      where: {...paymentScope, paidAt: { gte: monthStart } },
       _sum: { amount: true },
     }),
     prisma.payment.aggregate({
-      where: { businessId, paidAt: { gte: yearStart } },
+      where: {...paymentScope, paidAt: { gte: yearStart } },
       _sum: { amount: true },
     }),
     prisma.expense.aggregate({
       where: { businessId, expenseDate: { gte: monthStart } },
       _sum: { total: true },
     }),
+    prisma.payment.aggregate({where:{...paymentScope,invoice:{is:{...invoiceScope,status:{in:openStatuses}}}},_sum:{amount:true}}),
+    prisma.invoice.count({where:{businessId,sourceType:"quotation",currency:{not:currency}}}),
   ]);
 
   // Best-effort currency normalization without full table scan of values
   await Promise.all([
     prisma.invoice.updateMany({
-      where: { businessId, currency: { not: currency } },
+      where: { businessId, currency: { not: currency }, OR:[{sourceType:null},{sourceType:{not:"quotation"}}] },
       data: { currency },
     }),
     prisma.expense.updateMany({
@@ -175,7 +185,7 @@ export async function getFinanceDashboard(userId: string) {
     const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const [inflowAgg, outflowAgg] = await Promise.all([
       prisma.payment.aggregate({
-        where: { businessId, paidAt: { gte: d, lte: end } },
+        where: {...paymentScope, paidAt: { gte: d, lte: end } },
         _sum: { amount: true },
       }),
       prisma.expense.aggregate({
@@ -190,12 +200,13 @@ export async function getFinanceDashboard(userId: string) {
 
   return {
     currency,
+    excludedCommercialCurrencyCount:foreignCommercialCount,
     kpis: {
       totalInvoiced,
       totalPaid,
       totalExpenses,
       totalTax,
-      outstanding: Math.max(0, openTotal - totalPaid),
+      outstanding: Math.max(0, openTotal - toMoneyNumber(openPaymentAgg._sum.amount)),
       profit,
       monthRevenue,
       yearRevenue,
@@ -345,6 +356,7 @@ export async function updateInvoice(
   const { businessId } = await assertFinanceAccess(userId);
   const existing = await prisma.invoice.findFirst({ where: { id, businessId } });
   if (!existing) throw new Error("Invoice not found");
+  if (existing.sourceType === "quotation") throw new Error("Use the commercial invoice/payment routes");
 
   const amount =
     input.amount !== undefined ? toDecimal(input.amount) : toDecimal(existing.amount);
@@ -417,6 +429,7 @@ export async function deleteInvoice(userId: string, id: string) {
   const { businessId } = await assertFinanceAccess(userId);
   const existing = await prisma.invoice.findFirst({ where: { id, businessId } });
   if (!existing) throw new Error("Invoice not found");
+  if (existing.sourceType === "quotation") throw new Error("Use the commercial invoice/payment routes");
   await prisma.payment.deleteMany({ where: { invoiceId: id } });
   await prisma.invoice.delete({ where: { id } });
   await recordAudit({
@@ -639,6 +652,7 @@ export async function createPayment(
       where: { id: input.invoiceId, businessId },
     });
     if (!inv) throw new Error("Invoice not found");
+    if (inv.sourceType === "quotation") throw new Error("Use the commercial payment route");
   }
 
   const { resolveCustomFieldsWrite } = await import("./custom-fields.service.js");
@@ -767,6 +781,7 @@ export async function deletePayment(userId: string, id: string) {
   const { businessId } = await assertFinanceAccess(userId);
   const existing = await prisma.payment.findFirst({ where: { id, businessId } });
   if (!existing) throw new Error("Payment not found");
+  if (existing.invoiceId && await prisma.invoice.findFirst({where:{id:existing.invoiceId,businessId,sourceType:"quotation"}})) throw new Error("Use the commercial reversal route");
   await prisma.payment.delete({ where: { id } });
   await recordAudit({
     businessId,

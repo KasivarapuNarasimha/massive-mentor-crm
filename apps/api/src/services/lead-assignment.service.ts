@@ -6,13 +6,14 @@
  * - Transactional updates in batches of 1,000
  */
 import { prisma } from "../lib/prisma.js";
-import { getUserBusinessId } from "./field-engine.service.js";
+import { requireActiveBusinessAssignee } from "./lead-assignment-safety.service.js";
 import { recordAudit } from "./audit.service.js";
 import { scheduleFollowupRefresh } from "./followup-engine.service.js";
 import {
   andTenant,
   buildCrmScope,
-  resolveActorRole,
+  resolveLeadWriteContext,
+  type LeadWriteContext,
 } from "./tenant-scope.service.js";
 import {
   BULK_LEAD_CHUNK,
@@ -49,48 +50,21 @@ const HISTORY_ADMIN_ROLES = new Set([
   "super_admin",
 ]);
 
-export async function canViewAssignmentHistory(userId: string): Promise<boolean> {
-  const role = await resolveActorRole(userId);
+export async function canViewAssignmentHistory(userId: string, context?: LeadWriteContext): Promise<boolean> {
+  const { role } = context || await resolveLeadWriteContext(userId);
   return HISTORY_ADMIN_ROLES.has(role) || role.includes("admin");
 }
 
 /** Active workspace members only (not disabled). Any bulk-editor can list for Assign To. */
-export async function listAssignableMembers(actorUserId: string): Promise<AssignableMember[]> {
-  if (!(await canBulkEditLeads(actorUserId))) {
+export async function listAssignableMembers(actorUserId: string, writeContext?: LeadWriteContext): Promise<AssignableMember[]> {
+  const context = writeContext || await resolveLeadWriteContext(actorUserId);
+  if (!(await canBulkEditLeads(actorUserId, context))) {
     throw new Error("You do not have permission to assign leads");
   }
-  const businessId = await getUserBusinessId(actorUserId);
-  if (!businessId) {
-    // Solo user — only themselves if active
-    const me = await prisma.user.findUnique({
-      where: { id: actorUserId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        employeeCode: true,
-        username: true,
-        role: true,
-        isDisabled: true,
-      },
-    });
-    if (!me || me.isDisabled) return [];
-    return [
-      {
-        id: me.id,
-        name: me.name,
-        email: me.email,
-        phone: me.phone,
-        employeeCode: me.employeeCode,
-        username: me.username,
-        role: me.role,
-      },
-    ];
-  }
+  const { businessId } = context;
 
   const members = await prisma.businessMember.findMany({
-    where: { businessId },
+    where: { businessId, user: { isDisabled: false } },
     include: {
       user: {
         select: {
@@ -160,6 +134,7 @@ async function collectTargetLeadIds(
     search?: string;
     status?: string;
     assignedTo?: string;
+    writeContext: LeadWriteContext;
   }
 ): Promise<{ targetIds: string[]; matched: number; requested: number }> {
   const scopeMode = input.scope === "first_n" || input.scope === "all_filtered" ? input.scope : "ids";
@@ -175,7 +150,7 @@ async function collectTargetLeadIds(
     if (unique.length > BULK_LEAD_MAX_ROWS) {
       throw new Error(`Maximum ${BULK_LEAD_MAX_ROWS.toLocaleString()} leads per assignment`);
     }
-    const crmScope = await buildCrmScope(userId);
+    const crmScope = await buildCrmScope(userId, input.writeContext);
     const valid: string[] = [];
     for (let i = 0; i < unique.length; i += BULK_LEAD_CHUNK) {
       const chunk = unique.slice(i, i + BULK_LEAD_CHUNK);
@@ -184,6 +159,7 @@ async function collectTargetLeadIds(
           id: { in: chunk },
           type: "lead",
           deletedAt: null,
+          ...(filters.assignedTo === "unassigned" ? { assignedTo: null } : {}),
         }) as never,
         select: { id: true },
       });
@@ -199,7 +175,7 @@ async function collectTargetLeadIds(
     assignedTo: filters.assignedTo,
     trashOnly: false,
     includeDeleted: false,
-  });
+  }, input.writeContext);
   const matched = await prisma.contact.count({ where: where as never });
   if (matched === 0) throw new Error("No leads match the current filters");
   if (matched > BULK_LEAD_MAX_ROWS && scopeMode === "all_filtered") {
@@ -305,12 +281,13 @@ export async function smartBulkAssignLeads(
   actorUserId: string,
   input: SmartAssignInput
 ): Promise<SmartAssignResult> {
-  if (!(await canBulkEditLeads(actorUserId))) {
+  const context = await resolveLeadWriteContext(actorUserId);
+  if (!(await canBulkEditLeads(actorUserId, context))) {
     throw new Error("You do not have permission to assign leads");
   }
 
   const mode: AssignMode = input.mode === "all_members" ? "all_members" : "single";
-  const members = await listAssignableMembers(actorUserId);
+  const members = await listAssignableMembers(actorUserId, context);
   if (!members.length) throw new Error("No active workspace members available");
 
   let assignees: AssignableMember[] = [];
@@ -352,6 +329,7 @@ export async function smartBulkAssignLeads(
   const { targetIds, matched, requested } = await collectTargetLeadIds(actorUserId, {
     scope: input.scope === "reassign" ? "ids" : input.scope,
     ids: input.ids,
+    writeContext: context,
     limit: input.limit,
     assignedTo: mode === "all_members" ? "unassigned" : input.filterAssignedTo,
     search: input.search,
@@ -388,59 +366,13 @@ export async function smartBulkAssignLeads(
     };
   }
 
-  const businessId = await getUserBusinessId(actorUserId);
+  const { businessId } = context;
   const actor = await prisma.user.findUnique({
     where: { id: actorUserId },
     select: { id: true, name: true, email: true },
   });
   const actorName = actor?.name?.trim() || actor?.email || actorUserId;
-  const crmScope = await buildCrmScope(actorUserId);
-
-  // No workspace: still assign (no durable history table)
-  if (!businessId) {
-    let assigned = 0;
-    const now = new Date();
-    for (const a of assignees) {
-      const ids = buckets.get(a.id) || [];
-      for (let i = 0; i < ids.length; i += BULK_LEAD_CHUNK) {
-        const chunk = ids.slice(i, i + BULK_LEAD_CHUNK);
-        const upd = await prisma.contact.updateMany({
-          where: andTenant(crmScope.where, {
-            id: { in: chunk },
-            type: "lead",
-            deletedAt: null,
-          }) as never,
-          data: { assignedTo: a.id, lastContactedAt: now },
-        });
-        assigned += upd.count;
-      }
-    }
-    await recordAudit({
-      businessId: null,
-      actorUserId,
-      action: "lead_smart_assign",
-      entityType: "contact",
-      metadata: {
-        mode,
-        scope: input.scope,
-        assigned,
-        distribution,
-        noBusinessHistory: true,
-      },
-    });
-    scheduleFollowupRefresh(actorUserId);
-    return {
-      assigned,
-      failed: Math.max(0, targetIds.length - assigned),
-      matched,
-      requested,
-      mode,
-      scope: input.scope,
-      distribution,
-      assignmentId: null,
-      sequence: null,
-    };
-  }
+  const crmScope = await buildCrmScope(actorUserId, context);
 
   const result = await prisma.$transaction(
     async (tx) => {
@@ -476,6 +408,7 @@ export async function smartBulkAssignLeads(
       const now = new Date();
 
       for (const a of assignees) {
+        await requireActiveBusinessAssignee(businessId, a.id, tx);
         const ids = buckets.get(a.id) || [];
         if (!ids.length) continue;
 
@@ -496,12 +429,14 @@ export async function smartBulkAssignLeads(
               id: { in: chunk },
               type: "lead",
               deletedAt: null,
+              ...(mode === "all_members" ? { assignedTo: null } : {}),
             }) as never,
             data: {
               assignedTo: a.id,
               lastContactedAt: now,
             },
           });
+          if (upd.count !== chunk.length) throw new Error("Assignment conflict: leads changed; retry the operation");
           assigned += upd.count;
 
           await tx.leadAssignmentItem.createMany({
@@ -522,7 +457,7 @@ export async function smartBulkAssignLeads(
         failed: Math.max(0, targetIds.length - assigned),
       };
     },
-    { maxWait: 15_000, timeout: 120_000 }
+    { maxWait: 15_000, timeout: 120_000, isolationLevel: "Serializable" }
   );
 
   await recordAudit({
@@ -563,10 +498,11 @@ export async function listAssignmentHistory(
   actorUserId: string,
   opts?: { page?: number; pageSize?: number }
 ) {
-  if (!(await canViewAssignmentHistory(actorUserId))) {
+  const context = await resolveLeadWriteContext(actorUserId);
+  if (!(await canViewAssignmentHistory(actorUserId, context))) {
     throw new Error("Only Business Admin / Admin can view assignment history");
   }
-  const businessId = await getUserBusinessId(actorUserId);
+  const { businessId } = context;
   if (!businessId) return { total: 0, page: 1, pageSize: 25, items: [] };
 
   const page = opts?.page && opts.page > 0 ? opts.page : 1;
@@ -614,10 +550,11 @@ export async function listAssignmentHistory(
 }
 
 export async function getAssignmentDetail(actorUserId: string, batchId: string) {
-  if (!(await canViewAssignmentHistory(actorUserId))) {
+  const context = await resolveLeadWriteContext(actorUserId);
+  if (!(await canViewAssignmentHistory(actorUserId, context))) {
     throw new Error("Only Business Admin / Admin can view assignment history");
   }
-  const businessId = await getUserBusinessId(actorUserId);
+  const { businessId } = context;
   if (!businessId) throw new Error("Workspace not found");
 
   const batch = await prisma.leadAssignmentBatch.findFirst({
@@ -665,10 +602,11 @@ export async function moveAssignmentLeads(
     notes?: string;
   }
 ): Promise<SmartAssignResult> {
-  if (!(await canViewAssignmentHistory(actorUserId))) {
+  const context = await resolveLeadWriteContext(actorUserId);
+  if (!(await canViewAssignmentHistory(actorUserId, context))) {
     throw new Error("Only Business Admin / Admin can edit assignments");
   }
-  const businessId = await getUserBusinessId(actorUserId);
+  const { businessId } = context;
   if (!businessId) throw new Error("Workspace not found");
 
   const fromUserId = String(input.fromUserId || "").trim();
@@ -678,7 +616,7 @@ export async function moveAssignmentLeads(
   if (fromUserId === toUserId) throw new Error("Source and destination must differ");
   if (!Number.isFinite(count) || count < 1) throw new Error("Count must be at least 1");
 
-  const members = await listAssignableMembers(actorUserId);
+  const members = await listAssignableMembers(actorUserId, context);
   const toMember = members.find((m) => m.id === toUserId);
   if (!toMember) throw new Error("Destination user is not an active workspace member");
 
@@ -703,10 +641,11 @@ export async function moveAssignmentLeads(
     select: { name: true, email: true },
   });
   const fromMember = members.find((m) => m.id === fromUserId);
-  const crmScope = await buildCrmScope(actorUserId);
+  const crmScope = await buildCrmScope(actorUserId, context);
 
   const result = await prisma.$transaction(
     async (tx) => {
+      await requireActiveBusinessAssignee(businessId, toUserId, tx);
       const sequence = await (async () => {
         const last = await tx.leadAssignmentBatch.findFirst({
           where: { businessId },
@@ -768,13 +707,15 @@ export async function moveAssignmentLeads(
             id: { in: chunk },
             type: "lead",
             deletedAt: null,
+            assignedTo: fromUserId,
           }) as never,
           data: { assignedTo: toUserId, lastContactedAt: now },
         });
+        if (upd.count !== chunk.length) throw new Error("Stale assignment history: current owner no longer matches");
         assigned += upd.count;
 
         await tx.leadAssignmentItem.updateMany({
-          where: { batchId: batch.id, contactId: { in: chunk } },
+          where: { batchId: batch.id, userId: fromUserId, contactId: { in: chunk } },
           data: { userId: toUserId },
         });
 
@@ -826,7 +767,7 @@ export async function moveAssignmentLeads(
         distribution,
       };
     },
-    { maxWait: 15_000, timeout: 60_000 }
+    { maxWait: 15_000, timeout: 60_000, isolationLevel: "Serializable" }
   );
 
   await recordAudit({

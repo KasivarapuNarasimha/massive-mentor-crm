@@ -397,6 +397,7 @@ export async function postSalesOrder(userId: string, id: string) {
       include: { items: true, contact: { select: { name: true, company: true } } },
     });
     if (!so) throw new Error("Sales order not found");
+    if(so.dealId && await tx.quotationRevision.findFirst({where:{businessId,dealId:so.dealId,state:{in:["sent","accepted"]},sentPointers:{some:{businessId}}},select:{id:true}})) throw new Error("Commercial quotation linked to this deal; reconcile before sales-order posting");
     if (!so.items.length) throw new Error("Sales order has no line items");
 
     for (const line of so.items) {

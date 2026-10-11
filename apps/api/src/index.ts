@@ -268,6 +268,7 @@ import { seedIndustryTemplates } from "./services/template.service.js";
 import { startBackupScheduler, stopBackupScheduler } from "./services/backup.service.js";
 import { apiGeneralLimiter } from "./middleware/rateLimiter.js";
 import { requireBillingAccess } from "./middleware/requireBillingAccess.js";
+import { mountCommercialRoutes } from "./routes/commercial.routes.js";
 import { ensureSubscriptionPlans } from "./services/subscription-plan.service.js";
 import { runDailyBillingJobs } from "./services/saas-billing.service.js";
 
@@ -276,6 +277,9 @@ import { runDailyBillingJobs } from "./services/saas-billing.service.js";
 app.use("/api", apiGeneralLimiter);
 
 // SaaS trial/subscription gate (allows /api/billing/* and auth; webhook is public)
+// The real HTTP/PostgreSQL commercial chain is validated independently of legacy repair gates.
+mountCommercialRoutes(app);
+
 app.use("/api", requireBillingAccess);
 
 // —— Three-portal API surfaces (production SaaS isolation) ——

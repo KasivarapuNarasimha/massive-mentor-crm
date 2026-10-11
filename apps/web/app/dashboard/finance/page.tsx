@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -65,6 +66,7 @@ export default function FinancePage() {
   const { token } = useAuth();
   const { currency, money, setCurrency } = useBusinessCurrency();
   const [tab, setTab] = useState<"overview" | "invoices" | "expenses" | "payments">("overview");
+  const [excludedCommercialCurrencyCount,setExcludedCommercialCurrencyCount]=useState(0);
   const [kpis, setKpis] = useState<Kpis | null>(null);
   const [cashFlow, setCashFlow] = useState<Array<{ month: string; inflow: number; outflow: number; net: number }>>([]);
   const [pnl, setPnl] = useState<{ revenue: number; expenses: number; grossProfit: number; taxCollected: number } | null>(null);
@@ -112,6 +114,7 @@ export default function FinancePage() {
     if (!token) return;
     const res = await api.get<{
       currency?: string;
+      excludedCommercialCurrencyCount?:number;
       kpis: Kpis;
       cashFlow: typeof cashFlow;
       profitAndLoss: typeof pnl;
@@ -122,6 +125,7 @@ export default function FinancePage() {
         setAppCurrency(res.data.currency);
       }
       setKpis(res.data.kpis);
+      setExcludedCommercialCurrencyCount(res.data.excludedCommercialCurrencyCount||0);
       setCashFlow(res.data.cashFlow || []);
       setPnl(res.data.profitAndLoss || null);
     } else if (res.error) {
@@ -306,6 +310,8 @@ export default function FinancePage() {
           Currency: {currency}
         </span>
       </div>
+
+      {excludedCommercialCurrencyCount>0&&<p role="status">Quotation invoices in other currencies are excluded from these totals. <Link href="/commercial" className="underline">View balances by invoice currency in Commercial reports.</Link></p>}
 
       <ExportFiltersBar
         module={tab === "expenses" ? "expenses" : tab === "payments" ? "payments" : "invoices"}

@@ -1,4 +1,6 @@
 import { prisma } from "../lib/prisma.js";
+import { requireActiveBusinessAssignee } from "./lead-assignment-safety.service.js";
+import { getStrictRequestContext } from "./strict-request-context.service.js";
 import { z } from "zod";
 import { getAIService } from "./ai.service.js";
 import { sanitizePromptInput } from "../utils/sanitize.js";
@@ -61,6 +63,8 @@ import {
   buildTenantScope,
   buildOwnedTenantScope,
   resolveActorRole,
+  resolveLeadWriteContext,
+  type LeadWriteContext,
 } from "./tenant-scope.service.js";
 import { paginated, skipTake, type PaginatedResult } from "./pagination.js";
 import { recordAudit } from "./audit.service.js";
@@ -276,10 +280,12 @@ const CONTACT_SORTABLE = new Set([
  */
 export async function buildContactListWhere(
   userId: string,
-  filters?: ContactListFilters
+  filters?: ContactListFilters,
+  writeContext?: LeadWriteContext
 ): Promise<Record<string, unknown>> {
   // Reclaim imports stranded on soft-deleted workspaces (same user)
-  try {
+  if (!writeContext && getStrictRequestContext(userId)) writeContext = await resolveLeadWriteContext(userId);
+  if (!writeContext) try {
     const { getUserBusinessId, reclaimContactsFromDeletedBusinesses } = await import(
       "./field-engine.service.js"
     );
@@ -291,7 +297,7 @@ export async function buildContactListWhere(
     console.warn("[crm] reclaim contacts skipped:", e instanceof Error ? e.message : e);
   }
 
-  const scope = await buildCrmScope(userId);
+  const scope = await buildCrmScope(userId, writeContext);
 
   /**
    * Strict composition order (never OR visibility with age filters):
@@ -480,7 +486,9 @@ export async function getContactById(userId: string, id: string) {
 
 export async function createContact(userId: string, input: ContactInput | Record<string, unknown>) {
   const parsed = contactSchema.parse(input);
-  const businessId = await getUserBusinessId(userId);
+  const context = await resolveLeadWriteContext(userId);
+  const { businessId } = context;
+  const assignedTo = parsed.assignedTo?.trim() || null;
   const fieldDefs = await getContactFieldDefs(businessId);
 
   // FieldEngine: map template fields + customFields (config-driven)
@@ -494,7 +502,9 @@ export async function createContact(userId: string, input: ContactInput | Record
   const name = (applied.core.name || parsed.name || "").trim();
   if (!name) throw new Error("Name is required");
 
-  return prisma.contact.create({
+  return prisma.$transaction(async (tx) => {
+    if (assignedTo) await requireActiveBusinessAssignee(businessId, assignedTo, tx);
+    return tx.contact.create({
     data: {
       userId,
       businessId: businessId ?? null,
@@ -512,7 +522,7 @@ export async function createContact(userId: string, input: ContactInput | Record
           : parsed.notes || parsed.description || null,
       aiScore: parsed.aiScore ?? null,
       priority: parsed.priority ?? null,
-      assignedTo: parsed.assignedTo ?? null,
+      assignedTo,
       nextFollowUp: parsed.nextFollowUp ? new Date(parsed.nextFollowUp) : null,
       whatsapp: parsed.whatsapp ?? null,
       website: parsed.website || null,
@@ -520,7 +530,8 @@ export async function createContact(userId: string, input: ContactInput | Record
       tags: parsed.tags ?? [],
       customFields: applied.customFields as object,
     },
-  }).then(async (contact) => {
+    });
+  }, { isolationLevel: "Serializable" }).then(async (contact) => {
     const kind = contact.type === "client" ? "Client" : "Lead";
     await notifyCrmCreated(userId, {
       entityType: "contact",
@@ -571,7 +582,9 @@ export async function updateContact(
   id: string,
   input: Partial<ContactInput> | Record<string, unknown>
 ) {
-  const { where: tenant } = await buildTenantScope(userId);
+  const context = await resolveLeadWriteContext(userId);
+  const { businessId } = context;
+  const { where: tenant } = await buildCrmScope(userId, context);
   const existing = await prisma.contact.findFirst({
     where: andTenant(tenant, { id, deletedAt: null }) as never,
   });
@@ -580,7 +593,7 @@ export async function updateContact(
   }
 
   const parsed = contactSchema.partial().parse(input);
-  const businessId = existing.businessId || (await getUserBusinessId(userId));
+  const assignedTo = parsed.assignedTo?.trim() || null;
   const fieldDefs = await getContactFieldDefs(businessId);
 
   const applied = applyContactFieldDefs(fieldDefs, { ...input, ...parsed } as Record<string, unknown>, {
@@ -598,12 +611,13 @@ export async function updateContact(
   const statusChanged =
     nextStatus.trim().toLowerCase() !== String(existing.status || "").trim().toLowerCase();
 
-  // Ensure contact has a workspace businessId before deal sync
-  const resolvedBusinessId =
-    existing.businessId || (await getUserBusinessId(userId)) || null;
-
-  const contact = await prisma.contact.update({
-    where: { id },
+  const contact = await prisma.$transaction(async (tx) => {
+    if (parsed.assignedTo !== undefined && assignedTo) {
+      await requireActiveBusinessAssignee(businessId, assignedTo, tx);
+    }
+    return tx.contact.update({
+    where: { id, AND: [tenant, { businessId, deletedAt: null },
+      ...(parsed.assignedTo !== undefined ? [{ assignedTo: existing.assignedTo }] : [])] } as never,
     data: {
       type: parsed.type ?? existing.type,
       status: nextStatus,
@@ -654,7 +668,7 @@ export async function updateContact(
         parsed.notes || parsed.status || applied.core.status ? new Date() : existing.lastContactedAt,
       aiScore: parsed.aiScore !== undefined ? parsed.aiScore : existing.aiScore,
       priority: parsed.priority !== undefined ? parsed.priority : existing.priority,
-      assignedTo: parsed.assignedTo !== undefined ? parsed.assignedTo : existing.assignedTo,
+      ...(parsed.assignedTo !== undefined ? { assignedTo } : {}),
       nextFollowUp:
         parsed.nextFollowUp !== undefined
           ? parsed.nextFollowUp
@@ -666,12 +680,10 @@ export async function updateContact(
       industry: parsed.industry !== undefined ? parsed.industry : existing.industry,
       tags: parsed.tags !== undefined ? parsed.tags ?? [] : existing.tags,
       customFields: mergedCustom as object,
-      // Never leave lead without businessId when workspace exists
-      ...(resolvedBusinessId && !existing.businessId
-        ? { businessId: resolvedBusinessId }
-        : {}),
+
     },
-  });
+    });
+  }, { isolationLevel: "Serializable" });
 
   // Assignment notifications (store userId, not free-text name)
   const prevAssignee = existing.assignedTo || null;
@@ -707,7 +719,7 @@ export async function updateContact(
           status: contact.status,
           value: contact.value == null ? null : toMoneyNumber(contact.value),
           company: contact.company,
-          businessId: contact.businessId || resolvedBusinessId,
+          businessId: contact.businessId || businessId,
           userId: contact.userId,
         },
         existing.status
@@ -814,7 +826,7 @@ export async function updateContact(
 
     await logActivity({
       userId,
-      businessId: finalContact.businessId || resolvedBusinessId || null,
+      businessId: finalContact.businessId || businessId || null,
       entityType: "contact",
       entityId: finalContact.id,
       action: assigneeChanged && !statusChanged && changes.length === 1 ? "assigned" : "updated",
@@ -830,7 +842,7 @@ export async function updateContact(
       }),
     }).catch(() => undefined);
     await recordAudit({
-      businessId: finalContact.businessId || resolvedBusinessId || null,
+      businessId: finalContact.businessId || businessId || null,
       actorUserId: userId,
       action: "lead_update",
       entityType: "contact",
@@ -886,23 +898,19 @@ const BULK_EDIT_ROLES = new Set([
   "sales_executive", // edit allowed; delete restricted
 ]);
 
-export async function canBulkEditLeads(userId: string): Promise<boolean> {
-  const role = await resolveActorRole(userId);
+export async function canBulkEditLeads(userId: string, context?: LeadWriteContext): Promise<boolean> {
+  const { role } = context || await resolveLeadWriteContext(userId);
   return BULK_EDIT_ROLES.has(role) || role.includes("admin") || role.includes("manager");
 }
 
-export async function canBulkDeleteLeads(userId: string): Promise<boolean> {
-  const role = await resolveActorRole(userId);
+export async function canBulkDeleteLeads(userId: string, context?: LeadWriteContext): Promise<boolean> {
+  const { role, permissions } = context || await resolveLeadWriteContext(userId);
   if (BULK_DELETE_ROLES.has(role)) return true;
   // Sales manager: edit only (no bulk delete)
   if (role === "sales_manager" || role === "manager") return false;
   // Sales executive: only if membership permissions include bulk_delete
   if (role === "sales_executive") {
-    const mem = await prisma.businessMember.findFirst({
-      where: { userId },
-      select: { permissions: true },
-    });
-    const perms = mem?.permissions as Record<string, unknown> | null;
+    const perms = permissions as Record<string, unknown> | null;
     if (perms && (perms.bulk_delete === true || perms.bulkDelete === true)) return true;
     if (Array.isArray(perms) && (perms as string[]).includes("bulk_delete")) return true;
   }
@@ -928,14 +936,16 @@ export async function bulkEditLeads(
   ids: string[],
   patch: BulkLeadEditPatch
 ): Promise<{ updated: number; failed: number; ids: string[]; pipelineSyncCount: number }> {
-  if (!(await canBulkEditLeads(userId))) {
+  const context = await resolveLeadWriteContext(userId);
+  const { businessId } = context;
+  if (!(await canBulkEditLeads(userId, context))) {
     throw new Error("You do not have permission to bulk-edit leads");
   }
   const unique = [...new Set(ids.filter(Boolean))];
   if (!unique.length) throw new Error("Select at least one lead");
   if (unique.length > 500) throw new Error("Maximum 500 leads per bulk edit");
 
-  const scope = await buildCrmScope(userId);
+  const scope = await buildCrmScope(userId, context);
   const contacts = await prisma.contact.findMany({
     where: andTenant(scope.where, {
       id: { in: unique },
@@ -946,11 +956,12 @@ export async function bulkEditLeads(
 
   const data: Record<string, unknown> = {};
   if (patch.status !== undefined && String(patch.status).trim()) data.status = String(patch.status).trim();
-  if (patch.assignedTo !== undefined) data.assignedTo = patch.assignedTo ? String(patch.assignedTo).trim() : null;
+  if (patch.assignedTo !== undefined) data.assignedTo = patch.assignedTo ? String(patch.assignedTo).trim() || null : null;
   if (patch.source !== undefined) data.source = patch.source ? String(patch.source).trim() : null;
   if (patch.priority !== undefined) data.priority = patch.priority ? String(patch.priority).trim() : null;
   if (patch.company !== undefined) data.company = patch.company ? String(patch.company).trim() : null;
   if (patch.tags !== undefined) data.tags = Array.isArray(patch.tags) ? patch.tags : [];
+  if (data.assignedTo) await requireActiveBusinessAssignee(businessId, String(data.assignedTo));
   if (Object.keys(data).length === 0 && !patch.customFields) {
     throw new Error("No fields to update");
   }
@@ -971,14 +982,18 @@ export async function bulkEditLeads(
         String(data.status).trim().toLowerCase() !==
           String(c.status || "").trim().toLowerCase();
 
-      const contact = await prisma.contact.update({
-        where: { id: c.id },
+      const contact = await prisma.$transaction(async (tx) => {
+        if (data.assignedTo) await requireActiveBusinessAssignee(businessId, String(data.assignedTo), tx);
+        return tx.contact.update({
+        where: { id: c.id, AND: [scope.where, { businessId, type: "lead", deletedAt: null },
+          ...(patch.assignedTo !== undefined ? [{ assignedTo: c.assignedTo }] : [])] } as never,
         data: {
           ...data,
           ...(nextCustom !== undefined ? { customFields: nextCustom as object } : {}),
           lastContactedAt: new Date(),
         } as never,
-      });
+        });
+      }, { isolationLevel: "Serializable" });
       await logActivity({
         userId,
         entityType: "contact",
@@ -1022,7 +1037,7 @@ export async function bulkEditLeads(
     }
   }
 
-  const businessId = await getUserBusinessId(userId);
+
   await recordAudit({
     businessId,
     actorUserId: userId,
@@ -1067,7 +1082,9 @@ export async function bulkSoftDeleteLeads(
   ids: string[],
   opts?: { permanent?: boolean }
 ): Promise<{ deleted: number; failed: number; ids: string[]; permanent: boolean; scope: "ids" }> {
-  if (!(await canBulkDeleteLeads(userId))) {
+  const context = await resolveLeadWriteContext(userId);
+  const { businessId } = context;
+  if (!(await canBulkDeleteLeads(userId, context))) {
     throw new Error(
       "You do not have permission to bulk-delete leads. Contact a Business Admin or CEO."
     );
@@ -1080,13 +1097,13 @@ export async function bulkSoftDeleteLeads(
 
   const permanent = !!opts?.permanent;
   if (permanent) {
-    const role = await resolveActorRole(userId);
+    const { role } = context;
     if (!BULK_DELETE_ROLES.has(role)) {
       throw new Error("Only Business Admin / CEO can permanently delete leads");
     }
   }
 
-  const scope = await buildCrmScope(userId);
+  const scope = await buildCrmScope(userId, context);
   let deleted = 0;
   const okIds: string[] = [];
 
@@ -1104,7 +1121,7 @@ export async function bulkSoftDeleteLeads(
     if (permanent) {
       for (const c of contacts) {
         try {
-          await prisma.contact.delete({ where: { id: c.id } });
+          await prisma.contact.delete({ where: { id: c.id, AND: [scope.where, { businessId, type: "lead" }] } as never });
           deleted++;
           okIds.push(c.id);
         } catch {
@@ -1129,7 +1146,7 @@ export async function bulkSoftDeleteLeads(
     }
   }
 
-  const businessId = await getUserBusinessId(userId);
+
   await recordAudit({
     businessId,
     actorUserId: userId,
@@ -1172,7 +1189,9 @@ export async function bulkSoftDeleteLeadsByFilter(
   scope: "all_filtered";
   matched: number;
 }> {
-  if (!(await canBulkDeleteLeads(userId))) {
+  const context = await resolveLeadWriteContext(userId);
+  const { businessId } = context;
+  if (!(await canBulkDeleteLeads(userId, context))) {
     throw new Error(
       "You do not have permission to bulk-delete leads. Contact a Business Admin or CEO."
     );
@@ -1180,7 +1199,7 @@ export async function bulkSoftDeleteLeadsByFilter(
 
   const permanent = !!opts?.permanent;
   if (permanent) {
-    const role = await resolveActorRole(userId);
+    const { role } = context;
     if (!BULK_DELETE_ROLES.has(role)) {
       throw new Error("Only Business Admin / CEO can permanently delete leads");
     }
@@ -1192,7 +1211,7 @@ export async function bulkSoftDeleteLeadsByFilter(
     status: filters.status?.trim() || undefined,
     trashOnly: false,
     includeDeleted: false,
-  });
+  }, context);
 
   const matched = await prisma.contact.count({ where: where as never });
   if (matched === 0) {
@@ -1230,7 +1249,7 @@ export async function bulkSoftDeleteLeadsByFilter(
       let batchDeleted = 0;
       for (const id of batchIds) {
         try {
-          await prisma.contact.delete({ where: { id } });
+          await prisma.contact.delete({ where: { id, AND: [where, { businessId }] } as never });
           deleted++;
           batchDeleted++;
         } catch {
@@ -1256,7 +1275,7 @@ export async function bulkSoftDeleteLeadsByFilter(
     if (deleted >= matched) break;
   }
 
-  const businessId = await getUserBusinessId(userId);
+
   await recordAudit({
     businessId,
     actorUserId: userId,
@@ -1320,7 +1339,9 @@ export async function bulkAssignLeads(
   assigneeName: string | null;
   ids: string[];
 }> {
-  if (!(await canBulkEditLeads(userId))) {
+  const context = await resolveLeadWriteContext(userId);
+  const { businessId } = context;
+  if (!(await canBulkEditLeads(userId, context))) {
     throw new Error("You do not have permission to bulk-assign leads");
   }
 
@@ -1332,30 +1353,8 @@ export async function bulkAssignLeads(
       ? input.scope
       : "ids";
 
-  // Resolve assignee in same business (or platform user for super_admin edge cases)
-  const businessId = await getUserBusinessId(userId);
-  let assigneeName: string | null = null;
-  if (businessId) {
-    const member = await prisma.businessMember.findFirst({
-      where: { businessId, userId: assignedTo },
-      include: { user: { select: { id: true, name: true, email: true, isDisabled: true } } },
-    });
-    if (!member?.user) {
-      throw new Error("Assignee is not an active member of this workspace");
-    }
-    if (member.user.isDisabled) {
-      throw new Error("Cannot assign leads to a disabled user");
-    }
-    assigneeName = member.user.name?.trim() || member.user.email;
-  } else {
-    const user = await prisma.user.findUnique({
-      where: { id: assignedTo },
-      select: { id: true, name: true, email: true, isDisabled: true },
-    });
-    if (!user) throw new Error("Assignee user not found");
-    if (user.isDisabled) throw new Error("Cannot assign leads to a disabled user");
-    assigneeName = user.name?.trim() || user.email;
-  }
+  const assignee = await requireActiveBusinessAssignee(businessId, assignedTo);
+  const assigneeName = assignee.name?.trim() || assignee.email;
 
   const filters = {
     search: input.search?.trim() || undefined,
@@ -1372,7 +1371,7 @@ export async function bulkAssignLeads(
     if (unique.length > BULK_LEAD_MAX_ROWS) {
       throw new Error(`Maximum ${BULK_LEAD_MAX_ROWS.toLocaleString()} leads per bulk assign`);
     }
-    const crmScope = await buildCrmScope(userId);
+    const crmScope = await buildCrmScope(userId, context);
     // Validate tenant ownership in batches; only assign scoped leads
     const valid: string[] = [];
     for (let i = 0; i < unique.length; i += BULK_LEAD_CHUNK) {
@@ -1397,7 +1396,7 @@ export async function bulkAssignLeads(
       status: filters.status,
       trashOnly: false,
       includeDeleted: false,
-    });
+    }, context);
     matched = await prisma.contact.count({ where: where as never });
     if (matched === 0) {
       throw new Error("No leads match the current filters");
@@ -1472,12 +1471,14 @@ export async function bulkAssignLeads(
   }
 
   // Apply assignment in batches of 1,000 — re-apply tenant scope for defense-in-depth
-  const crmScopeForUpdate = await buildCrmScope(userId);
+  const crmScopeForUpdate = await buildCrmScope(userId, context);
   let assigned = 0;
   const sampleIds: string[] = [];
+  await prisma.$transaction(async (tx) => {
+    await requireActiveBusinessAssignee(businessId, assignedTo, tx);
   for (let i = 0; i < targetIds.length; i += BULK_LEAD_CHUNK) {
     const chunk = targetIds.slice(i, i + BULK_LEAD_CHUNK);
-    const result = await prisma.contact.updateMany({
+    const result = await tx.contact.updateMany({
       where: andTenant(crmScopeForUpdate.where, {
         id: { in: chunk },
         type: "lead",
@@ -1488,11 +1489,14 @@ export async function bulkAssignLeads(
         lastContactedAt: new Date(),
       },
     });
+    if (result.count !== chunk.length) throw new Error("Assignment conflict: leads changed; retry the operation");
     assigned += result.count;
     if (sampleIds.length < 100) {
       sampleIds.push(...chunk.slice(0, 100 - sampleIds.length));
     }
   }
+
+  }, { maxWait: 15_000, timeout: 120_000, isolationLevel: "Serializable" });
 
   const failed = Math.max(0, targetIds.length - assigned);
 
