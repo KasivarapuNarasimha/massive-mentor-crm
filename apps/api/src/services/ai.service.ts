@@ -97,9 +97,9 @@ export class AIService {
   /**
    * Generate structured JSON output using a named prompt template.
    */
-  async generateFromTemplate<T = any>(
+  async generateFromTemplate<T = unknown>(
     templateName: keyof typeof PromptTemplates,
-    variables: Record<string, any>,
+    variables: Record<string, unknown>,
     options?: GenerateOptions
   ): Promise<AIResponse<T>> {
     try {

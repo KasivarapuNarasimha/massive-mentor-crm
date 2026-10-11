@@ -352,7 +352,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       const assigneeId = (args.assignee as { id: string }).id;
       const { contact } = await updateContact(ctx.userId, id, { assignedTo: assigneeId });
       return {
-        message: `Assigned to ${(args as any)._labels?.m || "member"}`,
+        message: `Assigned to ${args._labels?.m || "member"}`,
         entityType: "contact",
         entityId: contact.id,
         label: contact.name || contact.company || contact.id,
@@ -388,7 +388,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       const id = (args.contact as { id: string }).id;
       await deleteContact(ctx.userId, id);
       return {
-        message: `Deleted ${(args as any)._label || "contact"}`,
+        message: `Deleted ${args._label || "contact"}`,
         entityType: "contact",
         entityId: id,
       };
@@ -574,7 +574,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
     },
     execute: async (ctx, args) => {
       await deleteDeal(ctx.userId, (args.deal as { id: string }).id);
-      return { message: `Deleted deal ${(args as any)._label || ""}`, entityType: "deal", entityId: (args.deal as { id: string }).id };
+      return { message: `Deleted deal ${args._label || ""}`, entityType: "deal", entityId: (args.deal as { id: string }).id };
     },
   },
 
@@ -759,9 +759,9 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
     execute: async (ctx, args) => {
       const task = await updateTask(ctx.userId, args.taskId!, {
         title: args.title,
-        status: args.status as any,
-        priority: args.priority as any,
-        dueDate: (args as any).dueDate,
+        status: args.status,
+        priority: args.priority,
+        dueDate: args.dueDate,
       });
       return { message: "Task updated", entityType: "task", entityId: task.id, label: task.title, href: "/dashboard/tasks" };
     },
@@ -884,9 +884,9 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
         entityId = c.id;
         label = c.label;
       }
-      return { ok: true, args: { ...args, entityType, entityId, _label: label } as any };
+      return { ok: true, args: { ...args, entityType, entityId, _label: label } };
     },
-    execute: async (ctx, args: any) => {
+    execute: async (ctx, args) => {
       const note = await createNote(ctx.userId, {
         entityType: args.entityType,
         entityId: args.entityId,
@@ -1006,7 +1006,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
         },
       };
     },
-    execute: async (ctx, args: any) => {
+    execute: async (ctx, args) => {
       const invoice = await createInvoice(ctx.userId, {
         contactId: args.contactId,
         clientName: args.clientName,
@@ -1046,7 +1046,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       const listed = await listInvoices(ctx.userId, { page: 1, pageSize: 100 });
       const now = Date.now();
       const minTotal = args.minTotal != null && args.minTotal !== "" ? money(args.minTotal) : 0;
-      const overdue = listed.items.filter((inv: any) => {
+      const overdue = listed.items.filter((inv) => {
         const due = inv.dueDate ? new Date(inv.dueDate).getTime() : 0;
         const status = String(inv.status || "");
         const total = Number(inv.total || 0);
@@ -1055,7 +1055,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       return {
         message: `Found ${overdue.length} overdue invoice(s)`,
         data: { items: overdue.slice(0, 20) },
-        fields: overdue.slice(0, 8).map((inv: any) => ({
+        fields: overdue.slice(0, 8).map((inv) => ({
           label: inv.number,
           value: `${inv.clientName || ""} · ${inv.total} · due ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : ""}`,
         })),
@@ -1105,7 +1105,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       }
       return { ok: true, args: { ...args, amount: money(args.amount), invoiceId, contactId } };
     },
-    execute: async (ctx, args: any) => {
+    execute: async (ctx, args) => {
       const payment = await createPayment(ctx.userId, {
         amount: args.amount,
         invoiceId: args.invoiceId || undefined,
@@ -1148,7 +1148,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
         },
       };
     },
-    execute: async (ctx, args: any) => {
+    execute: async (ctx, args) => {
       const expense = await createExpense(ctx.userId, {
         title: String(args.description || args.category || "Expense"),
         amount: args.amount,
@@ -1195,7 +1195,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
             : undefined;
       return { ok: true, args: { ...args, sku, sellingPrice } };
     },
-    execute: async (ctx, args: any) => {
+    execute: async (ctx, args) => {
       const created = (await createProduct(ctx.userId, {
         name: args.name,
         sku: args.sku,
@@ -1255,7 +1255,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       }
       return { ok: true, args: { ...args, productId: p.id, qty: Number(args.qty), _label: p.label } };
     },
-    execute: async (ctx, args: any) => {
+    execute: async (ctx, args) => {
       if (!ctx.businessId) throw new Error("Workspace required");
       const wh = await listWarehouses(ctx.userId);
       const warehouses = (wh as { warehouses?: Array<{ id: string }> }).warehouses || (Array.isArray(wh) ? wh : []);
@@ -1314,7 +1314,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       const products = res.products || [];
       return {
         message: `Found ${products.length} product(s)`,
-        fields: products.slice(0, 10).map((p: any) => ({
+        fields: products.slice(0, 10).map((p) => ({
           label: p.name,
           value: [p.sku, p.sellingPrice != null ? String(p.sellingPrice) : ""].filter(Boolean).join(" · "),
         })),
@@ -1346,7 +1346,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
       }
       return { ok: true, args: { ...args, contactId: c.id, _label: c.label } };
     },
-    execute: async (ctx, args: any) => {
+    execute: async (ctx, args) => {
       let message = "";
       try {
         const out = await generateWhatsAppMessage(ctx.userId, args.contactId, "Professional", "auto");

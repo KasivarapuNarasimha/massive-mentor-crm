@@ -371,6 +371,8 @@ app.use((
   res: express.Response,
   _next: express.NextFunction
 ) => {
+  // Express identifies error middleware by its four-argument arity.
+  void _next;
   const areq = req as AuthenticatedRequest;
   logError(err, {
     module: "express",
@@ -388,8 +390,7 @@ app.use((
   });
 });
 
-declare global {
-  namespace Express {
+declare module "express" {
     interface Request {
       user?: {
         id: string;
@@ -398,12 +399,9 @@ declare global {
         platformRole?: string;
       };
     }
-  }
 }
 
-let server: Server;
-
-server = app.listen(PORT, () => {
+const server: Server = app.listen(PORT, () => {
   console.log(`🚀 Massive Mentor API running on port ${PORT}`);
   console.log(`   Environment: ${env.NODE_ENV}`);
   console.log(`   Health: http://localhost:${PORT}/health`);

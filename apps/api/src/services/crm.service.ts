@@ -62,7 +62,6 @@ import {
   buildOwnedEntityScope,
   buildTenantScope,
   buildOwnedTenantScope,
-  resolveActorRole,
   resolveLeadWriteContext,
   type LeadWriteContext,
 } from "./tenant-scope.service.js";
@@ -114,7 +113,7 @@ function coerceToIsoDateTime(value: unknown): string | null | undefined {
   }
 
   // dd-mm-yyyy or dd/mm/yyyy or dd.mm.yyyy
-  const dmy = raw.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  const dmy = raw.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
   if (dmy) {
     const day = parseInt(dmy[1], 10);
     const month = parseInt(dmy[2], 10);

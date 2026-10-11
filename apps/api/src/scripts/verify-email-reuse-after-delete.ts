@@ -28,7 +28,7 @@ async function main() {
       ownerPassword: password,
     plan: "trial",
   });
-  const bizAId = (a as { id?: string }).id || (a as { business?: { id: string } }).business?.id;
+
   // getBusinessDetail shape
   const idA =
     (a as { id?: string }).id ||
@@ -56,7 +56,7 @@ async function main() {
   console.log("   user still exists:", !!userAfter, "isDisabled:", userAfter?.isDisabled);
 
   console.log("3) Create business B with SAME email");
-  const b = await platform.createCustomerBusiness({
+  await platform.createCustomerBusiness({
     actorUserId: admin.id,
     businessName: `Reuse Biz B ${stamp}`,
     ownerEmail: email,

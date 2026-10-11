@@ -2,9 +2,8 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import {
   checkAndSendReminders,
-  logCrmActivity,
 } from "../services/automation.service.js";
-import { createNotification, getNotifications, markAsRead, markAllAsRead } from "../services/notification.service.js";
+import { getNotifications, markAsRead, markAllAsRead } from "../services/notification.service.js";
 import { logActivity, getActivityTimeline } from "../services/activity.service.js";
 
 export async function triggerReminders(req: AuthenticatedRequest, res: Response) {
@@ -12,7 +11,7 @@ export async function triggerReminders(req: AuthenticatedRequest, res: Response)
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const result = await checkAndSendReminders(req.user.id);
     res.json({ success: true, data: result });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed to process reminders" });
   }
 }
@@ -42,7 +41,7 @@ export async function getUserNotifications(req: AuthenticatedRequest, res: Respo
         unreadCount: result.unreadCount,
       },
     });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed to fetch notifications" });
   }
 }
@@ -53,7 +52,7 @@ export async function markNotificationRead(req: AuthenticatedRequest, res: Respo
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     await markAsRead(req.user.id, id);
     res.json({ success: true, data: { message: "Marked as read" } });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed" });
   }
 }
@@ -63,7 +62,7 @@ export async function markAllRead(req: AuthenticatedRequest, res: Response) {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     await markAllAsRead(req.user.id);
     res.json({ success: true, data: { message: "All marked as read" } });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed" });
   }
 }
@@ -75,7 +74,7 @@ export async function logActivityHandler(req: AuthenticatedRequest, res: Respons
     const { entityType, entityId, action, details } = req.body;
     await logActivity({ userId: req.user.id, entityType, entityId, action, details });
     res.json({ success: true });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed to log" });
   }
 }
@@ -194,7 +193,7 @@ export async function listActivities(req: AuthenticatedRequest, res: Response) {
         auditTotalPages: audit.totalPages,
       },
     });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed to fetch activities" });
   }
 }

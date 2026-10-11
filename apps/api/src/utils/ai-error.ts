@@ -94,7 +94,7 @@ export function sanitizeAiUserError(
     };
   }
   // Strip leaked provider JSON / status prefixes if present
-  if (/^\s*\d{3}\s*[\{\[]/.test(raw) || /"error"\s*:\s*\{/.test(raw)) {
+  if (/^\s*\d{3}\s*[{[]/.test(raw) || /"error"\s*:\s*\{/.test(raw)) {
     return { status: 503, message: scrubAiProviderBranding(fallback) };
   }
   return { status: 500, message: scrubAiProviderBranding(fallback) };

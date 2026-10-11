@@ -7,7 +7,7 @@ import { buildActionContext } from "../services/ai-command/permissions.js";
 import { executePlan, executeConfirmedAction } from "../services/ai-command/executor.js";
 import { issueConfirmToken, verifyConfirmToken } from "../services/ai-command/confirm-store.js";
 import { ACTION_REGISTRY } from "../services/ai-command/registry.js";
-import { getContacts, getTasks, getContactById } from "../services/crm.service.js";
+import { getTasks, getContactById } from "../services/crm.service.js";
 import { listInvoices } from "../services/finance.service.js";
 
 const results: Array<{ name: string; ok: boolean; detail?: string }> = [];
@@ -58,7 +58,8 @@ async function main() {
     pass("Create lead via executor", createRes.steps[0].entityId);
   } else fail("Create lead via executor", createRes.summary);
 
-  const leadId = createRes.steps[0]?.entityId!;
+  const leadId = createRes.steps[0]?.entityId;
+  if (!leadId) throw new Error("Create lead did not return an entity ID");
   const lead = await getContactById(userId, leadId);
   if (lead && lead.phone === "9777777777" && lead.businessId === ctx.businessId) {
     pass("Lead active workspace + phone verified");

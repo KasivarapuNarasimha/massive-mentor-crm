@@ -33,6 +33,8 @@ function backupRoot(): string {
   // Windows: fileURL path may start with /C: — fix below
 }
 
+export { backupRoot };
+
 function resolveBackupRoot(): string {
   const configured = (env.BACKUP_DIR || "").trim();
   if (configured) return path.resolve(configured);

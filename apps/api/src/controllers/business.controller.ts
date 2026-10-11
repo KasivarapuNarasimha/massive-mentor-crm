@@ -45,7 +45,7 @@ export async function getCurrentBusinessOptional(req: AuthenticatedRequest, res:
     }
     const business = await getCurrentBusinessForUser(req.user.id);
     res.json({ success: true, data: { business } });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed to load business" });
   }
 }

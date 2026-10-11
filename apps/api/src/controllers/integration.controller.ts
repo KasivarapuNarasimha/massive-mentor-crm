@@ -131,7 +131,7 @@ export async function toggleIntegrationHandler(req: AuthenticatedRequest, res: R
     const { provider, isActive } = req.body;
     await toggleIntegration(req.user.id, provider, isActive);
     res.json({ success: true });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed" });
   }
 }

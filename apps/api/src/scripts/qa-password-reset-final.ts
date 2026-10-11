@@ -14,7 +14,7 @@ import {
   hashResetToken,
   GENERIC_OK,
 } from "../services/password-reset.service.js";
-import { loginUser, loginPlatformAdmin, verifyToken, getUserById } from "../services/auth.service.js";
+import { loginUser, verifyToken, getUserById } from "../services/auth.service.js";
 
 const results: Array<{ check: string; pass: boolean; detail: string }> = [];
 

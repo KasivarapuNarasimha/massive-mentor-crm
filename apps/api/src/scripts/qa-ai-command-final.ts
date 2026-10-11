@@ -16,9 +16,7 @@ import {
   createContact,
   updateContact,
   getContactById,
-  getContacts,
   getTasks,
-  getDeals,
   deleteContact,
 } from "../services/crm.service.js";
 import { listInvoices } from "../services/finance.service.js";
@@ -190,7 +188,7 @@ async function main() {
   );
   const taskId = task.steps[0]?.entityId;
   const listedTasks = await getTasks(userId, { page: 1, pageSize: 50, sortBy: "createdAt", sortDir: "desc" });
-  if (task.status === "completed" && taskId && listedTasks.items.some((t: any) => t.id === taskId)) {
+  if (task.status === "completed" && taskId && listedTasks.items.some((t) => t.id === taskId)) {
     pass(CRM, "Follow-up task create + list visible", taskId);
   } else fail(CRM, "Follow-up task create + list visible", task.summary);
 
@@ -351,7 +349,7 @@ async function main() {
   );
   const invId = inv.steps[0]?.entityId;
   const invList = await listInvoices(userId, { page: 1, pageSize: 40 });
-  const invHit = ((invList as { items?: any[] }).items || []).find((x) => x.id === invId);
+  const invHit = ((invList).items || []).find((x) => x.id === invId);
   if (
     inv.status === "completed" &&
     invHit &&
@@ -508,7 +506,7 @@ async function main() {
   let d = await nl(`${uniq} ki website development ₹85,000 invoice create cheyyi, due 15 days.`);
   d = await resolve(d, nlLead.id);
   const nlInvId = d.steps?.[0]?.entityId;
-  const nlInv = ((await listInvoices(userId, { page: 1, pageSize: 30 })) as { items?: any[] }).items?.find((x) => x.id === nlInvId);
+  const nlInv = ((await listInvoices(userId, { page: 1, pageSize: 30 }))).items?.find((x) => x.id === nlInvId);
   if (
     (d.status === "completed" || d.status === "partial") &&
     nlInv &&

@@ -9,17 +9,17 @@ export async function buildPriorityFocus(ctx: ActionContext): Promise<ExecuteRes
 
   const [tasks, deals, invoices, inventory, leads] = await Promise.all([
     getTasks(ctx.userId, { page: 1, pageSize: 50, sortBy: "dueDate", sortDir: "asc" }).catch(() => ({
-      items: [] as any[],
+      items: [],
       total: 0,
     })),
     getDeals(ctx.userId, { page: 1, pageSize: 50, sortBy: "updatedAt", sortDir: "asc" }).catch(() => ({
-      items: [] as any[],
+      items: [],
       total: 0,
     })),
-    listInvoices(ctx.userId, { page: 1, pageSize: 50 }).catch(() => ({ items: [] as any[], total: 0 })),
-    listInventory(ctx.userId, { lowStockOnly: true }).catch(() => ({ balances: [] as any[] })),
+    listInvoices(ctx.userId, { page: 1, pageSize: 50 }).catch(() => ({ items: [], total: 0 })),
+    listInventory(ctx.userId, { lowStockOnly: true }).catch(() => ({ balances: [] })),
     getContacts(ctx.userId, { type: "lead", page: 1, pageSize: 30 }).catch(() => ({
-      items: [] as any[],
+      items: [],
       total: 0,
     })),
   ]);
@@ -32,14 +32,14 @@ export async function buildPriorityFocus(ctx: ActionContext): Promise<ExecuteRes
     if (due && due < now) {
       priorities.push({
         title: `Overdue task: ${t.title}`,
-        detail: `Due ${new Date(t.dueDate).toLocaleString()}`,
+        detail: `Due ${new Date(due).toLocaleString()}`,
         href: "/dashboard/tasks",
         score: 100,
       });
     } else if (due && due < now + dayMs) {
       priorities.push({
         title: `Task due today: ${t.title}`,
-        detail: new Date(t.dueDate).toLocaleString(),
+        detail: new Date(due).toLocaleString(),
         href: "/dashboard/tasks",
         score: 80,
       });
@@ -58,7 +58,7 @@ export async function buildPriorityFocus(ctx: ActionContext): Promise<ExecuteRes
     }
   }
 
-  for (const inv of invoices.items as any[]) {
+  for (const inv of invoices.items) {
     const due = inv.dueDate ? new Date(inv.dueDate).getTime() : 0;
     if (due && due < now && inv.status !== "paid" && inv.status !== "cancelled") {
       priorities.push({
@@ -71,9 +71,7 @@ export async function buildPriorityFocus(ctx: ActionContext): Promise<ExecuteRes
   }
 
   const balances =
-    (inventory as any).balances ||
-    (inventory as any).items ||
-    (Array.isArray(inventory) ? inventory : []);
+    inventory.balances;
   for (const b of balances.slice(0, 5)) {
     priorities.push({
       title: `Low stock: ${b.product?.name || b.productId || "Product"}`,

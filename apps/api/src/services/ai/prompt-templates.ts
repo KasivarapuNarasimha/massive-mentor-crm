@@ -294,11 +294,11 @@ Return ONLY JSON:
 `.trim(),
 } as const;
 
-export function fillTemplate(template: string, variables: Record<string, any>): string {
+export function fillTemplate(template: string, variables: Record<string, unknown>): string {
   let result = template;
   for (const [key, value] of Object.entries(variables)) {
     const placeholder = `{{${key}}}`;
-    result = result.replaceAll(placeholder, value ?? 'Not specified');
+    result = result.replaceAll(placeholder, String(value ?? 'Not specified'));
   }
   return result;
 }

@@ -12,12 +12,11 @@ import {
   buildTrialExpiryReminderEmail,
   buildRenewalReminderEmail,
 } from "./email.service.js";
-import { notifyUser } from "./notification.service.js";
+
 import { getUserBusinessId } from "./field-engine.service.js";
 import {
   ensureSubscriptionPlans,
   getPlanByCode,
-  getPlanById,
   listActivePlans,
 } from "./subscription-plan.service.js";
 import { evaluateBillingAccess } from "./billing-access.service.js";
@@ -49,11 +48,7 @@ function addDays(d: Date, n: number): Date {
   return x;
 }
 
-function addMonths(d: Date, n: number): Date {
-  const x = new Date(d);
-  x.setMonth(x.getMonth() + n);
-  return x;
-}
+
 
 /** Provision trial subscription row + business flags (3-day default). */
 export async function startTrialForBusiness(opts: {
@@ -243,7 +238,7 @@ export async function createCheckoutOrder(
     });
   }
 
-  let basePrice = Number(plan.price);
+  const basePrice = Number(plan.price);
   let discountAmount = 0;
   let couponId: string | null = null;
   let couponMeta: Record<string, unknown> = {};

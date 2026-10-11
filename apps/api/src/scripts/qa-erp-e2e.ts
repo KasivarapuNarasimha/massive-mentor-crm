@@ -231,7 +231,7 @@ async function main() {
   else fail("Inventory list tenant-scoped");
 
   // —— CRM createDeal businessId harden ——
-  let dealNullRejected = false;
+
   // Force path: temporarily we call with a user that has no business — hard to find.
   // Instead verify createDeal throws when getUserBusinessId would be null by checking message on synthetic:
   // Use createDeal only when membership exists — positive path.

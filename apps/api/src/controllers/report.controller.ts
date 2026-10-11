@@ -21,7 +21,7 @@ export async function getDashboardReports(req: AuthenticatedRequest, res: Respon
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const reports = await getReportsDashboard(req.user.id);
     res.json({ success: true, data: reports });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed to generate reports" });
   }
 }
@@ -70,7 +70,7 @@ function resolveExportModule(type: unknown): ExportModule {
 
 function attachmentDisposition(filename: string): string {
   // ASCII fallback + RFC 5987 UTF-8 filename* for browsers
-  const safe = filename.replace(/[^\w.\-]+/g, "_");
+  const safe = filename.replace(/[^\w.-]+/g, "_");
   return `attachment; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
@@ -305,7 +305,7 @@ export async function backupDb(req: AuthenticatedRequest, res: Response) {
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Content-Disposition", `attachment; filename="backup-${req.user.id}.json"`);
     res.send(JSON.stringify(backup, null, 2));
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Backup failed" });
   }
 }

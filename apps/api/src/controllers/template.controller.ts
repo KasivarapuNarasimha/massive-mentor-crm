@@ -63,7 +63,7 @@ export async function getTemplate(req: AuthenticatedRequest, res: Response) {
         },
       },
     });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed to load template" });
   }
 }
@@ -175,7 +175,7 @@ export async function reseedTemplates(req: AuthenticatedRequest, res: Response) 
     }
     const result = await seedIndustryTemplates();
     res.json({ success: true, data: result });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed to seed templates" });
   }
 }

@@ -178,7 +178,7 @@ export async function buildMultiSheetXlsxBuffer(
   const wb = XLSX.utils.book_new();
   const used = new Set<string>();
   for (const s of sheets) {
-    let { ws, safeName } = sheetFromAoa(XLSX, s.name, s.headers, s.rows);
+    const { ws, safeName } = sheetFromAoa(XLSX, s.name, s.headers, s.rows);
     // Ensure unique sheet names
     let n = safeName;
     let i = 2;
@@ -304,7 +304,7 @@ export async function streamPdfTable(
   }
 
   // Font size scales with column density
-  let fontSize = colCount > 12 ? 5.5 : colCount > 9 ? 6.5 : colCount > 6 ? 7.5 : 8.5;
+  const fontSize = colCount > 12 ? 5.5 : colCount > 9 ? 6.5 : colCount > 6 ? 7.5 : 8.5;
   const headerFontSize = fontSize + 0.5;
   const titleFontSize = 11;
   const metaFontSize = 7.5;

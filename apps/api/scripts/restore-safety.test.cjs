@@ -163,14 +163,39 @@ function functions(source) {
   return new Map(file.statements.filter(ts.isFunctionDeclaration).map(n =>
     [n.name.text, n.getText(file).replace(/\r\n/g, "\n")]));
 }
-test("all non-restore service/controller functions are unchanged from HEAD", () => {
+// Only these owner-authorized, behavior-preserving lint edits are permitted.
+// Keep every other token and every protected function under exact comparison.
+function expectedPreservedFunction(p, name, text) {
+  if (p !== "apps/api/src/controllers/report.controller.ts") return text;
+  if (name === "getDashboardReports" || name === "backupDb") {
+    return text.replace("catch (error: unknown)", "catch");
+  }
+  if (name === "attachmentDisposition") {
+    return text.replace(String.raw`/[^\w.\-]+/g`, String.raw`/[^\w.-]+/g`);
+  }
+  return text;
+}
+
+test("preservation exception cannot allow unrelated implementation changes", () => {
+  const p = "apps/api/src/controllers/report.controller.ts";
+  const source = 'function backupDb() { try { writeOriginal(); } catch (error: unknown) { failOriginal(); } }';
+  const expected = expectedPreservedFunction(p, "backupDb", source);
+  assert.equal(expected, source.replace("catch (error: unknown)", "catch"));
+  assert.notEqual(expected, expected.replace("writeOriginal()", "writeOther()"));
+  assert.notEqual(expected, expected.replace("failOriginal()", "returnSuccess()"));
+  assert.equal(expectedPreservedFunction(p, "restoreDb", source), source);
+  assert.equal(expectedPreservedFunction("other.ts", "backupDb", source), source);
+});
+
+test("all non-restore service/controller functions are unchanged except exact authorized lint edits", () => {
   for (const p of ["apps/api/src/services/backup.service.ts", "apps/api/src/controllers/backup.controller.ts",
     "apps/api/src/controllers/report.controller.ts"]) {
     const before = functions(execFileSync("git", ["show", "HEAD:" + p], { cwd: root, encoding: "utf8" }));
     const after = functions(read(p));
+    assert.deepEqual([...after.keys()].sort(), [...before.keys()].sort(), p + ":function inventory");
     const changed = new Set(["requestRestore", "confirmRestore", "restoreBusinessData", "restoreFullData",
       "platformRequestRestore", "platformConfirmRestore", "tenantRequestRestore", "tenantConfirmRestore", "restoreDb"]);
-    for (const [name, text] of before) if (!changed.has(name)) assert.equal(after.get(name), text, p + ":" + name);
+    for (const [name, text] of before) if (!changed.has(name)) assert.equal(after.get(name), expectedPreservedFunction(p, name, text), p + ":" + name);
   }
 });
 test("frontend restore controls are disabled and maintenance notice is visible", () => {

@@ -56,7 +56,7 @@ function stripSlash(url: string): string {
  * Prefer APP_URL → CUSTOMER_APP_URL; never emit localhost in production.
  */
 export function getAppUrl(): string {
-  let raw =
+  const raw =
     stripSlash(env.APP_URL || "") ||
     stripSlash(env.CUSTOMER_APP_URL || "") ||
     "";
@@ -82,7 +82,7 @@ export function getAppUrl(): string {
 }
 
 export function getAdminAppUrl(): string {
-  let raw = stripSlash(env.ADMIN_APP_URL || "") || getAppUrl();
+  const raw = stripSlash(env.ADMIN_APP_URL || "") || getAppUrl();
   if (isProd() && isLocalUrl(raw)) {
     return PROD_ADMIN_URL;
   }

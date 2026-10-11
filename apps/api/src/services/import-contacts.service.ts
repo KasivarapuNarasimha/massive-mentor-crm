@@ -376,8 +376,7 @@ function extractHeaders(rows: Record<string, unknown>[]): string[] {
  */
 function suggestFieldForHeader(
   header: string,
-  saved: ColumnMapping[],
-  usedFields: Set<string>
+  saved: ColumnMapping[]
 ): { fieldKey: string | null; confidence: ColumnSuggestion["confidence"] } {
   const norm = normalizeHeaderKey(header);
 
@@ -445,7 +444,7 @@ export function buildImportPreview(
 
   // First pass: high-confidence unique assignments
   for (const header of headers) {
-    const { fieldKey, confidence } = suggestFieldForHeader(header, savedMappings, used);
+    const { fieldKey, confidence } = suggestFieldForHeader(header, savedMappings);
     let assigned: string | null = fieldKey;
     let conf = confidence;
 
@@ -861,7 +860,7 @@ async function importContactRows(
   preview.allowedStatuses = allowedStatuses.map((s) => s.key);
 
   // Resolve effective mappings: explicit wizard > auto+saved
-  let mappings: ColumnMapping[] =
+  const mappings: ColumnMapping[] =
     options.mappings && options.mappings.length
       ? options.mappings.filter((m) => m.fieldKey && m.fieldKey !== "skip")
       : preview.autoMappings.slice();
@@ -1159,7 +1158,7 @@ async function importContactRows(
       if (skipped > 0) {
         skippedDuplicates += skipped;
       }
-    } catch (batchErr: unknown) {
+    } catch {
       // Fallback: per-row create so one bad row does not drop the batch
       for (let j = 0; j < chunk.length; j++) {
         try {

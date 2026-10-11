@@ -128,7 +128,7 @@ async function main() {
     d = await r.cmd("(selection)", { [choice.field || "assignee"]: choice.id });
   }
   const createdId = d.steps?.[0]?.entityId;
-  let created: any = null;
+  let created: Awaited<ReturnType<typeof getContacts>>["items"][number] | null = null;
   if (createdId) {
     try {
       created = await getContactById(userId, createdId);
@@ -138,10 +138,10 @@ async function main() {
   }
   if (!created) {
     const createdList = await getContacts(userId, { search: createPhone, page: 1, pageSize: 20 });
-    created = createdList.items.find((c: any) => String(c.phone) === createPhone) || null;
+    created = createdList.items.find((c) => String(c.phone) === createPhone) || null;
   }
   if ((d.status === "completed" || d.status === "partial") && created) {
-    pass("1 Lead create TE+EN", created.id);
+    pass("1 Lead create TE+EN", String(created.id));
   } else fail("1 Lead create TE+EN", `${d.status} ${d.summary} entityId=${createdId}`);
 
   // 2 Lead update x5 against seeded company (exact prod phrasing variants)
@@ -171,7 +171,7 @@ async function main() {
       else pick = d.choices[0];
       d = await r.cmd("(selection)", { [pick.field || (bySuresh ? "assignee" : "contact")]: pick.id });
     }
-    let lead: any = null;
+    let lead: Awaited<ReturnType<typeof getContacts>>["items"][number] | null = null;
     try {
       lead = await getContactById(userId, leadId);
     } catch {
@@ -199,8 +199,8 @@ async function main() {
   const prodPhone = `9933${suffix}`;
   // Prefer reusing/creating a single unique phone-tagged ABC Company for this run
   let prodLead = (await getContacts(userId, { search: prodPhone, page: 1, pageSize: 10 })).items.find(
-    (c: any) => String(c.phone) === prodPhone
-  ) as any;
+    (c) => String(c.phone) === prodPhone
+  );
   if (!prodLead) {
     prodLead = await createContact(userId, {
       type: "lead",
@@ -227,7 +227,7 @@ async function main() {
       d = await r.cmd("(selection)", { [choice.field || "assignee"]: choice.id });
     }
   }
-  let afterProd: any = null;
+  let afterProd: Awaited<ReturnType<typeof getContacts>>["items"][number] | null = null;
   try {
     afterProd = await getContactById(userId, prodLeadId);
   } catch {
@@ -239,7 +239,7 @@ async function main() {
     String(afterProd.status || "").toLowerCase() === "qualified" &&
     (!suresh || afterProd.assignedTo === suresh.id)
   ) {
-    pass("2b Prod phrasing lead update", afterProd.status);
+    pass("2b Prod phrasing lead update", String(afterProd.status));
   } else if (d.status === "needs_choice") {
     // Multiple historic ABC Company rows — deterministic policy is needs_choice (correct)
     pass("2b Prod phrasing lead update needs_choice (multi ABC)", `choices=${d.choices?.length}`);
@@ -256,8 +256,8 @@ async function main() {
     d = await r.cmd("(selection)", { [choice.field || "contact"]: choice.id });
   }
   const tasks = await getTasks(userId, { page: 1, pageSize: 50, sortBy: "createdAt", sortDir: "desc" });
-  const task = tasks.items.find((t: any) => t.contactId === leadId);
-  if ((d.status === "completed" || d.status === "partial") && task) pass("3 Follow-up", (task as any).id);
+  const task = tasks.items.find((t) => t.contactId === leadId);
+  if ((d.status === "completed" || d.status === "partial") && task) pass("3 Follow-up", (task).id);
   else fail("3 Follow-up", `${d.status} ${d.summary}`);
 
   // 4 Invoice — exact prod phrasing against unique company + ABC Company alias
@@ -280,7 +280,7 @@ async function main() {
     }
     const entityId = d.steps?.[0]?.entityId;
     const listedInv = await listInvoices(userId, { page: 1, pageSize: 50 });
-    const items = (listedInv as { items?: any[] }).items || [];
+    const items = (listedInv).items || [];
     const hit = entityId ? items.find((x) => x.id === entityId) : null;
     const tax = hit != null ? Number(hit.taxRate) : -1;
     let dueOk = false;
@@ -323,8 +323,8 @@ async function main() {
     d = await r.cmd("(selection)", { [d.choices[0].field || "deal"]: d.choices[0].id });
   }
   const deals = await getDeals(userId, { search: company, page: 1, pageSize: 25 });
-  const deal = deals.items.find((x: any) => Math.abs(Number(x.value) - 500000) < 1);
-  if ((d.status === "completed" || d.status === "partial") && deal) pass("5 Deal 5 lakhs", String((deal as any).value));
+  const deal = deals.items.find((x) => Math.abs(Number(x.value) - 500000) < 1);
+  if ((d.status === "completed" || d.status === "partial") && deal) pass("5 Deal 5 lakhs", String((deal).value));
   else fail("5 Deal 5 lakhs", `${d.status} ${d.summary}`);
 
   // 6 WhatsApp
@@ -360,7 +360,7 @@ async function main() {
     } catch {
       replayRejected = true;
     }
-    const still = (await getContacts(userId, { search: phone, page: 1, pageSize: 20 })).items.find((c: any) => c.id === leadId);
+    const still = (await getContacts(userId, { search: phone, page: 1, pageSize: 20 })).items.find((c) => c.id === leadId);
     afterGone = !still;
   }
   if (d.status === "needs_confirmation" && confOk && replayRejected && afterGone) pass("7 Delete confirm + replay reject");
@@ -373,10 +373,10 @@ async function main() {
   await createContact(userId, { type: "lead", name: `${twin} B`, company: twin, status: "new", phone: `9772${suffix}` });
   r.sessionId = undefined;
   const before = await getContacts(userId, { search: twin, page: 1, pageSize: 20 });
-  const beforeMap = Object.fromEntries(before.items.map((c: any) => [c.id, c.status]));
+  const beforeMap = Object.fromEntries(before.items.map((c) => [c.id, c.status]));
   d = await r.cmd(`${twin} status Qualified ki change cheyyi.`);
   const after = await getContacts(userId, { search: twin, page: 1, pageSize: 20 });
-  const changed = after.items.filter((c: any) => beforeMap[c.id] !== c.status);
+  const changed = after.items.filter((c) => beforeMap[String(c.id)] !== c.status);
   if (d.status === "needs_choice" && (d.choices?.length || 0) >= 2 && changed.length === 0) {
     pass("8 Ambiguous needs_choice", `choices=${d.choices?.length}`);
   } else fail("8 Ambiguous needs_choice", `${d.status} choices=${d.choices?.length} changed=${changed.length}`);

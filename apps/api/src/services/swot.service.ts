@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { getAIService } from "./ai.service.js";
-import { BusinessProfile } from "@prisma/client";
+
 import { sanitizePromptInput } from "../utils/sanitize.js";
 
 interface SWOTResult {

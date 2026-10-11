@@ -2,10 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { getAIService } from "./ai.service.js";
 import { sanitizePromptInput } from "../utils/sanitize.js";
 
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
+
 
 export async function getChatHistory(userId: string, limit: number = 50) {
   return prisma.chatMessage.findMany({

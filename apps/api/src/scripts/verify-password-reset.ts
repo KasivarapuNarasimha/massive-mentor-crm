@@ -10,8 +10,8 @@ import {
   validateResetToken,
   hashResetToken,
 } from "../services/password-reset.service.js";
-import { loginUser, loginPlatformAdmin, verifyToken, getUserById } from "../services/auth.service.js";
-import { requireAuth } from "../middleware/auth.js";
+import { loginUser, verifyToken, getUserById } from "../services/auth.service.js";
+
 
 async function main() {
   console.log("=== Password reset verification ===\n");
@@ -32,7 +32,7 @@ async function main() {
 
   if (customer) {
     console.log("1) Customer forgot-password (generic message + token in DB)");
-    const before = await prisma.passwordResetToken.count({
+    await prisma.passwordResetToken.count({
       where: { userId: customer.id, portal: "customer", usedAt: null },
     });
     const msg = await requestPasswordReset({
@@ -109,7 +109,7 @@ async function main() {
     // Simulate old session (tv = previous)
     const jwt = await import("jsonwebtoken");
     const { env } = await import("../config/env.js");
-    const oldToken = jwt.default.sign(
+    jwt.default.sign(
       { userId: customer.id, portal: "customer", tv: beforeUser?.tokenVersion ?? 0 },
       env.JWT_SECRET,
       { expiresIn: "1h", algorithm: "HS256" }

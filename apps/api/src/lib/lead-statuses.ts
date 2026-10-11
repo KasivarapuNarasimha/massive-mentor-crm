@@ -64,7 +64,7 @@ export function isCallResultStatus(status: string): boolean {
  * Legacy Deal stages: lead→new, closed_won→won, closed_lost→lost, etc.
  */
 export function normalizeStatusKey(raw: string | null | undefined): string {
-  let s = String(raw || "")
+  const s = String(raw || "")
     .trim()
     .toLowerCase()
     .replace(/[\s-]+/g, "_");

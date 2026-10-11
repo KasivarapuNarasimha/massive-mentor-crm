@@ -73,7 +73,7 @@ export async function saveMediaFile(opts: {
   if (opts.buffer.length > MEDIA_MAX_BYTES) {
     throw new Error(MEDIA_SIZE_LIMIT_MESSAGE);
   }
-  const dir = await ensureMediaDir(opts.businessId);
+  await ensureMediaDir(opts.businessId);
   const safe = safeFileName(opts.originalName);
   const storageKey = path.join(opts.businessId, `${opts.assetId}__${safe}`).replace(/\\/g, "/");
   const abs = path.join(mediaRoot(), storageKey);

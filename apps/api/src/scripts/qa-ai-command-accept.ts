@@ -33,8 +33,7 @@ async function cmd(userId: string, message: string, sessionId?: string, choices?
 async function resolveChoices(
   userId: string,
   d: Awaited<ReturnType<typeof runAiCommand>>,
-  preferContactId: string,
-  sureshId?: string
+  preferContactId: string
 ) {
   let cur = d;
   for (let i = 0; i < 5 && cur.status === "needs_choice" && cur.choices?.length; i++) {
@@ -78,10 +77,10 @@ async function main() {
     userId,
     `${company} ki website development ₹85,000 invoice create cheyyi, due 15 days.`
   );
-  d = await resolveChoices(userId, d, lead.id, suresh?.id);
+  d = await resolveChoices(userId, d, lead.id);
   const invId = d.steps?.[0]?.entityId;
   const listed = await listInvoices(userId, { page: 1, pageSize: 30 });
-  const hit = ((listed as { items?: any[] }).items || []).find((x) => x.id === invId);
+  const hit = ((listed).items || []).find((x) => x.id === invId);
   const tax = hit != null ? Number(hit.taxRate) : -1;
   const days = hit?.dueDate
     ? Math.round((new Date(hit.dueDate).getTime() - Date.now()) / (24 * 3600 * 1000))
@@ -117,7 +116,7 @@ async function main() {
     await updateContact(userId, lead.id, { status: "new", assignedTo: rahul?.id || null });
     console.log(`  -- run ${i + 1}`);
     d = await cmd(userId, variants[i]);
-    d = await resolveChoices(userId, d, lead.id, suresh?.id);
+    d = await resolveChoices(userId, d, lead.id);
     const after = await getContactById(userId, lead.id);
     const ok =
       (d.status === "completed" || d.status === "partial") &&

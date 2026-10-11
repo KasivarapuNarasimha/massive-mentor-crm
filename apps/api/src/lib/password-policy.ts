@@ -37,12 +37,12 @@ export function normalizeLoginPassword(password: string): string {
   if (typeof password !== "string") return "";
   // Outer ends only (not internal spaces). Includes NBSP, ZWSP, BOM common in email copy.
   return password.replace(
-    /^[\s\u00A0\u1680\u2000-\u200A\u200B\u200C\u200D\u2028\u2029\u202F\u205F\u3000\uFEFF]+|[\s\u00A0\u1680\u2000-\u200A\u200B\u200C\u200D\u2028\u2029\u202F\u205F\u3000\uFEFF]+$/g,
+    /^(?:\u200B|\u200C|\u200D|[\s\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF])+|(?:\u200B|\u200C|\u200D|[\s\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF])+$/g,
     ""
   );
 }
 
 /** True if string contains any whitespace (including NBSP / zero-width). */
 export function passwordContainsWhitespace(password: string): boolean {
-  return /[\s\u00A0\u200B\u200C\u200D\uFEFF]/.test(password);
+  return /(?:\u200B|\u200C|\u200D|[\s\u00A0\uFEFF])/.test(password);
 }

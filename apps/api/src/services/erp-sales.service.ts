@@ -121,7 +121,7 @@ export async function createSalesOrder(
   if (!warehouse) throw new Error("Warehouse not found or inactive");
 
   let contactId = input.contactId || null;
-  let dealId = input.dealId || null;
+  const dealId = input.dealId || null;
   if (dealId) {
     const deal = await prisma.deal.findFirst({
       where: { id: dealId, businessId },

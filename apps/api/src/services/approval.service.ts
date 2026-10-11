@@ -8,7 +8,7 @@ import { resolveActorRole } from "./tenant-scope.service.js";
 import { recordAudit } from "./audit.service.js";
 import { notifyUser } from "./notification.service.js";
 import { sendEmail } from "./email.service.js";
-import { env } from "../config/env.js";
+
 import { paginated, skipTake } from "./pagination.js";
 
 export const APPROVAL_TYPES = [
@@ -373,7 +373,7 @@ export async function submitRequest(
     ? input.type
     : "custom") as string;
 
-  let workflow =
+  const workflow =
     input.workflowId
       ? await prisma.approvalWorkflow.findFirst({
           where: { id: input.workflowId, businessId, enabled: true },

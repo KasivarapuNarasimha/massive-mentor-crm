@@ -1374,7 +1374,7 @@ export async function aiWhatsappHistory(req: AuthenticatedRequest, res: Response
     });
 
     res.json({ success: true, data: history });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed to load history" });
   }
 }

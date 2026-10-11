@@ -257,7 +257,7 @@ export async function getMyStatus(req: AuthenticatedRequest, res: Response) {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const data = await getMyFieldStatus(req.user.id);
     res.json({ success: true, data });
-  } catch (error: unknown) {
+  } catch {
     res.status(500).json({ success: false, error: "Failed" });
   }
 }

@@ -779,6 +779,7 @@ export async function sendWhatsAppMessage(
 }
 
 export async function sendGmail(_userId: string, _to: string, _subject: string, _body: string) {
+  void [_userId, _to, _subject, _body]; // Preserve the disabled call contract and arity.
   throw new Error(
     "Gmail is not enabled in this release. WhatsApp is the supported messaging integration."
   );
@@ -788,6 +789,7 @@ export async function createCalendarEvent(
   _userId: string,
   _event: { title: string; start: string; end?: string; attendees?: string[] }
 ) {
+  void [_userId, _event]; // Preserve the disabled call contract and arity.
   throw new Error(
     "Google Calendar is not enabled in this release. It will be available in a future update."
   );

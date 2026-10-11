@@ -99,7 +99,7 @@ export function normalizeQuoteRequest(value: unknown) {
 export function normalizeQuoteInput(value: unknown, configuration: CommercialConfiguration) {
   const normalized=normalizeQuoteRequest(value);
   const items=normalized.items;
-  const engineInput={currency:configuration.currency.code,items:items.map(({description,...item})=>item),discount:normalized.discount};
+  const engineInput={currency:configuration.currency.code,items:items.map(({position,quantity,unitPrice,taxRate,discount})=>({position,quantity,unitPrice,taxRate,discount})),discount:normalized.discount};
   const pricingOutput=calculateCommercialQuote(engineInput,[{code:configuration.currency.code,decimalPlaces:2}]);
   const snapshotItems=items.map(({discount,...item},i)=>({...item,discountInput:discount,calculation:pricingOutput.lines[i]}));
   return {engineInput,items:snapshotItems,pricingOutput};

@@ -219,7 +219,7 @@ async function smtpSendWithTranscript(c: Case): Promise<{
     });
 
     // Ensure timeout clears on success
-    const _done = done;
+
     // monkey-patch by wrapping resolve path — redo simpler: clear in both places
     setTimeout(() => {
       /* keep timer from first setTimeout */
