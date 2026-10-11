@@ -1,0 +1,37 @@
+{
+  "branch": "codex/phase-c-release-candidate",
+  "runtimeCommit": "541bcc5870ccf3afde113304fd642f120be581ad",
+  "node": "v24.16.0",
+  "apiEntrypointSha256": "48afbd70229b2a6ff2fdad101bf7aa461dfaaefabf40108895eab0998c7fb34c",
+  "webBuildId": "yu-Zkl-ReC-K5PpEa0orB",
+  "mergedSchemaSha256": "3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e",
+  "productionExecution": false,
+  "emailBrowser": "PENDING",
+  "apiLint": "BLOCKED: existing missing ESLint 9 configuration",
+  "migrations": {
+    "20261010140000_quotation_foundation": "1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9",
+    "20261010160000_quotation_customer_finance": "31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1",
+    "20260907120000_import_batch": "24a3eba1671be2014365a29d2264628fe83f93ddfa332895ad6178147d32bd08",
+    "20260903120000_activity_business_id": "9f9f76964b112ae7c149cb562812e79076bb841432c12cca63fea8c67959d91e"
+  },
+  "mergedIntegration": {
+    "run": "https://github.com/KasivarapuNarasimha/massive-mentor-crm/actions/runs/38135754511",
+    "source": "541bcc5870ccf3afde113304fd642f120be581ad",
+    "tests": 31,
+    "passed": 31,
+    "failed": 0,
+    "skipped": 0,
+    "exit": 0
+  },
+  "offlineTests": {
+    "tests": 323,
+    "passed": 323,
+    "failed": 0
+  },
+  "builds": {
+    "API": "PASS",
+    "Web": "PASS",
+    "WebPages": 63,
+    "productionFontAdaptation": false
+  }
+}

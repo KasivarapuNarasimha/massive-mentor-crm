@@ -32,3 +32,43 @@ Real email delivery and full browser E2E remain PENDING: no approved non-product
 7. On failure, switch scoped prior compatible artifacts and PM2 state; preserve all commercial tables/history and Finance protection triggers. Do not drop populated tables or reverse payments. A rollback API must retain strict safety and commercial Finance protections; old code without protections is not a compatible rollback target. Database recovery/PITR is a separately approved disaster operation, not automatic schema rollback.
 
 Production migration/cutover remains prohibited until merged release and artifacts are reviewed and explicitly authorized.
+
+## Completed merged local gates
+
+API no-emit TypeScript and optimized build passed: 242 compiled JS files checked, zero ESM replacements. Web no-emit TypeScript before/after build and optimized build passed: 63 generated pages, original Inter preserved. Next build lint passed with existing hook/ARIA warnings. Startup callback containment test passed with zero seeds/schedulers/timers. Nineteen safety files remain exact deployed hash matches; index and permissions contain only reviewed commercial additions. Generated client includes ImportBatch and commercial models.
+
+`pnpm --filter @massivementor/api lint` executed and exited 2: repository has ESLint 9 but no API eslint.config.js/mjs/cjs. No passing full API lint is claimed; no arbitrary replacement lint policy or new dependency was introduced.
+
+Local build used Node 24.16.0; GitHub application integration is pinned to Node 22.16.0. Local Windows artifacts are validation artifacts, not Linux production-deployable Prisma binaries. Linux immutable release build/client and rollback-artifact validation remain production preparation gates.
+
+## Executed merged PostgreSQL application gate
+
+GitHub run https://github.com/KasivarapuNarasimha/massive-mentor-crm/actions/runs/38135754511 succeeded on disposable PostgreSQL 16.15. Dispatcher 8a8186eb56e914e7fe0a4998c1e2c90d776284ff checked out fixed merged runtime source 541bcc5870ccf3afde113304fd642f120be581ad, checked literal source/safety/ImportBatch hashes and fresh service provenance. Application runner applied both actual commercial migrations to its synthetic merged legacy schema (including ImportBatch), generated its Linux Prisma client, and executed 31 application integration tests: 31 pass, 0 fail, 0 skipped, harness exit 0. This was a new merged-candidate gate; the completed commercial-only PostgreSQL 16.15 proposal/catalog run was not repeated. Tests include actual HTTP tenant/grant/ownership gates, billing denials, approval, OTP, one-time unpaid conversion, payment/reversal balances, Finance protections, audit rollback, sequence locking and both service send/edit orderings. No claim is made that every legacy CRM endpoint has a database-backed test.
+
+## Authorization-only operation template
+
+These are reviewed operation steps, NOT executed commands and NOT production authorization. Use only a separately verified explicit production service connection, immutable Linux artifacts and recorded checkpoint paths. Never read or log connection secrets. The two SQL files already own their BEGIN/COMMIT transactions; do not wrap them with psql --single-transaction.
+
+```sh
+# AFTER authorization and read-only identity/checksum preflight:
+# service alias must independently resolve to the approved production DB.
+psql 'service=mm_production_reviewed' -X -v ON_ERROR_STOP=1 -f apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
+psql 'service=mm_production_reviewed' -X -v ON_ERROR_STOP=1 -f apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
+# Record only these applied migrations using the reviewed merged schema and
+# protected connection configuration. No generic migrate-deploy fallback.
+pnpm --filter @massivementor/api exec prisma migrate resolve --applied 20261010140000_quotation_foundation
+pnpm --filter @massivementor/api exec prisma migrate resolve --applied 20261010160000_quotation_customer_finance
+# AFTER verified artifact checkpoint/switch and separate cutover approval:
+pm2 stop massive-mentor-api
+# Verify no old API/restore-capable worker remains before artifact switch.
+MM_SAFE_STARTUP=1 pm2 restart massive-mentor-api --update-env
+# Web only after reviewed .next/artifact switch:
+pm2 restart massive-mentor-web
+curl --fail --silent http://127.0.0.1:4000/health
+curl --fail --silent http://127.0.0.1:4000/ready
+curl --fail --silent --output /dev/null http://127.0.0.1:3000/
+```
+
+No shell snippet above is self-authorizing: mm_production_reviewed is a proposed protected service alias, not an existing verified configuration. Migration resolve writes migration metadata and needs the same production authorization. Validate process metadata via sanitized projections, not pm2 environment dumps. Exact artifact switch/checkpoint paths must be finalized from the reviewed Linux release packaging; no dirty source directory replacement. Verify authenticated restore denial RESTORE_TEMPORARILY_DISABLED and authorized synthetic smoke tests without touching customer records.
+
+Remaining gates: API ESLint configuration decision; immutable Linux API/Web release build and compatible rollback-artifact rehearsal; approved non-production SMTP recipient/configuration and real browser E2E; release/schema/configuration/grant review; separate production migration/deployment authorization. Windows builds are not represented as ready Linux deployment artifacts.
