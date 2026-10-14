@@ -89,8 +89,8 @@ jobs:
           test "$(git rev-parse HEAD)" = a8a6edafa0a85c680625cedca24b9cd700d1af61
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
-          bac7c8e9bf19eb6b5c17c1fc9c14fc64d9a14923cfbb3dd9281ef8e48ade0ea7  ../tools/scripts/phase-c-rollback/rehearsal.py
-          f1bd66a9a7a261b489d3dcff81a621d2ad02ee7f4ce6e12ce5b82fe3a3b8cdbb  ../tools/scripts/phase-c-rollback/run.sh
+          48efeb7fd9d6a591e952665f6c135e317f461c93099359542cd14710ba067e3c  ../tools/scripts/phase-c-rollback/rehearsal.py
+          c5ca5d5bd42abfb48550c401c30cf8c608acf4ab39156b2516d1fa1db5e9aed5  ../tools/scripts/phase-c-rollback/run.sh
           91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
           f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
           3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
@@ -201,6 +201,7 @@ jobs:
           text=(private/'runtime-private.log').read_text(errors='replace')
           for line in text.splitlines():
               if re.fullmatch(r'MM_ROLLBACK_FAILURE:[A-Z_]+',line): print(line)
+              # Failure JSON is preserved through the fixed allowlisted summary writer, not raw log printing.
           if result.returncode: raise SystemExit('Isolated rollback failed; raw log not uploaded')
           if not (private/'rollback-summary.json').is_file(): raise SystemExit('Rollback evidence absent')
           print('Three PM2 stages and populated database integrity: PASS')
@@ -220,7 +221,7 @@ jobs:
               raise SystemExit(0)
           private=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
           # Never upload PM2 dumps, environment, raw logs, database rows, npm configuration or credentials.
-          for n in ['artifact-summary.json','rollback-summary.json']:
+          for n in ['artifact-summary.json','rollback-summary.json','diagnostic-summary.json','cleanup-summary.json','database-cleanup-summary.json']:
               p=private/n
               if p.is_file(): shutil.copyfile(p,out/n)
           files=[private/'massive-mentor-1bc44ba9d9a0951645df42a853bc5799650865ef-linux-x64.tar.gz',
