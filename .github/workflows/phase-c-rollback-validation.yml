@@ -31,11 +31,37 @@ jobs:
             const {data:r} = await github.rest.actions.getWorkflowRunAttempt({...context.repo,run_id:id,attempt_number:attempt});
             const {data:w} = await github.rest.actions.getWorkflow({...context.repo,workflow_id:r.workflow_id});
             const started = Date.parse(r.run_started_at);
+            // Diagnostic output is fixed predicate IDs and typed/allowlisted metadata only.
+            const safe = (v,kind) => {
+              if (kind === 'number') return Number.isSafeInteger(v) ? v : 'INVALID_NUMBER';
+              if (kind === 'sha') return typeof v === 'string' && /^[a-f0-9]{40}$/.test(v) ? v : 'INVALID_SHA';
+              if (kind === 'status') return ['queued','in_progress','completed','waiting','pending','requested'].includes(v) ? v : 'UNEXPECTED_STATUS';
+              return 'UNEXPECTED_VALUE';
+            };
+            const provenanceDiagnostics = () => {
+              const checks = [
+                ['RUN_ID',r.id,id,'number'],['RUN_ATTEMPT',r.run_attempt,attempt,'number'],
+                ['REPOSITORY',r.repository.full_name,repo,'literal'],['EVENT',r.event,'workflow_dispatch','literal'],
+                ['BRANCH',r.head_branch,'main','literal'],['SOURCE_SHA',r.head_sha,e.GITHUB_SHA,'sha'],
+                ['WORKFLOW_SHA',r.head_sha,e.GITHUB_WORKFLOW_SHA,'sha'],['RUN_STATUS',r.status,'in_progress','status'],
+                ['ACTOR',r.actor.login,'KasivarapuNarasimha','literal'],
+                ['TRIGGERING_ACTOR',r.triggering_actor.login,'KasivarapuNarasimha','literal'],
+                ['WORKFLOW_PATH',w.path,path,'literal']
+              ];
+              const failed = checks.filter(([,a,b])=>a!==b).map(([predicate,a,b,kind])=>({
+                predicate,expected:kind==='literal'?b:safe(b,kind),actual:safe(a,kind)
+              }));
+              const now=Date.now();
+              if (!Number.isFinite(started)) failed.push({predicate:'START_VALID',expected:true,actual:false});
+              if (started>now) failed.push({predicate:'START_NOT_FUTURE',expected:true,actual:false});
+              if (now-started>3600000) failed.push({predicate:'START_MAX_AGE',expected:true,actual:false});
+              core.error('PROVENANCE_PREDICATES:'+JSON.stringify(failed));
+            };
             if (r.id !== id || r.run_attempt !== attempt || r.repository.full_name !== repo || r.event !== 'workflow_dispatch' || r.head_branch !== 'main' ||
                 r.head_sha !== e.GITHUB_SHA || r.head_sha !== e.GITHUB_WORKFLOW_SHA || r.status !== 'in_progress' ||
                 r.actor.login !== 'KasivarapuNarasimha' || r.triggering_actor.login !== 'KasivarapuNarasimha' ||
                 w.path !== path || !Number.isFinite(started) || started > Date.now() || Date.now()-started > 3600000)
-              throw new Error('Authenticated metadata rejected');
+              { provenanceDiagnostics(); throw new Error('Authenticated metadata rejected'); }
             core.setOutput('started_at',r.run_started_at);
   rollback:
     needs: provenance
