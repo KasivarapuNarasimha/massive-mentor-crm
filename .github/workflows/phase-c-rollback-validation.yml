@@ -31,7 +31,7 @@ jobs:
             const {data:r} = await github.rest.actions.getWorkflowRunAttempt({...context.repo,run_id:id,attempt_number:attempt});
             const {data:w} = await github.rest.actions.getWorkflow({...context.repo,workflow_id:r.workflow_id});
             const started = Date.parse(r.run_started_at);
-            if (r.repository.full_name !== repo || r.event !== 'workflow_dispatch' || r.head_branch !== 'main' ||
+            if (r.id !== id || r.run_attempt !== attempt || r.repository.full_name !== repo || r.event !== 'workflow_dispatch' || r.head_branch !== 'main' ||
                 r.head_sha !== e.GITHUB_SHA || r.head_sha !== e.GITHUB_WORKFLOW_SHA || r.status !== 'in_progress' ||
                 r.actor.login !== 'KasivarapuNarasimha' || r.triggering_actor.login !== 'KasivarapuNarasimha' ||
                 w.path !== path || !Number.isFinite(started) || started > Date.now() || Date.now()-started > 3600000)
@@ -56,8 +56,6 @@ jobs:
     env:
       MM_PHASEC_DISPOSABLE: 'YES'
       MM_ROLLBACK_AUTHORIZED: 'YES'
-      MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}
-      MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}
       MM_PHASEC_RUN_STARTED_AT: ${{ needs.provenance.outputs.started_at }}
       MM_PHASEC_IMAGE_DIGEST: postgres@sha256:ec9f656f17c8b4dfebf49e58cf5c46d493d4846d4ea6d8b85d0637f68ee33bfc
       MM_PHASEC_IMAGE_ID: sha256:e8538db784b854a9baac5c1be6d059dcf0db257af2d94c8c5807b5fc15f11222
@@ -80,6 +78,9 @@ jobs:
           path: source
       - name: Verify independently reviewed pins and storage before application SQL
         working-directory: source
+        env:
+          MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}
+          MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}
         shell: bash
         run: |
           set -euo pipefail
@@ -99,11 +100,13 @@ jobs:
           HASHES
           python3 docs/phase-c-review/validation/concurrency.py --storage-only "$MM_PHASEC_CONTAINER_ID"
           python3 - <<'PY'
-          import os,pathlib,tempfile
+          import os,pathlib,tempfile,re
+          container=os.environ['MM_PHASEC_CONTAINER_ID'];port=os.environ['MM_PHASEC_PG_PORT']
+          assert re.fullmatch(r'[0-9a-f]{64}',container) and re.fullmatch(r'[0-9]+',port) and 1 <= int(port) <= 65535
           private=pathlib.Path(tempfile.mkdtemp(prefix='mm-rollback-private-',dir=os.environ['RUNNER_TEMP']))
           root=pathlib.Path(tempfile.mkdtemp(prefix='mm-rollback-',dir='/tmp'))
           with open(os.environ['GITHUB_ENV'],'a') as f:
-              f.write('MM_ROLLBACK_PRIVATE='+str(private)+'\nMM_ROLLBACK_ROOT='+str(root)+'\n')
+              f.write('MM_ROLLBACK_PRIVATE='+str(private)+'\nMM_ROLLBACK_ROOT='+str(root)+'\nMM_PHASEC_CONTAINER_ID='+container+'\nMM_PHASEC_PG_PORT='+port+'\n')
           for name in pathlib.Path('.').rglob('.env'):
               if 'node_modules' not in name.parts:
                   raise SystemExit('Environment file excluded')

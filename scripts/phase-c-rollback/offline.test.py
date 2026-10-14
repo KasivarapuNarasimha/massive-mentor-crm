@@ -10,6 +10,17 @@ class StaticSafety(unittest.TestCase):
             fn()
         self.assertEqual(str(e.exception), code)
 
+    def test_workflow_service_context_placement(self):
+        import re
+        workflow=pathlib.Path(__file__).parents[2]/'.github/workflows/phase-c-rollback-validation.yml'
+        text=workflow.read_text()
+        jobenv=text.split('    env:\n',1)[1].split('    steps:',1)[0]
+        allowed=lambda value: re.search(r'\$\{\{\s*job\.',value) is None
+        self.assertTrue(allowed(jobenv))
+        self.assertFalse(allowed('MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}'))
+        self.assertIn('          MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}',text)
+        self.assertIn('          MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}',text)
+
     def test_path_rejections(self):
         for name, code in [("../x","ARCHIVE_PARENT"),("/x","ARCHIVE_PATH"),("C:x","ARCHIVE_PATH"),
                            ("x\\y","ARCHIVE_PATH"),("apps/api/.env","ARCHIVE_SECRET_PATH"),

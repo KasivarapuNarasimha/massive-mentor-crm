@@ -50,7 +50,7 @@ Uploads are allowlisted archives, checksums and generated summary JSON only. No 
 
 ## Approval gates and tests
 
-Offline tests: python -B scripts/phase-c-rollback/offline.test.py. Bash syntax: bash -n scripts/phase-c-rollback/run.sh. YAML/embedded JS/Python parsing is static evidence only.
+Executed offline tests: 9/9 PASS, including specific archive rejection classes and service-context placement. Command: python -B scripts/phase-c-rollback/offline.test.py. Bash syntax: bash -n scripts/phase-c-rollback/run.sh. YAML/embedded JS/Python parsing is static evidence only.
 
 Required next approval: review and merge this exact CI-only PR, then separately authorize its first manually dispatched GitHub-hosted disposable rollback run. Do not dispatch from the review branch; provenance requires main. No production migration/deployment is included.
 
@@ -60,3 +60,5 @@ Authoritative action pins:
 - https://github.com/actions/setup-node/commit/49933ea5288caeca8642d1e84afbd3f7d6820020
 - https://github.com/actions/upload-artifact/commit/cf430e030ddbb5b0abf93d22962f4752f3646cd9
 - https://registry.npmjs.org/pm2/6.0.8
+
+GitHub job service context is bound at step level (not job env), validated and exported for later steps. This matches https://docs.github.com/en/actions/reference/workflows-and-actions/contexts. Static parsing is not GitHub server validation or database execution.
