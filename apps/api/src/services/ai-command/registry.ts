@@ -38,7 +38,7 @@ import {
   resolveProductRef,
   pickContactSoftRef,
 } from "./entity-resolver.js";
-import type { ActionDef } from "./types.js";
+import type { ActionDef, ActionContext, ExecuteResult, VerifyResult, ResolveOutcome } from "./types.js";
 
 const softRefSchema = z.any().optional().nullable();
 
@@ -48,7 +48,57 @@ function money(v: unknown): number {
   return n;
 }
 
-export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
+// Per-action contracts mirror the existing runtime schemas. Legacy z.any fields remain legacy-permissive.
+type RegistryArguments = {
+  search_contacts: z.output<z.ZodObject<{ query: z.ZodOptional<z.ZodString>; type: z.ZodOptional<z.ZodEnum<["lead", "client"]>>; status: z.ZodOptional<z.ZodString> }>>;
+  create_lead: z.output<z.ZodObject<{ name: z.ZodNullable<z.ZodOptional<z.ZodAny>>; company: z.ZodNullable<z.ZodOptional<z.ZodAny>>; phone: z.ZodNullable<z.ZodOptional<z.ZodAny>>; email: z.ZodNullable<z.ZodOptional<z.ZodAny>>; status: z.ZodNullable<z.ZodOptional<z.ZodAny>>; contact: typeof softRefSchema; assignee: typeof softRefSchema; assignedTo: z.ZodNullable<z.ZodOptional<z.ZodString>> }>>;
+  create_client: z.output<z.ZodObject<{ name: z.ZodNullable<z.ZodOptional<z.ZodString>>; company: z.ZodNullable<z.ZodOptional<z.ZodString>>; phone: z.ZodNullable<z.ZodOptional<z.ZodString>>; email: z.ZodNullable<z.ZodOptional<z.ZodString>> }>>;
+  update_contact: z.output<z.ZodObject<{ contact: typeof softRefSchema; status: z.ZodNullable<z.ZodOptional<z.ZodAny>>; phone: z.ZodNullable<z.ZodOptional<z.ZodAny>>; email: z.ZodNullable<z.ZodOptional<z.ZodAny>>; name: z.ZodNullable<z.ZodOptional<z.ZodAny>>; company: z.ZodNullable<z.ZodOptional<z.ZodAny>>; clientName: z.ZodNullable<z.ZodOptional<z.ZodAny>>; client: z.ZodNullable<z.ZodOptional<z.ZodAny>>; assignee: typeof softRefSchema; assignedTo: z.ZodNullable<z.ZodOptional<z.ZodString>> }>>;
+  assign_contact: z.output<z.ZodObject<{ contact: typeof softRefSchema; company: z.ZodNullable<z.ZodOptional<z.ZodAny>>; clientName: z.ZodNullable<z.ZodOptional<z.ZodAny>>; assignee: typeof softRefSchema }>> & { _labels?: { c: string; m: string } };
+  delete_contact: z.output<z.ZodObject<{ contact: typeof softRefSchema; company: z.ZodNullable<z.ZodOptional<z.ZodAny>>; clientName: z.ZodNullable<z.ZodOptional<z.ZodAny>> }>> & { _label?: string };
+  create_deal: z.output<z.ZodObject<{ title: z.ZodNullable<z.ZodOptional<z.ZodString>>; value: z.ZodNullable<z.ZodOptional<z.ZodAny>>; stage: z.ZodNullable<z.ZodOptional<z.ZodString>>; contact: typeof softRefSchema; expectedClose: typeof softRefSchema }>>;
+  update_deal: z.output<z.ZodObject<{ deal: typeof softRefSchema; title: z.ZodNullable<z.ZodOptional<z.ZodString>>; value: z.ZodNullable<z.ZodOptional<z.ZodAny>>; stage: z.ZodNullable<z.ZodOptional<z.ZodString>> }>>;
+  change_deal_stage: z.output<z.ZodObject<{ deal: typeof softRefSchema; stage: z.ZodString }>>;
+  delete_deal: z.output<z.ZodObject<{ deal: typeof softRefSchema }>> & { _label?: string };
+  create_task: z.output<z.ZodObject<{ title: z.ZodNullable<z.ZodOptional<z.ZodString>>; description: z.ZodNullable<z.ZodOptional<z.ZodString>>; due: z.ZodNullable<z.ZodOptional<z.ZodAny>>; dueDate: z.ZodNullable<z.ZodOptional<z.ZodString>>; priority: z.ZodNullable<z.ZodOptional<z.ZodString>>; contact: typeof softRefSchema; deal: typeof softRefSchema; status: z.ZodNullable<z.ZodOptional<z.ZodString>> }>>;
+  complete_task: z.output<z.ZodObject<{ titleQuery: z.ZodOptional<z.ZodString>; taskId: z.ZodOptional<z.ZodString>; contact: typeof softRefSchema }>>;
+  update_task: z.output<z.ZodObject<{ taskId: z.ZodOptional<z.ZodString>; titleQuery: z.ZodOptional<z.ZodString>; title: z.ZodOptional<z.ZodString>; status: z.ZodOptional<z.ZodString>; priority: z.ZodOptional<z.ZodString>; due: z.ZodOptional<z.ZodAny> }>> & { dueDate?: string };
+  delete_task: z.output<z.ZodObject<{ taskId: z.ZodString; title: z.ZodOptional<z.ZodString> }>>;
+  create_meeting: z.output<z.ZodObject<{ title: z.ZodNullable<z.ZodOptional<z.ZodString>>; when: z.ZodOptional<z.ZodAny>; scheduledAt: z.ZodNullable<z.ZodOptional<z.ZodString>>; contact: typeof softRefSchema; durationMin: z.ZodNullable<z.ZodOptional<z.ZodNumber>>; notes: z.ZodNullable<z.ZodOptional<z.ZodString>> }>>;
+  create_note: z.output<z.ZodObject<{ content: z.ZodString; entityType: z.ZodOptional<z.ZodEnum<["contact", "deal", "meeting"]>>; contact: typeof softRefSchema; deal: typeof softRefSchema; meeting: typeof softRefSchema }>> & { entityId?: string; _label?: string };
+  create_invoice: z.output<z.ZodObject<{ contact: typeof softRefSchema; clientName: z.ZodNullable<z.ZodOptional<z.ZodAny>>; company: z.ZodNullable<z.ZodOptional<z.ZodAny>>; client: z.ZodNullable<z.ZodOptional<z.ZodAny>>; name: z.ZodNullable<z.ZodOptional<z.ZodAny>>; amount: z.ZodAny; description: z.ZodNullable<z.ZodOptional<z.ZodAny>>; taxRate: z.ZodNullable<z.ZodOptional<z.ZodAny>>; gst: z.ZodNullable<z.ZodOptional<z.ZodAny>>; due: z.ZodNullable<z.ZodOptional<z.ZodAny>>; dueDate: z.ZodNullable<z.ZodOptional<z.ZodAny>>; dueInDays: z.ZodNullable<z.ZodOptional<z.ZodAny>> }>> & { contactId?: string | null };
+  list_overdue_invoices: z.output<z.ZodObject<{ minTotal: z.ZodNullable<z.ZodOptional<z.ZodAny>> }>>;
+  record_payment: z.output<z.ZodObject<{ amount: z.ZodAny; contact: typeof softRefSchema; invoice: typeof softRefSchema; method: z.ZodNullable<z.ZodOptional<z.ZodString>>; notes: z.ZodNullable<z.ZodOptional<z.ZodString>> }>> & { invoiceId?: string | null; contactId?: string | null };
+  create_expense: z.output<z.ZodObject<{ amount: z.ZodAny; category: z.ZodNullable<z.ZodOptional<z.ZodString>>; description: z.ZodNullable<z.ZodOptional<z.ZodString>> }>>;
+  create_product: z.output<z.ZodObject<{ name: z.ZodString; sku: z.ZodNullable<z.ZodOptional<z.ZodString>>; sellingPrice: z.ZodNullable<z.ZodOptional<z.ZodAny>>; price: z.ZodNullable<z.ZodOptional<z.ZodAny>>; stock: z.ZodNullable<z.ZodOptional<z.ZodAny>>; reorderLevel: z.ZodNullable<z.ZodOptional<z.ZodAny>> }>>;
+  adjust_stock: z.output<z.ZodObject<{ product: typeof softRefSchema; qty: z.ZodAny; note: z.ZodNullable<z.ZodOptional<z.ZodString>> }>> & { productId?: string; _label?: string };
+  list_low_stock: z.output<z.ZodObject<Record<string, never>>>;
+  search_products: z.output<z.ZodObject<{ query: z.ZodOptional<z.ZodString> }>>;
+  draft_whatsapp: z.output<z.ZodObject<{ contact: typeof softRefSchema; company: z.ZodNullable<z.ZodOptional<z.ZodAny>>; clientName: z.ZodNullable<z.ZodOptional<z.ZodAny>>; topic: z.ZodNullable<z.ZodOptional<z.ZodString>> }>> & { contactId?: string | null; _label?: string };
+  priority_focus_today: z.output<z.ZodObject<Record<string, never>>>;
+};
+type ResolvedOverrides = {
+  create_deal: { title: string };
+  create_task: { title: string };
+  create_meeting: { title: string };
+  create_note: { entityType: "contact" | "deal" | "meeting"; entityId: string; _label: string };
+  create_expense: { category: string; description: string };
+  create_product: { sku: string };
+  adjust_stock: { productId: string; _label: string };
+  draft_whatsapp: { contactId: string; _label: string };
+};
+type ResolvedArguments<K extends keyof RegistryArguments> = K extends keyof ResolvedOverrides
+  ? RegistryArguments[K] & ResolvedOverrides[K] : RegistryArguments[K];
+type RegistryAction<K extends keyof RegistryArguments> = Omit<ActionDef<RegistryArguments[K]>, 'resolveArgs' | 'execute' | 'verify'> & {
+  resolveArgs?: (ctx: ActionContext, args: RegistryArguments[K]) => Promise<ResolveOutcome<ResolvedArguments<K>>>;
+  execute: (ctx: ActionContext, args: ResolvedArguments<K>) => Promise<ExecuteResult>;
+  verify?: (ctx: ActionContext, args: ResolvedArguments<K>, result: ExecuteResult) => Promise<VerifyResult>;
+};
+type TypedActionRegistry = { [K in keyof RegistryArguments]: RegistryAction<K> } & {
+  [name: string]: { [K in keyof RegistryArguments]: RegistryAction<K> }[keyof RegistryArguments];
+};
+
+export const ACTION_REGISTRY: TypedActionRegistry = {
   search_contacts: {
     name: "search_contacts",
     description: "Search leads/clients by name, company, phone",
@@ -759,8 +809,8 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
     execute: async (ctx, args) => {
       const task = await updateTask(ctx.userId, args.taskId!, {
         title: args.title,
-        status: args.status,
-        priority: args.priority,
+        status: args.status as Parameters<typeof updateTask>[2]["status"],
+        priority: args.priority as Parameters<typeof updateTask>[2]["priority"],
         dueDate: args.dueDate,
       });
       return { message: "Task updated", entityType: "task", entityId: task.id, label: task.title, href: "/dashboard/tasks" };
@@ -1008,7 +1058,7 @@ export const ACTION_REGISTRY: Record<string, ActionDef<any>> = {
     },
     execute: async (ctx, args) => {
       const invoice = await createInvoice(ctx.userId, {
-        contactId: args.contactId,
+        contactId: args.contactId as Parameters<typeof createInvoice>[1]["contactId"],
         clientName: args.clientName,
         amount: args.amount,
         description: args.description,

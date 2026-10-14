@@ -22,7 +22,7 @@ export async function buildActionContext(userId: string, locale?: string): Promi
 
 export function assertActionAllowed(
   ctx: ActionContext,
-  action: ActionDef
+  action: Pick<ActionDef, "name" | "modules" | "category" | "roles">
 ): { ok: true } | { ok: false; error: string } {
   if (ctx.moduleKeys.includes("dashboard") === false && action.modules.length === 0) {
     /* ok */

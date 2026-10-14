@@ -80,3 +80,35 @@ test('registry lint cleanup leaves emitted runtime byte-identical',()=>{
  const p='apps/api/src/services/ai-command/registry.ts';
  assert.equal(output(current(p),ts.ModuleKind.ESNext),output(before(p),ts.ModuleKind.ESNext));
 });
+
+
+test('permission metadata type narrowing emits identical runtime',()=>{
+ const p='apps/api/src/services/ai-command/permissions.ts';
+ assert.equal(output(current(p),ts.ModuleKind.ESNext),output(before(p),ts.ModuleKind.ESNext));
+});
+
+test('per-action registry rejects mismatched argument contracts at compile time',()=>{
+ const api=path.join(root,'apps/api');
+ const config=ts.readConfigFile(path.join(api,'tsconfig.json'),ts.sys.readFile);assert.equal(config.error,undefined);
+ const parsed=ts.parseJsonConfigFileContent(config.config,ts.sys,api,{noEmit:true,incremental:false});
+ const virtual=path.join(api,'src/services/ai-command/registry-contract-check.ts');
+ const source=`import { ACTION_REGISTRY } from './registry.js';
+import type { ActionContext } from './types.js';
+declare const ctx: ActionContext;
+ACTION_REGISTRY.create_product.execute(ctx, {name:'Synthetic',sku:'SYN'});
+// @ts-expect-error product name must be a string
+ACTION_REGISTRY.create_product.execute(ctx, {name:42,sku:'SYN'});
+// @ts-expect-error normalized product execution requires SKU
+ACTION_REGISTRY.create_product.execute(ctx, {name:'Synthetic'});
+// @ts-expect-error search contact type is a schema enum
+ACTION_REGISTRY.search_contacts.execute(ctx, {type:'foreign'});
+// @ts-expect-error stage change requires an explicit stage
+ACTION_REGISTRY.change_deal_stage.execute(ctx, {});
+// @ts-expect-error normalized approval labels cannot be a string
+ACTION_REGISTRY.assign_contact.execute(ctx, {_labels:'wrong'});`;
+ const host=ts.createCompilerHost(parsed.options);const read=host.readFile.bind(host),exists=host.fileExists.bind(host);
+ host.readFile=p=>path.resolve(p)===virtual?source:read(p);host.fileExists=p=>path.resolve(p)===virtual||exists(p);
+ const program=ts.createProgram([...parsed.fileNames,virtual],parsed.options,host);
+ const diagnostics=ts.getPreEmitDiagnostics(program);
+ assert.equal(diagnostics.length,0,ts.formatDiagnostics(diagnostics,{getCanonicalFileName:p=>p,getCurrentDirectory:()=>api,getNewLine:()=> '\n'}));
+});
