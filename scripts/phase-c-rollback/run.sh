@@ -41,6 +41,16 @@ cleanup() {
     sudo ip6tables -F "$chain" || status=1
     sudo ip6tables -X "$chain" || status=1
   fi
+  MM_CLEANUP_STATUS="$status" MM_CLEANUP_USER="$created_user" python3 - <<'PYCLEAN'
+import json,os,pathlib
+p=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
+status=int(os.environ['MM_CLEANUP_STATUS'])
+(p/'cleanup-summary.json').write_text(json.dumps({
+    'exitCode':status,'cleanupReached':True,'freshUidCreated':os.environ['MM_CLEANUP_USER']=='1',
+    'ownedProcessesAndFirewall':'VERIFIED_REMOVED' if status==0 else 'NOT_ESTABLISHED',
+    'databaseCleanup':'SEE_SEPARATE_DATABASE_SUMMARY',
+    'containerCleanup':'GITHUB_RUNNER_TEARDOWN','productionAccess':False})+'\n')
+PYCLEAN
   # Hosted runner/service lifecycle removes its own container/anonymous volume after failure/timeout.
   # No filesystem deletion, shared container removal, volume deletion or pruning.
   exit "$status"
@@ -85,6 +95,18 @@ actual=$(printf "SELECT shobj_description(oid,'pg_database') FROM pg_database WH
 printf"""
 assert text.count(old)==1
 text=text.replace(old,new)
+cleanup_tail='|| code=1;fi;exit "$code"; }'
+cleanup_evidence=r"""|| code=1;
+remaining=$(printf "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname='%s');" "$db" | pg postgres) || remaining=unknown
+case "$remaining" in
+ f) outcome=VERIFIED_ABSENT ;;
+ t) outcome=STILL_PRESENT ;;
+ *) outcome=UNVERIFIED ;;
+esac
+printf '{"databaseCleanup":"%s","productionAccess":false}\n' "$outcome" > "$MM_ROLLBACK_PRIVATE/database-cleanup-summary.json"
+fi;exit "$code"; }"""
+assert text.count(cleanup_tail)==1
+text=text.replace(cleanup_tail,cleanup_evidence)
 suffix=r'''
 printf 'INSERT INTO "ImportBatch" ("id","businessId","actorUserId","filename","createdCount","updatedCount","createdAt") VALUES ('\''phasec-rollback-import'\'','\''phasec-A'\'','\''phasec-owner'\'','\''synthetic.csv'\'',0,0,CURRENT_TIMESTAMP);' | pg "$db" >/dev/null
 python3 - <<'PYSYNTH' > "$MM_ROLLBACK_PRIVATE/synthetic-ledger.sql"

@@ -13,6 +13,21 @@ ROOT_FILES = {"package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "RELEASE.
 PREFIXES = ("node_modules/", "apps/api/dist/", "apps/api/prisma/", "apps/api/node_modules/",
             "apps/web/.next/", "apps/web/node_modules/", "apps/web/public/")
 
+DIAGNOSTIC = {"phase": "ENTRY", "operation": "NONE", "exitCode": None, "postgres": "NOT_CHECKED", "pm2": "NOT_CHECKED"}
+
+def phase(name):
+    DIAGNOSTIC["phase"] = name
+
+def failure_summary(error):
+    # Only literal phases/statuses and numeric codes. Never exception messages,
+    # command arguments, environment, response bodies, SQL, or subprocess logs.
+    known = {"GateFailure", "KeyError", "TypeError", "ValueError", "JSONDecodeError", "PermissionError", "FileNotFoundError", "TimeoutExpired", "OSError"}
+    kind = type(error).__name__
+    return {**DIAGNOSTIC, "exceptionClass": kind if kind in known else "OtherException",
+            "errno": error.errno if isinstance(error, OSError) and isinstance(error.errno, int) else None,
+            "failure": str(error) if isinstance(error, GateFailure) and re.fullmatch(r"[A-Z_]+",str(error)) else "UNCLASSIFIED_FAILURE",
+            "runtime": "FAILED", "productionAccess": False}
+
 class GateFailure(Exception):
     pass
 
@@ -119,7 +134,9 @@ def compatibility(previous, candidate, before, after):
 
 def run(args, env=None, timeout=60):
     # stdout/stderr are private; never surface raw errors or environment values.
+    DIAGNOSTIC["operation"] = "ISOLATED_UID_LOOKUP"
     result = subprocess.run(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+    DIAGNOSTIC["exitCode"] = result.returncode
     require(result.returncode == 0, "SUBPROCESS_FAILED")
     return result.stdout
 
@@ -130,9 +147,15 @@ def pg(sql):
     env = ["env", "-i", "PATH=/usr/local/bin:/usr/bin:/bin", "PGHOST=/var/run/postgresql", "PGPORT=5432",
            "PGUSER=mm_phasec", "PGPASSWORD=phasec_dummy_only", "PGCONNECT_TIMEOUT=5",
            "PGOPTIONS=-c statement_timeout=20000 -c lock_timeout=5000"]
+    DIAGNOSTIC["operation"] = "PG_READ_ONLY"
     result = subprocess.run(["docker", "--context", "default", "exec", "-i", container, *env,
-                             "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-d", db],
+                             "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=verbose", "-d", db],
                             input=sql.encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45)
+    DIAGNOSTIC["exitCode"] = result.returncode
+    DIAGNOSTIC["postgres"] = "SELECT_OK" if result.returncode == 0 else "SELECT_FAILED"
+    # SQLSTATE only, not server messages, statements, detail, or credentials.
+    match = re.search(rb"(?:ERROR|FATAL):\s+([0-9A-Z]{5}):", result.stderr)
+    if match: DIAGNOSTIC["sqlstate"] = match.group(1).decode("ascii")
     require(result.returncode == 0, "READ_ONLY_PG_CHECK")
     return result.stdout.decode().strip()
 
@@ -173,8 +196,10 @@ def runtime(private):
     require(previous.is_dir() and candidate.is_dir(), "VERIFIED_BUNDLES_REQUIRED")
     before = json.loads((previous / "RELEASE.json").read_text())
     after = json.loads((candidate / "RELEASE.json").read_text())
+    phase("RUNTIME_BUNDLE_COMPATIBILITY")
     require(before["sourceCommit"] == SOURCE and after["sourceCommit"] == CANDIDATE, "RUNTIME_SOURCE")
     compatibility(previous, candidate, before, after)
+    phase("BASELINE_FINGERPRINT")
     baseline = fingerprint()
     user = "mmrollback"
     uid = run(["id", "-u", user]).decode().strip()
@@ -193,13 +218,17 @@ def runtime(private):
     # env -i prevents application .env/runner credentials reaching PM2. Bundles contain no .env.
     def pm(args, allow_failure=False):
         cmd = ["sudo", "-u", user, "env", "-i", *[k + "=" + v for k, v in safeenv.items()], node, str(pm2), *args]
+        DIAGNOSTIC["operation"] = "PM2_" + args[0].upper()
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=35)
+        DIAGNOSTIC["exitCode"] = result.returncode
+        DIAGNOSTIC["pm2"] = "COMMAND_OK" if result.returncode == 0 else "COMMAND_FAILED"
         require(allow_failure or result.returncode == 0, "PM2_OPERATION")
         return result.stdout
     evidence = []
     active = root / "active"
     try:
         for label, bundle in [("before_upgrade", previous), ("after_upgrade", candidate), ("after_rollback", previous)]:
+            phase(label.upper() + "_SWITCH")
             if active.is_symlink():
                 pm(["kill"])
                 stopped = subprocess.run(["ps", "-u", user, "-o", "pid="], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
@@ -218,12 +247,18 @@ def runtime(private):
             config = root / "ecosystem.config.cjs"
             config.write_text("module.exports=" + json.dumps(cfg) + ";\n")
             config.chmod(0o644)
+            phase(label.upper() + "_PM2_START")
             pm(["start", str(config), "--env", "production"])
+            phase(label.upper() + "_HTTP_HEALTH")
             deadline = time.monotonic() + 75
             while True:
                 try:
+                    DIAGNOSTIC["operation"] = "HTTP_READY"
                     ready, body = http(4000, "/ready")
+                    DIAGNOSTIC["readyStatus"] = ready
+                    DIAGNOSTIC["operation"] = "HTTP_WEB_LOGIN"
                     web, _ = http(3000, "/login")
+                    DIAGNOSTIC["webStatus"] = web
                     if ready == 200 and json.loads(body)["ready"] and web == 200:
                         break
                 except (OSError, ValueError):
@@ -232,16 +267,29 @@ def runtime(private):
                 time.sleep(1)
             require(http(4000, "/health")[0] == 200, "API_HEALTH")
             require(http(4000, "/api/quotations")[0] == 401, "STRICT_HTTP_AUTH_BOUNDARY")
+            phase(label.upper() + "_PM2_INVENTORY")
             rows = json.loads(pm(["jlist"]))
             require(len(rows) == 2 and {r["name"] for r in rows} == {"massive-mentor-api", "massive-mentor-web"}, "PROCESS_INVENTORY")
+            DIAGNOSTIC["processStatuses"] = [
+                {"name": row.get("name") if row.get("name") in {"massive-mentor-api","massive-mentor-web"} else "UNEXPECTED",
+                 "status": row.get("pm2_env",{}).get("status") if row.get("pm2_env",{}).get("status") in {"online","stopped","errored","launching","stopping"} else "UNKNOWN",
+                 "restartCount": row.get("pm2_env",{}).get("restart_time") if isinstance(row.get("pm2_env",{}).get("restart_time"),int) else None}
+                for row in rows]
             for r in rows:
                 require(r["pid"] > 0 and r["pm2_env"]["status"] == "online" and r["pm2_env"]["restart_time"] == 0, "PROCESS_HEALTH")
                 executable = pathlib.Path(r["pm2_env"]["pm_exec_path"]).resolve()
                 require(executable.is_relative_to(bundle.resolve()), "PROCESS_ARTIFACT")
+            phase(label.upper() + "_DATA_INTEGRITY")
             require(fingerprint() == baseline, "DATA_CHANGED")
             evidence.append({"stage": label, "health": "PASS", "processes": 2, "allPublicTableFingerprint": "UNCHANGED"})
     finally:
-        pm(["kill"], allow_failure=True)
+        failed = sys.exc_info()[0] is not None
+        saved = dict(DIAGNOSTIC)
+        try:
+            pm(["kill"], allow_failure=True)
+        finally:
+            if failed:
+                DIAGNOSTIC.clear(); DIAGNOSTIC.update(saved)
     require(fingerprint() == baseline, "FINAL_DATA_CHANGED")
     (private / "rollback-summary.json").write_text(json.dumps({
         "candidateSource": CANDIDATE, "fallbackSource": SOURCE,
@@ -278,5 +326,11 @@ if __name__ == "__main__":
     except BaseException as e:
         # Never upload traceback, raw subprocess output, tokens or credentials.
         safe = str(e) if isinstance(e, GateFailure) and re.fullmatch(r"[A-Z_]+", str(e)) else "UNCLASSIFIED_FAILURE"
+        summary = failure_summary(e)
+        # Write only to the already-created private directory; no path from error text.
+        private = pathlib.Path(os.environ.get("MM_ROLLBACK_PRIVATE", ""))
+        if private.is_dir() and private.name.startswith("mm-rollback-private-"):
+            (private / "diagnostic-summary.json").write_text(json.dumps(summary,sort_keys=True)+"\n")
         print("MM_ROLLBACK_FAILURE:" + safe)
+        print("MM_ROLLBACK_DIAGNOSTIC:" + json.dumps(summary,sort_keys=True))
         sys.exit(1)

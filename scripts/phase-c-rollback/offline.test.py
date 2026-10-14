@@ -1,5 +1,6 @@
 """Offline negative tests only. Never starts processes, connects to PostgreSQL or downloads artifacts."""
-import importlib.util, io, hashlib, json, pathlib, tarfile, tempfile, unittest
+import importlib.util, io, hashlib, json, pathlib, tarfile, tempfile, unittest, subprocess
+from unittest.mock import patch
 spec = importlib.util.spec_from_file_location("rehearsal", pathlib.Path(__file__).with_name("rehearsal.py"))
 r = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
@@ -20,6 +21,25 @@ class StaticSafety(unittest.TestCase):
         self.assertFalse(allowed('MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}'))
         self.assertIn('          MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}',text)
         self.assertIn('          MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}',text)
+
+    def test_diagnostic_does_not_expose_exception_or_subprocess_arguments(self):
+        r.phase("BASELINE_FINGERPRINT")
+        for error in [KeyError("postgresql://secret"), PermissionError(13,"secret-token","/secret/path"),
+                      subprocess.TimeoutExpired(["command","secret-password"],35,output=b"secret")]:
+            summary=r.failure_summary(error)
+            self.assertNotIn("secret",json.dumps(summary))
+            self.assertEqual(summary["phase"],"BASELINE_FINGERPRINT")
+            self.assertEqual(summary["runtime"],"FAILED")
+
+    def test_command_failure_keeps_exit_code_and_assertion(self):
+        with patch.object(r.subprocess,"run",return_value=subprocess.CompletedProcess([],7,b"",b"SECRET")):
+            self.rejected("SUBPROCESS_FAILED",lambda:r.run(["id","-u","synthetic"]))
+        self.assertEqual(r.DIAGNOSTIC["exitCode"],7)
+        self.assertNotIn("SECRET",json.dumps(r.failure_summary(r.GateFailure("SUBPROCESS_FAILED"))))
+
+    def test_gate_failure_remains_specific(self):
+        self.assertEqual(r.failure_summary(r.GateFailure("DATA_CHANGED"))["failure"],"DATA_CHANGED")
+        self.assertEqual(r.failure_summary(r.GateFailure("secret string"))["failure"],"UNCLASSIFIED_FAILURE")
 
     def test_path_rejections(self):
         for name, code in [("../x","ARCHIVE_PARENT"),("/x","ARCHIVE_PATH"),("C:x","ARCHIVE_PATH"),
