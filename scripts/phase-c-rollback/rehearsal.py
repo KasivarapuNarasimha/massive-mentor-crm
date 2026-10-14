@@ -25,8 +25,35 @@ def failure_summary(error):
     kind = type(error).__name__
     return {**DIAGNOSTIC, "exceptionClass": kind if kind in known else "OtherException",
             "errno": error.errno if isinstance(error, OSError) and isinstance(error.errno, int) else None,
-            "failure": str(error) if isinstance(error, GateFailure) and re.fullmatch(r"[A-Z_]+",str(error)) else "UNCLASSIFIED_FAILURE",
+            "failure": safe_failure(error),
             "runtime": "FAILED", "productionAccess": False}
+
+
+def safe_failure(error):
+    value = str(error) if isinstance(error, GateFailure) else ""
+    return value if value == "PM2_OPERATION" or re.fullmatch(r"[A-Z_]+",value) else "UNCLASSIFIED_FAILURE"
+
+def pm2_error_categories(stdout, stderr):
+    text=(stdout[:32768]+stderr[:32768]).decode("utf-8",errors="replace")
+    signatures={"PERMISSION_DENIED":r"\b(?:EACCES|EPERM|Permission denied)\b",
+                "FILE_NOT_FOUND":r"\bENOENT\b|Script not found|Cannot find module",
+                "ADDRESS_IN_USE":r"\bEADDRINUSE\b",
+                "CONFIG_SYNTAX":r"SyntaxError|Malformed ecosystem|Unexpected token",
+                "DAEMON_CONNECTION":r"connect (?:ECONNREFUSED|ETIMEDOUT)|Cannot connect to daemon"}
+    return [name for name,pattern in signatures.items() if re.search(pattern,text)] or ["UNCLASSIFIED"]
+
+def cleanup_preserving_failure(action):
+    primary=sys.exc_info()[1]
+    saved=dict(DIAGNOSTIC)
+    try:
+        action()
+    except BaseException as cleanup_error:
+        if primary is None: raise
+        saved["pythonCleanup"]="FAILED"
+        saved["cleanupExceptionClass"]=type(cleanup_error).__name__ if type(cleanup_error).__name__ in {"TimeoutExpired","OSError","GateFailure"} else "OtherException"
+    finally:
+        if primary is not None:
+            DIAGNOSTIC.clear(); DIAGNOSTIC.update(saved)
 
 class GateFailure(Exception):
     pass
@@ -222,6 +249,8 @@ def runtime(private):
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=35)
         DIAGNOSTIC["exitCode"] = result.returncode
         DIAGNOSTIC["pm2"] = "COMMAND_OK" if result.returncode == 0 else "COMMAND_FAILED"
+        if result.returncode:
+            DIAGNOSTIC["pm2ErrorCategories"]=pm2_error_categories(result.stdout,result.stderr)
         require(allow_failure or result.returncode == 0, "PM2_OPERATION")
         return result.stdout
     evidence = []
@@ -283,13 +312,7 @@ def runtime(private):
             require(fingerprint() == baseline, "DATA_CHANGED")
             evidence.append({"stage": label, "health": "PASS", "processes": 2, "allPublicTableFingerprint": "UNCHANGED"})
     finally:
-        failed = sys.exc_info()[0] is not None
-        saved = dict(DIAGNOSTIC)
-        try:
-            pm(["kill"], allow_failure=True)
-        finally:
-            if failed:
-                DIAGNOSTIC.clear(); DIAGNOSTIC.update(saved)
+        cleanup_preserving_failure(lambda: pm(["kill"], allow_failure=True))
     require(fingerprint() == baseline, "FINAL_DATA_CHANGED")
     (private / "rollback-summary.json").write_text(json.dumps({
         "candidateSource": CANDIDATE, "fallbackSource": SOURCE,
@@ -325,7 +348,7 @@ if __name__ == "__main__":
         main()
     except BaseException as e:
         # Never upload traceback, raw subprocess output, tokens or credentials.
-        safe = str(e) if isinstance(e, GateFailure) and re.fullmatch(r"[A-Z_]+", str(e)) else "UNCLASSIFIED_FAILURE"
+        safe = safe_failure(e)
         summary = failure_summary(e)
         # Write only to the already-created private directory; no path from error text.
         private = pathlib.Path(os.environ.get("MM_ROLLBACK_PRIVATE", ""))

@@ -41,6 +41,26 @@ class StaticSafety(unittest.TestCase):
         self.assertEqual(r.failure_summary(r.GateFailure("DATA_CHANGED"))["failure"],"DATA_CHANGED")
         self.assertEqual(r.failure_summary(r.GateFailure("secret string"))["failure"],"UNCLASSIFIED_FAILURE")
 
+    def test_pm2_literal_and_unexpected_codes(self):
+        self.assertEqual(r.safe_failure(r.GateFailure("PM2_OPERATION")),"PM2_OPERATION")
+        for value in ["PM2_OPERATION secret","PM2_OTHER123","TOKEN123","PM2_OPERATION\\nsecret"]:
+            self.assertEqual(r.safe_failure(r.GateFailure(value)),"UNCLASSIFIED_FAILURE")
+
+    def test_pm2_categories_are_bounded_and_redacted(self):
+        self.assertEqual(r.pm2_error_categories(b"EACCES /secret password=token",b""),["PERMISSION_DENIED"])
+        self.assertEqual(r.pm2_error_categories(b"x"*32768+b"EACCES",b""),["UNCLASSIFIED"])
+
+    def test_cleanup_cannot_replace_primary_failure(self):
+        def broken(): raise subprocess.TimeoutExpired(["secret"],35)
+        try:
+            raise r.GateFailure("PM2_OPERATION")
+        except r.GateFailure as original:
+            r.cleanup_preserving_failure(broken)
+            self.assertEqual(r.safe_failure(original),"PM2_OPERATION")
+            self.assertEqual(r.DIAGNOSTIC["pythonCleanup"],"FAILED")
+        with self.assertRaises(subprocess.TimeoutExpired):
+            r.cleanup_preserving_failure(broken)
+
     def test_path_rejections(self):
         for name, code in [("../x","ARCHIVE_PARENT"),("/x","ARCHIVE_PATH"),("C:x","ARCHIVE_PATH"),
                            ("x\\y","ARCHIVE_PATH"),("apps/api/.env","ARCHIVE_SECRET_PATH"),

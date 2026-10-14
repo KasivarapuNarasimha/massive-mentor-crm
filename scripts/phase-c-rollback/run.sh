@@ -14,46 +14,63 @@ tool=$(realpath "$(dirname "$0")")
 ! getent passwd mmrollback >/dev/null || exit 2
 chain="MMRB${GITHUB_RUN_ID}${GITHUB_RUN_ATTEMPT}"
 [[ ${#chain} -le 28 && $chain =~ ^MMRB[0-9]+$ ]] || exit 2
+uid=0
 created_user=0
 v4=0
 v6=0
 cleanup() {
-  status=$?
+  primary_status=$?
   trap - EXIT INT TERM
+  set +e
+  cleanup_status=0
+  process_status=NOT_CREATED
+  safe_to_remove=1
   if [[ $created_user == 1 ]]; then
     timeout 35 sudo -u mmrollback env -i PATH="$PATH" HOME="$MM_ROLLBACK_ROOT/home" PM2_HOME="$MM_ROLLBACK_ROOT/pm2-home" node "$MM_ROLLBACK_ROOT/pm2/node_modules/pm2/bin/pm2" kill > /dev/null 2>&1 || true
-    if [[ -n $(ps -u mmrollback -o pid= || true) ]]; then
-      [[ ${uid:-} =~ ^[0-9]+$ && $(id -u mmrollback) == "$uid" ]] || exit 1
+    owned=$(timeout 5 ps -u mmrollback -o pid= 2>/dev/null); ps_status=$?
+    if [[ $ps_status -le 1 && -n $owned && $uid -gt 0 && $(id -u mmrollback) == "$uid" ]]; then
       timeout 5 sudo pkill -KILL -u "$uid" || true
-      for n in 1 2 3 4 5; do [[ -z $(ps -u mmrollback -o pid= || true) ]] && break; sleep 1; done
-      # Keep network denial in place if an owned process cannot be eliminated.
-      [[ -z $(ps -u mmrollback -o pid= || true) ]] || exit 1
-      status=1
+      for n in 1 2 3 4 5; do
+        owned=$(timeout 5 ps -u mmrollback -o pid= 2>/dev/null); ps_status=$?
+        [[ $ps_status -le 1 && -z $owned ]] && break
+        sleep 1
+      done
     fi
+    if [[ $ps_status -le 1 && -z $owned ]]; then process_status=VERIFIED_ABSENT
+    else process_status=NOT_ESTABLISHED; cleanup_status=1; safe_to_remove=0; fi
   fi
-  if [[ $v4 == 1 ]]; then
-    sudo iptables -D OUTPUT -m owner --uid-owner "$uid" -j "$chain" || status=1
-    sudo iptables -F "$chain" || status=1
-    sudo iptables -X "$chain" || status=1
-  fi
-  if [[ $v6 == 1 ]]; then
-    sudo ip6tables -D OUTPUT -m owner --uid-owner "$uid" -j "$chain" || status=1
-    sudo ip6tables -F "$chain" || status=1
-    sudo ip6tables -X "$chain" || status=1
-  fi
-  MM_CLEANUP_STATUS="$status" MM_CLEANUP_USER="$created_user" python3 - <<'PYCLEAN'
+  firewall4=NOT_CREATED
+  firewall6=NOT_CREATED
+  for family in 4 6; do
+    active=$v4; command=iptables
+    [[ $family == 6 ]] && active=$v6 && command=ip6tables
+    outcome=NOT_CREATED
+    if [[ $active == 1 ]]; then
+      outcome=RETAINED
+      if [[ $safe_to_remove == 1 ]]; then
+        timeout 5 sudo "$command" -D OUTPUT -m owner --uid-owner "$uid" -j "$chain" || cleanup_status=1
+        timeout 5 sudo "$command" -F "$chain" || cleanup_status=1
+        timeout 5 sudo "$command" -X "$chain" || cleanup_status=1
+        listing=$(timeout 5 sudo "$command" -S 2>/dev/null); list_status=$?
+        if [[ $list_status == 0 && $listing != *"$chain"* ]]; then outcome=VERIFIED_ABSENT
+        else outcome=NOT_ESTABLISHED; cleanup_status=1; fi
+      fi
+    fi
+    [[ $family == 4 ]] && firewall4=$outcome || firewall6=$outcome
+  done
+  MM_CLEANUP_PRIMARY="$primary_status" MM_CLEANUP_RESULT="$cleanup_status" MM_CLEANUP_PROCESS="$process_status" MM_CLEANUP_V4="$firewall4" MM_CLEANUP_V6="$firewall6" python3 - <<'PYCLEAN'
 import json,os,pathlib
 p=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
-status=int(os.environ['MM_CLEANUP_STATUS'])
 (p/'cleanup-summary.json').write_text(json.dumps({
-    'exitCode':status,'cleanupReached':True,'freshUidCreated':os.environ['MM_CLEANUP_USER']=='1',
-    'ownedProcessesAndFirewall':'VERIFIED_REMOVED' if status==0 else 'NOT_ESTABLISHED',
-    'databaseCleanup':'SEE_SEPARATE_DATABASE_SUMMARY',
-    'containerCleanup':'GITHUB_RUNNER_TEARDOWN','productionAccess':False})+'\n')
+ 'primaryExitCode':int(os.environ['MM_CLEANUP_PRIMARY']),'cleanupExitCode':int(os.environ['MM_CLEANUP_RESULT']),
+ 'cleanupReached':True,'processes':os.environ['MM_CLEANUP_PROCESS'],
+ 'ipv4Firewall':os.environ['MM_CLEANUP_V4'],'ipv6Firewall':os.environ['MM_CLEANUP_V6'],
+ 'databaseCleanup':'SEE_SEPARATE_DATABASE_SUMMARY',
+ 'containerCleanup':'GITHUB_RUNNER_TEARDOWN','productionAccess':False})+'\n')
 PYCLEAN
-  # Hosted runner/service lifecycle removes its own container/anonymous volume after failure/timeout.
-  # No filesystem deletion, shared container removal, volume deletion or pruning.
-  exit "$status"
+  [[ $? == 0 ]] || cleanup_status=1
+  [[ $primary_status == 0 ]] || exit "$primary_status"
+  exit "$cleanup_status"
 }
 trap cleanup EXIT
 trap 'exit 130' INT

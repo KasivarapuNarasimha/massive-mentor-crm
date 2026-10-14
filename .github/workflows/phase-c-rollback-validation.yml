@@ -89,8 +89,8 @@ jobs:
           test "$(git rev-parse HEAD)" = a8a6edafa0a85c680625cedca24b9cd700d1af61
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
-          48efeb7fd9d6a591e952665f6c135e317f461c93099359542cd14710ba067e3c  ../tools/scripts/phase-c-rollback/rehearsal.py
-          c5ca5d5bd42abfb48550c401c30cf8c608acf4ab39156b2516d1fa1db5e9aed5  ../tools/scripts/phase-c-rollback/run.sh
+          b1126d443398a195c9fce0c166daf02e20f402dfd6a7234be55f25b97c8c524a  ../tools/scripts/phase-c-rollback/rehearsal.py
+          cbc5593815438abb16f5b094e33bf0e043d8e1b5b2d9f42b863fc0688bc9fe60  ../tools/scripts/phase-c-rollback/run.sh
           91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
           f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
           3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
@@ -200,7 +200,7 @@ jobs:
                                     stdout=log,stderr=subprocess.STDOUT,timeout=1010)
           text=(private/'runtime-private.log').read_text(errors='replace')
           for line in text.splitlines():
-              if re.fullmatch(r'MM_ROLLBACK_FAILURE:[A-Z_]+',line): print(line)
+              if re.fullmatch(r'MM_ROLLBACK_FAILURE:(?:[A-Z_]+|PM2_OPERATION)',line): print(line)
               # Failure JSON is preserved through the fixed allowlisted summary writer, not raw log printing.
           if result.returncode: raise SystemExit('Isolated rollback failed; raw log not uploaded')
           if not (private/'rollback-summary.json').is_file(): raise SystemExit('Rollback evidence absent')
