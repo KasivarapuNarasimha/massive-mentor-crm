@@ -36,11 +36,44 @@ def safe_failure(error):
 def pm2_error_categories(stdout, stderr):
     text=(stdout[:32768]+stderr[:32768]).decode("utf-8",errors="replace")
     signatures={"PERMISSION_DENIED":r"\b(?:EACCES|EPERM|Permission denied)\b",
+                "CWD_UNAVAILABLE":r"uv_cwd|getcwd",
                 "FILE_NOT_FOUND":r"\bENOENT\b|Script not found|Cannot find module",
                 "ADDRESS_IN_USE":r"\bEADDRINUSE\b",
                 "CONFIG_SYNTAX":r"SyntaxError|Malformed ecosystem|Unexpected token",
                 "DAEMON_CONNECTION":r"connect (?:ECONNREFUSED|ETIMEDOUT)|Cannot connect to daemon"}
     return [name for name,pattern in signatures.items() if re.search(pattern,text)] or ["UNCLASSIFIED"]
+
+def permission_probe(node, user, safeenv, root, active, pm2, config):
+    # Same UID, clean environment, node binary and inherited cwd as the PM2 command.
+    # No writes, socket connections, network probes or customer/config file reads.
+    aliases = [
+        ("RUNTIME_ROOT", root, 1), ("HOME", root/"home", 7),
+        ("PM2_HOME",root/"pm2-home",7), ("LOG_DIRECTORY",root/"logs",7),
+        ("NODE_BINARY",pathlib.Path(node),5), ("PM2_SCRIPT",pm2,4),
+        ("ECOSYSTEM_CONFIG",config,4), ("API_CWD",active/"apps/api",5),
+        ("WEB_CWD",active/"apps/web",5), ("API_ENTRY",active/"apps/api/dist/index.js",4),
+        ("WEB_ENTRY",active/"apps/web/node_modules/next/dist/bin/next",4)]
+    cwd=pathlib.Path.cwd()
+    aliases.extend(("INHERITED_CWD" if i==0 else "CWD_PARENT_"+str(i),path,1)
+                   for i,path in enumerate([cwd,*list(cwd.parents)[:6]]))
+    targets=[{"alias":a,"path":str(p),"mask":mask} for a,p,mask in aliases]
+    script=pathlib.Path(__file__).with_name("permission-probe.cjs").read_text()
+    result=subprocess.run(["sudo","-u",user,"env","-i",*[k+"="+v for k,v in safeenv.items()],
+                           node,"-e",script,json.dumps(targets)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+    if result.returncode: return {"probe":"FAILED","exitCode":result.returncode}
+    data=json.loads(result.stdout[:32768])
+    codes={"ACCESSIBLE","EACCES","EPERM","ENOENT","ENOTDIR","ELOOP","ENAMETOOLONG","UNCLASSIFIED"}
+    permitted={a for a,_,_ in aliases}
+    if (set(data)!={"uid","gid","cwd","targets"} or data["cwd"] not in codes
+            or any(type(data[k]) is not int or data[k]<0 for k in ("uid","gid"))
+            or type(data["targets"]) is not list or len(data["targets"])!=len(aliases)):
+        return {"probe":"REJECTED"}
+    for row in data["targets"]:
+        if (set(row)!={"alias","access","mode","ownerUid","ownerGid"}
+                or row["alias"] not in permitted or row["access"] not in codes
+                or any(row[k] is not None and (type(row[k]) is not int or row[k]<0) for k in ("mode","ownerUid","ownerGid"))):
+            return {"probe":"REJECTED"}
+    return data
 
 def cleanup_preserving_failure(action):
     primary=sys.exc_info()[1]
@@ -277,6 +310,10 @@ def runtime(private):
             config.write_text("module.exports=" + json.dumps(cfg) + ";\n")
             config.chmod(0o644)
             phase(label.upper() + "_PM2_START")
+            try:
+                DIAGNOSTIC["permissionBoundary"]=permission_probe(node,user,safeenv,root,active,pm2,config)
+            except BaseException:
+                DIAGNOSTIC["permissionBoundary"]={"probe":"UNAVAILABLE"}
             pm(["start", str(config), "--env", "production"])
             phase(label.upper() + "_HTTP_HEALTH")
             deadline = time.monotonic() + 75

@@ -115,7 +115,7 @@ jobs:
           test "$(git rev-parse HEAD)" = a8a6edafa0a85c680625cedca24b9cd700d1af61
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
-          b1126d443398a195c9fce0c166daf02e20f402dfd6a7234be55f25b97c8c524a  ../tools/scripts/phase-c-rollback/rehearsal.py
+          eba55701c7843c14ea03c666ae68eaf9a7c792d40d6b763dfb79ade85d3ce354  ../tools/scripts/phase-c-rollback/rehearsal.py
           cbc5593815438abb16f5b094e33bf0e043d8e1b5b2d9f42b863fc0688bc9fe60  ../tools/scripts/phase-c-rollback/run.sh
           91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
           f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
@@ -123,6 +123,7 @@ jobs:
           1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
           31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
           24a3eba1671be2014365a29d2264628fe83f93ddfa332895ad6178147d32bd08  apps/api/prisma/migrations/20260907120000_import_batch/migration.sql
+          286623af639b065355b6757ff2362df7450018a818787d80acb51f3e169259e3  ../tools/scripts/phase-c-rollback/permission-probe.cjs
           HASHES
           python3 docs/phase-c-review/validation/concurrency.py --storage-only "$MM_PHASEC_CONTAINER_ID"
           python3 - <<'PY'
