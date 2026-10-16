@@ -44,7 +44,8 @@ def pm2_error_categories(stdout, stderr):
     return [name for name,pattern in signatures.items() if re.search(pattern,text)] or ["UNCLASSIFIED"]
 
 def permission_probe(node, user, safeenv, root, active, pm2, config):
-    # Same UID, clean environment, node binary and inherited cwd as the PM2 command.
+    # Same UID, clean environment, node binary and private runtime cwd as PM2.
+    # Keep probing the caller checkout separately to retain denied-path evidence.
     # No writes, socket connections, network probes or customer/config file reads.
     aliases = [
         ("RUNTIME_ROOT", root, 1), ("HOME", root/"home", 7),
@@ -59,7 +60,7 @@ def permission_probe(node, user, safeenv, root, active, pm2, config):
     targets=[{"alias":a,"path":str(p),"mask":mask} for a,p,mask in aliases]
     script=pathlib.Path(__file__).with_name("permission-probe.cjs").read_text()
     result=subprocess.run(["sudo","-u",user,"env","-i",*[k+"="+v for k,v in safeenv.items()],
-                           node,"-e",script,json.dumps(targets)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+                           node,"-e",script,json.dumps(targets)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10,cwd=root)
     if result.returncode: return {"probe":"FAILED","exitCode":result.returncode}
     data=json.loads(result.stdout[:32768])
     codes={"ACCESSIBLE","EACCES","EPERM","ENOENT","ENOTDIR","ELOOP","ENAMETOOLONG","UNCLASSIFIED"}
@@ -279,7 +280,7 @@ def runtime(private):
     def pm(args, allow_failure=False):
         cmd = ["sudo", "-u", user, "env", "-i", *[k + "=" + v for k, v in safeenv.items()], node, str(pm2), *args]
         DIAGNOSTIC["operation"] = "PM2_" + args[0].upper()
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=35)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=35, cwd=root)
         DIAGNOSTIC["exitCode"] = result.returncode
         DIAGNOSTIC["pm2"] = "COMMAND_OK" if result.returncode == 0 else "COMMAND_FAILED"
         if result.returncode:

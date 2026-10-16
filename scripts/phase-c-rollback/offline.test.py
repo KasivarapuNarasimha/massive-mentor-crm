@@ -124,5 +124,57 @@ class StaticSafety(unittest.TestCase):
             root=pathlib.Path(d);extra=tarfile.TarInfo("package.json")
             self.rejected("DUPLICATE_TAR_ENTRY",lambda:r.verify_bundle(self.archive(root,extra),root/"out",r.SOURCE))
 
+
+    def pm_boundary(self):
+        import ast
+        source=pathlib.Path(r.__file__).read_text()
+        fn=next(n for n in ast.walk(ast.parse(source)) if isinstance(n,ast.FunctionDef) and n.name=='pm')
+        root=pathlib.Path('/tmp/mm-rollback-synthetic')
+        namespace={**vars(r),'root':root,'user':'mmrollback','node':'/synthetic/node',
+                   'pm2':root/'pm2/node_modules/pm2/bin/pm2','safeenv':{'MM_SAFE_STARTUP':'1'}}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[fn],type_ignores=[])),'actual-pm-boundary','exec'),namespace)
+        return namespace['pm'],root
+
+    def test_pm_commands_use_private_cwd_and_retain_uid_clean_env_timeout(self):
+        pm,root=self.pm_boundary()
+        for args in [['start','synthetic-config','--env','production'],['jlist'],['delete','all'],['kill']]:
+            with self.subTest(operation=args[0]), patch.object(r.subprocess,'run',return_value=subprocess.CompletedProcess([],0,b'[]',b'')) as run:
+                pm(args)
+                command=run.call_args.args[0]
+                self.assertEqual(command[:5],['sudo','-u','mmrollback','env','-i'])
+                self.assertIn('MM_SAFE_STARTUP=1',command)
+                self.assertEqual(run.call_args.kwargs['cwd'],root)
+                self.assertEqual(run.call_args.kwargs['timeout'],35)
+
+    def test_pm_failure_remains_fail_closed_after_cwd_change(self):
+        pm,_=self.pm_boundary()
+        with patch.object(r.subprocess,'run',return_value=subprocess.CompletedProcess([],1,b'',b'EACCES synthetic')):
+            self.rejected('PM2_OPERATION',lambda:pm(['start','synthetic-config','--env','production']))
+        self.assertEqual(r.DIAGNOSTIC['exitCode'],1)
+        self.assertEqual(r.DIAGNOSTIC['pm2ErrorCategories'],['PERMISSION_DENIED'])
+
+    def test_permission_probe_uses_same_private_cwd_without_disclosing_paths(self):
+        root=pathlib.Path('/tmp/mm-rollback-synthetic')
+        with patch.object(r.subprocess,'run',return_value=subprocess.CompletedProcess([],7,b'',b'SECRET')) as run:
+            result=r.permission_probe('/synthetic/node','mmrollback',{'MM_SAFE_STARTUP':'1'},root,root/'active',root/'pm2-script',root/'config')
+        self.assertEqual(run.call_args.kwargs['cwd'],root)
+        self.assertEqual(run.call_args.kwargs['timeout'],10)
+        self.assertEqual(run.call_args.args[0][:5],['sudo','-u','mmrollback','env','-i'])
+        self.assertEqual(result,{'probe':'FAILED','exitCode':7})
+        self.assertNotIn('SECRET',json.dumps(result))
+
+    def test_cleanup_pm2_uses_scoped_subshell_cwd(self):
+        text=pathlib.Path(__file__).with_name('run.sh').read_text()
+        self.assertIn('(cd -- "$MM_ROLLBACK_ROOT" && timeout 35 sudo -u mmrollback env -i',text)
+        self.assertIn('kill) > /dev/null 2>&1 || true',text)
+        self.assertIn('[[ $primary_status == 0 ]] || exit "$primary_status"',text)
+
+    def test_original_rollback_assertions_are_ast_identical(self):
+        import ast
+        tree=ast.parse(pathlib.Path(r.__file__).read_text())
+        checks=[ast.dump(n) for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=='require']
+        self.assertEqual(hashlib.sha256('\n'.join(checks).encode()).hexdigest(),
+                         'bb81503d5e4104bff79c13d1e12de8e0adf7e72c73bc885a3a5bf90f9b7da30c')
+
 if __name__ == "__main__":
     unittest.main()

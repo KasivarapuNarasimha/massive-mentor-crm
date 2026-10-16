@@ -26,7 +26,7 @@ cleanup() {
   process_status=NOT_CREATED
   safe_to_remove=1
   if [[ $created_user == 1 ]]; then
-    timeout 35 sudo -u mmrollback env -i PATH="$PATH" HOME="$MM_ROLLBACK_ROOT/home" PM2_HOME="$MM_ROLLBACK_ROOT/pm2-home" node "$MM_ROLLBACK_ROOT/pm2/node_modules/pm2/bin/pm2" kill > /dev/null 2>&1 || true
+    (cd -- "$MM_ROLLBACK_ROOT" && timeout 35 sudo -u mmrollback env -i PATH="$PATH" HOME="$MM_ROLLBACK_ROOT/home" PM2_HOME="$MM_ROLLBACK_ROOT/pm2-home" node "$MM_ROLLBACK_ROOT/pm2/node_modules/pm2/bin/pm2" kill) > /dev/null 2>&1 || true
     owned=$(timeout 5 ps -u mmrollback -o pid= 2>/dev/null); ps_status=$?
     if [[ $ps_status -le 1 && -n $owned && $uid -gt 0 && $(id -u mmrollback) == "$uid" ]]; then
       timeout 5 sudo pkill -KILL -u "$uid" || true

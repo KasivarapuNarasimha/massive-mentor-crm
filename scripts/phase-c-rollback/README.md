@@ -62,3 +62,36 @@ Authoritative action pins:
 - https://registry.npmjs.org/pm2/6.0.8
 
 GitHub job service context is bound at step level (not job env), validated and exported for later steps. This matches https://docs.github.com/en/actions/reference/workflows-and-actions/contexts. Static parsing is not GitHub server validation or database execution.
+
+
+## Reviewed run 38706010859: private working-directory correction
+
+The downloaded evidence ZIP matches GitHub artifact 11958792074's published SHA-256
+`36a6a00c6eebf1c9c15ed9dda8edb23a1cb4c274bfb5b32a83d908c3654cb511`.
+ZIP CRC and candidate/fallback tar checksums also passed offline inspection.
+The diagnostic records UID 999/GID 987, accessible runtime/Node/PM2/app paths,
+and EACCES for the inherited checkout and ancestors. CWD_PARENT_4 is owned by
+UID/GID 1001 with mode 0750. Returning process.cwd() successfully is not proof
+that the UID can traverse that pathname. No retained raw PM2 syscall/path error
+identifies its exact internal operation, and the historical runner is gone.
+
+The workflow runs the helper with working-directory: source. The pinned checkout
+action creates the checkout with mkdirP; it does not establish a traversal grant
+for the later isolated UID. The exact provisioning command that set the denied
+ancestor's mode was not retained. Do not attribute it to the shell's umask alone.
+
+The correction sets explicit cwd=root for every PM2 subprocess and its same-UID
+permission probe, and uses a scoped cd to that private root for shell cleanup.
+Caller checkout-path probes remain in the diagnostics. No access permissions,
+UID, firewall rules, environment isolation, timeout, health/data assertions or
+cleanup-primary-failure handling are relaxed. Existing runtime ownership setup
+is unchanged; no recursive chmod/chown is added by this correction.
+
+Offline tests exercise the actual nested PM2 boundary with mocked subprocesses,
+all operation cwd settings, failure propagation, probe cwd, cleanup scope and a
+frozen AST digest of every original require assertion. They do not prove Linux
+PM2 runtime success. Merge/publication and another manually dispatched disposable
+run require their applicable authorizations; this patch does not dispatch one.
+Both exact same-snapshot sealing scenarios and commercial email/browser E2E
+remain UNVERIFIED. The subsequently user-confirmed production password-reset
+email is not evidence for isolated commercial quotation/OTP browser validation.

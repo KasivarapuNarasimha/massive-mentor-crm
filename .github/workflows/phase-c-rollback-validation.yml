@@ -115,8 +115,8 @@ jobs:
           test "$(git rev-parse HEAD)" = a8a6edafa0a85c680625cedca24b9cd700d1af61
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
-          eba55701c7843c14ea03c666ae68eaf9a7c792d40d6b763dfb79ade85d3ce354  ../tools/scripts/phase-c-rollback/rehearsal.py
-          cbc5593815438abb16f5b094e33bf0e043d8e1b5b2d9f42b863fc0688bc9fe60  ../tools/scripts/phase-c-rollback/run.sh
+          d9b7b8dd74a4fc916e5c555e007faa6a8eb1d8cec5c2f7712d586f06d739c482  ../tools/scripts/phase-c-rollback/rehearsal.py
+          ec2ff6c1875b4e2e8b71fe222b76c9aabe2e2ec10823f5dabbbe6dfdb8dd04f9  ../tools/scripts/phase-c-rollback/run.sh
           91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
           f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
           3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
