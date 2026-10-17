@@ -169,6 +169,42 @@ class StaticSafety(unittest.TestCase):
         self.assertIn('kill) > /dev/null 2>&1 || true',text)
         self.assertIn('[[ $primary_status == 0 ]] || exit "$primary_status"',text)
 
+    def test_quotation_http_status_is_bounded_and_body_is_not_diagnostic(self):
+        from unittest.mock import MagicMock
+        for status in [200, 307, 401, 403, 404, 500, 600, "SECRET"]:
+            r.DIAGNOSTIC.clear()
+            response=MagicMock()
+            response.__enter__.return_value=response
+            response.status=status
+            response.read.return_value=b"SECRET_BODY"
+            opener=MagicMock()
+            opener.open.return_value=response
+            with patch.object(r.urllib.request,'build_opener',return_value=opener):
+                self.assertEqual(r.http(4000,'/api/quotations'),(status,b"SECRET_BODY"))
+            self.assertEqual(r.DIAGNOSTIC['operation'],'HTTP_QUOTATION_AUTH')
+            self.assertEqual(r.DIAGNOSTIC['quotationStatus'],status if type(status) is int and 100 <= status <= 599 else None)
+            self.assertNotIn('SECRET',json.dumps(r.failure_summary(r.GateFailure('STRICT_HTTP_AUTH_BOUNDARY'))))
+            self.assertEqual(opener.open.call_args.kwargs['timeout'],3)
+
+    def test_quotation_http_error_captures_only_status(self):
+        for status in [401,403,404,500]:
+            r.DIAGNOSTIC.clear()
+            error=r.urllib.error.HTTPError('http://synthetic',status,'SECRET_MESSAGE',{},io.BytesIO(b'SECRET_BODY'))
+            with patch.object(r.urllib.request,'build_opener') as build:
+                build.return_value.open.side_effect=error
+                self.assertEqual(r.http(4000,'/api/quotations'),(status,b'SECRET_BODY'))
+            error.close()
+            self.assertEqual(r.DIAGNOSTIC['quotationStatus'],status)
+            self.assertNotIn('SECRET',json.dumps(r.DIAGNOSTIC))
+
+    def test_other_http_paths_do_not_record_request_details(self):
+        r.DIAGNOSTIC.clear()
+        with patch.object(r.urllib.request,'build_opener') as build:
+            build.return_value.open.side_effect=TimeoutError('SECRET')
+            with self.assertRaises(TimeoutError):
+                r.http(4000,'/unlisted')
+        self.assertEqual(r.DIAGNOSTIC,{})
+
     def test_original_rollback_assertions_are_ast_identical(self):
         import ast
         tree=ast.parse(pathlib.Path(r.__file__).read_text())

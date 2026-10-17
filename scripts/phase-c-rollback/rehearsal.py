@@ -242,11 +242,19 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 def http(port, path):
+    quotation_check = port == 4000 and path == "/api/quotations"
+    if quotation_check:
+        DIAGNOSTIC["operation"] = "HTTP_QUOTATION_AUTH"
+        DIAGNOSTIC["quotationStatus"] = None
     try:
         with urllib.request.build_opener(NoRedirect()).open("http://127.0.0.1:" + str(port) + path, timeout=3) as r:
-            return r.status, r.read(1048576)
+            status, body = r.status, r.read(1048576)
     except urllib.error.HTTPError as e:
-        return e.code, e.read(1048576)
+        status, body = e.code, e.read(1048576)
+    if quotation_check and type(status) is int and 100 <= status <= 599:
+        DIAGNOSTIC["quotationStatus"] = status
+    return status, body
+
 
 def runtime(private):
     require(sys.platform == "linux" and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted" and os.environ.get("MM_ROLLBACK_AUTHORIZED") == "YES", "EXECUTION_NOT_AUTHORIZED")
