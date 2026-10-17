@@ -1,0 +1,54 @@
+# PROPOSAL ONLY. This file is intentionally outside .github/workflows.
+# GitHub will not register or run it until it is moved there after explicit approval.
+# Default dispatch performs shape checks only. It does not send mail, open a browser,
+# create secrets, migrate production, or start PostgreSQL.
+name: Phase C live customer workflow proposal
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: preflight checks names only; postgres and live remain disabled until a later approval
+        type: choice
+        required: true
+        default: preflight
+        options: [preflight]
+permissions:
+  contents: read
+concurrency:
+  group: phase-c-live-proposal
+  cancel-in-progress: false
+jobs:
+  preflight:
+    if: inputs.stage == 'preflight'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: phase-c-live
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: KasivarapuNarasimha/massive-mentor-crm
+          ref: b1d5935325edfdad27827b27f44de340bde98ca0
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Check live settings are present without printing them
+        shell: bash
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          COMMERCIAL_PUBLIC_URL: ${{ secrets.COMMERCIAL_PUBLIC_URL }}
+          COMMERCIAL_DELIVERY_KEY: ${{ secrets.COMMERCIAL_DELIVERY_KEY }}
+          MM_PHASEC_TEST_MAILBOX: ${{ secrets.MM_PHASEC_TEST_MAILBOX }}
+          MM_PHASEC_MAILBOX_MODE: ${{ vars.MM_PHASEC_MAILBOX_MODE }}
+          IMAP_HOST: ${{ secrets.IMAP_HOST }}
+          IMAP_PORT: ${{ secrets.IMAP_PORT }}
+          IMAP_USER: ${{ secrets.IMAP_USER }}
+          IMAP_PASS: ${{ secrets.IMAP_PASS }}
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          test "$(git rev-parse HEAD)" = b1d5935325edfdad27827f44de340bde98ca0
+          node apps/api/scripts/phase-c-live-preflight.cjs
