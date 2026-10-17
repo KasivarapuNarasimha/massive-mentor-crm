@@ -35,6 +35,22 @@ The SQL/application harness uses only a fresh run-specific GitHub-hosted Postgre
 The two originally requested competing same-snapshot sealing trigger-lock orderings remain UNVERIFIED. A newly inserted unsealed snapshot cannot survive commit, and an independent transaction cannot see it before commit. Executed tests prove those visibility rejections, post-seal insertion rejection and actual service send/edit lock races; they do not masquerade as the two requested trigger-order tests. Do not disable the completeness trigger or use an invalid shared fixture merely to obtain a PASS.
 SMTP deliverability and browser interaction against the deployed full flow remain unverified. The UI production build is not a browser E2E test. No production database, migrations or deployment was accessed/executed.
 
+## 2026-10-17 sealed PDF and Unpaid label checkpoint
+
+Worktree `codex/phase-c-release-candidate` at `a8a6edafa0a85c680625cedca24b9cd700d1af61`, plus uncommitted PDF/label changes. Original checkout `C:\Users\acer\massive-mentor` was not edited. No production access, migration, deployment, or connection to the local PostgreSQL service.
+
+Added an in-memory pdfkit quotation PDF from a reconciled sealed snapshot. The renderer recomputes totals with `calculateCommercialQuote` and fails closed on mismatch. It prints the quotation number, customer name, company, and pricing only. Staff download is `GET /api/quotations/:id/snapshots/:snapshotId/pdf` after `quotation.read`, visibility, and item reconciliation. Customer download is `POST /api/quotation-customer/pdf` with the token in the JSON body. Issued invoices still store Finance status `sent`; API and commercial UI now show the display label Unpaid.
+
+Local commands and results, Node v24.16.0:
+
+- `node --test` on commercial-foundation, commercial-pricing, commercial-document, commercial-customer, commercial-pdf, restore-safety, lead-assignment-safety, strict-business-resolution, strict-module-authorization, and release-lint-regression: 337 passed, 0 failed, 0 skipped, 39947 ms. Pricing tests were not rewritten. The new PDF file contributed 6 passing tests, including secret exclusion, malformed totals, authorization denial before snapshot read, and foreign/unsealed rejection.
+- API `tsc --noEmit --incremental false`: PASS. API `tsc -p tsconfig.json --incremental false` plus `node scripts/ensure-dist-esm.mjs`: PASS, 243 files scanned, 0 replacements.
+- API `eslint src`: PASS, zero errors. Web `next lint` on `app/commercial/page.tsx` and `app/quotation/[token]/page.tsx`: no warnings or errors.
+- Web `tsc --noEmit --incremental false`: PASS. `next build` with `NEXT_TELEMETRY_DISABLED=1` and `NEXT_PUBLIC_API_URL=http://127.0.0.1:1/api`: PASS, 63/63 pages. Existing unrelated hook/ARIA warnings remain. `/commercial` and `/quotation/[token]` are in the route list.
+- `git diff --check`: PASS. Prisma `validate` with `DATABASE_URL=postgresql://invalid:invalid@127.0.0.1:1/invalid`: schema valid. No migration was applied.
+
+`commercial-workflow-postgres.test.cjs` was not executed. It refuses to start unless `GITHUB_ACTIONS=true`, `RUNNER_ENVIRONMENT=github-hosted`, and `MM_PHASEC_DISPOSABLE=YES`. Fresh disposable PostgreSQL concurrency, real SMTP delivery, and browser OTP/PDF use remain BLOCKED. Prior run 38135754511 (31/31 on source `541bcc5`) is not evidence for this dirty tree. The two same-visible-unsealed sealing orderings remain UNVERIFIED. Delivery decision for this checkpoint: NOT READY.
+
 ## Controlled deployment and rollback gate
 Repository PM2 configuration: deploy/ecosystem.config.cjs runs massive-mentor-api from apps/api/dist/index.js on 4000, and massive-mentor-web via next start on 3000, one instance each. deploy/nginx.conf is the reverse proxy. deploy/deploy.sh is forbidden: its migrate deploy fallback executes db push.
 

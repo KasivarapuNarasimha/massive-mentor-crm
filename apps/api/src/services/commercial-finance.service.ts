@@ -3,6 +3,14 @@ import { authorize,transaction,mutate,audit,type QuoteActor } from "./quotation.
 import { CommercialDocumentError,object,id,text } from "./commercial-document.service.js";
 import { parseCommercialDecimal } from "../lib/commercial-money.js";
 type Tx=Prisma.TransactionClient;
+/** Display label only. Stored Finance status remains sent/paid/overdue/cancelled. */
+export function commercialInvoiceStatusLabel(status:string){
+ if(status==="sent")return "Unpaid";
+ if(status==="paid")return "Paid";
+ if(status==="overdue")return "Overdue";
+ if(status==="cancelled")return "Cancelled";
+ throw new CommercialDocumentError("COMMERCIAL_INVOICE_STATUS_INVALID",409);
+}
 export function financialBalance(total:string,entries:{id:string;amount:string;reversalOfId:string|null;paidAt:Date}[],dueDate:Date|null,now=new Date()){
  const money=(v:string)=>parseCommercialDecimal(v,"money"),value=money(total);let paid=new Prisma.Decimal(0);
  const originals=new Map(entries.filter(e=>!e.reversalOfId).map(e=>[e.id,e]));const reversed=new Set<string>();
@@ -33,7 +41,7 @@ async function balance(tx:Tx,actor:QuoteActor,invoice:{id:string;total:Prisma.De
 }
 export async function getCommercialInvoice(actor:QuoteActor,invoiceId:string){return transaction(async tx=>{
  await authorize(tx,actor,"invoice.read");await authorize(tx,actor,"payment.read");const {invoice,conversion}=await invoiceScope(tx,actor,invoiceId),b=await balance(tx,actor,invoice);
- return {id:invoice.id,number:invoice.number,quotationId:conversion.quotationId,revisionId:conversion.revisionId,currency:invoice.currency,amount:invoice.amount.toFixed(2),taxAmount:invoice.taxAmount.toFixed(2),...b.result,customer:conversion.customerSnapshot,pricing:conversion.pricingSnapshot,history:b.entries.map(e=>({...e,amount:e.amount.toFixed(2)}))};
+ return {id:invoice.id,number:invoice.number,quotationId:conversion.quotationId,revisionId:conversion.revisionId,currency:invoice.currency,amount:invoice.amount.toFixed(2),taxAmount:invoice.taxAmount.toFixed(2),...b.result,statusLabel:commercialInvoiceStatusLabel(b.result.status),customer:conversion.customerSnapshot,pricing:conversion.pricingSnapshot,history:b.entries.map(e=>({...e,amount:e.amount.toFixed(2)}))};
 });}
 export async function recordCommercialPayment(actor:QuoteActor,invoiceId:string,key:unknown,input:unknown){
  const row=object(input,["amount","method","reference","notes","paidAt"]),amount=parseCommercialDecimal(row.amount,"money").toFixed(2),method=id(row.method);
@@ -70,6 +78,6 @@ export async function commercialReport(actor:QuoteActor,cursor?:string){return t
  await authorize(tx,actor,"invoice.read");await authorize(tx,actor,"payment.read");
  const rows=await tx.quotationInvoiceConversion.findMany({where:{businessId:actor.businessId},orderBy:{id:"asc"},take:51,...(cursor?{cursor:{id:cursor},skip:1}: {})});
  const page=rows.slice(0,50),items=[];
- for(const row of page){const {invoice}=await invoiceScope(tx,actor,row.invoiceId),b=await balance(tx,actor,invoice);items.push({invoiceId:invoice.id,number:invoice.number,quotationId:row.quotationId,currency:invoice.currency,dueDate:invoice.dueDate,...b.result});}
+ for(const row of page){const {invoice}=await invoiceScope(tx,actor,row.invoiceId),b=await balance(tx,actor,invoice);items.push({invoiceId:invoice.id,number:invoice.number,quotationId:row.quotationId,currency:invoice.currency,dueDate:invoice.dueDate,...b.result,statusLabel:commercialInvoiceStatusLabel(b.result.status)});}
  return {items,nextCursor:rows.length>50?page[page.length-1].id:null};
 });}

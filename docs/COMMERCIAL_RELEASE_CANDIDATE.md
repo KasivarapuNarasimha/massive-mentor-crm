@@ -21,6 +21,10 @@ Merged Prisma validation passed with a dummy nonconnecting URL. Isolated generat
 
 Real email delivery and full browser E2E remain PENDING: no approved non-production SMTP/test recipient is configured. No production secrets or database used.
 
+## 2026-10-17 local checkpoint
+
+Uncommitted sealed quotation PDF and Finance `sent` → display label Unpaid. Offline regression on this dirty tree: 337 passed, 0 failed, 0 skipped. API/Web typecheck, API ESLint, changed-page lint, Prisma validate, API emit, and web production build passed. Details and the NOT READY decision are in `docs/COMMERCIAL_PHASEC_APPLICATION.md`. Run 38135754511 remains the last disposable PostgreSQL evidence and does not cover this diff. No production operation.
+
 ## Controlled release procedure (design only; not executed)
 
 1. Review immutable release commit/artifact hashes and reverify current deployed baseline before writes. Review ImportBatch/client and all safety preservation. Confirm policy/grants/trusted currency/timezone and dedicated commercial delivery configuration separately; never seed grants.

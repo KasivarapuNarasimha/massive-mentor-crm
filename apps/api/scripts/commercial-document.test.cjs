@@ -13,7 +13,7 @@ function loader(overrides={}) {
       if(name==="@prisma/client")return {Prisma};
       if(name.startsWith("node:"))return require(name);
       if(name.startsWith("."))return load(path.relative(path.resolve(__dirname,"../src"),path.resolve(path.dirname(file),name.replace(/\.js$/, ".ts"))));
-      if(name==="express")return req(name);
+      if(name==="express"||name==="pdfkit")return req(name);
       throw Error("Unexpected dependency "+name);
     },module,module.exports);
     cache.set(file,module.exports);return module.exports;

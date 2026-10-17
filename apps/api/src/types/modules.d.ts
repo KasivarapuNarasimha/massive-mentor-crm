@@ -12,6 +12,8 @@ declare module "pdfkit" {
     layout?: "portrait" | "landscape";
     bufferPages?: boolean;
     autoFirstPage?: boolean;
+    /** pdfkit flate-compresses content streams unless this is false. */
+    compress?: boolean;
     info?: Record<string, string>;
   }
 

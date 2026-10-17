@@ -5,7 +5,7 @@ import { requireCommercialBillingAccess } from "../middleware/requireCommercialB
 import { CommercialAccessError } from "../services/commercial-access.service.js";
 import { CommercialDocumentError, id } from "../services/commercial-document.service.js";
 import { CommercialValueError } from "../lib/commercial-money.js";
-import { createQuotation, editQuotationDraft, getQuotation, listQuotations, requestQuotationApproval } from "../services/quotation.service.js";
+import { createQuotation, editQuotationDraft, getQuotation, listQuotations, quotationSnapshotPdf, requestQuotationApproval } from "../services/quotation.service.js";
 import { getCommercialConfiguration,setCommercialConfiguration } from "../services/commercial-configuration.service.js";
 import { sendQuotation,cancelQuotationDelivery } from "../services/quotation-customer.service.js";
 import type { CommercialAction } from "../services/commercial-policy.js";
@@ -40,6 +40,18 @@ quotationRouter.get("/",...gate("quotation.read"),handle(req=>listQuotations(act
 quotationRouter.post("/",...gate("quotation.create"),handle(req=>createQuotation(actor(req),key(req),req.body),201));
 quotationRouter.get("/configuration",...gate("commercial.policy.manage"),handle(req=>getCommercialConfiguration(actor(req))));
 quotationRouter.patch("/configuration",...gate("commercial.policy.manage"),handle(req=>setCommercialConfiguration(actor(req),key(req),req.body)));
+quotationRouter.get("/:id/snapshots/:snapshotId/pdf",...gate("quotation.read"),async(req:AuthenticatedRequest,res:Response)=>{
+  try {
+    const file=await quotationSnapshotPdf(actor(req),id(req.params.id),id(req.params.snapshotId));
+    res.set({"Content-Type":"application/pdf","Content-Disposition":`attachment; filename="${file.filename}"`,"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});
+    return res.send(file.bytes);
+  } catch(error) {
+    if(error instanceof CommercialDocumentError) return res.status(error.status).json({success:false,code:error.code});
+    if(error instanceof CommercialAccessError) return res.status(403).json({success:false,code:error.code});
+    if(error instanceof CommercialValueError) return res.status(422).json({success:false,code:"INVALID_COMMERCIAL_VALUE"});
+    return res.status(500).json({success:false,code:"COMMERCIAL_OPERATION_FAILED"});
+  }
+});
 quotationRouter.get("/:id",...gate("quotation.read"),handle(req=>getQuotation(actor(req),id(req.params.id))));
 quotationRouter.patch("/:id",...gate("quotation.update"),handle(req=>editQuotationDraft(actor(req),id(req.params.id),key(req),req.body)));
 quotationRouter.post("/:id/revisions",...gate("quotation.update"),handle(req=>editQuotationDraft(actor(req),id(req.params.id),key(req),req.body,true),201));

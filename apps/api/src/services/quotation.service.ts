@@ -6,6 +6,7 @@ import { COMMERCIAL_PRICING_VERSION } from "./commercial-pricing.service.js";
 import { CommercialDocumentError, object, text, id, canonical, contentHash, COMMERCIAL_HASH_VERSION,
   parseCommercialConfiguration, commercialYear, normalizeQuoteInput, normalizeQuoteRequest, approvalRequired, reconcileCommercialSnapshot } from "./commercial-document.service.js";
 import { moduleForCommercialAction, type CommercialAction } from "./commercial-policy.js";
+import { quotationPdfFilename, quotationPdfSource, renderSealedQuotationPdf } from "./commercial-quotation-pdf.js";
 import { getStrictRequestContext, runWithStrictBusinessContext } from "./strict-request-context.service.js";
 import type { LeadWriteContext } from "./tenant-scope.service.js";
 
@@ -280,5 +281,22 @@ export async function requestQuotationApproval(actor:QuoteActor,quotationId:stri
     await tx.quotationApprovalHistory.create({data:{businessId:actor.businessId,snapshotId,actorUserId:actor.userId,event:state,reason,metadata:{policyVersion:current.version,policyHash:contentHash(current),contentHash:snap.contentHash}}});
     await audit(tx,actor,quote.id,snapshotId,"quotation.approval."+state,{reason,revisionId:revision.id});
     return {quotationId:quote.id,revisionId:revision.id,snapshotId,version:expected+1,revisionVersion:revision.version,approvalState:state};
+  });
+}
+
+/** Authorized download of one sealed snapshot. Customer links and tokens are not part of the file. */
+export async function quotationSnapshotPdf(actor:QuoteActor,quotationId:string,snapshotId:string) {
+  return transaction(async tx=>{
+    const context=await authorize(tx,actor,"quotation.read");
+    const quote=await tx.quotation.findFirst({where:{id:quotationId,businessId:actor.businessId}});
+    if(!quote) throw new CommercialDocumentError("QUOTATION_NOT_FOUND",404);
+    const snap=await tx.quotationPricingSnapshot.findFirst({where:{id:snapshotId,businessId:actor.businessId}});
+    if(!snap?.sealedAt) throw new CommercialDocumentError("QUOTATION_SNAPSHOT_CONFLICT",409);
+    const revision=await tx.quotationRevision.findFirst({where:{id:snap.revisionId,businessId:actor.businessId,quotationId:quote.id}});
+    if(!revision) throw new CommercialDocumentError("QUOTATION_SNAPSHOT_CONFLICT",409);
+    await visible(tx,context,quote,revision);
+    const verified=await reconcileStoredItems(tx,snap);
+    const bytes=await renderSealedQuotationPdf(quotationPdfSource(verified),snap.canonicalInput);
+    return {filename:quotationPdfFilename(String(verified.envelope.quotationNumber)),bytes};
   });
 }

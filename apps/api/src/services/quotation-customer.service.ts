@@ -4,6 +4,7 @@ import { authorize,authorizeInvoiceIssuer,transaction,mutate,audit,reconcileStor
 import { CommercialDocumentError,object,id,text,canonical,parseCommercialConfiguration,approvalRequired } from "./commercial-document.service.js";
 import { deliveryPolicy,encryptDelivery,decryptDelivery,randomLink,tokenHash,newOtp,otpHash,verifyOtpHash,customerLink,sendCommercialEmail } from "./commercial-delivery.service.js";
 import { nextFinanceInvoiceNumber } from "./invoice-sequence.service.js";
+import { quotationPdfFilename, quotationPdfSource, renderSealedQuotationPdf } from "./commercial-quotation-pdf.js";
 type Tx=Prisma.TransactionClient;
 const json=(v:unknown)=>JSON.parse(JSON.stringify(v)) as Prisma.InputJsonValue;
 function conflict(code:string):never {throw new CommercialDocumentError(code,409);}
@@ -106,6 +107,11 @@ async function customerAccess(tx:Tx,token:unknown,allowConsumed=false){
  // Membership, business and billing are still revalidated on every customer operation.
  return {a,q,r,s,verified,policy:deliveryPolicy(a.policy)};
 }
+export async function customerQuotationPdf(token:unknown){return transaction(async tx=>{
+ const {verified,s}=await customerAccess(tx,token,true);
+ const bytes=await renderSealedQuotationPdf(quotationPdfSource(verified),s.canonicalInput);
+ return {filename:quotationPdfFilename(String(verified.envelope.quotationNumber)),bytes};
+});}
 export async function viewCustomerQuotation(token:unknown){return transaction(async tx=>{
  const {a,q,r,verified}=await customerAccess(tx,token,true);
  return {number:q.number,revisionNumber:r.revisionNumber,state:r.state,validUntil:r.validUntil,terms:r.terms,currency:r.currency,items:verified.envelope.items,pricing:verified.output,decision:a.decision};
