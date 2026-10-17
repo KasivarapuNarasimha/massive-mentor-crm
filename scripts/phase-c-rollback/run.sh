@@ -125,6 +125,9 @@ fi;exit "$code"; }"""
 assert text.count(cleanup_tail)==1
 text=text.replace(cleanup_tail,cleanup_evidence)
 suffix=r'''
+# Runtime-owned infrastructure is intentionally absent from the Prisma schema.
+# Match the fixed application's PostgreSQL rate-limit store before safe startup.
+printf 'CREATE TABLE rate_limit_buckets (key TEXT PRIMARY KEY,total_hits INTEGER NOT NULL DEFAULT 0,reset_time TIMESTAMPTZ NOT NULL); CREATE INDEX rate_limit_buckets_reset_idx ON rate_limit_buckets (reset_time);' | pg "$db" >/dev/null
 printf 'INSERT INTO "ImportBatch" ("id","businessId","actorUserId","filename","createdCount","updatedCount","createdAt") VALUES ('\''phasec-rollback-import'\'','\''phasec-A'\'','\''phasec-owner'\'','\''synthetic.csv'\'',0,0,CURRENT_TIMESTAMP);' | pg "$db" >/dev/null
 python3 - <<'PYSYNTH' > "$MM_ROLLBACK_PRIVATE/synthetic-ledger.sql"
 import pathlib,hashlib,re,uuid

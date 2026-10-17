@@ -6,6 +6,9 @@ r = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
 
 class StaticSafety(unittest.TestCase):
+    def setUp(self):
+        r.RATE_LIMIT_STATE.update(rows=[], request=None)
+
     def rejected(self, code, fn):
         with self.assertRaises(r.GateFailure) as e:
             fn()
@@ -173,6 +176,7 @@ class StaticSafety(unittest.TestCase):
         from unittest.mock import MagicMock
         for status in [200, 307, 401, 403, 404, 500, 600, "SECRET"]:
             r.DIAGNOSTIC.clear()
+            r.RATE_LIMIT_STATE.update(rows=[], request=None)
             response=MagicMock()
             response.__enter__.return_value=response
             response.status=status
@@ -189,6 +193,7 @@ class StaticSafety(unittest.TestCase):
     def test_quotation_http_error_captures_only_status(self):
         for status in [401,403,404,500]:
             r.DIAGNOSTIC.clear()
+            r.RATE_LIMIT_STATE.update(rows=[], request=None)
             error=r.urllib.error.HTTPError('http://synthetic',status,'SECRET_MESSAGE',{},io.BytesIO(b'SECRET_BODY'))
             with patch.object(r.urllib.request,'build_opener') as build:
                 build.return_value.open.side_effect=error
@@ -204,6 +209,83 @@ class StaticSafety(unittest.TestCase):
             with self.assertRaises(TimeoutError):
                 r.http(4000,'/unlisted')
         self.assertEqual(r.DIAGNOSTIC,{})
+
+    def test_operational_counter_initial_increment_and_final_stability(self):
+        self.assertEqual(r.rate_limit_snapshot([]),'STRICT_OPERATIONAL_COUNTER_CONTRACT_V1')
+        key='mmrl:api:ip:127.0.0.1'
+        for count in [1,2,3]:
+            r.RATE_LIMIT_STATE['request']=(1000*count,1000*count+20)
+            row={'key':key,'total_hits':count,'reset_ms':901010}
+            r.rate_limit_snapshot([row])
+            r.rate_limit_snapshot([row])
+        self.assertIsNone(r.RATE_LIMIT_STATE['request'])
+
+    def test_operational_counter_rejects_unexpected_data_and_mutations(self):
+        base={'key':'mmrl:api:ip:127.0.0.1','total_hits':1,'reset_ms':901010}
+        cases=[[],[base,base],[dict(base,key='SECRET')],[dict(base,total_hits=3)],
+               [dict(base,total_hits=True)],[dict(base,reset_ms=99999)],
+               [dict(base,extra='SECRET')]]
+        for rows in cases:
+            with self.subTest(rows=rows):
+                r.RATE_LIMIT_STATE.update(rows=[base],request=(2000,2020))
+                self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot(rows))
+
+    def test_operational_counter_cannot_reset_early_or_change_key(self):
+        base={'key':'mmrl:api:ip:127.0.0.1','total_hits':2,'reset_ms':901010}
+        for row in [dict(base,total_hits=1,reset_ms=902000),dict(base,key='mmrl:api:ip:::1',total_hits=3)]:
+            r.RATE_LIMIT_STATE.update(rows=[base],request=(2000,2020))
+            self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot([row]))
+
+    def test_expired_counter_must_reset_exactly_with_bounded_expiry(self):
+        base={'key':'mmrl:api:ip:127.0.0.1','total_hits':2,'reset_ms':901010}
+        r.RATE_LIMIT_STATE.update(rows=[base],request=(902000,902020))
+        r.rate_limit_snapshot([dict(base,total_hits=1,reset_ms=1802010)])
+        for row in [dict(base,total_hits=3),dict(base,total_hits=1,reset_ms=999999)]:
+            r.RATE_LIMIT_STATE.update(rows=[base],request=(902000,902020))
+            self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot([row]))
+
+    def test_no_request_means_no_counter_mutation_permitted(self):
+        base={'key':'mmrl:api:ip:127.0.0.1','total_hits':1,'reset_ms':901010}
+        r.RATE_LIMIT_STATE.update(rows=[base],request=None)
+        self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot([dict(base,total_hits=2)]))
+
+    def test_fixture_provisions_only_operational_store_before_runtime(self):
+        text=pathlib.Path(__file__).with_name('run.sh').read_text()
+        self.assertIn('CREATE TABLE rate_limit_buckets (key TEXT PRIMARY KEY,total_hits INTEGER NOT NULL DEFAULT 0,reset_time TIMESTAMPTZ NOT NULL)',text)
+        self.assertIn('CREATE INDEX rate_limit_buckets_reset_idx ON rate_limit_buckets (reset_time)',text)
+        self.assertLess(text.index('CREATE TABLE rate_limit_buckets'),text.index('python3 "$MM_ROLLBACK_HELPER" runtime'))
+        helper=pathlib.Path(r.__file__).read_text()
+        self.assertIn('"_rate_limit_structure"',helper)
+        self.assertNotIn('allPublicTableFingerprint',helper)
+
+    def test_actual_fingerprint_keeps_durable_and_unknown_tables_and_structure(self):
+        tables=['User','Business','Contact','Invoice','Payment','ImportBatch','QuotationInvoiceConversion','QuotationRevision','QuotationEvent','_prisma_migrations','rate_limit_buckets','rate_limit_buckets_shadow']
+        values={'Invoice':'original','rate_limit_buckets_shadow':'original','structure':'original'}
+        def pg(sql):
+            if sql.startswith('SELECT current_database()'):return 'mm_phasecapp_123_1:mm_phasec:160015:MM_PHASEC_DISPOSABLE:123:1'
+            if sql.startswith('SELECT tablename'):return '\n'.join(tables)
+            if sql.startswith('SELECT count(*)'):return '1'
+            if 'FROM rate_limit_buckets;' in sql:return '[]'
+            if sql.startswith("SELECT jsonb_build_object('columns'"):return values['structure']
+            if 'FROM pg_constraint' in sql:return 'catalog'
+            for table in tables:
+                if 'FROM "'+table+'" t' in sql:return values.get(table,'original')
+            raise AssertionError('Unexpected query')
+        with patch.dict(r.os.environ,{'GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1'}),patch.object(r,'pg',side_effect=pg):
+            baseline=r.fingerprint()
+            for field in ['Invoice','rate_limit_buckets_shadow','structure']:
+                values[field]='changed'
+                self.assertNotEqual(r.fingerprint(),baseline)
+                values[field]='original'
+            self.assertEqual(r.fingerprint(),baseline)
+
+    def test_expiry_crossing_accepts_only_exact_increment_or_reset(self):
+        base={'key':'mmrl:api:ip:127.0.0.1','total_hits':2,'reset_ms':901010}
+        for row in [dict(base,total_hits=3),dict(base,total_hits=1,reset_ms=1801020)]:
+            r.RATE_LIMIT_STATE.update(rows=[base],request=(901000,901030))
+            r.rate_limit_snapshot([row])
+        r.RATE_LIMIT_STATE.update(rows=[base],request=(901000,901030))
+        self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot([dict(base,total_hits=2)]))
 
     def test_original_rollback_assertions_are_ast_identical(self):
         import ast

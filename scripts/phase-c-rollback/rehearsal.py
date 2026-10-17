@@ -220,6 +220,39 @@ def pg(sql):
     require(result.returncode == 0, "READ_ONLY_PG_CHECK")
     return result.stdout.decode().strip()
 
+# Operational rate-limit writes are checked exactly, separately from durable data.
+RATE_LIMIT_STATE = {"rows": [], "request": None}
+
+def rate_limit_snapshot(rows):
+    def check(ok):
+        if not ok:
+            raise GateFailure("RATE_LIMIT_STATE_INVALID")
+    check(isinstance(rows, list) and len(rows) <= 1)
+    for row in rows:
+        check(set(row) == {"key", "total_hits", "reset_ms"})
+        check(row["key"] in {"mmrl:api:ip:127.0.0.1", "mmrl:api:ip:::ffff:127.0.0.1", "mmrl:api:ip:::1"})
+        check(type(row["total_hits"]) is int and 1 <= row["total_hits"] <= 3)
+        check(type(row["reset_ms"]) in (int, float))
+    prior = RATE_LIMIT_STATE["rows"]
+    request = RATE_LIMIT_STATE["request"]
+    if request is None:
+        check(rows == prior)
+    else:
+        check(len(rows) == 1)
+        start, end = request
+        row = rows[0]
+        if prior:
+            check(row["key"] == prior[0]["key"])
+        # Exact increment while active; reset to one only after expiration.
+        active = bool(prior) and prior[0]["reset_ms"] > end
+        expired = not prior or prior[0]["reset_ms"] <= start
+        increment = bool(prior) and row["total_hits"] == prior[0]["total_hits"] + 1 and row["reset_ms"] == prior[0]["reset_ms"]
+        reset = row["total_hits"] == 1 and start + 900000 <= row["reset_ms"] <= end + 900000
+        check(increment if active else reset if expired else increment or reset)
+    RATE_LIMIT_STATE["rows"] = [dict(row) for row in rows]
+    RATE_LIMIT_STATE["request"] = None
+    return "STRICT_OPERATIONAL_COUNTER_CONTRACT_V1"
+
 def fingerprint():
     marker = "MM_PHASEC_DISPOSABLE:" + os.environ["GITHUB_RUN_ID"] + ":" + os.environ["GITHUB_RUN_ATTEMPT"]
     identity = pg("SELECT current_database()||':'||current_user||':'||current_setting('server_version_num')||':'||shobj_description(oid,'pg_database') FROM pg_database WHERE datname=current_database();")
@@ -229,6 +262,11 @@ def fingerprint():
     result = {}
     for t in tables:
         require(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", t), "TABLE_IDENTIFIER")
+        if t == "rate_limit_buckets":
+            rows = json.loads(pg("SELECT COALESCE(jsonb_agg(jsonb_build_object('key',key,'total_hits',total_hits,'reset_ms',EXTRACT(EPOCH FROM reset_time)*1000) ORDER BY key),'[]'::jsonb)::text FROM rate_limit_buckets;"))
+            result[t] = rate_limit_snapshot(rows)
+            result["_rate_limit_structure"] = hashlib.sha256(pg("SELECT jsonb_build_object('columns',(SELECT jsonb_agg(row_to_json(c) ORDER BY ordinal_position) FROM information_schema.columns c WHERE table_schema='public' AND table_name='rate_limit_buckets'),'indexes',(SELECT jsonb_agg(indexdef ORDER BY indexname) FROM pg_indexes WHERE schemaname='public' AND tablename='rate_limit_buckets'))::text;").encode()).hexdigest()
+            continue
         data = pg('SELECT COALESCE(jsonb_agg(v ORDER BY v::text),\'[]\'::jsonb)::text FROM (SELECT to_jsonb(t) AS v FROM "' + t + '" t) s;')
         result[t] = hashlib.sha256(data.encode()).hexdigest()
     for t in ["User", "Business", "Contact", "Invoice", "Payment", "ImportBatch", "QuotationInvoiceConversion", "QuotationRevision", "QuotationEvent", "_prisma_migrations"]:
@@ -246,6 +284,7 @@ def http(port, path):
     if quotation_check:
         DIAGNOSTIC["operation"] = "HTTP_QUOTATION_AUTH"
         DIAGNOSTIC["quotationStatus"] = None
+        request_start = int(time.time() * 1000)
     try:
         with urllib.request.build_opener(NoRedirect()).open("http://127.0.0.1:" + str(port) + path, timeout=3) as r:
             status, body = r.status, r.read(1048576)
@@ -253,6 +292,9 @@ def http(port, path):
         status, body = e.code, e.read(1048576)
     if quotation_check and type(status) is int and 100 <= status <= 599:
         DIAGNOSTIC["quotationStatus"] = status
+        if RATE_LIMIT_STATE["request"] is not None:
+            raise GateFailure("RATE_LIMIT_STATE_INVALID")
+        RATE_LIMIT_STATE["request"] = (request_start, int(time.time() * 1000))
     return status, body
 
 
@@ -269,6 +311,10 @@ def runtime(private):
     require(before["sourceCommit"] == SOURCE and after["sourceCommit"] == CANDIDATE, "RUNTIME_SOURCE")
     compatibility(previous, candidate, before, after)
     phase("BASELINE_FINGERPRINT")
+    RATE_LIMIT_STATE.update(rows=[], request=None)
+    # Missing operational storage fails with a fixed code before application start.
+    if pg("SELECT to_regclass('public.rate_limit_buckets') IS NOT NULL;") != "t":
+        raise GateFailure("RATE_LIMIT_TABLE_MISSING")
     baseline = fingerprint()
     user = "mmrollback"
     uid = run(["id", "-u", user]).decode().strip()
@@ -356,7 +402,7 @@ def runtime(private):
                 require(executable.is_relative_to(bundle.resolve()), "PROCESS_ARTIFACT")
             phase(label.upper() + "_DATA_INTEGRITY")
             require(fingerprint() == baseline, "DATA_CHANGED")
-            evidence.append({"stage": label, "health": "PASS", "processes": 2, "allPublicTableFingerprint": "UNCHANGED"})
+            evidence.append({"stage": label, "health": "PASS", "processes": 2, "durablePublicTableFingerprint": "UNCHANGED", "rateLimitCounters": "STRICTLY_VERIFIED"})
     finally:
         cleanup_preserving_failure(lambda: pm(["kill"], allow_failure=True))
     require(fingerprint() == baseline, "FINAL_DATA_CHANGED")

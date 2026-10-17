@@ -33,7 +33,7 @@ PM2 uses the reviewed ecosystem configuration with only isolated cwd/log paths. 
 3. Add a synthetic ImportBatch and synthetic migration-ledger rows/checksums. Ledger rows are representative fixture metadata, not evidence that every partial historical migration was executed.
 4. Start fallback -> stop all owned old processes -> switch to Run 16 -> stop -> switch back.
 5. At each stage: /ready database readiness, /health, Web /login, protected quotation 401, exactly two online fork/one-instance PM2 apps, no restarts, script paths tied to the intended artifact.
-6. All public table row fingerprints (including invoices/payments/quotation history/ImportBatch/audit/ledger) and public constraint/trigger/function catalog fingerprint remain unchanged.
+6. Durable public table row fingerprints (including invoices/payments/quotation history/ImportBatch/audit/ledger), operational-store structure and public constraint/trigger/function catalog remain unchanged. The single rate_limit_buckets table follows the strict per-request counter contract below; it is not ignored.
 7. Compare before/after/rollback evidence; preserve both tarballs and their checksums/source identities.
 
 Bounded build/process/SQL/HTTP waits and a 55-minute job cap. Cleanup kills only the fresh UID/private PM2 daemon, leaves network denial until owned processes are gone, drops only the exact marked database and removes only its own iptables chains. Hosted runner service teardown/disposal owns container/anonymous-volume removal; no Docker pruning or shared filesystem deletion. If a hard cancellation prevents traps, runner destruction is the final isolation boundary.
@@ -95,3 +95,56 @@ run require their applicable authorizations; this patch does not dispatch one.
 Both exact same-snapshot sealing scenarios and commercial email/browser E2E
 remain UNVERIFIED. The subsequently user-confirmed production password-reset
 email is not evidence for isolated commercial quotation/OTP browser validation.
+
+
+## Review correction after run 39010037180: operational rate-limit storage
+
+The authenticated evidence ZIP matches published SHA-256
+`04634ea0325e8b6dcdfbcef306dc4583e3485005ff28c393946f2eb20e796527`
+and passes full ZIP CRC checks. The fixed fallback bundle also matches recorded
+SHA-256 `02b717e2365ce50395698abb6fa74f1c833ceb85231a716e43847ba98f219fdc`.
+Its actual compiled API mounts the PostgreSQL-backed general rate limiter before
+commercial authentication. MM_SAFE_STARTUP requires an existing
+rate_limit_buckets table and does not provision it. The fixed Prisma-derived
+fixture omits this runtime-owned table. A mocked execution of the actual store
+reproduced rejection before auth when that table is absent. Historical runtime
+SQLSTATE was not retained, so this establishes a fixture defect and a supported
+explanation of HTTP 500, not proof that no additional runtime defect exists.
+
+The disposable setup now provisions the application's exact operational table
+and reset-time index before taking the baseline and starting PM2. This does not
+change the real schema, application, startup flag, limiter, privileges or firewall.
+
+The previous all-public-table-data-unchanged description was incompatible with
+real HTTP probes: shared rate limiting necessarily writes operational counters.
+The integrity contract is now explicit, not a blanket exclusion:
+
+- Every public table except the single named rate_limit_buckets table retains
+  its original full-content hash, including CRM, Finance, users, ImportBatch,
+  commercial/audit history and the migration ledger. Existing catalog checks
+  and all original require assertions remain unchanged.
+- The operational table must initially be empty. At most one exact loopback API
+  bucket is allowed; no unexpected keys, extra fields or additional rows pass.
+- Each fixed unauthenticated quotation request opens one checked transition.
+  While active, the counter must increase by exactly one and retain its expiry.
+  After expiry, it must reset to exactly one with a 15-minute expiry bounded by
+  that request's measured start/end times. A request crossing expiry may take
+  either exact transition. No other transition is accepted; at most three hits
+  can occur because there are three fixed probes.
+- With no outstanding probe, the operational rows must remain byte-for-value
+  unchanged, including the final post-PM2-stop check. Table columns/defaults and
+  indexes are hashed separately and must remain unchanged through all stages.
+- The same 401 assertion still applies; a 500 or any other status stops the run.
+  Operational data is never erased or restored merely to pass a fingerprint.
+
+Tests are offline/mocked only. This correction requires review before merge and
+separate authorization for another disposable execution. It has not passed a new
+PostgreSQL/PM2 run. Production remains out of scope. Both sealing scenarios and
+commercial email/browser validation remain UNVERIFIED.
+
+The fixed legacy limiter wrappers share one backend windowMs. The final exported
+exportLimiter initializes that backend to 15 minutes, even though the general
+limiter declares one minute. This correction does not change immutable bundles
+or silently claim that declared per-limiter windows work. The operational check
+uses the actual fixed backend's 15-minute window. Correcting that separate legacy
+application defect requires a separately tested release artifact.
