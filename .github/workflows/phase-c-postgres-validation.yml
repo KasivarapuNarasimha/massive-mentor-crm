@@ -1,5 +1,5 @@
 # Manual dispatch only. Database execution requires explicit owner authorization.
-name: Phase C merged release PostgreSQL validation
+name: Quotations candidate isolated validation
 on:
   workflow_dispatch:
     inputs:
@@ -8,7 +8,7 @@ on:
         type: choice
         required: true
         default: integration
-        options: [integration, packaging]
+        options: [integration]
 permissions:
   contents: read
   actions: read
@@ -31,8 +31,8 @@ jobs:
             const path = '.github/workflows/phase-c-postgres-validation.yml';
             const e = process.env;
             if (e.GITHUB_REPOSITORY !== repo || e.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
-                e.GITHUB_REF !== 'refs/heads/codex/phase-c-release-candidate' || e.GITHUB_ACTOR !== 'KasivarapuNarasimha' ||
-                e.GITHUB_WORKFLOW_REF !== `${repo}/${path}@refs/heads/codex/phase-c-release-candidate` ||
+                e.GITHUB_REF !== 'refs/heads/codex/quotations-validation' || e.GITHUB_ACTOR !== 'KasivarapuNarasimha' ||
+                e.GITHUB_WORKFLOW_REF !== `${repo}/${path}@refs/heads/codex/quotations-validation` ||
                 e.RUNNER_ENVIRONMENT !== 'github-hosted') {
               throw new Error('Dispatcher identity rejected');
             }
@@ -50,7 +50,7 @@ jobs:
             });
             if (run.id !== runId || run.run_attempt !== attempt ||
                 run.repository.full_name !== repo || run.event !== 'workflow_dispatch' ||
-                run.head_branch !== 'codex/phase-c-release-candidate' || run.head_sha !== e.GITHUB_SHA ||
+                run.head_branch !== 'codex/quotations-validation' || run.head_sha !== e.GITHUB_SHA ||
                 run.head_sha !== e.GITHUB_WORKFLOW_SHA || workflow.path !== path ||
                 run.actor.login !== 'KasivarapuNarasimha' ||
                 run.triggering_actor.login !== 'KasivarapuNarasimha' ||
@@ -85,7 +85,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: 1e58b4addc5eff5fb5053fabfb509f8c9617c401
+          ref: 9219ba31f619bec15b563bbacf6ad82c5f80d3fc
           persist-credentials: false
           fetch-depth: 1
       - name: Verify source, hashes and environment-file exclusion
@@ -93,14 +93,14 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test "$(git rev-parse HEAD)" = 1e58b4addc5eff5fb5053fabfb509f8c9617c401
+          test "$(git rev-parse HEAD)" = 9219ba31f619bec15b563bbacf6ad82c5f80d3fc
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
           3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
           1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
           31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
           f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
-          5dcbd9b9cc1d5ae09913bee2f7875bf6041fe2cda2fdef80f15360878aa14b03  apps/api/scripts/commercial-workflow-postgres.test.cjs
+          8173a54c14948cfcaa2d9f348860bf42a00c714f0bbdb981870696552288a1b5  apps/api/scripts/commercial-workflow-postgres.test.cjs
           5cd7515bf66601f18a4ad886a1075aa95d8b3e0eb87e08fb140c068b1986bd98  apps/api/scripts/commercial-test-loader.cjs
           c7540d388b862058875f56cf047550fe5bf373e14432be51c2c1ac376e551a8a  apps/api/src/services/quotation.service.ts
           cc7510a7f92bae74c28b0da32334960d9e33c23263aa29ca10bd977d0c64e503  apps/api/src/services/commercial-quotation-pdf.ts
@@ -112,10 +112,10 @@ jobs:
           388ffece3c1f06a26852cec29492e0c07af82ce02b49bae6bbf4e078c1844a38  pnpm-lock.yaml
           dab7a2239ffdf47df6f04c55298d6460c1e31a38b4544d0ad170ecc15e22253c  apps/api/src/index.ts
           f3e6a480eb22cd084ab9d294d15315daf6307a6b23db2cbb8cece140d46b5908  apps/api/src/routes/commercial.routes.ts
-          dd40373a12a1e4c0e8b6a97e8b69330d31dd07db87fb37a4dab4302803fd0834  apps/api/src/routes/quotation.routes.ts
+          cdf07b6df6415487b06aee11c7c7223b1707561bbdb2a5a84d48d3cb457311a7  apps/api/src/routes/quotation.routes.ts
           54fe3f152c9f3726c92004497a4634fa318a5267d7ef07bb8c60e1149fbb907e  apps/api/src/routes/quotation-customer.routes.ts
           2c0d661c615b1d29d2fe9f15fc5ea8d1c95bfd0d217f6450dfba084f69b0a7ce  apps/api/src/routes/commercial-finance.routes.ts
-          984bb4c0535bf05582344c296354dc76ffb69e074f4be1e3183dc641eb5fc838  apps/web/app/commercial/page.tsx
+          3c0256658614e7fc4bb652efc65cf39472b47632dc9d46bf6406b03557f200bd  apps/web/app/commercial/page.tsx
           d8ac32eb28ccdb758821792d6d3af0ca16fc3117168c75b09c4412cedffeb86d  apps/api/src/services/finance.service.ts
           adb31681579a4589701fd1529b8d29b48848e4836c340dbddaaa5bb431680381  apps/web/app/dashboard/finance/page.tsx
           55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28  docs/phase-c-review/migration.sql.proposed
@@ -133,6 +133,18 @@ jobs:
           8bc24c119b9b23c78972e3f20b27d1f3d826bcaee32b2d6205fc16fb913089f5  apps/api/src/middleware/requireModule.ts
           60cf381d4ceae72fb0bf0209bea2c0125836bb9b35ef4f9cad40405023ae249a  apps/api/src/middleware/requireBillingAccess.ts
           4abd4b03f10c3343ec24ae28bcaccd2f6e962d3f092a863c4ef0dabfdf031b7f  apps/api/src/services/permissions.service.ts
+          0dcc163d24365cf09da5d2c72b39364275afed70bae8e3be976291aa65c36294  apps/api/scripts/commercial-document.test.cjs
+          65a8cf43db7f81bc46b24c54b0d778d7a908f0e5d2f840d372d91eac7c0b92d2  apps/api/scripts/commercial-pdf.test.cjs
+          ab7e246f9a01433b20bb3e1fc9533c9c1e8f074068d6c7ed5c45275afed9dc1d  apps/api/scripts/quotation-catalog.test.cjs
+          f05f935edc96679ed2c6678082548c3cbe29603873bab797f9f7aa147c035add  apps/api/src/services/quotation-catalog.service.ts
+          4d55655203f713afe1ff33639ae4c2129b700d812c69df595922b303ae46a554  apps/web/app/dashboard/deals/page.tsx
+          3c0256658614e7fc4bb652efc65cf39472b47632dc9d46bf6406b03557f200bd  apps/web/app/dashboard/quotations/page.tsx
+          790f7b665677c65cbf7561ae4aa9d19d297c5ea4b64b45dc8d2229be67de6214  apps/web/components/dashboard/DashboardShell.tsx
+          e0c8f728b3ad660f0a4af973eade68f089568f32b51b099393086f0093e0d063  apps/web/components/quotations/QuotationReferenceSelect.tsx
+          610b7059ea1bd014a66ee5573c2db74875fb3b6291497237a6c3241bd286c0ff  apps/web/components/quotations/QuotationWorkspace.tsx
+          defafc999b83e0915953e1ab0a9e4a65f275f652d63c0c05200d92a4f6a35198  apps/web/lib/module-permissions.ts
+          47e4e7d72876ee63bcb384d68047f1275aae870939132574899f06b7b2ed5336  apps/web/lib/nav-hierarchy.ts
+          6d78f6b22a708856c09acd37e9441efea1997dcfa5b0bd94f9077ef4728a3395  apps/web/scripts/quotation-ui.test.cjs
           HASHES
           python3 - <<'PY'
           import pathlib,subprocess
@@ -173,6 +185,10 @@ jobs:
           import os,pathlib,re,subprocess
           output=pathlib.Path(os.environ['RUNNER_TEMP'],'phasec-application-private.log')
           with output.open('w') as log:
+              foundation=subprocess.run(['timeout','--signal=TERM','--kill-after=15','600','bash','docs/phase-c-review/validation/run.sh','docs/phase-c-review/migration.sql.proposed'],stdout=log,stderr=subprocess.STDOUT,timeout=630)
+              if foundation.returncode:
+                  print('Foundation harness exit: '+str(foundation.returncode))
+                  raise SystemExit(1)
               try:
                   result=subprocess.run(['timeout','--signal=TERM','--kill-after=15','600','bash','apps/api/scripts/commercial-application-run.sh'],stdout=log,stderr=subprocess.STDOUT,timeout=630)
                   code=result.returncode
@@ -195,71 +211,4 @@ jobs:
           name: phase-c-application-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: evidence/*-summary.txt
           retention-days: 7
-          if-no-files-found: error
-
-  package:
-    if: inputs.gate == 'packaging'
-    needs: provenance
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: 1bc44ba9d9a0951645df42a853bc5799650865ef
-          persist-credentials: false
-          fetch-depth: 1
-      - name: Verify fixed packaging source
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = 1bc44ba9d9a0951645df42a853bc5799650865ef
-          test -z "$(git status --porcelain)"
-          sha256sum --check --strict <<'HASHES'
-          91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
-          388ffece3c1f06a26852cec29492e0c07af82ce02b49bae6bbf4e078c1844a38  pnpm-lock.yaml
-          d4a4a138454f4578e12d2254e75b2868aaab44cd96b2a9504191dfc8b362ce97  apps/api/eslint.config.mjs
-          HASHES
-          python3 - <<'PY'
-          import pathlib,subprocess
-          for name in subprocess.check_output(['git','ls-files'],text=True).splitlines():
-              base=pathlib.PurePosixPath(name).name
-              if base.startswith('.env') and not (base.endswith('.example') or base.endswith('.template')):
-                  raise SystemExit('Unexpected environment file in source')
-          PY
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '22.16.0'
-      - name: Build Linux artifacts and rehearse scoped filesystem rollback
-        shell: bash
-        env:
-          MM_RELEASE_SOURCE_COMMIT: 1bc44ba9d9a0951645df42a853bc5799650865ef
-          DATABASE_URL: postgresql://unused:unused@127.0.0.1:1/not_connected
-          NEXT_PUBLIC_API_URL: https://api.massivementor.in/api
-          NEXT_TELEMETRY_DISABLED: '1'
-        run: |
-          set -euo pipefail
-          set +x
-          umask 077
-          python3 - <<'PY'
-          import os,pathlib,re,subprocess
-          commands=[['npm','install','--global','pnpm@9.15.0','--ignore-scripts','--no-audit','--no-fund'],['pnpm','install','--frozen-lockfile','--ignore-scripts'],['pnpm','--filter','@massivementor/api','build'],['pnpm','--filter','@massivementor/web','build'],['node','scripts/commercial-release-package.mjs']]
-          log=pathlib.Path(os.environ['RUNNER_TEMP'],'linux-release-private.log')
-          with log.open('w') as output:
-              for index,command in enumerate(commands):
-                  try: result=subprocess.run(command,stdout=output,stderr=subprocess.STDOUT,timeout=900)
-                  except subprocess.TimeoutExpired: raise SystemExit('Bounded Linux packaging stage timed out')
-                  if result.returncode:
-                      output.flush()
-                      for line in log.read_text(errors='replace').splitlines():
-                          if re.fullmatch(r'# MM_PACKAGE_(?:FAILURE|SUBPROCESS):[A-Za-z0-9_,-]+:[A-Za-z0-9_,-]+(?::[A-Za-z0-9_,-]+)?',line): print(line)
-                      raise SystemExit('Linux packaging stage '+str(index+1)+' failed; raw log excluded')
-          print(pathlib.Path('release-evidence/packaging-summary.txt').read_text())
-          PY
-      - name: Preserve immutable release and sanitized identity
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: phase-c-linux-release-${{ github.run_id }}-${{ github.run_attempt }}
-          path: release-evidence/*
-          retention-days: 14
           if-no-files-found: error
