@@ -21,7 +21,7 @@ import {
 } from "@/lib/plan-entitlements";
 import { FeatureGate } from "@/components/billing/FeatureGate";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { canAccessPath, filterNavByModules } from "@/lib/module-permissions";
+import { canAccessPath, filterNavByModules, includeGrantedNavItem } from "@/lib/module-permissions";
 import { NAV_HIERARCHY, findActiveSubModuleId, type NavMainKey } from "@/lib/nav-hierarchy";
 import { FeatureSearch } from "@/components/dashboard/FeatureSearch";
 import { canViewTeamActivity } from "@/lib/team-activity-access";
@@ -178,6 +178,16 @@ const crmNavItems: NavItem[] = [
     icon: (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 01-2-2" />
+      </svg>
+    ),
+  },
+  {
+    key: "quotations",
+    href: "/dashboard/quotations",
+    label: "Quotations",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5V3h6v2M9 12h6m-6 4h6" />
       </svg>
     ),
   },
@@ -982,7 +992,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const primaryNav = withMediaBadge(
     filterNavByModules(
-      (portalNav || resolveNav(navItems)).filter((item) => item.href !== APPEARANCE_HREF),
+      includeGrantedNavItem(
+        portalNav || resolveNav(navItems),
+        portalNav ? resolveNav(crmNavItems).find((item) => item.href === "/dashboard/quotations") : undefined,
+        moduleKeys
+      ).filter((item) => item.href !== APPEARANCE_HREF),
       moduleKeys
     )
   );
