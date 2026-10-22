@@ -321,7 +321,9 @@ export function parseBusinessModuleAccess(settings: unknown): BusinessModuleAcce
   if (!raw || typeof raw !== "object") return null;
   const ma = raw as { customized?: unknown; enabled?: unknown };
   if (!Array.isArray(ma.enabled)) return null;
-  const valid = new Set(MODULE_CATALOG.map((m) => m.key));
+  // Strict commercial administration owns this key; preserve its explicit business cap.
+  // Do not add it to legacy role templates or automatically grant it to members.
+  const valid = new Set([...MODULE_CATALOG.map((m) => m.key), "quotations"]);
   const enabled = Array.from(
     new Set(
       (ma.enabled as unknown[])

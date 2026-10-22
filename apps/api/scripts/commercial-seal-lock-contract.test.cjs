@@ -81,7 +81,8 @@ test("application inserts and seals one snapshot before the transaction commits"
 test("runtime evidence still names both same-snapshot lock orders unverified", () => {
   assert.match(workflow, /Exact competing same-snapshot trigger-lock orderings: UNVERIFIED/);
   assert.equal(workflow.includes("trigger-lock orderings: VERIFIED"), false);
-  assert.equal(sha256(blob(workflowRel)), "5dcbd9b9cc1d5ae09913bee2f7875bf6041fe2cda2fdef80f15360878aa14b03");
+  assert.equal(sha256(blob(workflowRel)), "8173a54c14948cfcaa2d9f348860bf42a00c714f0bbdb981870696552288a1b5");
+  assert.ok(workflow.includes(`${sha256(blob(workflowRel))}  ${workflowRel}`));
   assert.equal(pgTest.includes("DISABLE TRIGGER"), false);
   assert.equal(pgTest.includes("session_replication_role"), false);
   assert.match(pgTest, /for\(const sealFirst of \[false,true\]\)test\(`independent insertion cannot see uncommitted snapshot \(\$\{sealFirst\?"sealed":"not yet sealed"\}\); original trigger-lock scenario remains UNVERIFIED`/);

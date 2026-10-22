@@ -66,3 +66,19 @@ test("manager team OR scope is ANDed with customer search, never overwritten",as
  const g=fixture({contactWhere:team,dealWhere:{userId:{in:["actor","peer"]}}});await g.service.searchQuotations(actor,{search:"Buyer"});
  const lookup=g.reads.find(x=>x[0]==="contacts")[1];assert.deepEqual(lookup.where.AND[0],team);assert(lookup.where.AND[1].OR);assert.equal(lookup.where.OR,undefined);
 });
+
+
+test("explicit business quotation allowlist survives portal resolution without auto-granting",async()=>{
+ const member={role:"owner",permissions:{customized:true,modules:["quotations","finance"]}};
+ let settings={moduleAccess:{customized:true,enabled:["quotations","finance","untrusted-module"]}};
+ const prisma={user:{findUnique:async()=>({platformRole:"user",role:"owner",isDisabled:false})},businessMember:{findUnique:async()=>member},business:{findUnique:async()=>({settings,status:"active"})}};
+ const permissions=loadWith({"../lib/prisma.js":{prisma},"./field-engine.service.js":{getUserBusinessId:async()=>"tenant-A"}})("services/permissions.service.ts");
+ assert(permissions.parseBusinessModuleAccess(settings).enabled.includes("quotations"));
+ assert(!permissions.parseBusinessModuleAccess(settings).enabled.includes("untrusted-module"));
+ assert((await permissions.getMemberModuleKeys("actor","tenant-A")).includes("quotations"));
+ settings={moduleAccess:{customized:true,enabled:["finance"]}};
+ assert(!(await permissions.getMemberModuleKeys("actor","tenant-A")).includes("quotations"));
+ settings={moduleAccess:{customized:true,enabled:["quotations","finance"]}};
+ member.permissions.modules=["finance"];
+ assert(!(await permissions.getMemberModuleKeys("actor","tenant-A")).includes("quotations"));
+});
