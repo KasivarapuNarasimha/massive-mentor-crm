@@ -84,7 +84,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: 8f8cf944e6304727cebeee3241fc6796121a5eb9
+          ref: e5b1721f732a021c64788f8a073111bf6a37ce0c
           persist-credentials: false
           fetch-depth: 1
       - name: Verify source, hashes and environment-file exclusion
@@ -92,7 +92,7 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test "$(git rev-parse HEAD)" = 8f8cf944e6304727cebeee3241fc6796121a5eb9
+          test "$(git rev-parse HEAD)" = e5b1721f732a021c64788f8a073111bf6a37ce0c
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
           3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
@@ -145,7 +145,7 @@ jobs:
           47e4e7d72876ee63bcb384d68047f1275aae870939132574899f06b7b2ed5336  apps/web/lib/nav-hierarchy.ts
           6d78f6b22a708856c09acd37e9441efea1997dcfa5b0bd94f9077ef4728a3395  apps/web/scripts/quotation-ui.test.cjs
           af2baefd115edd6ade2546dbc7c5d6f9e9580e47bc146111479e74afe210e961  apps/api/scripts/commercial-seal-lock-contract.test.cjs
-          a92cab35240a8244e519ca124f582d13e502704be454adb55e06d31a4c76c601  scripts/quotations-browser/contract.test.cjs
+          b4ef89542505de0dc15bc9e6d618f8131a2e30bb0977df7fa3043361304b4c99  scripts/quotations-browser/contract.test.cjs
           3f892069e51205e419af4774ebf6edb784c55a62957d967e3d246ee44e0fc618  scripts/quotations-browser/e2e.cjs
           afac822ee7b748b12452490d8f45276c99eca344c77b4121d99386cffff10611  scripts/quotations-browser/package-lock.json
           23384a19da23b6ade2c90f2c0d3d77af9e7fc2ffefacfa1e720c08b4a1a96d27  scripts/quotations-browser/package.json
@@ -239,7 +239,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: 8f8cf944e6304727cebeee3241fc6796121a5eb9
+          ref: e5b1721f732a021c64788f8a073111bf6a37ce0c
           persist-credentials: false
           fetch-depth: 1
       - name: Verify source, hashes and environment-file exclusion
@@ -247,7 +247,7 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test "$(git rev-parse HEAD)" = 8f8cf944e6304727cebeee3241fc6796121a5eb9
+          test "$(git rev-parse HEAD)" = e5b1721f732a021c64788f8a073111bf6a37ce0c
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
           3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
@@ -300,7 +300,7 @@ jobs:
           47e4e7d72876ee63bcb384d68047f1275aae870939132574899f06b7b2ed5336  apps/web/lib/nav-hierarchy.ts
           6d78f6b22a708856c09acd37e9441efea1997dcfa5b0bd94f9077ef4728a3395  apps/web/scripts/quotation-ui.test.cjs
           af2baefd115edd6ade2546dbc7c5d6f9e9580e47bc146111479e74afe210e961  apps/api/scripts/commercial-seal-lock-contract.test.cjs
-          a92cab35240a8244e519ca124f582d13e502704be454adb55e06d31a4c76c601  scripts/quotations-browser/contract.test.cjs
+          b4ef89542505de0dc15bc9e6d618f8131a2e30bb0977df7fa3043361304b4c99  scripts/quotations-browser/contract.test.cjs
           3f892069e51205e419af4774ebf6edb784c55a62957d967e3d246ee44e0fc618  scripts/quotations-browser/e2e.cjs
           afac822ee7b748b12452490d8f45276c99eca344c77b4121d99386cffff10611  scripts/quotations-browser/package-lock.json
           23384a19da23b6ade2c90f2c0d3d77af9e7fc2ffefacfa1e720c08b4a1a96d27  scripts/quotations-browser/package.json
@@ -356,7 +356,7 @@ jobs:
           MM_PHASEC_IMAGE_DIGEST: postgres@sha256:ec9f656f17c8b4dfebf49e58cf5c46d493d4846d4ea6d8b85d0637f68ee33bfc
           MM_PHASEC_PROPOSAL_SHA256: 55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28
           MM_PHASEC_IMAGE_ID: sha256:e8538db784b854a9baac5c1be6d059dcf0db257af2d94c8c5807b5fc15f11222
-          MM_BROWSER_SOURCE: 8f8cf944e6304727cebeee3241fc6796121a5eb9
+          MM_BROWSER_SOURCE: e5b1721f732a021c64788f8a073111bf6a37ce0c
         run: |
           set -euo pipefail
           set +x
