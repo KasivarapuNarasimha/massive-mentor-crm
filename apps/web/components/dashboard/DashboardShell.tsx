@@ -546,6 +546,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { can, requireFeature, plan, isTrial, planStatus, licenseStatus, accessKnown, loading: planLoading } = usePlan();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const statusBannerRef = useRef<HTMLDivElement>(null);
+  const [statusBannerHeight, setStatusBannerHeight] = useState(0);
+  useEffect(() => {
+    const element = statusBannerRef.current;
+    if (!element) return;
+    const measure = () => setStatusBannerHeight(Math.ceil(element.getBoundingClientRect().height));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   /** Desktop collapse — icons-only rail */
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -1347,14 +1359,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     };
   }, [token]);
 
-  // Fixed chrome stack: [demo banner?] + navbar + location strip
-  const navTop = isDemoMode ? DEMO_BANNER_H : "0px";
-  const fieldTop = isDemoMode
-    ? `calc(${DEMO_BANNER_H} + ${NAV_H})`
-    : NAV_H;
-  const contentOffset = isDemoMode
-    ? `calc(${DEMO_BANNER_H} + ${NAV_H} + ${FIELD_BAR_H})`
-    : `calc(${NAV_H} + ${FIELD_BAR_H})`;
+  // Reserve the measured status stack, including wrapped mobile trial/connectivity banners.
+  const navTop = `calc(${isDemoMode ? DEMO_BANNER_H : "0px"} + ${statusBannerHeight}px)`;
+  const fieldTop = `calc(${navTop} + ${NAV_H})`;
+  const contentOffset = `calc(${navTop} + ${NAV_H} + ${FIELD_BAR_H})`;
 
   return (
     <>
@@ -1378,7 +1386,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
       {/* Non-blocking connectivity alert when backend is down */}
-      <div className="fixed left-0 right-0 z-[55]" style={{ top: isDemoMode ? DEMO_BANNER_H : 0 }}>
+      <div ref={statusBannerRef} data-testid="dashboard-status-banners" className="fixed left-0 right-0 z-[55]" style={{ top: isDemoMode ? DEMO_BANNER_H : 0 }}>
         <ApiConnectivityBanner />
         {/* Trial / Upgrade Plan is for real customers only — never in Demo Mode */}
         {!isDemoMode ? <TrialBanner /> : null}
