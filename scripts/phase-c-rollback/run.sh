@@ -75,9 +75,19 @@ PYCLEAN
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-sudo useradd --system --no-create-home mmrollback
+# Container UIDs share the host process namespace; passwd absence is insufficient.
+uid=$(python3 "$tool/uid-boundary.py")
+[[ $uid =~ ^20[0-9]{3}$ ]] || exit 2
+sudo useradd --system --uid "$uid" --no-create-home mmrollback
 created_user=1
-uid=$(id -u mmrollback)
+[[ $(id -u mmrollback) == "$uid" ]] || exit 2
+python3 - "$uid" <<'PYUID'
+import subprocess,sys
+uid=int(sys.argv[1])
+processes=subprocess.check_output(['ps','-eo','uid='],text=True,timeout=5)
+assert uid not in {int(x) for x in processes.split()}
+print('ISOLATED_UID_EXCLUSIVE:PASS')
+PYUID
 [[ $uid =~ ^[0-9]+$ && $uid -gt 0 && $uid != "$(id -u)" ]] || exit 2
 mkdir -p "$MM_ROLLBACK_ROOT"/{home,logs,storage,backups,pm2-home}
 cp -a "$MM_ROLLBACK_PRIVATE/pm2-tool" "$MM_ROLLBACK_ROOT/pm2"

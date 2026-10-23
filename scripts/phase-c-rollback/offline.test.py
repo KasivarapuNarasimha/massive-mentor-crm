@@ -302,6 +302,17 @@ class StaticSafety(unittest.TestCase):
         self.assertEqual(r.DIAGNOSTIC["oldProcessStates"],["S","Z"])
         self.assertNotIn("SECRET",json.dumps(r.DIAGNOSTIC))
 
+    def test_uid_allocator_rejects_account_process_and_container_collisions(self):
+        spec=importlib.util.spec_from_file_location("uid_boundary",pathlib.Path(__file__).with_name("uid-boundary.py"))
+        boundary=importlib.util.module_from_spec(spec);spec.loader.exec_module(boundary)
+        self.assertEqual(boundary.select_uid({20000},{999,20001},999),20002)
+        self.assertEqual(boundary.select_uid(set(),set(),20000),20001)
+        with self.assertRaisesRegex(RuntimeError,"NO_EXCLUSIVE_UID"):
+            boundary.select_uid(set(range(20000,20128)),set(),999)
+        text=pathlib.Path(__file__).with_name("run.sh").read_text()
+        self.assertLess(text.index('uid=$(python3 "$tool/uid-boundary.py")'),text.index('sudo useradd'))
+        self.assertIn('sudo useradd --system --uid "$uid"',text)
+
     def test_exact_validated_release_record(self):
         record={"sourceCommit":r.CANDIDATE,"validationRun":39918705226,"workflowHead":"707b418e8352dbf1e11a7efd01407470178f32fa",
             "browserArtifactDigest":"sha256:21d8c4f108cea69e547af576591ad03fdef36712c161fe86fe05763e80119cfa",

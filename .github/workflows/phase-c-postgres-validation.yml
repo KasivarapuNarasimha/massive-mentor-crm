@@ -592,7 +592,7 @@ jobs:
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
           f6c342f5586a5f4b80e6c2ea4b995758415c681d9e825bf15615531da0266c7e  ../tools/scripts/phase-c-rollback/rehearsal.py
-          d6166aec203f0d7f64920696167ea8026aad934615014a956544a376f5ad6081  ../tools/scripts/phase-c-rollback/run.sh
+          babfbf2fa892dc615d031c9f0e84ef565b7100fc363e1a9186e5dfea7ee135f3  ../tools/scripts/phase-c-rollback/run.sh
           91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
           f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
           3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
@@ -600,6 +600,7 @@ jobs:
           31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
           24a3eba1671be2014365a29d2264628fe83f93ddfa332895ad6178147d32bd08  apps/api/prisma/migrations/20260907120000_import_batch/migration.sql
           286623af639b065355b6757ff2362df7450018a818787d80acb51f3e169259e3  ../tools/scripts/phase-c-rollback/permission-probe.cjs
+          946966bb5770def4f2017d175204b4d45b77a967bfb40622bea1fa17b85cc0f2  ../tools/scripts/phase-c-rollback/uid-boundary.py
           HASHES
           python3 docs/phase-c-review/validation/concurrency.py --storage-only "$MM_PHASEC_CONTAINER_ID"
           python3 - <<'PY'
@@ -724,7 +725,7 @@ jobs:
               raise SystemExit(0)
           private=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
           # Never upload PM2 dumps, environment, raw logs, database rows, npm configuration or credentials.
-          for n in ['artifact-summary.json','rollback-summary.json','diagnostic-summary.json','cleanup-summary.json','database-cleanup-summary.json']:
+          for n in ['artifact-summary.json','rollback-summary.json','diagnostic-summary.json','cleanup-summary.json','database-cleanup-summary.json','uid-boundary-summary.json']:
               p=private/n
               if p.is_file(): shutil.copyfile(p,out/n)
           files=[private/'massive-mentor-49130bfe386066e211a49b868231f6a5f6b6f277-linux-x64.tar.gz',
