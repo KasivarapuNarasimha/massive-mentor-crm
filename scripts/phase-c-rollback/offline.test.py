@@ -1,0 +1,310 @@
+"""Offline negative tests only. Never starts processes, connects to PostgreSQL or downloads artifacts."""
+import importlib.util, io, hashlib, json, pathlib, tarfile, tempfile, unittest, subprocess
+from unittest.mock import patch
+spec = importlib.util.spec_from_file_location("rehearsal", pathlib.Path(__file__).with_name("rehearsal.py"))
+r = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(r)
+
+class StaticSafety(unittest.TestCase):
+    def setUp(self):
+        r.RATE_LIMIT_STATE.update(rows=[], request=None)
+
+    def rejected(self, code, fn):
+        with self.assertRaises(r.GateFailure) as e:
+            fn()
+        self.assertEqual(str(e.exception), code)
+
+    def test_workflow_service_context_placement(self):
+        import re
+        workflow=pathlib.Path(__file__).parents[2]/'.github/workflows/phase-c-postgres-validation.yml'
+        text=workflow.read_text().split('  rollback:',1)[1]
+        jobenv=text.split('    env:\n',1)[1].split('    steps:',1)[0]
+        allowed=lambda value: re.search(r'\$\{\{\s*job\.',value) is None
+        self.assertTrue(allowed(jobenv))
+        self.assertFalse(allowed('MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}'))
+        self.assertIn('          MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}',text)
+        self.assertIn('          MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}',text)
+
+    def test_diagnostic_does_not_expose_exception_or_subprocess_arguments(self):
+        r.phase("BASELINE_FINGERPRINT")
+        for error in [KeyError("postgresql://secret"), PermissionError(13,"secret-token","/secret/path"),
+                      subprocess.TimeoutExpired(["command","secret-password"],35,output=b"secret")]:
+            summary=r.failure_summary(error)
+            self.assertNotIn("secret",json.dumps(summary))
+            self.assertEqual(summary["phase"],"BASELINE_FINGERPRINT")
+            self.assertEqual(summary["runtime"],"FAILED")
+
+    def test_command_failure_keeps_exit_code_and_assertion(self):
+        with patch.object(r.subprocess,"run",return_value=subprocess.CompletedProcess([],7,b"",b"SECRET")):
+            self.rejected("SUBPROCESS_FAILED",lambda:r.run(["id","-u","synthetic"]))
+        self.assertEqual(r.DIAGNOSTIC["exitCode"],7)
+        self.assertNotIn("SECRET",json.dumps(r.failure_summary(r.GateFailure("SUBPROCESS_FAILED"))))
+
+    def test_gate_failure_remains_specific(self):
+        self.assertEqual(r.failure_summary(r.GateFailure("DATA_CHANGED"))["failure"],"DATA_CHANGED")
+        self.assertEqual(r.failure_summary(r.GateFailure("secret string"))["failure"],"UNCLASSIFIED_FAILURE")
+
+    def test_pm2_literal_and_unexpected_codes(self):
+        self.assertEqual(r.safe_failure(r.GateFailure("PM2_OPERATION")),"PM2_OPERATION")
+        for value in ["PM2_OPERATION secret","PM2_OTHER123","TOKEN123","PM2_OPERATION\\nsecret"]:
+            self.assertEqual(r.safe_failure(r.GateFailure(value)),"UNCLASSIFIED_FAILURE")
+
+    def test_pm2_categories_are_bounded_and_redacted(self):
+        self.assertEqual(r.pm2_error_categories(b"EACCES /secret password=token",b""),["PERMISSION_DENIED"])
+        self.assertEqual(r.pm2_error_categories(b"x"*32768+b"EACCES",b""),["UNCLASSIFIED"])
+
+    def test_cleanup_cannot_replace_primary_failure(self):
+        def broken(): raise subprocess.TimeoutExpired(["secret"],35)
+        try:
+            raise r.GateFailure("PM2_OPERATION")
+        except r.GateFailure as original:
+            r.cleanup_preserving_failure(broken)
+            self.assertEqual(r.safe_failure(original),"PM2_OPERATION")
+            self.assertEqual(r.DIAGNOSTIC["pythonCleanup"],"FAILED")
+        with self.assertRaises(subprocess.TimeoutExpired):
+            r.cleanup_preserving_failure(broken)
+
+    def test_path_rejections(self):
+        for name, code in [("../x","ARCHIVE_PARENT"),("/x","ARCHIVE_PATH"),("C:x","ARCHIVE_PATH"),
+                           ("x\\y","ARCHIVE_PATH"),("apps/api/.env","ARCHIVE_SECRET_PATH"),
+                           ("node_modules/.ssh/key","ARCHIVE_SECRET_PATH")]:
+            self.rejected(code, lambda: r.safe_name(name))
+        self.assertEqual(r.safe_name("./apps/api/dist/index.js"), "apps/api/dist/index.js")
+
+    def archive(self, root, extra=None, wrong_source=False, wrong_hash=False):
+        schema=b"synthetic schema\n"
+        r.SCHEMA_SHA=hashlib.sha256(schema).hexdigest()
+        package=b"{}\n"
+        entries=[{"path":"package.json","sha256":hashlib.sha256(package).hexdigest()},
+                 {"path":"apps/api/prisma/schema.prisma","sha256":r.SCHEMA_SHA}]
+        if wrong_hash: entries[0]["sha256"]="0"*64
+        manifest={"sourceCommit": "0"*40 if wrong_source else r.SOURCE,
+                  "platform":"linux-x64","node":"v22.16.0","schemaSha256":r.SCHEMA_SHA,"files":entries}
+        p=root/"test.tar.gz"
+        with tarfile.open(p,"w:gz") as t:
+            for name,data in [("package.json",package),("apps/api/prisma/schema.prisma",schema),
+                              ("RELEASE.json",json.dumps(manifest).encode())]:
+                info=tarfile.TarInfo(name);info.size=len(data);t.addfile(info,io.BytesIO(data))
+            if extra: t.addfile(extra)
+        return p
+
+    def test_minimal_manifest_positive(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=pathlib.Path(d)
+            m=r.verify_bundle(self.archive(root),root/"out",r.SOURCE)
+            self.assertEqual(m["sourceCommit"],r.SOURCE)
+
+    def test_wrong_source(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=pathlib.Path(d)
+            self.rejected("BUNDLE_IDENTITY",lambda:r.verify_bundle(self.archive(root,wrong_source=True),root/"out",r.SOURCE))
+
+    def test_changed_file_digest(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=pathlib.Path(d)
+            self.rejected("FILE_DIGEST",lambda:r.verify_bundle(self.archive(root,wrong_hash=True),root/"out",r.SOURCE))
+
+    def test_escaping_symlink(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=pathlib.Path(d);extra=tarfile.TarInfo("apps/api/dist/link")
+            extra.type=tarfile.SYMTYPE;extra.linkname="../../../../escape"
+            self.rejected("SYMLINK_ESCAPE",lambda:r.verify_bundle(self.archive(root,extra),root/"out",r.SOURCE))
+
+    def test_absolute_hardlink(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=pathlib.Path(d);extra=tarfile.TarInfo("apps/api/dist/link")
+            extra.type=tarfile.LNKTYPE;extra.linkname="/etc/passwd"
+            self.rejected("ARCHIVE_PATH",lambda:r.verify_bundle(self.archive(root,extra),root/"out",r.SOURCE))
+
+    def test_special_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=pathlib.Path(d);extra=tarfile.TarInfo("apps/api/dist/device")
+            extra.type=tarfile.CHRTYPE
+            self.rejected("SPECIAL_TAR_ENTRY",lambda:r.verify_bundle(self.archive(root,extra),root/"out",r.SOURCE))
+
+    def test_duplicate_entry(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=pathlib.Path(d);extra=tarfile.TarInfo("package.json")
+            self.rejected("DUPLICATE_TAR_ENTRY",lambda:r.verify_bundle(self.archive(root,extra),root/"out",r.SOURCE))
+
+
+    def pm_boundary(self):
+        import ast
+        source=pathlib.Path(r.__file__).read_text()
+        fn=next(n for n in ast.walk(ast.parse(source)) if isinstance(n,ast.FunctionDef) and n.name=='pm')
+        root=pathlib.Path('/tmp/mm-rollback-synthetic')
+        namespace={**vars(r),'root':root,'user':'mmrollback','node':'/synthetic/node',
+                   'pm2':root/'pm2/node_modules/pm2/bin/pm2','safeenv':{'MM_SAFE_STARTUP':'1'}}
+        exec(compile(ast.fix_missing_locations(ast.Module(body=[fn],type_ignores=[])),'actual-pm-boundary','exec'),namespace)
+        return namespace['pm'],root
+
+    def test_pm_commands_use_private_cwd_and_retain_uid_clean_env_timeout(self):
+        pm,root=self.pm_boundary()
+        for args in [['start','synthetic-config','--env','production'],['jlist'],['delete','all'],['kill']]:
+            with self.subTest(operation=args[0]), patch.object(r.subprocess,'run',return_value=subprocess.CompletedProcess([],0,b'[]',b'')) as run:
+                pm(args)
+                command=run.call_args.args[0]
+                self.assertEqual(command[:5],['sudo','-u','mmrollback','env','-i'])
+                self.assertIn('MM_SAFE_STARTUP=1',command)
+                self.assertEqual(run.call_args.kwargs['cwd'],root)
+                self.assertEqual(run.call_args.kwargs['timeout'],35)
+
+    def test_pm_failure_remains_fail_closed_after_cwd_change(self):
+        pm,_=self.pm_boundary()
+        with patch.object(r.subprocess,'run',return_value=subprocess.CompletedProcess([],1,b'',b'EACCES synthetic')):
+            self.rejected('PM2_OPERATION',lambda:pm(['start','synthetic-config','--env','production']))
+        self.assertEqual(r.DIAGNOSTIC['exitCode'],1)
+        self.assertEqual(r.DIAGNOSTIC['pm2ErrorCategories'],['PERMISSION_DENIED'])
+
+    def test_permission_probe_uses_same_private_cwd_without_disclosing_paths(self):
+        root=pathlib.Path('/tmp/mm-rollback-synthetic')
+        with patch.object(r.subprocess,'run',return_value=subprocess.CompletedProcess([],7,b'',b'SECRET')) as run:
+            result=r.permission_probe('/synthetic/node','mmrollback',{'MM_SAFE_STARTUP':'1'},root,root/'active',root/'pm2-script',root/'config')
+        self.assertEqual(run.call_args.kwargs['cwd'],root)
+        self.assertEqual(run.call_args.kwargs['timeout'],10)
+        self.assertEqual(run.call_args.args[0][:5],['sudo','-u','mmrollback','env','-i'])
+        self.assertEqual(result,{'probe':'FAILED','exitCode':7})
+        self.assertNotIn('SECRET',json.dumps(result))
+
+    def test_cleanup_pm2_uses_scoped_subshell_cwd(self):
+        text=pathlib.Path(__file__).with_name('run.sh').read_text()
+        self.assertIn('(cd -- "$MM_ROLLBACK_ROOT" && timeout 35 sudo -u mmrollback env -i',text)
+        self.assertIn('kill) > /dev/null 2>&1 || true',text)
+        self.assertIn('[[ $primary_status == 0 ]] || exit "$primary_status"',text)
+
+    def test_quotation_http_status_is_bounded_and_body_is_not_diagnostic(self):
+        from unittest.mock import MagicMock
+        for status in [200, 307, 401, 403, 404, 500, 600, "SECRET"]:
+            r.DIAGNOSTIC.clear()
+            r.RATE_LIMIT_STATE.update(rows=[], request=None)
+            response=MagicMock()
+            response.__enter__.return_value=response
+            response.status=status
+            response.read.return_value=b"SECRET_BODY"
+            opener=MagicMock()
+            opener.open.return_value=response
+            with patch.object(r.urllib.request,'build_opener',return_value=opener):
+                self.assertEqual(r.http(4000,'/api/quotations'),(status,b"SECRET_BODY"))
+            self.assertEqual(r.DIAGNOSTIC['operation'],'HTTP_QUOTATION_AUTH')
+            self.assertEqual(r.DIAGNOSTIC['quotationStatus'],status if type(status) is int and 100 <= status <= 599 else None)
+            self.assertNotIn('SECRET',json.dumps(r.failure_summary(r.GateFailure('STRICT_HTTP_AUTH_BOUNDARY'))))
+            self.assertEqual(opener.open.call_args.kwargs['timeout'],3)
+
+    def test_quotation_http_error_captures_only_status(self):
+        for status in [401,403,404,500]:
+            r.DIAGNOSTIC.clear()
+            r.RATE_LIMIT_STATE.update(rows=[], request=None)
+            error=r.urllib.error.HTTPError('http://synthetic',status,'SECRET_MESSAGE',{},io.BytesIO(b'SECRET_BODY'))
+            with patch.object(r.urllib.request,'build_opener') as build:
+                build.return_value.open.side_effect=error
+                self.assertEqual(r.http(4000,'/api/quotations'),(status,b'SECRET_BODY'))
+            error.close()
+            self.assertEqual(r.DIAGNOSTIC['quotationStatus'],status)
+            self.assertNotIn('SECRET',json.dumps(r.DIAGNOSTIC))
+
+    def test_other_http_paths_do_not_record_request_details(self):
+        r.DIAGNOSTIC.clear()
+        with patch.object(r.urllib.request,'build_opener') as build:
+            build.return_value.open.side_effect=TimeoutError('SECRET')
+            with self.assertRaises(TimeoutError):
+                r.http(4000,'/unlisted')
+        self.assertEqual(r.DIAGNOSTIC,{})
+
+    def test_operational_counter_initial_increment_and_final_stability(self):
+        self.assertEqual(r.rate_limit_snapshot([]),'STRICT_OPERATIONAL_COUNTER_CONTRACT_V1')
+        key='mmrl:api:ip:127.0.0.1'
+        for count in [1,2,3]:
+            r.RATE_LIMIT_STATE['request']=(1000*count,1000*count+20)
+            row={'key':key,'total_hits':count,'reset_ms':901010}
+            r.rate_limit_snapshot([row])
+            r.rate_limit_snapshot([row])
+        self.assertIsNone(r.RATE_LIMIT_STATE['request'])
+
+    def test_operational_counter_rejects_unexpected_data_and_mutations(self):
+        base={'key':'mmrl:api:ip:127.0.0.1','total_hits':1,'reset_ms':901010}
+        cases=[[],[base,base],[dict(base,key='SECRET')],[dict(base,total_hits=3)],
+               [dict(base,total_hits=True)],[dict(base,reset_ms=99999)],
+               [dict(base,extra='SECRET')]]
+        for rows in cases:
+            with self.subTest(rows=rows):
+                r.RATE_LIMIT_STATE.update(rows=[base],request=(2000,2020))
+                self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot(rows))
+
+    def test_operational_counter_cannot_reset_early_or_change_key(self):
+        base={'key':'mmrl:api:ip:127.0.0.1','total_hits':2,'reset_ms':901010}
+        for row in [dict(base,total_hits=1,reset_ms=902000),dict(base,key='mmrl:api:ip:::1',total_hits=3)]:
+            r.RATE_LIMIT_STATE.update(rows=[base],request=(2000,2020))
+            self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot([row]))
+
+    def test_expired_counter_must_reset_exactly_with_bounded_expiry(self):
+        base={'key':'mmrl:api:ip:127.0.0.1','total_hits':2,'reset_ms':901010}
+        r.RATE_LIMIT_STATE.update(rows=[base],request=(902000,902020))
+        r.rate_limit_snapshot([dict(base,total_hits=1,reset_ms=1802010)])
+        for row in [dict(base,total_hits=3),dict(base,total_hits=1,reset_ms=999999)]:
+            r.RATE_LIMIT_STATE.update(rows=[base],request=(902000,902020))
+            self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot([row]))
+
+    def test_no_request_means_no_counter_mutation_permitted(self):
+        base={'key':'mmrl:api:ip:127.0.0.1','total_hits':1,'reset_ms':901010}
+        r.RATE_LIMIT_STATE.update(rows=[base],request=None)
+        self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot([dict(base,total_hits=2)]))
+
+    def test_fixture_provisions_only_operational_store_before_runtime(self):
+        text=pathlib.Path(__file__).with_name('run.sh').read_text()
+        self.assertIn('CREATE TABLE rate_limit_buckets (key TEXT PRIMARY KEY,total_hits INTEGER NOT NULL DEFAULT 0,reset_time TIMESTAMPTZ NOT NULL)',text)
+        self.assertIn('CREATE INDEX rate_limit_buckets_reset_idx ON rate_limit_buckets (reset_time)',text)
+        self.assertLess(text.index('CREATE TABLE rate_limit_buckets'),text.index('python3 "$MM_ROLLBACK_HELPER" runtime'))
+        helper=pathlib.Path(r.__file__).read_text()
+        self.assertIn('"_rate_limit_structure"',helper)
+        self.assertNotIn('allPublicTableFingerprint',helper)
+
+    def test_actual_fingerprint_keeps_durable_and_unknown_tables_and_structure(self):
+        tables=['User','Business','Contact','Invoice','Payment','ImportBatch','QuotationInvoiceConversion','QuotationRevision','QuotationEvent','_prisma_migrations','rate_limit_buckets','rate_limit_buckets_shadow']
+        values={'Invoice':'original','rate_limit_buckets_shadow':'original','structure':'original'}
+        def pg(sql):
+            if sql.startswith('SELECT current_database()'):return 'mm_phasecapp_123_1:mm_phasec:160015:MM_PHASEC_DISPOSABLE:123:1'
+            if sql.startswith('SELECT tablename'):return '\n'.join(tables)
+            if sql.startswith('SELECT count(*)'):return '1'
+            if 'FROM rate_limit_buckets;' in sql:return '[]'
+            if sql.startswith("SELECT jsonb_build_object('columns'"):return values['structure']
+            if 'FROM pg_constraint' in sql:return 'catalog'
+            for table in tables:
+                if 'FROM "'+table+'" t' in sql:return values.get(table,'original')
+            raise AssertionError('Unexpected query')
+        with patch.dict(r.os.environ,{'GITHUB_RUN_ID':'123','GITHUB_RUN_ATTEMPT':'1'}),patch.object(r,'pg',side_effect=pg):
+            baseline=r.fingerprint()
+            for field in ['Invoice','rate_limit_buckets_shadow','structure']:
+                values[field]='changed'
+                self.assertNotEqual(r.fingerprint(),baseline)
+                values[field]='original'
+            self.assertEqual(r.fingerprint(),baseline)
+
+    def test_expiry_crossing_accepts_only_exact_increment_or_reset(self):
+        base={'key':'mmrl:api:ip:127.0.0.1','total_hits':2,'reset_ms':901010}
+        for row in [dict(base,total_hits=3),dict(base,total_hits=1,reset_ms=1801020)]:
+            r.RATE_LIMIT_STATE.update(rows=[base],request=(901000,901030))
+            r.rate_limit_snapshot([row])
+        r.RATE_LIMIT_STATE.update(rows=[base],request=(901000,901030))
+        self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot([dict(base,total_hits=2)]))
+
+    def test_exact_validated_release_record(self):
+        record={"sourceCommit":r.CANDIDATE,"validationRun":39918705226,"workflowHead":"707b418e8352dbf1e11a7efd01407470178f32fa",
+            "browserArtifactDigest":"sha256:21d8c4f108cea69e547af576591ad03fdef36712c161fe86fe05763e80119cfa",
+            "integration":"PASS","capturedMailBrowser":"PASS","sameSnapshotLockOrders":"UNVERIFIED",
+            "productionExecution":False,"archiveSHA256":r.TAR_SHA}
+        r.verify_validation_record(record)
+        for field,value in [("sourceCommit","0"*40),("validationRun",1),("workflowHead","0"*40),
+            ("integration","FAIL"),("capturedMailBrowser","FAIL"),("productionExecution",True),
+            ("archiveSHA256","0"*64),("browserArtifactDigest","sha256:"+"0"*64)]:
+            self.rejected("VALIDATION_RECORD",lambda:r.verify_validation_record(dict(record,**{field:value})))
+        self.rejected("VALIDATION_RECORD",lambda:r.verify_validation_record(dict(record,unexpected="rejected")))
+
+    def test_original_rollback_assertions_are_ast_identical(self):
+        import ast
+        tree=ast.parse(pathlib.Path(r.__file__).read_text())
+        checks=[ast.dump(n) for n in ast.walk(tree) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=='require']
+        self.assertEqual(hashlib.sha256('\n'.join(checks).encode()).hexdigest(),
+                         'bb45d2abbf6d7470787be3eaa5ef22a4a3622c8b58011daed4f90736794533ab')
+
+if __name__ == "__main__":
+    unittest.main()
