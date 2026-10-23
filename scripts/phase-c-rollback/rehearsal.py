@@ -307,6 +307,24 @@ def http(port, path):
     return status, body
 
 
+def wait_for_old_process_exit(user, timeout=30):
+    # PM2 command completion is not proof that the daemon PID has been reaped.
+    # Wait for actual UID-wide absence; never ignore zombies or kill to force PASS.
+    deadline = time.monotonic() + timeout
+    while True:
+        stopped = subprocess.run(["ps", "-u", user, "-o", "pid="], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+        if stopped.returncode not in (0, 1) or not stopped.stdout.strip() or time.monotonic() >= deadline:
+            break
+        time.sleep(0.2)
+    DIAGNOSTIC["oldProcessCount"] = min(999, len(stopped.stdout.splitlines()))
+    DIAGNOSTIC["oldProcessProbeExit"] = stopped.returncode if isinstance(stopped.returncode, int) and -128 <= stopped.returncode <= 255 else None
+    if stopped.stdout.strip():
+        states = subprocess.run(["ps", "-u", user, "-o", "stat="], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+        allowed = {"R", "S", "D", "T", "t", "Z", "X", "I", "W", "P"}
+        DIAGNOSTIC["oldProcessStates"] = sorted({line[:1].decode("ascii") for line in states.stdout[:4096].splitlines() if line[:1].decode("ascii", errors="ignore") in allowed})
+    return stopped
+
+
 def runtime(private):
     require(sys.platform == "linux" and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted" and os.environ.get("MM_ROLLBACK_AUTHORIZED") == "YES", "EXECUTION_NOT_AUTHORIZED")
     require(os.environ.get("GITHUB_REPOSITORY") == REPO and re.fullmatch(r"[0-9]+", os.environ.get("GITHUB_RUN_ID", "")), "RUN_IDENTITY")
@@ -357,7 +375,7 @@ def runtime(private):
             phase(label.upper() + "_SWITCH")
             if active.is_symlink():
                 pm(["kill"])
-                stopped = subprocess.run(["ps", "-u", user, "-o", "pid="], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                stopped = wait_for_old_process_exit(user)
                 require(stopped.returncode in (0, 1) and not stopped.stdout.strip(), "OLD_PROCESS_REMAINS")
             pending = root / "pending"
             pending.symlink_to(bundle, target_is_directory=True)

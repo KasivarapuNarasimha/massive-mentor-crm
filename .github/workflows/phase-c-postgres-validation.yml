@@ -591,7 +591,7 @@ jobs:
           test "$(git rev-parse HEAD)" = 9219ba31f619bec15b563bbacf6ad82c5f80d3fc
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
-          fb46f819e558d3b4ed119e251e4fdf9e23c2105f0d92262d52242702b64891c0  ../tools/scripts/phase-c-rollback/rehearsal.py
+          f6c342f5586a5f4b80e6c2ea4b995758415c681d9e825bf15615531da0266c7e  ../tools/scripts/phase-c-rollback/rehearsal.py
           d6166aec203f0d7f64920696167ea8026aad934615014a956544a376f5ad6081  ../tools/scripts/phase-c-rollback/run.sh
           91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
           f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh

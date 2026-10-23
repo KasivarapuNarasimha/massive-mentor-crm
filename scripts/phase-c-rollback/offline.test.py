@@ -287,6 +287,21 @@ class StaticSafety(unittest.TestCase):
         r.RATE_LIMIT_STATE.update(rows=[base],request=(901000,901030))
         self.rejected('RATE_LIMIT_STATE_INVALID',lambda:r.rate_limit_snapshot([dict(base,total_hits=2)]))
 
+    def test_shutdown_wait_requires_actual_absence(self):
+        rows=[subprocess.CompletedProcess([],0,b"42\n",b""),subprocess.CompletedProcess([],0,b"42\n",b""),subprocess.CompletedProcess([],1,b"",b"")]
+        with patch.object(r.subprocess,"run",side_effect=rows),patch.object(r.time,"sleep") as sleep:
+            result=r.wait_for_old_process_exit("synthetic")
+        self.assertEqual(result.stdout,b"")
+        self.assertEqual(sleep.call_count,2)
+        self.assertEqual(r.DIAGNOSTIC["oldProcessCount"],0)
+
+    def test_shutdown_timeout_retains_original_rejection_and_redacts(self):
+        rows=[subprocess.CompletedProcess([],0,b"42\n",b"SECRET"),subprocess.CompletedProcess([],0,b"Zs\nS\nSECRET",b"SECRET")]
+        with patch.object(r.subprocess,"run",side_effect=rows):result=r.wait_for_old_process_exit("synthetic",timeout=0)
+        self.rejected("OLD_PROCESS_REMAINS",lambda:r.require(result.returncode in (0,1) and not result.stdout.strip(),"OLD_PROCESS_REMAINS"))
+        self.assertEqual(r.DIAGNOSTIC["oldProcessStates"],["S","Z"])
+        self.assertNotIn("SECRET",json.dumps(r.DIAGNOSTIC))
+
     def test_exact_validated_release_record(self):
         record={"sourceCommit":r.CANDIDATE,"validationRun":39918705226,"workflowHead":"707b418e8352dbf1e11a7efd01407470178f32fa",
             "browserArtifactDigest":"sha256:21d8c4f108cea69e547af576591ad03fdef36712c161fe86fe05763e80119cfa",
