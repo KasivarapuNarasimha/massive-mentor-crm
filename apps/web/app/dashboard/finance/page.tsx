@@ -37,7 +37,7 @@ type Invoice = {
   total: number;
   status: string;
   dueDate: string | null;
-  /** deal | client | null (manual) */
+  /** quotation | deal | client | null (manual) */
   sourceType?: string | null;
   sourceId?: string | null;
   description?: string | null;
@@ -436,7 +436,9 @@ export default function FinancePage() {
                   ? "Deal"
                   : inv.sourceType === "client"
                     ? "Client"
-                    : "Manual";
+                    : inv.sourceType === "quotation"
+                      ? "Quotation"
+                      : "Manual";
               return (
               <div key={inv.id} className="flex flex-wrap justify-between gap-2 bg-card border border-border rounded-md p-3 text-sm">
                 <div className="min-w-0">
@@ -445,7 +447,7 @@ export default function FinancePage() {
                     <span className="px-1.5 py-0.5 rounded-md bg-muted border border-border">
                       Source: {src}
                     </span>
-                    <span>{inv.status} · tax {money(inv.taxAmount)}</span>
+                    <span>{inv.sourceType === "quotation" && inv.status === "sent" ? "Unpaid" : inv.status} · tax {money(inv.taxAmount)}</span>
                   </div>
                   {inv.description ? (
                     <div className="text-xs text-muted-foreground mt-0.5 truncate max-w-md">

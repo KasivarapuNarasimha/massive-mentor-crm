@@ -1,0 +1,9 @@
+{
+  "name": "mm-quotations-disposable-browser",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "playwright": "1.56.1",
+    "smtp-server": "3.21.0"
+  }
+}

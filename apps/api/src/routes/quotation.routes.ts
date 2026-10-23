@@ -8,6 +8,7 @@ import { CommercialValueError } from "../lib/commercial-money.js";
 import { createQuotation, editQuotationDraft, getQuotation, listQuotations, quotationSnapshotPdf, requestQuotationApproval } from "../services/quotation.service.js";
 import { getCommercialConfiguration,setCommercialConfiguration } from "../services/commercial-configuration.service.js";
 import { sendQuotation,cancelQuotationDelivery } from "../services/quotation-customer.service.js";
+import { searchQuotations, searchQuotationReferences } from "../services/quotation-catalog.service.js";
 import type { CommercialAction } from "../services/commercial-policy.js";
 
 /** Mounted after real HTTP/PostgreSQL authorization tests passed.
@@ -36,6 +37,8 @@ const handle=(work:(req:AuthenticatedRequest)=>Promise<unknown>,status=200)=>asy
     return res.status(500).json({success:false,code:"COMMERCIAL_OPERATION_FAILED"});
   }
 };
+quotationRouter.get("/search",...gate("quotation.read"),handle(req=>searchQuotations(actor(req),req.query)));
+quotationRouter.get("/references",...gate("quotation.create"),handle(req=>searchQuotationReferences(actor(req),req.query)));
 quotationRouter.get("/",...gate("quotation.read"),handle(req=>listQuotations(actor(req))));
 quotationRouter.post("/",...gate("quotation.create"),handle(req=>createQuotation(actor(req),key(req),req.body),201));
 quotationRouter.get("/configuration",...gate("commercial.policy.manage"),handle(req=>getCommercialConfiguration(actor(req))));

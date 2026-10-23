@@ -1,14 +1,17 @@
-# Manual dispatch only. Database execution requires explicit owner authorization.
-name: Phase C merged release PostgreSQL validation
-on:
+name: Quotations candidate isolated validation
+"on":
   workflow_dispatch:
     inputs:
       gate:
-        description: Select the isolated gate; packaging never starts PostgreSQL
+        description: "integration: database; all: database and captured-mail browser; package: validated-source Linux release only; rollback: exact release/fallback PM2 populated database rehearsal"
         type: choice
         required: true
         default: integration
-        options: [integration, packaging]
+        options:
+          - integration
+          - all
+          - package
+          - rollback
 permissions:
   contents: read
   actions: read
@@ -31,8 +34,8 @@ jobs:
             const path = '.github/workflows/phase-c-postgres-validation.yml';
             const e = process.env;
             if (e.GITHUB_REPOSITORY !== repo || e.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
-                e.GITHUB_REF !== 'refs/heads/codex/phase-c-release-candidate' || e.GITHUB_ACTOR !== 'KasivarapuNarasimha' ||
-                e.GITHUB_WORKFLOW_REF !== `${repo}/${path}@refs/heads/codex/phase-c-release-candidate` ||
+                e.GITHUB_REF !== 'refs/heads/codex/quotations-validation' || e.GITHUB_ACTOR !== 'KasivarapuNarasimha' ||
+                e.GITHUB_WORKFLOW_REF !== `${repo}/${path}@refs/heads/codex/quotations-validation` ||
                 e.RUNNER_ENVIRONMENT !== 'github-hosted') {
               throw new Error('Dispatcher identity rejected');
             }
@@ -50,7 +53,7 @@ jobs:
             });
             if (run.id !== runId || run.run_attempt !== attempt ||
                 run.repository.full_name !== repo || run.event !== 'workflow_dispatch' ||
-                run.head_branch !== 'codex/phase-c-release-candidate' || run.head_sha !== e.GITHUB_SHA ||
+                run.head_branch !== 'codex/quotations-validation' || run.head_sha !== e.GITHUB_SHA ||
                 run.head_sha !== e.GITHUB_WORKFLOW_SHA || workflow.path !== path ||
                 run.actor.login !== 'KasivarapuNarasimha' ||
                 run.triggering_actor.login !== 'KasivarapuNarasimha' ||
@@ -64,7 +67,7 @@ jobs:
             }
             core.setOutput('started_at', run.run_started_at);
   validate:
-    if: inputs.gate == 'integration'
+    if: inputs.gate == 'integration' || inputs.gate == 'all'
     needs: provenance
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -77,15 +80,13 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432/tcp
-        options: >-
-          --health-cmd "pg_isready -U mm_phasec -d postgres"
-          --health-interval 5s --health-timeout 5s --health-retries 12
+        options: "--health-cmd \"pg_isready -U mm_phasec -d postgres\" --health-interval 5s --health-timeout 5s --health-retries 12"
     steps:
       - name: Checkout fixed application checkpoint
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: 1e58b4addc5eff5fb5053fabfb509f8c9617c401
+          ref: 49130bfe386066e211a49b868231f6a5f6b6f277
           persist-credentials: false
           fetch-depth: 1
       - name: Verify source, hashes and environment-file exclusion
@@ -93,14 +94,14 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test "$(git rev-parse HEAD)" = 1e58b4addc5eff5fb5053fabfb509f8c9617c401
+          test "$(git rev-parse HEAD)" = 49130bfe386066e211a49b868231f6a5f6b6f277
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
           3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
           1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
           31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
           f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
-          5dcbd9b9cc1d5ae09913bee2f7875bf6041fe2cda2fdef80f15360878aa14b03  apps/api/scripts/commercial-workflow-postgres.test.cjs
+          8173a54c14948cfcaa2d9f348860bf42a00c714f0bbdb981870696552288a1b5  apps/api/scripts/commercial-workflow-postgres.test.cjs
           5cd7515bf66601f18a4ad886a1075aa95d8b3e0eb87e08fb140c068b1986bd98  apps/api/scripts/commercial-test-loader.cjs
           c7540d388b862058875f56cf047550fe5bf373e14432be51c2c1ac376e551a8a  apps/api/src/services/quotation.service.ts
           cc7510a7f92bae74c28b0da32334960d9e33c23263aa29ca10bd977d0c64e503  apps/api/src/services/commercial-quotation-pdf.ts
@@ -112,12 +113,12 @@ jobs:
           388ffece3c1f06a26852cec29492e0c07af82ce02b49bae6bbf4e078c1844a38  pnpm-lock.yaml
           dab7a2239ffdf47df6f04c55298d6460c1e31a38b4544d0ad170ecc15e22253c  apps/api/src/index.ts
           f3e6a480eb22cd084ab9d294d15315daf6307a6b23db2cbb8cece140d46b5908  apps/api/src/routes/commercial.routes.ts
-          dd40373a12a1e4c0e8b6a97e8b69330d31dd07db87fb37a4dab4302803fd0834  apps/api/src/routes/quotation.routes.ts
+          cdf07b6df6415487b06aee11c7c7223b1707561bbdb2a5a84d48d3cb457311a7  apps/api/src/routes/quotation.routes.ts
           54fe3f152c9f3726c92004497a4634fa318a5267d7ef07bb8c60e1149fbb907e  apps/api/src/routes/quotation-customer.routes.ts
           2c0d661c615b1d29d2fe9f15fc5ea8d1c95bfd0d217f6450dfba084f69b0a7ce  apps/api/src/routes/commercial-finance.routes.ts
-          984bb4c0535bf05582344c296354dc76ffb69e074f4be1e3183dc641eb5fc838  apps/web/app/commercial/page.tsx
+          3c0256658614e7fc4bb652efc65cf39472b47632dc9d46bf6406b03557f200bd  apps/web/app/commercial/page.tsx
           d8ac32eb28ccdb758821792d6d3af0ca16fc3117168c75b09c4412cedffeb86d  apps/api/src/services/finance.service.ts
-          adb31681579a4589701fd1529b8d29b48848e4836c340dbddaaa5bb431680381  apps/web/app/dashboard/finance/page.tsx
+          b983f1f44fe455e9206d2da0d05838874365af735402f33cac4cbb712dadd92b  apps/web/app/dashboard/finance/page.tsx
           55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28  docs/phase-c-review/migration.sql.proposed
           661384b2effc41bae5ae71db57813521babea9e5e7f2c608b0d654317e46a752  docs/phase-c-review/validation/run.sh
           769ae7c624c8cfb689f6f1b69c3db022f6227fba4e64dc2dfd89bd9c23d33311  docs/phase-c-review/validation/catalog-and-negative.sql
@@ -132,7 +133,25 @@ jobs:
           b9e0eb053b53c47feeef2986720e2e50c40d32f2742d212b13231fb7b1ccc61d  apps/api/src/services/lead-assignment.service.ts
           8bc24c119b9b23c78972e3f20b27d1f3d826bcaee32b2d6205fc16fb913089f5  apps/api/src/middleware/requireModule.ts
           60cf381d4ceae72fb0bf0209bea2c0125836bb9b35ef4f9cad40405023ae249a  apps/api/src/middleware/requireBillingAccess.ts
-          4abd4b03f10c3343ec24ae28bcaccd2f6e962d3f092a863c4ef0dabfdf031b7f  apps/api/src/services/permissions.service.ts
+          f55bd45860c61f56bca88615e4360a59b0e1bede80b20e7205f0581388a5f476  apps/api/src/services/permissions.service.ts
+          0dcc163d24365cf09da5d2c72b39364275afed70bae8e3be976291aa65c36294  apps/api/scripts/commercial-document.test.cjs
+          65a8cf43db7f81bc46b24c54b0d778d7a908f0e5d2f840d372d91eac7c0b92d2  apps/api/scripts/commercial-pdf.test.cjs
+          8581974e59a95703d27df453aa8d7a20c5a11e5b24693f43f3a19748ba040ec7  apps/api/scripts/quotation-catalog.test.cjs
+          f05f935edc96679ed2c6678082548c3cbe29603873bab797f9f7aa147c035add  apps/api/src/services/quotation-catalog.service.ts
+          4d55655203f713afe1ff33639ae4c2129b700d812c69df595922b303ae46a554  apps/web/app/dashboard/deals/page.tsx
+          3c0256658614e7fc4bb652efc65cf39472b47632dc9d46bf6406b03557f200bd  apps/web/app/dashboard/quotations/page.tsx
+          51fcb7aadaf870909ecb554d744ae082d3cd904720138f9f3a66f5b81d99af0d  apps/web/components/dashboard/DashboardShell.tsx
+          e0c8f728b3ad660f0a4af973eade68f089568f32b51b099393086f0093e0d063  apps/web/components/quotations/QuotationReferenceSelect.tsx
+          610b7059ea1bd014a66ee5573c2db74875fb3b6291497237a6c3241bd286c0ff  apps/web/components/quotations/QuotationWorkspace.tsx
+          defafc999b83e0915953e1ab0a9e4a65f275f652d63c0c05200d92a4f6a35198  apps/web/lib/module-permissions.ts
+          47e4e7d72876ee63bcb384d68047f1275aae870939132574899f06b7b2ed5336  apps/web/lib/nav-hierarchy.ts
+          6d78f6b22a708856c09acd37e9441efea1997dcfa5b0bd94f9077ef4728a3395  apps/web/scripts/quotation-ui.test.cjs
+          af2baefd115edd6ade2546dbc7c5d6f9e9580e47bc146111479e74afe210e961  apps/api/scripts/commercial-seal-lock-contract.test.cjs
+          1eb8c7856ace4686cfd533bfab494ffb28c2bb5c3815638b76cb525936f07aa3  scripts/quotations-browser/contract.test.cjs
+          e8be52e3037e91fe70737940c272e349391b19b8cff0ecbdb1b823b00c3ac24c  scripts/quotations-browser/e2e.cjs
+          afac822ee7b748b12452490d8f45276c99eca344c77b4121d99386cffff10611  scripts/quotations-browser/package-lock.json
+          23384a19da23b6ade2c90f2c0d3d77af9e7fc2ffefacfa1e720c08b4a1a96d27  scripts/quotations-browser/package.json
+          0fbabb4b91f88bf9fca2fcc367c76de378258248efd8185e129073b4d5156e4a  scripts/quotations-browser/run.sh
           HASHES
           python3 - <<'PY'
           import pathlib,subprocess
@@ -144,7 +163,7 @@ jobs:
       - name: Fixed Node runtime
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '22.16.0'
+          node-version: 22.16.0
       - name: Frozen dependencies without lifecycle scripts
         shell: bash
         run: |
@@ -157,7 +176,7 @@ jobs:
       - name: Execute disposable application tests with sanitized evidence
         shell: bash
         env:
-          MM_PHASEC_DISPOSABLE: 'YES'
+          MM_PHASEC_DISPOSABLE: "YES"
           MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}
           MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}
           MM_PHASEC_RUN_STARTED_AT: ${{ needs.provenance.outputs.started_at }}
@@ -173,6 +192,10 @@ jobs:
           import os,pathlib,re,subprocess
           output=pathlib.Path(os.environ['RUNNER_TEMP'],'phasec-application-private.log')
           with output.open('w') as log:
+              foundation=subprocess.run(['timeout','--signal=TERM','--kill-after=15','600','bash','docs/phase-c-review/validation/run.sh','docs/phase-c-review/migration.sql.proposed'],stdout=log,stderr=subprocess.STDOUT,timeout=630)
+              if foundation.returncode:
+                  print('Foundation harness exit: '+str(foundation.returncode))
+                  raise SystemExit(1)
               try:
                   result=subprocess.run(['timeout','--signal=TERM','--kill-after=15','600','bash','apps/api/scripts/commercial-application-run.sh'],stdout=log,stderr=subprocess.STDOUT,timeout=630)
                   code=result.returncode
@@ -196,29 +219,94 @@ jobs:
           path: evidence/*-summary.txt
           retention-days: 7
           if-no-files-found: error
-
-  package:
-    if: inputs.gate == 'packaging'
-    needs: provenance
+  browser:
+    if: inputs.gate == 'all'
+    needs:
+      - provenance
+      - validate
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres@sha256:ec9f656f17c8b4dfebf49e58cf5c46d493d4846d4ea6d8b85d0637f68ee33bfc
+        env:
+          POSTGRES_USER: mm_phasec
+          POSTGRES_PASSWORD: phasec_dummy_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432/tcp
+        options: "--health-cmd \"pg_isready -U mm_phasec -d postgres\" --health-interval 5s --health-timeout 5s --health-retries 12"
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Checkout fixed application checkpoint
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: 1bc44ba9d9a0951645df42a853bc5799650865ef
+          ref: 49130bfe386066e211a49b868231f6a5f6b6f277
           persist-credentials: false
           fetch-depth: 1
-      - name: Verify fixed packaging source
+      - name: Verify source, hashes and environment-file exclusion
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 1bc44ba9d9a0951645df42a853bc5799650865ef
+          set +x
+          test "$(git rev-parse HEAD)" = 49130bfe386066e211a49b868231f6a5f6b6f277
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
-          91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
+          3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
+          1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
+          31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
+          f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
+          8173a54c14948cfcaa2d9f348860bf42a00c714f0bbdb981870696552288a1b5  apps/api/scripts/commercial-workflow-postgres.test.cjs
+          5cd7515bf66601f18a4ad886a1075aa95d8b3e0eb87e08fb140c068b1986bd98  apps/api/scripts/commercial-test-loader.cjs
+          c7540d388b862058875f56cf047550fe5bf373e14432be51c2c1ac376e551a8a  apps/api/src/services/quotation.service.ts
+          cc7510a7f92bae74c28b0da32334960d9e33c23263aa29ca10bd977d0c64e503  apps/api/src/services/commercial-quotation-pdf.ts
+          8f21977523fc55fc3aeaa6f8bf3b25077e6a06ec32b72eb41cb054845aafdc52  apps/api/src/services/quotation-customer.service.ts
+          87f108b91d2d7733005776701f02438f49eca08bba743bbc892119058f9420cb  apps/api/src/services/commercial-finance.service.ts
+          d70dd6072c4d708d49cc2245f64c04f7477675323be176b3407f390dca2ee93c  apps/api/src/services/commercial-delivery.service.ts
+          6aadd750df584bb4086cecad9845b315b8369133cfcd1a80a3945f54e830a68a  apps/api/src/services/commercial-configuration.service.ts
+          6583fc4c8f3a05c080510e9fe2b0a1802c8458ca1d4e421953fa847c23fc11b1  docs/phase-c-review/validation/concurrency.py
           388ffece3c1f06a26852cec29492e0c07af82ce02b49bae6bbf4e078c1844a38  pnpm-lock.yaml
-          d4a4a138454f4578e12d2254e75b2868aaab44cd96b2a9504191dfc8b362ce97  apps/api/eslint.config.mjs
+          dab7a2239ffdf47df6f04c55298d6460c1e31a38b4544d0ad170ecc15e22253c  apps/api/src/index.ts
+          f3e6a480eb22cd084ab9d294d15315daf6307a6b23db2cbb8cece140d46b5908  apps/api/src/routes/commercial.routes.ts
+          cdf07b6df6415487b06aee11c7c7223b1707561bbdb2a5a84d48d3cb457311a7  apps/api/src/routes/quotation.routes.ts
+          54fe3f152c9f3726c92004497a4634fa318a5267d7ef07bb8c60e1149fbb907e  apps/api/src/routes/quotation-customer.routes.ts
+          2c0d661c615b1d29d2fe9f15fc5ea8d1c95bfd0d217f6450dfba084f69b0a7ce  apps/api/src/routes/commercial-finance.routes.ts
+          3c0256658614e7fc4bb652efc65cf39472b47632dc9d46bf6406b03557f200bd  apps/web/app/commercial/page.tsx
+          d8ac32eb28ccdb758821792d6d3af0ca16fc3117168c75b09c4412cedffeb86d  apps/api/src/services/finance.service.ts
+          b983f1f44fe455e9206d2da0d05838874365af735402f33cac4cbb712dadd92b  apps/web/app/dashboard/finance/page.tsx
+          55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28  docs/phase-c-review/migration.sql.proposed
+          661384b2effc41bae5ae71db57813521babea9e5e7f2c608b0d654317e46a752  docs/phase-c-review/validation/run.sh
+          769ae7c624c8cfb689f6f1b69c3db022f6227fba4e64dc2dfd89bd9c23d33311  docs/phase-c-review/validation/catalog-and-negative.sql
+          6d507f805e6f215e60d2f50745719be953e524909b8900e5975cf776e235d9a0  apps/api/src/services/restore-safety.ts
+          a09dd9bcdf11a26ea8570f3215ed35e4ad10c2c61f91cb3ba94b83619a4063e5  apps/api/src/services/strict-business-resolution.service.ts
+          e1fe3abf9d62aebf4dd532d1869d4cfc3adedb6604b3d66a2a79bdf360006070  apps/api/src/services/lead-assignment-safety.service.ts
+          6f54e775b072e5ed609c6b9e3b01b88ab2a5c0303eb6f299f279c03fa8c07bc4  apps/api/src/services/billing-access.service.ts
+          51e80618fd8064c97785bb7792c83e390343caaf529640c1cf33040e2a1ced82  apps/api/src/services/followup-engine.service.ts
+          24a3eba1671be2014365a29d2264628fe83f93ddfa332895ad6178147d32bd08  apps/api/prisma/migrations/20260907120000_import_batch/migration.sql
+          3708d1419accee0543f35864ddcc5af42b3d655e06fa8f8986757c4599d1b302  apps/api/src/services/tenant-scope.service.ts
+          c050f78b86b45f3b3384be543da063db941a28a948fa381a00603538b5fba722  apps/api/src/services/crm.service.ts
+          b9e0eb053b53c47feeef2986720e2e50c40d32f2742d212b13231fb7b1ccc61d  apps/api/src/services/lead-assignment.service.ts
+          8bc24c119b9b23c78972e3f20b27d1f3d826bcaee32b2d6205fc16fb913089f5  apps/api/src/middleware/requireModule.ts
+          60cf381d4ceae72fb0bf0209bea2c0125836bb9b35ef4f9cad40405023ae249a  apps/api/src/middleware/requireBillingAccess.ts
+          f55bd45860c61f56bca88615e4360a59b0e1bede80b20e7205f0581388a5f476  apps/api/src/services/permissions.service.ts
+          0dcc163d24365cf09da5d2c72b39364275afed70bae8e3be976291aa65c36294  apps/api/scripts/commercial-document.test.cjs
+          65a8cf43db7f81bc46b24c54b0d778d7a908f0e5d2f840d372d91eac7c0b92d2  apps/api/scripts/commercial-pdf.test.cjs
+          8581974e59a95703d27df453aa8d7a20c5a11e5b24693f43f3a19748ba040ec7  apps/api/scripts/quotation-catalog.test.cjs
+          f05f935edc96679ed2c6678082548c3cbe29603873bab797f9f7aa147c035add  apps/api/src/services/quotation-catalog.service.ts
+          4d55655203f713afe1ff33639ae4c2129b700d812c69df595922b303ae46a554  apps/web/app/dashboard/deals/page.tsx
+          3c0256658614e7fc4bb652efc65cf39472b47632dc9d46bf6406b03557f200bd  apps/web/app/dashboard/quotations/page.tsx
+          51fcb7aadaf870909ecb554d744ae082d3cd904720138f9f3a66f5b81d99af0d  apps/web/components/dashboard/DashboardShell.tsx
+          e0c8f728b3ad660f0a4af973eade68f089568f32b51b099393086f0093e0d063  apps/web/components/quotations/QuotationReferenceSelect.tsx
+          610b7059ea1bd014a66ee5573c2db74875fb3b6291497237a6c3241bd286c0ff  apps/web/components/quotations/QuotationWorkspace.tsx
+          defafc999b83e0915953e1ab0a9e4a65f275f652d63c0c05200d92a4f6a35198  apps/web/lib/module-permissions.ts
+          47e4e7d72876ee63bcb384d68047f1275aae870939132574899f06b7b2ed5336  apps/web/lib/nav-hierarchy.ts
+          6d78f6b22a708856c09acd37e9441efea1997dcfa5b0bd94f9077ef4728a3395  apps/web/scripts/quotation-ui.test.cjs
+          af2baefd115edd6ade2546dbc7c5d6f9e9580e47bc146111479e74afe210e961  apps/api/scripts/commercial-seal-lock-contract.test.cjs
+          1eb8c7856ace4686cfd533bfab494ffb28c2bb5c3815638b76cb525936f07aa3  scripts/quotations-browser/contract.test.cjs
+          e8be52e3037e91fe70737940c272e349391b19b8cff0ecbdb1b823b00c3ac24c  scripts/quotations-browser/e2e.cjs
+          afac822ee7b748b12452490d8f45276c99eca344c77b4121d99386cffff10611  scripts/quotations-browser/package-lock.json
+          23384a19da23b6ade2c90f2c0d3d77af9e7fc2ffefacfa1e720c08b4a1a96d27  scripts/quotations-browser/package.json
+          0fbabb4b91f88bf9fca2fcc367c76de378258248efd8185e129073b4d5156e4a  scripts/quotations-browser/run.sh
           HASHES
           python3 - <<'PY'
           import pathlib,subprocess
@@ -227,39 +315,440 @@ jobs:
               if base.startswith('.env') and not (base.endswith('.example') or base.endswith('.template')):
                   raise SystemExit('Unexpected environment file in source')
           PY
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - name: Fixed Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: '22.16.0'
-      - name: Build Linux artifacts and rehearse scoped filesystem rollback
+          node-version: 22.16.0
+      - name: Frozen dependencies without lifecycle scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          npm install --global pnpm@9.15.0 --ignore-scripts --no-audit --no-fund
+          test "$(pnpm --version)" = 9.15.0
+          pnpm install --frozen-lockfile --ignore-scripts
+          test -z "$(git status --porcelain)"
+      - name: Build exact source and install frozen tools inside disposable runner only
         shell: bash
         env:
-          MM_RELEASE_SOURCE_COMMIT: 1bc44ba9d9a0951645df42a853bc5799650865ef
           DATABASE_URL: postgresql://unused:unused@127.0.0.1:1/not_connected
-          NEXT_PUBLIC_API_URL: https://api.massivementor.in/api
-          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:4400/api
+          NEXT_TELEMETRY_DISABLED: "1"
         run: |
           set -euo pipefail
           set +x
           umask 077
           python3 - <<'PY'
-          import os,pathlib,re,subprocess
-          commands=[['npm','install','--global','pnpm@9.15.0','--ignore-scripts','--no-audit','--no-fund'],['pnpm','install','--frozen-lockfile','--ignore-scripts'],['pnpm','--filter','@massivementor/api','build'],['pnpm','--filter','@massivementor/web','build'],['node','scripts/commercial-release-package.mjs']]
-          log=pathlib.Path(os.environ['RUNNER_TEMP'],'linux-release-private.log')
-          with log.open('w') as output:
-              for index,command in enumerate(commands):
-                  try: result=subprocess.run(command,stdout=output,stderr=subprocess.STDOUT,timeout=900)
-                  except subprocess.TimeoutExpired: raise SystemExit('Bounded Linux packaging stage timed out')
-                  if result.returncode:
-                      output.flush()
-                      for line in log.read_text(errors='replace').splitlines():
-                          if re.fullmatch(r'# MM_PACKAGE_(?:FAILURE|SUBPROCESS):[A-Za-z0-9_,-]+:[A-Za-z0-9_,-]+(?::[A-Za-z0-9_,-]+)?',line): print(line)
-                      raise SystemExit('Linux packaging stage '+str(index+1)+' failed; raw log excluded')
-          print(pathlib.Path('release-evidence/packaging-summary.txt').read_text())
+          import os,pathlib,subprocess
+          commands=[['npm','ci','--prefix','scripts/quotations-browser','--ignore-scripts','--no-audit','--no-fund'],['node','scripts/quotations-browser/node_modules/playwright/cli.js','install','--with-deps','chromium'],['sudo','-n','apt-get','install','-y','libnss3-tools'],['pnpm','--filter','@massivementor/api','build'],['pnpm','--filter','@massivementor/api','lint'],['pnpm','--filter','@massivementor/api','exec','tsc','--noEmit','--incremental','false'],['pnpm','--filter','@massivementor/web','build'],['node','--test','scripts/quotations-browser/contract.test.cjs']]
+          with pathlib.Path(os.environ['RUNNER_TEMP'],'browser-build.private.log').open('w') as log:
+           for index,command in enumerate(commands):
+            try: result=subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,timeout=900)
+            except subprocess.TimeoutExpired: raise SystemExit('MM_BROWSER_BUILD_FAILURE:STAGE_'+str(index+1)+':TIMEOUT')
+            if result.returncode: raise SystemExit('MM_BROWSER_BUILD_FAILURE:STAGE_'+str(index+1)+':EXIT_'+str(result.returncode))
+            print('MM_BROWSER_BUILD_PASS:STAGE_'+str(index+1),flush=True)
           PY
-      - name: Preserve immutable release and sanitized identity
+      - name: Authenticated browser E2E with isolated synthetic database and captured TLS SMTP
+        shell: bash
+        env:
+          MM_PHASEC_DISPOSABLE: "YES"
+          MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}
+          MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}
+          MM_PHASEC_RUN_STARTED_AT: ${{ needs.provenance.outputs.started_at }}
+          MM_PHASEC_IMAGE_DIGEST: postgres@sha256:ec9f656f17c8b4dfebf49e58cf5c46d493d4846d4ea6d8b85d0637f68ee33bfc
+          MM_PHASEC_PROPOSAL_SHA256: 55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28
+          MM_PHASEC_IMAGE_ID: sha256:e8538db784b854a9baac5c1be6d059dcf0db257af2d94c8c5807b5fc15f11222
+          MM_BROWSER_SOURCE: 49130bfe386066e211a49b868231f6a5f6b6f277
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          mkdir -p evidence
+          python3 - <<'PY'
+          import os,pathlib,re,subprocess
+          output=pathlib.Path(os.environ['RUNNER_TEMP'],'browser-run.private.log')
+          with output.open('w') as log:
+           try:
+            result=subprocess.run(['timeout','--signal=TERM','--kill-after=20','780','bash','scripts/quotations-browser/run.sh'],stdout=log,stderr=subprocess.STDOUT,timeout=810)
+            code=result.returncode
+           except subprocess.TimeoutExpired: code=124
+          safe=[line for line in output.read_text(errors='replace').splitlines() if re.fullmatch(r'MM_BROWSER_(?:PASS|FAILURE|CLEANUP|NETWORK_CLEANUP):[A-Za-z0-9_:]+',line)]
+          safe.append('Browser harness exit: '+str(code))
+          pathlib.Path('evidence/browser-run-summary.txt').write_text('\n'.join(safe)+'\n')
+          print('\n'.join(safe))
+          if code: raise SystemExit(1)
+          PY
+      - name: Upload bounded synthetic browser summaries only
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: phase-c-linux-release-${{ github.run_id }}-${{ github.run_attempt }}
-          path: release-evidence/*
-          retention-days: 14
+          name: quotations-browser-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/browser-*summary.*
+          retention-days: 7
+          if-no-files-found: warn
+  package:
+    if: inputs.gate == 'package'
+    needs: provenance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Require authenticated successful validation of this exact runtime
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |-
+            const expectedRepo = 'KasivarapuNarasimha/massive-mentor-crm';
+            if (context.repo.owner + '/' + context.repo.repo !== expectedRepo) throw new Error('PACKAGE_REPOSITORY_REJECTED');
+            const params = {owner: context.repo.owner, repo: context.repo.repo};
+            const {data: workflow} = await github.rest.actions.getWorkflow({...params, workflow_id: 'phase-c-postgres-validation.yml'});
+            const {data: run} = await github.rest.actions.getWorkflowRun({...params, run_id: 39918705226});
+            if (run.id !== 39918705226 || run.workflow_id !== workflow.id || run.head_sha !== '707b418e8352dbf1e11a7efd01407470178f32fa' || run.head_branch !== 'codex/quotations-validation' || run.event !== 'workflow_dispatch' || run.run_attempt !== 1 || run.status !== 'completed' || run.conclusion !== 'success' || run.repository.full_name !== expectedRepo || run.path !== '.github/workflows/phase-c-postgres-validation.yml') throw new Error('PACKAGE_VALIDATION_RUN_REJECTED');
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {...params, run_id: run.id, filter: 'latest', per_page: 100});
+            if (jobs.length !== 3 || !['provenance','validate','browser'].every(name => jobs.some(job => job.name === name && job.status === 'completed' && job.conclusion === 'success'))) throw new Error('PACKAGE_VALIDATION_JOBS_REJECTED');
+            const {data: artifact} = await github.rest.actions.getArtifact({...params, artifact_id: 12485818496});
+            if (artifact.expired || artifact.name !== 'quotations-browser-evidence-39918705226-1' || artifact.workflow_run.id !== run.id || artifact.digest !== 'sha256:21d8c4f108cea69e547af576591ad03fdef36712c161fe86fe05763e80119cfa') throw new Error('PACKAGE_VALIDATION_ARTIFACT_REJECTED');
+            require('fs').writeFileSync(require('path').join(process.env.RUNNER_TEMP,'quotations-validated-source.json'), JSON.stringify({sourceCommit:'49130bfe386066e211a49b868231f6a5f6b6f277',validationRun:run.id,workflowHead:run.head_sha,browserArtifactDigest:artifact.digest,integration:'PASS',capturedMailBrowser:'PASS',sameSnapshotLockOrders:'UNVERIFIED',productionExecution:false},null,2));
+            core.info('Authenticated exact-source validation evidence accepted');
+      - name: Checkout fixed application checkpoint
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: KasivarapuNarasimha/massive-mentor-crm
+          ref: 49130bfe386066e211a49b868231f6a5f6b6f277
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Verify source, hashes and environment-file exclusion
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          test "$(git rev-parse HEAD)" = 49130bfe386066e211a49b868231f6a5f6b6f277
+          test -z "$(git status --porcelain)"
+          sha256sum --check --strict <<'HASHES'
+          3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
+          1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
+          31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
+          f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
+          8173a54c14948cfcaa2d9f348860bf42a00c714f0bbdb981870696552288a1b5  apps/api/scripts/commercial-workflow-postgres.test.cjs
+          5cd7515bf66601f18a4ad886a1075aa95d8b3e0eb87e08fb140c068b1986bd98  apps/api/scripts/commercial-test-loader.cjs
+          c7540d388b862058875f56cf047550fe5bf373e14432be51c2c1ac376e551a8a  apps/api/src/services/quotation.service.ts
+          cc7510a7f92bae74c28b0da32334960d9e33c23263aa29ca10bd977d0c64e503  apps/api/src/services/commercial-quotation-pdf.ts
+          8f21977523fc55fc3aeaa6f8bf3b25077e6a06ec32b72eb41cb054845aafdc52  apps/api/src/services/quotation-customer.service.ts
+          87f108b91d2d7733005776701f02438f49eca08bba743bbc892119058f9420cb  apps/api/src/services/commercial-finance.service.ts
+          d70dd6072c4d708d49cc2245f64c04f7477675323be176b3407f390dca2ee93c  apps/api/src/services/commercial-delivery.service.ts
+          6aadd750df584bb4086cecad9845b315b8369133cfcd1a80a3945f54e830a68a  apps/api/src/services/commercial-configuration.service.ts
+          6583fc4c8f3a05c080510e9fe2b0a1802c8458ca1d4e421953fa847c23fc11b1  docs/phase-c-review/validation/concurrency.py
+          388ffece3c1f06a26852cec29492e0c07af82ce02b49bae6bbf4e078c1844a38  pnpm-lock.yaml
+          dab7a2239ffdf47df6f04c55298d6460c1e31a38b4544d0ad170ecc15e22253c  apps/api/src/index.ts
+          f3e6a480eb22cd084ab9d294d15315daf6307a6b23db2cbb8cece140d46b5908  apps/api/src/routes/commercial.routes.ts
+          cdf07b6df6415487b06aee11c7c7223b1707561bbdb2a5a84d48d3cb457311a7  apps/api/src/routes/quotation.routes.ts
+          54fe3f152c9f3726c92004497a4634fa318a5267d7ef07bb8c60e1149fbb907e  apps/api/src/routes/quotation-customer.routes.ts
+          2c0d661c615b1d29d2fe9f15fc5ea8d1c95bfd0d217f6450dfba084f69b0a7ce  apps/api/src/routes/commercial-finance.routes.ts
+          3c0256658614e7fc4bb652efc65cf39472b47632dc9d46bf6406b03557f200bd  apps/web/app/commercial/page.tsx
+          d8ac32eb28ccdb758821792d6d3af0ca16fc3117168c75b09c4412cedffeb86d  apps/api/src/services/finance.service.ts
+          b983f1f44fe455e9206d2da0d05838874365af735402f33cac4cbb712dadd92b  apps/web/app/dashboard/finance/page.tsx
+          55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28  docs/phase-c-review/migration.sql.proposed
+          661384b2effc41bae5ae71db57813521babea9e5e7f2c608b0d654317e46a752  docs/phase-c-review/validation/run.sh
+          769ae7c624c8cfb689f6f1b69c3db022f6227fba4e64dc2dfd89bd9c23d33311  docs/phase-c-review/validation/catalog-and-negative.sql
+          6d507f805e6f215e60d2f50745719be953e524909b8900e5975cf776e235d9a0  apps/api/src/services/restore-safety.ts
+          a09dd9bcdf11a26ea8570f3215ed35e4ad10c2c61f91cb3ba94b83619a4063e5  apps/api/src/services/strict-business-resolution.service.ts
+          e1fe3abf9d62aebf4dd532d1869d4cfc3adedb6604b3d66a2a79bdf360006070  apps/api/src/services/lead-assignment-safety.service.ts
+          6f54e775b072e5ed609c6b9e3b01b88ab2a5c0303eb6f299f279c03fa8c07bc4  apps/api/src/services/billing-access.service.ts
+          51e80618fd8064c97785bb7792c83e390343caaf529640c1cf33040e2a1ced82  apps/api/src/services/followup-engine.service.ts
+          24a3eba1671be2014365a29d2264628fe83f93ddfa332895ad6178147d32bd08  apps/api/prisma/migrations/20260907120000_import_batch/migration.sql
+          3708d1419accee0543f35864ddcc5af42b3d655e06fa8f8986757c4599d1b302  apps/api/src/services/tenant-scope.service.ts
+          c050f78b86b45f3b3384be543da063db941a28a948fa381a00603538b5fba722  apps/api/src/services/crm.service.ts
+          b9e0eb053b53c47feeef2986720e2e50c40d32f2742d212b13231fb7b1ccc61d  apps/api/src/services/lead-assignment.service.ts
+          8bc24c119b9b23c78972e3f20b27d1f3d826bcaee32b2d6205fc16fb913089f5  apps/api/src/middleware/requireModule.ts
+          60cf381d4ceae72fb0bf0209bea2c0125836bb9b35ef4f9cad40405023ae249a  apps/api/src/middleware/requireBillingAccess.ts
+          f55bd45860c61f56bca88615e4360a59b0e1bede80b20e7205f0581388a5f476  apps/api/src/services/permissions.service.ts
+          0dcc163d24365cf09da5d2c72b39364275afed70bae8e3be976291aa65c36294  apps/api/scripts/commercial-document.test.cjs
+          65a8cf43db7f81bc46b24c54b0d778d7a908f0e5d2f840d372d91eac7c0b92d2  apps/api/scripts/commercial-pdf.test.cjs
+          8581974e59a95703d27df453aa8d7a20c5a11e5b24693f43f3a19748ba040ec7  apps/api/scripts/quotation-catalog.test.cjs
+          f05f935edc96679ed2c6678082548c3cbe29603873bab797f9f7aa147c035add  apps/api/src/services/quotation-catalog.service.ts
+          4d55655203f713afe1ff33639ae4c2129b700d812c69df595922b303ae46a554  apps/web/app/dashboard/deals/page.tsx
+          3c0256658614e7fc4bb652efc65cf39472b47632dc9d46bf6406b03557f200bd  apps/web/app/dashboard/quotations/page.tsx
+          51fcb7aadaf870909ecb554d744ae082d3cd904720138f9f3a66f5b81d99af0d  apps/web/components/dashboard/DashboardShell.tsx
+          e0c8f728b3ad660f0a4af973eade68f089568f32b51b099393086f0093e0d063  apps/web/components/quotations/QuotationReferenceSelect.tsx
+          610b7059ea1bd014a66ee5573c2db74875fb3b6291497237a6c3241bd286c0ff  apps/web/components/quotations/QuotationWorkspace.tsx
+          defafc999b83e0915953e1ab0a9e4a65f275f652d63c0c05200d92a4f6a35198  apps/web/lib/module-permissions.ts
+          47e4e7d72876ee63bcb384d68047f1275aae870939132574899f06b7b2ed5336  apps/web/lib/nav-hierarchy.ts
+          6d78f6b22a708856c09acd37e9441efea1997dcfa5b0bd94f9077ef4728a3395  apps/web/scripts/quotation-ui.test.cjs
+          af2baefd115edd6ade2546dbc7c5d6f9e9580e47bc146111479e74afe210e961  apps/api/scripts/commercial-seal-lock-contract.test.cjs
+          1eb8c7856ace4686cfd533bfab494ffb28c2bb5c3815638b76cb525936f07aa3  scripts/quotations-browser/contract.test.cjs
+          e8be52e3037e91fe70737940c272e349391b19b8cff0ecbdb1b823b00c3ac24c  scripts/quotations-browser/e2e.cjs
+          afac822ee7b748b12452490d8f45276c99eca344c77b4121d99386cffff10611  scripts/quotations-browser/package-lock.json
+          23384a19da23b6ade2c90f2c0d3d77af9e7fc2ffefacfa1e720c08b4a1a96d27  scripts/quotations-browser/package.json
+          0fbabb4b91f88bf9fca2fcc367c76de378258248efd8185e129073b4d5156e4a  scripts/quotations-browser/run.sh
+          91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
+          HASHES
+          python3 - <<'PY'
+          import pathlib,subprocess
+          for name in subprocess.check_output(['git','ls-files'],text=True).splitlines():
+              base=pathlib.PurePosixPath(name).name
+              if base.startswith('.env') and not (base.endswith('.example') or base.endswith('.template')):
+                  raise SystemExit('Unexpected environment file in source')
+          PY
+      - name: Fixed Node runtime
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22.16.0
+      - name: Frozen dependencies without lifecycle scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          npm install --global pnpm@9.15.0 --ignore-scripts --no-audit --no-fund
+          test "$(pnpm --version)" = 9.15.0
+          pnpm install --frozen-lockfile --ignore-scripts
+          test -z "$(git status --porcelain)"
+      - name: Build production-URL immutable Linux artifacts without application startup
+        shell: bash
+        env:
+          DATABASE_URL: postgresql://synthetic:dummy@127.0.0.1:1/nonconnecting_build
+          NEXT_PUBLIC_API_URL: https://api.massivementor.in/api
+          NEXT_TELEMETRY_DISABLED: "1"
+          MM_RELEASE_SOURCE_COMMIT: 49130bfe386066e211a49b868231f6a5f6b6f277
+        run: |-
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import os,pathlib,subprocess,hashlib,json
+          log_path=pathlib.Path(os.environ['RUNNER_TEMP'])/'quotations-release-build.private.log'
+          commands=[['pnpm','--filter','@massivementor/api','build'],['pnpm','--filter','@massivementor/api','lint'],['pnpm','--filter','@massivementor/api','exec','tsc','--noEmit','--incremental','false'],['pnpm','--filter','@massivementor/web','build'],['node','scripts/commercial-release-package.mjs']]
+          for index,command in enumerate(commands,1):
+              with log_path.open('ab') as log:
+                  try: result=subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,timeout=900)
+                  except subprocess.TimeoutExpired: raise SystemExit('MM_RELEASE_FAILURE:STAGE_'+str(index)+':TIMEOUT')
+              if result.returncode: raise SystemExit('MM_RELEASE_FAILURE:STAGE_'+str(index)+':EXIT_'+str(result.returncode))
+              print('MM_RELEASE_PASS:STAGE_'+str(index),flush=True)
+          out=pathlib.Path('release-evidence')
+          record=json.loads((pathlib.Path(os.environ['RUNNER_TEMP'])/'quotations-validated-source.json').read_text())
+          manifest=json.loads((out/'RELEASE.json').read_text())
+          assert manifest['sourceCommit']==record['sourceCommit']==os.environ['MM_RELEASE_SOURCE_COMMIT']
+          assert manifest['platform']=='linux-x64' and manifest['node']=='v22.16.0'
+          checksum,name=(out/'SHA256SUMS').read_text().strip().split('  ')
+          assert name=='massive-mentor-'+record['sourceCommit']+'-linux-x64.tar.gz'
+          assert hashlib.sha256((out/name).read_bytes()).hexdigest()==checksum
+          record['archiveSHA256']=checksum
+          (out/'validation-evidence.json').write_text(json.dumps(record,indent=2)+'\n')
+          summary=out/'packaging-summary.txt'
+          summary.write_text(summary.read_text().replace('Real SMTP/browser validation: PENDING','Captured TLS SMTP/browser validation: PASS (run 39918705226); external real-mail delivery: UNVERIFIED'))
+          print('MM_RELEASE_ARCHIVE_SHA256:'+checksum)
+          PY
+      - name: Upload immutable release archive and bounded evidence
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: quotations-linux-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-evidence/
           if-no-files-found: error
+          retention-days: 14
+  rollback:
+    needs: provenance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    services:
+      postgres:
+        image: postgres@sha256:ec9f656f17c8b4dfebf49e58cf5c46d493d4846d4ea6d8b85d0637f68ee33bfc
+        env:
+          POSTGRES_USER: mm_phasec
+          POSTGRES_PASSWORD: phasec_dummy_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432/tcp
+        options: "--health-cmd \"pg_isready -U mm_phasec -d postgres\" --health-interval 5s --health-timeout 5s --health-retries 12"
+    env:
+      MM_PHASEC_DISPOSABLE: "YES"
+      MM_ROLLBACK_AUTHORIZED: "YES"
+      MM_PHASEC_RUN_STARTED_AT: ${{ needs.provenance.outputs.started_at }}
+      MM_PHASEC_IMAGE_DIGEST: postgres@sha256:ec9f656f17c8b4dfebf49e58cf5c46d493d4846d4ea6d8b85d0637f68ee33bfc
+      MM_PHASEC_IMAGE_ID: sha256:e8538db784b854a9baac5c1be6d059dcf0db257af2d94c8c5807b5fc15f11222
+      MM_PHASEC_PROPOSAL_SHA256: 55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Checkout exact dispatcher tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: tools
+      - name: Checkout fixed compatible fallback source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 9219ba31f619bec15b563bbacf6ad82c5f80d3fc
+          persist-credentials: false
+          fetch-depth: 1
+          path: source
+      - name: Verify independently reviewed pins and storage before application SQL
+        working-directory: source
+        env:
+          MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}
+          MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          test "$(git rev-parse HEAD)" = 9219ba31f619bec15b563bbacf6ad82c5f80d3fc
+          test -z "$(git status --porcelain)"
+          sha256sum --check --strict <<'HASHES'
+          f6c342f5586a5f4b80e6c2ea4b995758415c681d9e825bf15615531da0266c7e  ../tools/scripts/phase-c-rollback/rehearsal.py
+          babfbf2fa892dc615d031c9f0e84ef565b7100fc363e1a9186e5dfea7ee135f3  ../tools/scripts/phase-c-rollback/run.sh
+          91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
+          f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
+          3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
+          1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
+          31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
+          24a3eba1671be2014365a29d2264628fe83f93ddfa332895ad6178147d32bd08  apps/api/prisma/migrations/20260907120000_import_batch/migration.sql
+          286623af639b065355b6757ff2362df7450018a818787d80acb51f3e169259e3  ../tools/scripts/phase-c-rollback/permission-probe.cjs
+          946966bb5770def4f2017d175204b4d45b77a967bfb40622bea1fa17b85cc0f2  ../tools/scripts/phase-c-rollback/uid-boundary.py
+          HASHES
+          python3 docs/phase-c-review/validation/concurrency.py --storage-only "$MM_PHASEC_CONTAINER_ID"
+          python3 - <<'PY'
+          import os,pathlib,tempfile,re
+          container=os.environ['MM_PHASEC_CONTAINER_ID'];port=os.environ['MM_PHASEC_PG_PORT']
+          assert re.fullmatch(r'[0-9a-f]{64}',container) and re.fullmatch(r'[0-9]+',port) and 1 <= int(port) <= 65535
+          private=pathlib.Path(tempfile.mkdtemp(prefix='mm-rollback-private-',dir=os.environ['RUNNER_TEMP']))
+          root=pathlib.Path(tempfile.mkdtemp(prefix='mm-rollback-',dir='/tmp'))
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              f.write('MM_ROLLBACK_PRIVATE='+str(private)+'\nMM_ROLLBACK_ROOT='+str(root)+'\nMM_PHASEC_CONTAINER_ID='+container+'\nMM_PHASEC_PG_PORT='+port+'\n')
+          for name in pathlib.Path('.').rglob('.env'):
+              if 'node_modules' not in name.parts:
+                  raise SystemExit('Environment file excluded')
+          PY
+      - name: Retrieve authenticated exact validated release artifact
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        timeout-minutes: 6
+        with:
+          script: |
+            const fs = require('fs'), path = require('path'), crypto = require('crypto');
+            const {data:r} = await github.rest.actions.getWorkflowRun({...context.repo,run_id:39919629936});
+            const {data:w} = await github.rest.actions.getWorkflow({...context.repo,workflow_id:r.workflow_id});
+            const {data:a} = await github.rest.actions.getArtifact({...context.repo,artifact_id:12485299685});
+            const expected='d4482fdccd88c26275527961e21465854ce3c388f0ae10208b773fe98709cca8';
+            if (r.repository.full_name !== 'KasivarapuNarasimha/massive-mentor-crm' ||
+                r.run_attempt !== 1 || r.head_branch !== 'codex/quotations-validation' || r.status !== 'completed' || r.conclusion !== 'success' || r.event !== 'workflow_dispatch' ||
+                r.head_sha !== 'aa114cdaa50492b810f7c894ca4c8fce3c9139fc' ||
+                w.path !== '.github/workflows/phase-c-postgres-validation.yml' ||
+                a.expired || a.workflow_run.id !== r.id ||
+                a.name !== 'quotations-linux-release-39919629936-1' || a.digest !== 'sha256:'+expected)
+              throw new Error('Fixed artifact metadata rejected');
+            const result=await github.rest.actions.downloadArtifact({...context.repo,artifact_id:a.id,archive_format:'zip'});
+            const bytes=Buffer.from(result.data);
+            if(crypto.createHash('sha256').update(bytes).digest('hex') !== expected) throw new Error('Fixed ZIP checksum rejected');
+            fs.writeFileSync(path.join(process.env.MM_ROLLBACK_PRIVATE,'candidate.zip'),bytes,{flag:'wx',mode:0o400});
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22.16.0
+          architecture: x64
+      - name: Build fixed compatible fallback without application startup
+        working-directory: source
+        shell: bash
+        timeout-minutes: 25
+        env:
+          MM_RELEASE_SOURCE_COMMIT: 9219ba31f619bec15b563bbacf6ad82c5f80d3fc
+          DATABASE_URL: postgresql://unused:unused@127.0.0.1:1/not_connected
+          NEXT_PUBLIC_API_URL: https://api.massivementor.in/api
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import os,pathlib,subprocess
+          private=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
+          commands=[['npm','install','--global','pnpm@9.15.0','--ignore-scripts','--no-audit','--no-fund'],
+                    ['pnpm','install','--frozen-lockfile','--ignore-scripts'],
+                    ['pnpm','--filter','@massivementor/api','build'],
+                    ['pnpm','--filter','@massivementor/web','build'],
+                    ['node','scripts/commercial-release-package.mjs']]
+          with (private/'build-private.log').open('wb') as log:
+              for command in commands:
+                  result=subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,timeout=650)
+                  if result.returncode: raise SystemExit('Bounded fallback build failed; private log not uploaded')
+          PY
+      - name: Verify bundles and fixed PM2 package integrity
+        working-directory: source
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          python3 ../tools/scripts/phase-c-rollback/rehearsal.py verify "$MM_ROLLBACK_PRIVATE/candidate.zip" \
+            release-evidence/massive-mentor-9219ba31f619bec15b563bbacf6ad82c5f80d3fc-linux-x64.tar.gz
+          python3 - <<'PY'
+          import base64,hashlib,json,os,pathlib,subprocess,urllib.request
+          private=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
+          expected='sha512-y7sO+UuGjfESK/ChRN+efJKAsHrBd95GY2p1GQfjVTtOfFtUfiW0NOuUhP5dN5QTF2F0EWcepgkLqbF32j90Iw=='
+          with urllib.request.urlopen('https://registry.npmjs.org/pm2/6.0.8',timeout=20) as r: meta=json.load(r)
+          assert meta['name']=='pm2' and meta['version']=='6.0.8' and meta['dist']['integrity']==expected
+          with urllib.request.urlopen('https://registry.npmjs.org/pm2/-/pm2-6.0.8.tgz',timeout=30) as r: blob=r.read(20000000)
+          assert 'sha512-'+base64.b64encode(hashlib.sha512(blob).digest()).decode()==expected
+          tar=private/'pm2-verified.tgz';tar.write_bytes(blob)
+          with (private/'pm2-install-private.log').open('wb') as log:
+              subprocess.run(['npm','install','--prefix',str(private/'pm2-tool'),'--ignore-scripts','--no-audit','--no-fund',str(tar)],stdout=log,stderr=subprocess.STDOUT,timeout=180,check=True)
+          # Reviewed PM2 configuration contains no credentials; only paths change during rehearsal.
+          data=subprocess.check_output(['node','-e',"console.log(JSON.stringify(require('./deploy/ecosystem.config.cjs')))"],timeout=10)
+          (private/'pm2-reviewed.json').write_bytes(data)
+          PY
+      - name: Full disposable PM2 populated PostgreSQL upgrade and rollback
+        working-directory: source
+        timeout-minutes: 18
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import os,pathlib,re,subprocess
+          private=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
+          with (private/'runtime-private.log').open('wb') as log:
+              result=subprocess.run(['timeout','--signal=TERM','--kill-after=30','960','bash','../tools/scripts/phase-c-rollback/run.sh'],
+                                    stdout=log,stderr=subprocess.STDOUT,timeout=1010)
+          text=(private/'runtime-private.log').read_text(errors='replace')
+          for line in text.splitlines():
+              if re.fullmatch(r'MM_ROLLBACK_FAILURE:(?:[A-Z_]+|PM2_OPERATION)',line): print(line)
+              # Failure JSON is preserved through the fixed allowlisted summary writer, not raw log printing.
+          if result.returncode: raise SystemExit('Isolated rollback failed; raw log not uploaded')
+          if not (private/'rollback-summary.json').is_file(): raise SystemExit('Rollback evidence absent')
+          print('Three PM2 stages and populated database integrity: PASS')
+          PY
+      - name: Preserve exact artifacts and sanitized evidence
+        if: always()
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,shutil
+          out=pathlib.Path('../rollback-evidence');out.mkdir(exist_ok=True)
+          if 'MM_ROLLBACK_PRIVATE' not in os.environ:
+              (out/'failure-summary.json').write_text('{"preflight":"FAILED","runtime":"UNVERIFIED"}\n')
+              raise SystemExit(0)
+          private=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
+          # Never upload PM2 dumps, environment, raw logs, database rows, npm configuration or credentials.
+          for n in ['artifact-summary.json','rollback-summary.json','diagnostic-summary.json','cleanup-summary.json','database-cleanup-summary.json','uid-boundary-summary.json']:
+              p=private/n
+              if p.is_file(): shutil.copyfile(p,out/n)
+          files=[private/'massive-mentor-49130bfe386066e211a49b868231f6a5f6b6f277-linux-x64.tar.gz',
+                 pathlib.Path('release-evidence/massive-mentor-9219ba31f619bec15b563bbacf6ad82c5f80d3fc-linux-x64.tar.gz')]
+          sums=[]
+          for p in files:
+              if p.is_file():
+                  shutil.copyfile(p,out/p.name)
+                  h=hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
+                  sums.append(h+'  '+p.name)
+          (out/'SHA256SUMS').write_text('\n'.join(sums)+'\n')
+          (out/'limitations.json').write_text(json.dumps({'capturedSMTPBrowser':'PASS_RUN_39918705226','externalRealMail':'UNVERIFIED','exactSameSnapshotSealingOrders':'UNVERIFIED','previousProductionArtifact':'NOT USED','productionAccess':False})+'\n')
+          PY
+      - name: Upload allowlisted artifacts and summaries only
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: phase-c-rollback-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            rollback-evidence/*.tar.gz
+            rollback-evidence/*summary.json
+            rollback-evidence/limitations.json
+            rollback-evidence/SHA256SUMS
+          retention-days: 7
+          if-no-files-found: error
+    if: ${{ inputs.gate == 'rollback' }}

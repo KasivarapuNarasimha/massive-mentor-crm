@@ -528,7 +528,7 @@ export default function DealsPage() {
                             {deal.value != null ? money(deal.value) : "—"}
                           </div>
                           <div className="flex gap-1.5 flex-wrap">
-                            {deal.businessId && deal.contactId && <Link href={`/commercial?businessId=${encodeURIComponent(deal.businessId)}&contactId=${encodeURIComponent(deal.contactId)}&dealId=${encodeURIComponent(deal.id)}`} className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs inline-flex">Quotation</Link>}
+                            {deal.businessId && deal.contactId && <Link href={`/dashboard/quotations?businessId=${encodeURIComponent(deal.businessId)}&contactId=${encodeURIComponent(deal.contactId)}&dealId=${encodeURIComponent(deal.id)}`} className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs inline-flex">Create Quotation</Link>}
                             <Link
                               href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
                               className="mm-btn mm-btn-secondary h-9 min-h-9 px-2.5 text-xs touch-manipulation"
@@ -646,7 +646,7 @@ export default function DealsPage() {
                             {deal.value != null ? money(deal.value) : "-"}
                           </div>
                           <div className="flex gap-1">
-                            {deal.businessId && deal.contactId && <Link href={`/commercial?businessId=${encodeURIComponent(deal.businessId)}&contactId=${encodeURIComponent(deal.contactId)}&dealId=${encodeURIComponent(deal.id)}`} className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs inline-flex">Quotation</Link>}
+                            {deal.businessId && deal.contactId && <Link href={`/dashboard/quotations?businessId=${encodeURIComponent(deal.businessId)}&contactId=${encodeURIComponent(deal.contactId)}&dealId=${encodeURIComponent(deal.id)}`} className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs inline-flex">Create Quotation</Link>}
                             <Link
                               href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
                               className="mm-btn mm-btn-secondary h-7 min-h-7 px-1.5 text-[10px]"
@@ -707,7 +707,7 @@ export default function DealsPage() {
                     {deal.value != null ? money(deal.value) : "—"}
                   </span>
                   <div className="flex gap-1.5 flex-wrap">
-                    {deal.businessId && deal.contactId && <Link href={`/commercial?businessId=${encodeURIComponent(deal.businessId)}&contactId=${encodeURIComponent(deal.contactId)}&dealId=${encodeURIComponent(deal.id)}`} className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs inline-flex">Quotation</Link>}
+                    {deal.businessId && deal.contactId && <Link href={`/dashboard/quotations?businessId=${encodeURIComponent(deal.businessId)}&contactId=${encodeURIComponent(deal.contactId)}&dealId=${encodeURIComponent(deal.id)}`} className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs inline-flex">Create Quotation</Link>}
                     <Link
                       href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
                       className="mm-btn mm-btn-secondary h-9 min-h-9 px-2.5 text-xs touch-manipulation"
@@ -757,7 +757,7 @@ export default function DealsPage() {
                       </td>
                       <td className="text-foreground tabular-nums">{deal.value != null ? money(deal.value) : "-"}</td>
                       <td className="text-right space-x-1.5">
-                        {deal.businessId && deal.contactId && <Link href={`/commercial?businessId=${encodeURIComponent(deal.businessId)}&contactId=${encodeURIComponent(deal.contactId)}&dealId=${encodeURIComponent(deal.id)}`} className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs inline-flex">Quotation</Link>}
+                        {deal.businessId && deal.contactId && <Link href={`/dashboard/quotations?businessId=${encodeURIComponent(deal.businessId)}&contactId=${encodeURIComponent(deal.contactId)}&dealId=${encodeURIComponent(deal.id)}`} className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs inline-flex">Create Quotation</Link>}
                         <Link
                           href={`/dashboard/erp/sales-orders?dealId=${encodeURIComponent(deal.id)}`}
                           className="mm-btn mm-btn-secondary h-8 min-h-8 px-2.5 text-xs inline-flex"

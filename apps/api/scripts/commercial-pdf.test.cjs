@@ -169,7 +169,7 @@ test("missing, foreign and unsealed snapshots do not render", async () => {
 
 test("staff and customer surfaces keep the unpaid label and body-only pdf token", () => {
   const root = path.resolve(__dirname, "../../..");
-  const staff = fs.readFileSync(path.join(root, "apps/web/app/commercial/page.tsx"), "utf8");
+  const staff = fs.readFileSync(path.join(root, "apps/web/components/quotations/QuotationWorkspace.tsx"), "utf8");
   const customer = fs.readFileSync(path.join(root, "apps/web/app/quotation/[token]/page.tsx"), "utf8");
   const staffRoute = fs.readFileSync(path.join(root, "apps/api/src/routes/quotation.routes.ts"), "utf8");
   const customerRoute = fs.readFileSync(path.join(root, "apps/api/src/routes/quotation-customer.routes.ts"), "utf8");
