@@ -285,6 +285,7 @@ app.use("/api/demo", demoRoutes);
 // Module permission gate — path → CrmModule; Super Admin catalog is DB-seeded
 import { requireModuleFromPath } from "./middleware/requireModule.js";
 import { requireAuth as requireAuthMw } from "./middleware/auth.js";
+import teamChatRoutes from "./routes/team-chat.routes.js";
 
 // Mount API routes (auth + module gate on tenant CRM surfaces)
 app.use("/api/auth", authRoutes);
@@ -303,6 +304,8 @@ app.use("/api/automations", requireAuthMw, requireModuleFromPath, automationRout
 // Public WhatsApp webhook is registered earlier; authenticated integration routes below
 app.use("/api/integrations", requireAuthMw, requireModuleFromPath, integrationRoutes);
 app.use("/api/teams", requireAuthMw, requireModuleFromPath, teamRoutes);
+// Team Chat owns an explicit, strictly validated business context on every request.
+app.use("/api/team-chat", teamChatRoutes);
 app.use("/api/reports", requireAuthMw, requireModuleFromPath, reportRoutes);
 app.use("/api/businesses", businessRoutes);
 app.use("/api/templates", templateRoutes);

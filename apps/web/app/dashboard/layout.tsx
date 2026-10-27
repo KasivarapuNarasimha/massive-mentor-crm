@@ -1,4 +1,5 @@
 "use client";
+import { TeamChatProvider } from "@/components/team-chat/TeamChatProvider";
 
 import { useAuth } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
@@ -126,9 +127,9 @@ export default function DashboardLayout({
     <PortalProvider>
       <PlanProvider>
         <AiQuotaModalProvider>
-          <DashboardShell>
+          <TeamChatProvider><DashboardShell>
             <ModuleGate>{children}</ModuleGate>
-          </DashboardShell>
+          </DashboardShell></TeamChatProvider>
         </AiQuotaModalProvider>
       </PlanProvider>
     </PortalProvider>

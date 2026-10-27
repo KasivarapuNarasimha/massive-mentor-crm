@@ -35,6 +35,7 @@ export const ROUTE_MODULE: Record<string, string> = {
   "/dashboard/approvals": "approvals",
   "/dashboard/activity": "activity",
   "/dashboard/team": "team",
+  "/dashboard/team-chat": "team_chat",
   "/dashboard/billing": "billing",
   "/dashboard/security": "settings",
   "/dashboard/backups": "backups",
