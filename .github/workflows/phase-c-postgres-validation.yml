@@ -30,9 +30,12 @@ jobs:
             const repo = 'KasivarapuNarasimha/massive-mentor-crm';
             const path = '.github/workflows/phase-c-postgres-validation.yml';
             const e = process.env;
+            const allowedBranches = ['codex/phase-c-release-candidate', 'integration/phase-c-staging', 'main'];
+            const allowedRefs = allowedBranches.map(b => 'refs/heads/' + b);
+            const allowedWorkflowRefs = allowedBranches.map(b => repo + '/' + path + '@refs/heads/' + b);
             if (e.GITHUB_REPOSITORY !== repo || e.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
-                e.GITHUB_REF !== 'refs/heads/codex/phase-c-release-candidate' || e.GITHUB_ACTOR !== 'KasivarapuNarasimha' ||
-                e.GITHUB_WORKFLOW_REF !== `${repo}/${path}@refs/heads/codex/phase-c-release-candidate` ||
+                !allowedRefs.includes(e.GITHUB_REF) || e.GITHUB_ACTOR !== 'KasivarapuNarasimha' ||
+                !allowedWorkflowRefs.includes(e.GITHUB_WORKFLOW_REF) ||
                 e.RUNNER_ENVIRONMENT !== 'github-hosted') {
               throw new Error('Dispatcher identity rejected');
             }
@@ -50,7 +53,7 @@ jobs:
             });
             if (run.id !== runId || run.run_attempt !== attempt ||
                 run.repository.full_name !== repo || run.event !== 'workflow_dispatch' ||
-                run.head_branch !== 'codex/phase-c-release-candidate' || run.head_sha !== e.GITHUB_SHA ||
+                !allowedBranches.includes(run.head_branch) || run.head_sha !== e.GITHUB_SHA ||
                 run.head_sha !== e.GITHUB_WORKFLOW_SHA || workflow.path !== path ||
                 run.actor.login !== 'KasivarapuNarasimha' ||
                 run.triggering_actor.login !== 'KasivarapuNarasimha' ||

@@ -1,0 +1,276 @@
+# REVIEW ONLY: merging and first dispatch require separate owner authorization.
+name: Phase C isolated artifact rollback
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: phase-c-rollback-only
+  cancel-in-progress: false
+jobs:
+  provenance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      started_at: ${{ steps.verify.outputs.started_at }}
+    steps:
+      - id: verify
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        with:
+          script: |
+            const e = process.env;
+            const repo = 'KasivarapuNarasimha/massive-mentor-crm';
+            const path = '.github/workflows/phase-c-rollback-validation.yml';
+            if (e.GITHUB_REPOSITORY !== repo || e.GITHUB_EVENT_NAME !== 'workflow_dispatch' ||
+                e.GITHUB_REF !== 'refs/heads/main' || e.GITHUB_ACTOR !== 'KasivarapuNarasimha' ||
+                e.GITHUB_WORKFLOW_REF !== repo + '/' + path + '@refs/heads/main' ||
+                e.RUNNER_ENVIRONMENT !== 'github-hosted' || e.RUNNER_ARCH !== 'X64') throw new Error('Dispatcher rejected');
+            const id = Number(e.GITHUB_RUN_ID), attempt = Number(e.GITHUB_RUN_ATTEMPT);
+            if (!Number.isSafeInteger(id) || id < 1 || !Number.isSafeInteger(attempt) || attempt < 1) throw new Error('Run rejected');
+            const {data:r} = await github.rest.actions.getWorkflowRunAttempt({...context.repo,run_id:id,attempt_number:attempt});
+            const {data:w} = await github.rest.actions.getWorkflow({...context.repo,workflow_id:r.workflow_id});
+            const started = Date.parse(r.run_started_at);
+            // Diagnostic output is fixed predicate IDs and typed/allowlisted metadata only.
+            const safe = (v,kind) => {
+              if (kind === 'number') return Number.isSafeInteger(v) ? v : 'INVALID_NUMBER';
+              if (kind === 'sha') return typeof v === 'string' && /^[a-f0-9]{40}$/.test(v) ? v : 'INVALID_SHA';
+              if (kind === 'status') return ['queued','in_progress','completed','waiting','pending','requested'].includes(v) ? v : 'UNEXPECTED_STATUS';
+              return 'UNEXPECTED_VALUE';
+            };
+            const provenanceDiagnostics = () => {
+              const checks = [
+                ['RUN_ID',r.id,id,'number'],['RUN_ATTEMPT',r.run_attempt,attempt,'number'],
+                ['REPOSITORY',r.repository.full_name,repo,'literal'],['EVENT',r.event,'workflow_dispatch','literal'],
+                ['BRANCH',r.head_branch,'main','literal'],['SOURCE_SHA',r.head_sha,e.GITHUB_SHA,'sha'],
+                ['WORKFLOW_SHA',r.head_sha,e.GITHUB_WORKFLOW_SHA,'sha'],['RUN_STATUS',r.status,'in_progress','status'],
+                ['ACTOR',r.actor.login,'KasivarapuNarasimha','literal'],
+                ['TRIGGERING_ACTOR',r.triggering_actor.login,'KasivarapuNarasimha','literal'],
+                ['WORKFLOW_PATH',w.path,path,'literal']
+              ];
+              const failed = checks.filter(([,a,b])=>a!==b).map(([predicate,a,b,kind])=>({
+                predicate,expected:kind==='literal'?b:safe(b,kind),actual:safe(a,kind)
+              }));
+              const now=Date.now();
+              if (!Number.isFinite(started)) failed.push({predicate:'START_VALID',expected:true,actual:false});
+              if (started>now) failed.push({predicate:'START_NOT_FUTURE',expected:true,actual:false});
+              if (now-started>3600000) failed.push({predicate:'START_MAX_AGE',expected:true,actual:false});
+              core.error('PROVENANCE_PREDICATES:'+JSON.stringify(failed));
+            };
+            if (r.id !== id || r.run_attempt !== attempt || r.repository.full_name !== repo || r.event !== 'workflow_dispatch' || r.head_branch !== 'main' ||
+                r.head_sha !== e.GITHUB_SHA || r.head_sha !== e.GITHUB_WORKFLOW_SHA || r.status !== 'in_progress' ||
+                r.actor.login !== 'KasivarapuNarasimha' || r.triggering_actor.login !== 'KasivarapuNarasimha' ||
+                w.path !== path || !Number.isFinite(started) || started > Date.now() || Date.now()-started > 3600000)
+              { provenanceDiagnostics(); throw new Error('Authenticated metadata rejected'); }
+            core.setOutput('started_at',r.run_started_at);
+  rollback:
+    needs: provenance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    services:
+      postgres:
+        image: postgres@sha256:ec9f656f17c8b4dfebf49e58cf5c46d493d4846d4ea6d8b85d0637f68ee33bfc
+        env:
+          POSTGRES_USER: mm_phasec
+          POSTGRES_PASSWORD: phasec_dummy_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U mm_phasec -d postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      MM_PHASEC_DISPOSABLE: 'YES'
+      MM_ROLLBACK_AUTHORIZED: 'YES'
+      MM_PHASEC_RUN_STARTED_AT: ${{ needs.provenance.outputs.started_at }}
+      MM_PHASEC_IMAGE_DIGEST: postgres@sha256:ec9f656f17c8b4dfebf49e58cf5c46d493d4846d4ea6d8b85d0637f68ee33bfc
+      MM_PHASEC_IMAGE_ID: sha256:e8538db784b854a9baac5c1be6d059dcf0db257af2d94c8c5807b5fc15f11222
+      MM_PHASEC_PROPOSAL_SHA256: 55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Checkout exact dispatcher tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: tools
+      - name: Checkout fixed compatible fallback source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: a8a6edafa0a85c680625cedca24b9cd700d1af61
+          persist-credentials: false
+          fetch-depth: 1
+          path: source
+      - name: Verify independently reviewed pins and storage before application SQL
+        working-directory: source
+        env:
+          MM_PHASEC_CONTAINER_ID: ${{ job.services.postgres.id }}
+          MM_PHASEC_PG_PORT: ${{ job.services.postgres.ports[5432] }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          test "$(git rev-parse HEAD)" = a8a6edafa0a85c680625cedca24b9cd700d1af61
+          test -z "$(git status --porcelain)"
+          sha256sum --check --strict <<'HASHES'
+          07c7106fb14769f85f37b4371864b3b77ec8d88db43fa6a5b9f5130cf1d2a6b3  ../tools/scripts/phase-c-rollback/rehearsal.py
+          dbee8af8b8266ccc08355cdcab87bd1102809b019edaa89a5d0d8e77cd71d089  ../tools/scripts/phase-c-rollback/run.sh
+          91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
+          f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
+          3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
+          1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
+          31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
+          24a3eba1671be2014365a29d2264628fe83f93ddfa332895ad6178147d32bd08  apps/api/prisma/migrations/20260907120000_import_batch/migration.sql
+          286623af639b065355b6757ff2362df7450018a818787d80acb51f3e169259e3  ../tools/scripts/phase-c-rollback/permission-probe.cjs
+          HASHES
+          python3 docs/phase-c-review/validation/concurrency.py --storage-only "$MM_PHASEC_CONTAINER_ID"
+          python3 - <<'PY'
+          import os,pathlib,tempfile,re
+          container=os.environ['MM_PHASEC_CONTAINER_ID'];port=os.environ['MM_PHASEC_PG_PORT']
+          assert re.fullmatch(r'[0-9a-f]{64}',container) and re.fullmatch(r'[0-9]+',port) and 1 <= int(port) <= 65535
+          private=pathlib.Path(tempfile.mkdtemp(prefix='mm-rollback-private-',dir=os.environ['RUNNER_TEMP']))
+          root=pathlib.Path(tempfile.mkdtemp(prefix='mm-rollback-',dir='/tmp'))
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              f.write('MM_ROLLBACK_PRIVATE='+str(private)+'\nMM_ROLLBACK_ROOT='+str(root)+'\nMM_PHASEC_CONTAINER_ID='+container+'\nMM_PHASEC_PG_PORT='+port+'\n')
+          for name in pathlib.Path('.').rglob('.env'):
+              if 'node_modules' not in name.parts:
+                  raise SystemExit('Environment file excluded')
+          PY
+      - name: Retrieve only fixed Run 16 artifact
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        timeout-minutes: 6
+        with:
+          script: |
+            const fs = require('fs'), path = require('path'), crypto = require('crypto');
+            const {data:r} = await github.rest.actions.getWorkflowRun({...context.repo,run_id:38137011527});
+            const {data:w} = await github.rest.actions.getWorkflow({...context.repo,workflow_id:r.workflow_id});
+            const {data:a} = await github.rest.actions.getArtifact({...context.repo,artifact_id:11701121837});
+            const expected='647a76d633eb1cdc8ad1f1b57208d960489ff016810a0cd512b892595298f563';
+            if (r.repository.full_name !== 'KasivarapuNarasimha/massive-mentor-crm' ||
+                r.status !== 'completed' || r.conclusion !== 'success' || r.event !== 'workflow_dispatch' ||
+                r.head_sha !== '1bf44dc8cdf6194f512002168849acefacea5be8' ||
+                w.path !== '.github/workflows/phase-c-postgres-validation.yml' ||
+                a.expired || a.workflow_run.id !== r.id ||
+                a.name !== 'phase-c-linux-release-38137011527-1' || a.digest !== 'sha256:'+expected)
+              throw new Error('Fixed artifact metadata rejected');
+            const result=await github.rest.actions.downloadArtifact({...context.repo,artifact_id:a.id,archive_format:'zip'});
+            const bytes=Buffer.from(result.data);
+            if(crypto.createHash('sha256').update(bytes).digest('hex') !== expected) throw new Error('Fixed ZIP checksum rejected');
+            fs.writeFileSync(path.join(process.env.MM_ROLLBACK_PRIVATE,'candidate.zip'),bytes,{flag:'wx',mode:0o400});
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+          architecture: x64
+      - name: Build fixed compatible fallback without application startup
+        working-directory: source
+        shell: bash
+        timeout-minutes: 25
+        env:
+          MM_RELEASE_SOURCE_COMMIT: a8a6edafa0a85c680625cedca24b9cd700d1af61
+          DATABASE_URL: postgresql://unused:unused@127.0.0.1:1/not_connected
+          NEXT_PUBLIC_API_URL: https://api.massivementor.in/api
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import os,pathlib,subprocess
+          private=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
+          commands=[['npm','install','--global','pnpm@9.15.0','--ignore-scripts','--no-audit','--no-fund'],
+                    ['pnpm','install','--frozen-lockfile','--ignore-scripts'],
+                    ['pnpm','--filter','@massivementor/api','build'],
+                    ['pnpm','--filter','@massivementor/web','build'],
+                    ['node','scripts/commercial-release-package.mjs']]
+          with (private/'build-private.log').open('wb') as log:
+              for command in commands:
+                  result=subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,timeout=650)
+                  if result.returncode: raise SystemExit('Bounded fallback build failed; private log not uploaded')
+          PY
+      - name: Verify bundles and fixed PM2 package integrity
+        working-directory: source
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          python3 ../tools/scripts/phase-c-rollback/rehearsal.py verify "$MM_ROLLBACK_PRIVATE/candidate.zip" \
+            release-evidence/massive-mentor-a8a6edafa0a85c680625cedca24b9cd700d1af61-linux-x64.tar.gz
+          python3 - <<'PY'
+          import base64,hashlib,json,os,pathlib,subprocess,urllib.request
+          private=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
+          expected='sha512-y7sO+UuGjfESK/ChRN+efJKAsHrBd95GY2p1GQfjVTtOfFtUfiW0NOuUhP5dN5QTF2F0EWcepgkLqbF32j90Iw=='
+          with urllib.request.urlopen('https://registry.npmjs.org/pm2/6.0.8',timeout=20) as r: meta=json.load(r)
+          assert meta['name']=='pm2' and meta['version']=='6.0.8' and meta['dist']['integrity']==expected
+          with urllib.request.urlopen('https://registry.npmjs.org/pm2/-/pm2-6.0.8.tgz',timeout=30) as r: blob=r.read(20000000)
+          assert 'sha512-'+base64.b64encode(hashlib.sha512(blob).digest()).decode()==expected
+          tar=private/'pm2-verified.tgz';tar.write_bytes(blob)
+          with (private/'pm2-install-private.log').open('wb') as log:
+              subprocess.run(['npm','install','--prefix',str(private/'pm2-tool'),'--ignore-scripts','--no-audit','--no-fund',str(tar)],stdout=log,stderr=subprocess.STDOUT,timeout=180,check=True)
+          # Reviewed PM2 configuration contains no credentials; only paths change during rehearsal.
+          data=subprocess.check_output(['node','-e',"console.log(JSON.stringify(require('./deploy/ecosystem.config.cjs')))"],timeout=10)
+          (private/'pm2-reviewed.json').write_bytes(data)
+          PY
+      - name: Full disposable PM2 populated PostgreSQL upgrade and rollback
+        working-directory: source
+        timeout-minutes: 18
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import os,pathlib,re,subprocess
+          private=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
+          with (private/'runtime-private.log').open('wb') as log:
+              result=subprocess.run(['timeout','--signal=TERM','--kill-after=30','960','bash','../tools/scripts/phase-c-rollback/run.sh'],
+                                    stdout=log,stderr=subprocess.STDOUT,timeout=1010)
+          text=(private/'runtime-private.log').read_text(errors='replace')
+          for line in text.splitlines():
+              if re.fullmatch(r'MM_ROLLBACK_FAILURE:(?:[A-Z_]+|PM2_OPERATION)',line): print(line)
+              # Failure JSON is preserved through the fixed allowlisted summary writer, not raw log printing.
+          if result.returncode: raise SystemExit('Isolated rollback failed; raw log not uploaded')
+          if not (private/'rollback-summary.json').is_file(): raise SystemExit('Rollback evidence absent')
+          print('Three PM2 stages and populated database integrity: PASS')
+          PY
+      - name: Preserve exact artifacts and sanitized evidence
+        if: always()
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,shutil
+          out=pathlib.Path('../rollback-evidence');out.mkdir(exist_ok=True)
+          if 'MM_ROLLBACK_PRIVATE' not in os.environ:
+              (out/'failure-summary.json').write_text('{"preflight":"FAILED","runtime":"UNVERIFIED"}\n')
+              raise SystemExit(0)
+          private=pathlib.Path(os.environ['MM_ROLLBACK_PRIVATE'])
+          # Never upload PM2 dumps, environment, raw logs, database rows, npm configuration or credentials.
+          for n in ['artifact-summary.json','rollback-summary.json','diagnostic-summary.json','cleanup-summary.json','database-cleanup-summary.json']:
+              p=private/n
+              if p.is_file(): shutil.copyfile(p,out/n)
+          files=[private/'massive-mentor-1bc44ba9d9a0951645df42a853bc5799650865ef-linux-x64.tar.gz',
+                 pathlib.Path('release-evidence/massive-mentor-a8a6edafa0a85c680625cedca24b9cd700d1af61-linux-x64.tar.gz')]
+          sums=[]
+          for p in files:
+              if p.is_file():
+                  shutil.copyfile(p,out/p.name)
+                  h=hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
+                  sums.append(h+'  '+p.name)
+          (out/'SHA256SUMS').write_text('\n'.join(sums)+'\n')
+          (out/'limitations.json').write_text(json.dumps({'SMTPBrowser':'PENDING','exactSameSnapshotSealingOrders':'UNVERIFIED','previousProductionArtifact':'NOT USED','productionAccess':False})+'\n')
+          PY
+      - name: Upload allowlisted artifacts and summaries only
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: phase-c-rollback-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            rollback-evidence/*.tar.gz
+            rollback-evidence/*summary.json
+            rollback-evidence/limitations.json
+            rollback-evidence/SHA256SUMS
+          retention-days: 7
+          if-no-files-found: error
