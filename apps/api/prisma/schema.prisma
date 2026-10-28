@@ -50,6 +50,9 @@ model User {
   swotAnalyses  SWOTAnalysis[]
   roadmaps      Roadmap[]
   chatMessages       ChatMessage[]
+  teamChatParticipants TeamChatParticipant[]
+  teamChatSentMessages TeamChatMessage[] @relation("TeamChatSender")
+  teamChatCreatedConversations TeamChatConversation[] @relation("TeamChatCreator")
   marketingContents  MarketingContent[]
 
   // Phase 3 - Core CRM (unified Contact supports Leads + Clients)
@@ -320,6 +323,7 @@ model Business {
   updatedAt        DateTime @updatedAt
 
   members   BusinessMember[]
+  teamChatConversations TeamChatConversation[]
   config    BusinessConfig?
   installs  TemplateInstall[]
   contacts  Contact[]
@@ -1516,6 +1520,60 @@ model TeamMember {
   createdAt   DateTime @default(now())
 
   @@unique([teamId, userId])
+}
+
+/// Internal messaging. ChatMessage above remains AI assistant history.
+model TeamChatConversation {
+  id            String @id
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  kind          String
+  directKey     String?
+  name          String?
+  description   String? @db.Text
+  creatorId     String?
+  creator       User? @relation("TeamChatCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  lastSequence  Int @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+  participants  TeamChatParticipant[]
+  messages      TeamChatMessage[]
+
+  @@unique([businessId, id])
+  @@unique([businessId, directKey])
+  @@index([businessId, updatedAt, id])
+}
+
+model TeamChatParticipant {
+  businessId     String
+  conversationId String
+  conversation   TeamChatConversation @relation(fields: [businessId, conversationId], references: [businessId, id], onDelete: Cascade)
+  userId         String
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadSequence Int @default(0)
+  joinedAt       DateTime @default(now())
+
+  @@id([businessId, conversationId, userId])
+  @@index([businessId, userId, conversationId])
+}
+
+model TeamChatMessage {
+  id             String @id
+  businessId     String
+  conversationId String
+  conversation   TeamChatConversation @relation(fields: [businessId, conversationId], references: [businessId, id], onDelete: Cascade)
+  senderId       String?
+  sender         User? @relation("TeamChatSender", fields: [senderId], references: [id], onDelete: SetNull)
+  senderName     String
+  clientMessageId String
+  sequence       Int
+  content        String @db.Text
+  createdAt      DateTime @default(now())
+
+  @@unique([businessId, conversationId, sequence])
+  @@unique([businessId, senderId, clientMessageId])
+  @@index([businessId, conversationId, sequence])
+  @@index([businessId, senderId, createdAt])
 }
 
 // =====================================================

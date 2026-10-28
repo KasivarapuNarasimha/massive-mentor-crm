@@ -154,6 +154,7 @@ export const MODULE_CATALOG: Array<{
   { key: "approvals", label: "Approvals", routePrefix: "/dashboard/approvals", apiPrefixes: ["/api/approvals"], category: "ops", sortOrder: 23 },
   { key: "activity", label: "Activity", routePrefix: "/dashboard/activity", apiPrefixes: ["/api/automations"], category: "ops", sortOrder: 24 },
   { key: "team", label: "Team Management", routePrefix: "/dashboard/team", apiPrefixes: ["/api/teams", "/api/business-users"], category: "admin", sortOrder: 30 },
+  { key: "team_chat", label: "Team Chat", routePrefix: "/dashboard/team-chat", apiPrefixes: ["/api/team-chat"], category: "crm", sortOrder: 29 },
   { key: "billing", label: "Billing", routePrefix: "/dashboard/billing", apiPrefixes: ["/api/billing"], category: "admin", sortOrder: 31 },
   { key: "settings", label: "Settings", routePrefix: "/dashboard/security", apiPrefixes: ["/api/security"], category: "admin", sortOrder: 32 },
   { key: "backups", label: "Backups", routePrefix: "/dashboard/backups", apiPrefixes: ["/api/backups"], category: "admin", sortOrder: 33 },
@@ -186,7 +187,7 @@ export const ROLE_TEMPLATE_DEFAULTS: Array<{
     sortOrder: 3,
     modules: [
       "dashboard", "leads", "clients", "deals", "tasks", "meetings", "notes", "documents", "media", "whatsapp",
-      "reports", "ai_sales", "mentor", "field_sales", "activity", "team", "profile", "appearance",
+      "reports", "ai_sales", "mentor", "field_sales", "activity", "team", "team_chat", "profile", "appearance",
     ],
   },
   {
@@ -195,7 +196,7 @@ export const ROLE_TEMPLATE_DEFAULTS: Array<{
     sortOrder: 4,
     modules: [
       "dashboard", "leads", "clients", "deals", "tasks", "meetings", "notes", "media", "whatsapp",
-      "ai_sales", "mentor", "field_sales", "activity", "profile", "appearance",
+      "ai_sales", "mentor", "field_sales", "activity", "team_chat", "profile", "appearance",
     ],
   },
   {
@@ -203,7 +204,7 @@ export const ROLE_TEMPLATE_DEFAULTS: Array<{
     label: "Marketing",
     sortOrder: 5,
     modules: [
-      "dashboard", "leads", "clients", "marketing", "reports", "mentor", "activity", "profile", "appearance",
+      "dashboard", "leads", "clients", "marketing", "reports", "mentor", "activity", "team_chat", "profile", "appearance",
     ],
   },
   {
@@ -212,7 +213,7 @@ export const ROLE_TEMPLATE_DEFAULTS: Array<{
     sortOrder: 6,
     modules: [
       "dashboard", "clients", "deals", "erp", "erp_products", "erp_inventory", "erp_vendors", "erp_purchases",
-      "erp_sales", "finance", "reports", "approvals", "activity", "profile", "appearance",
+      "erp_sales", "finance", "reports", "approvals", "activity", "team_chat", "profile", "appearance",
     ],
   },
   {
@@ -220,7 +221,7 @@ export const ROLE_TEMPLATE_DEFAULTS: Array<{
     label: "Support",
     sortOrder: 7,
     modules: [
-      "dashboard", "clients", "tasks", "meetings", "notes", "mentor", "activity", "profile", "appearance",
+      "dashboard", "clients", "tasks", "meetings", "notes", "mentor", "activity", "team_chat", "profile", "appearance",
     ],
   },
 ];
@@ -416,10 +417,17 @@ export function modulesForTemplate(roleKey: string): string[] {
  * Priority: member.permissions.modules → template for role → sales_executive defaults,
  * then intersect with business moduleAccess allowlist when customized.
  */
+export type MemberModuleContext = {
+  userId: string;
+  businessId: string;
+  role?: string;
+  permissions?: unknown;
+};
+
 export async function getMemberModuleKeys(
   userId: string,
   businessId?: string | null,
-  strictContext: Readonly<LeadWriteContext> | undefined = getStrictRequestContext(userId)
+  strictContext: Readonly<LeadWriteContext> | MemberModuleContext | undefined = getStrictRequestContext(userId)
 ): Promise<string[]> {
   if (strictContext && (strictContext.userId !== userId ||
       (businessId && businessId !== strictContext.businessId))) {
@@ -450,8 +458,8 @@ export async function getMemberModuleKeys(
   if (strictContext && (!member || !member.role || biz?.status !== "active")) {
     throw new Error("Active workspace membership required");
   }
-  const role = strictContext ? member!.role.trim().toLowerCase() : member?.role || user.role || "sales_executive";
-  const parsed = parseMemberPermissions(member?.permissions);
+  const role = strictContext?.role?.trim().toLowerCase() || member?.role || user.role || "sales_executive";
+  const parsed = parseMemberPermissions(strictContext?.permissions !== undefined ? strictContext.permissions : member?.permissions);
   const memberCustomized = !!parsed.customized;
   const businessAccess = parseBusinessModuleAccess(biz?.settings);
   const businessCustomized = !!businessAccess?.customized;

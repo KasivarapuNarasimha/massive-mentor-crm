@@ -27,6 +27,8 @@ import { FeatureSearch } from "@/components/dashboard/FeatureSearch";
 import { canViewTeamActivity } from "@/lib/team-activity-access";
 import { emitTeamActivityFromNotification } from "@/lib/team-activity-events";
 import { TeamActivityToaster } from "@/components/team/TeamActivityToaster";
+import { useTeamChat } from "@/components/team-chat/TeamChatProvider";
+import { QuickChat } from "@/components/team-chat/QuickChat";
 import { installCapacitorBridge } from "@/lib/capacitor-bridge";
 import { ensureNativePushRegistration } from "@/lib/native-push";
 
@@ -542,6 +544,7 @@ const ERP_PHASE2_ITEMS: Array<NavItem & { moduleKey: string }> = [
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { user, logout, token, role: authRole } = useAuth();
+  const { overview: chatOverview, enabled: chatEnabled } = useTeamChat();
   const { portal, workspaceRole, setWorkspaceRole, isLoading: portalLoading } = usePortal();
   const { can, requireFeature, plan, isTrial, planStatus, licenseStatus, accessKnown, loading: planLoading } = usePlan();
   const pathname = usePathname();
@@ -1015,8 +1018,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   /** Flat list then split into CRM | ERP | Settings for sidebar clarity */
   const allSidebarItems = (() => {
-    const merged = [...primaryNav, ...crmNav];
+    const merged = [...primaryNav, ...crmNav].filter(item=>item.href!=="/dashboard/team-chat"||chatEnabled)
+      .map(item=>item.href==="/dashboard/team-chat"?{...item,badge:chatOverview.unreadTotal||undefined}:item);
     const seen = new Set(merged.map((i) => i.href));
+    // Explicit server grant; works with old portal menu seeds for every role.
+    if (chatEnabled && moduleKeys?.includes("team_chat") && !seen.has("/dashboard/team-chat")) {
+      merged.push({ href: "/dashboard/team-chat", label: "Team Chat", badge: chatOverview.unreadTotal || undefined,
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeWidth={2} d="M4 4h16v12H8l-4 4V4Z"/></svg> });
+      seen.add("/dashboard/team-chat");
+    }
     const canErpDash =
       !moduleKeys ||
       moduleKeys.includes("erp") ||
@@ -1930,6 +1940,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
     </div>
+    <QuickChat hidden={sidebarOpen || notifOpen || userMenuOpen}/>
     </>
   );
 }

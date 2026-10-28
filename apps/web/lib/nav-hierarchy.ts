@@ -69,6 +69,7 @@ export const NAV_HIERARCHY: NavMainModuleDef[] = [
         id: "crm-communication",
         label: "Communication",
         features: [
+          { id: "crm-team-chat", label: "Team Chat", href: "/dashboard/team-chat" },
           { id: "crm-whatsapp", label: "WhatsApp", href: "/dashboard/whatsapp" },
           { id: "crm-media", label: "Media Library", href: "/dashboard/media" },
         ],
