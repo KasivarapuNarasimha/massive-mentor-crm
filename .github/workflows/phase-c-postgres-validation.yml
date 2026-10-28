@@ -84,11 +84,11 @@ jobs:
           --health-cmd "pg_isready -U mm_phasec -d postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
-      - name: Checkout fixed application checkpoint
+      - name: Checkout triggering integration commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: KasivarapuNarasimha/massive-mentor-crm
-          ref: 1e58b4addc5eff5fb5053fabfb509f8c9617c401
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 1
       - name: Verify source, hashes and environment-file exclusion
@@ -96,14 +96,15 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          test "$(git rev-parse HEAD)" = 1e58b4addc5eff5fb5053fabfb509f8c9617c401
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
-          3d41158267407796e07be3f57eb50aa8cd034267e91b7ad5e1211f1287bfe14e  apps/api/prisma/schema.prisma
+          faa135547db944411f717d5be0b4e989059542c0e3db0ff29109e4efd0f675f0  apps/api/prisma/schema.prisma
           1cab80668219ca27a29956038aec18bb0d4ceac93c9b9e229f552b8edb8ab0d9  apps/api/prisma/migrations/20261010140000_quotation_foundation/migration.sql
           31044fa032a37ce8324d3f4450accab8b2b462327a157140683f87d88f265ef1  apps/api/prisma/migrations/20261010160000_quotation_customer_finance/migration.sql
+          bd52fbea96dae2b15851cf5365ca3c8821e3485bc38b1426e1ef080ca1dd570a  apps/api/prisma/migrations/20261026090000_team_chat/migration.sql
           f14eef3fbbc35b9a262105239658440e2be2fa190299b8eccda999a3cd2fea96  apps/api/scripts/commercial-application-run.sh
-          5dcbd9b9cc1d5ae09913bee2f7875bf6041fe2cda2fdef80f15360878aa14b03  apps/api/scripts/commercial-workflow-postgres.test.cjs
+          8173a54c14948cfcaa2d9f348860bf42a00c714f0bbdb981870696552288a1b5  apps/api/scripts/commercial-workflow-postgres.test.cjs
           5cd7515bf66601f18a4ad886a1075aa95d8b3e0eb87e08fb140c068b1986bd98  apps/api/scripts/commercial-test-loader.cjs
           c7540d388b862058875f56cf047550fe5bf373e14432be51c2c1ac376e551a8a  apps/api/src/services/quotation.service.ts
           cc7510a7f92bae74c28b0da32334960d9e33c23263aa29ca10bd977d0c64e503  apps/api/src/services/commercial-quotation-pdf.ts
@@ -113,12 +114,12 @@ jobs:
           6aadd750df584bb4086cecad9845b315b8369133cfcd1a80a3945f54e830a68a  apps/api/src/services/commercial-configuration.service.ts
           6583fc4c8f3a05c080510e9fe2b0a1802c8458ca1d4e421953fa847c23fc11b1  docs/phase-c-review/validation/concurrency.py
           388ffece3c1f06a26852cec29492e0c07af82ce02b49bae6bbf4e078c1844a38  pnpm-lock.yaml
-          dab7a2239ffdf47df6f04c55298d6460c1e31a38b4544d0ad170ecc15e22253c  apps/api/src/index.ts
+          e97a7d42cda6a7af60901f2dea36cb458d8a68e2d47fc2a35323ec74b8ec0f3b  apps/api/src/index.ts
           f3e6a480eb22cd084ab9d294d15315daf6307a6b23db2cbb8cece140d46b5908  apps/api/src/routes/commercial.routes.ts
-          dd40373a12a1e4c0e8b6a97e8b69330d31dd07db87fb37a4dab4302803fd0834  apps/api/src/routes/quotation.routes.ts
+          cdf07b6df6415487b06aee11c7c7223b1707561bbdb2a5a84d48d3cb457311a7  apps/api/src/routes/quotation.routes.ts
           54fe3f152c9f3726c92004497a4634fa318a5267d7ef07bb8c60e1149fbb907e  apps/api/src/routes/quotation-customer.routes.ts
           2c0d661c615b1d29d2fe9f15fc5ea8d1c95bfd0d217f6450dfba084f69b0a7ce  apps/api/src/routes/commercial-finance.routes.ts
-          984bb4c0535bf05582344c296354dc76ffb69e074f4be1e3183dc641eb5fc838  apps/web/app/commercial/page.tsx
+          3c0256658614e7fc4bb652efc65cf39472b47632dc9d46bf6406b03557f200bd  apps/web/app/commercial/page.tsx
           d8ac32eb28ccdb758821792d6d3af0ca16fc3117168c75b09c4412cedffeb86d  apps/api/src/services/finance.service.ts
           adb31681579a4589701fd1529b8d29b48848e4836c340dbddaaa5bb431680381  apps/web/app/dashboard/finance/page.tsx
           55b59f1cfceb621de24e407053a4eedaf2c30a4a5da1016811b4803819cc1e28  docs/phase-c-review/migration.sql.proposed
@@ -135,7 +136,7 @@ jobs:
           b9e0eb053b53c47feeef2986720e2e50c40d32f2742d212b13231fb7b1ccc61d  apps/api/src/services/lead-assignment.service.ts
           8bc24c119b9b23c78972e3f20b27d1f3d826bcaee32b2d6205fc16fb913089f5  apps/api/src/middleware/requireModule.ts
           60cf381d4ceae72fb0bf0209bea2c0125836bb9b35ef4f9cad40405023ae249a  apps/api/src/middleware/requireBillingAccess.ts
-          4abd4b03f10c3343ec24ae28bcaccd2f6e962d3f092a863c4ef0dabfdf031b7f  apps/api/src/services/permissions.service.ts
+          10cb9bc0a46e639ad97781e5bc6cfa24a9857829e65ebd07f244fb6293c25872  apps/api/src/services/permissions.service.ts
           HASHES
           python3 - <<'PY'
           import pathlib,subprocess
@@ -219,9 +220,9 @@ jobs:
           test "$(git rev-parse HEAD)" = "${{ github.sha }}"
           test -z "$(git status --porcelain)"
           sha256sum --check --strict <<'HASHES'
-          37d48ab6f4e24abf53a3f72aecee6549411b65e1ec4ecf2246eb4d3ee2d6f82c  scripts/commercial-release-package.mjs
-          6f2bb35df240a18eacea9edae5fe0406f1a06223dca0c6d603a88ba39789954e  pnpm-lock.yaml
-          3a8a3d89698e087e385e2c47765c571edd2b5bcf467618e3d3a5a04f7e59f30b  apps/api/eslint.config.mjs
+          91c30992c02d8bddbb4ff088a4dc4836f200e72c3da7b72289e4eacba3675c45  scripts/commercial-release-package.mjs
+          388ffece3c1f06a26852cec29492e0c07af82ce02b49bae6bbf4e078c1844a38  pnpm-lock.yaml
+          d4a4a138454f4578e12d2254e75b2868aaab44cd96b2a9504191dfc8b362ce97  apps/api/eslint.config.mjs
           HASHES
           python3 - <<'PY'
           import pathlib,subprocess
