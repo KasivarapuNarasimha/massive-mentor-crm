@@ -1,6 +1,6 @@
 // Offline only: execute the real inline provenance script with mocked GitHub metadata.
 const fs=require('node:fs'),assert=require('node:assert/strict'),test=require('node:test');
-const text=fs.readFileSync('.github/workflows/phase-c-rollback-validation.yml','utf8');
+const text=fs.readFileSync('.github/workflows/phase-c-rollback-validation.yml','utf8').replace(/\r\n/g, '\n');
 const body=text.split('          script: |\n')[1].split('  rollback:\n')[0].split('\n').map(l=>l.startsWith('            ')?l.slice(12):l).join('\n');
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
 const fn=new AsyncFunction('process','github','context','core',body);
