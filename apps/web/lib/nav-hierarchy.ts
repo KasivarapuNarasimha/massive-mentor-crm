@@ -49,6 +49,7 @@ export const NAV_HIERARCHY: NavMainModuleDef[] = [
           { id: "crm-leads", label: "Leads", href: "/dashboard/leads" },
           { id: "crm-assignments", label: "Assignments", href: "/dashboard/assignments" },
           { id: "crm-deals", label: "Deals", href: "/dashboard/deals" },
+          { id: "crm-quotations", label: "Quotations", href: "/dashboard/quotations" },
           { id: "crm-clients", label: "Clients", href: "/dashboard/clients" },
           { id: "crm-field-sales", label: "Field Sales", href: "/dashboard/field-sales" },
         ],

@@ -11,6 +11,7 @@ export const ROUTE_MODULE: Record<string, string> = {
   "/dashboard/whatsapp": "whatsapp",
   "/dashboard/clients": "clients",
   "/dashboard/deals": "deals",
+  "/dashboard/quotations": "quotations",
   "/dashboard/tasks": "tasks",
   "/dashboard/meetings": "meetings",
   "/dashboard/notes": "notes",
@@ -118,4 +119,15 @@ export function filterNavByModules<T extends { href: string }>(
     });
   }
   return items.filter((item) => canAccessPath(item.href, modules, { loaded: true }));
+}
+
+/** Fill a stale portal menu from the configured catalog without expanding grants. */
+export function includeGrantedNavItem<T extends { href: string }>(
+  items: T[],
+  item: T | undefined,
+  modules: string[] | null | undefined
+): T[] {
+  if (!item || !canAccessPath(item.href, modules, { loaded: true })) return items;
+  if (items.some((existing) => existing.href === item.href)) return items;
+  return [...items, item];
 }

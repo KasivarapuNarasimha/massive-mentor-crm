@@ -185,3 +185,17 @@ test("legacy Finance dashboard preserves commercial currency and subtracts only 
  await db.business.update({where:{id:biz},data:{settings:{commercial:{...config,version:"usd",currency:{code:"USD",decimalPlaces:2}},commercialDelivery:deliveryConfig,moduleAccess:{customized:true,enabled:["quotations","finance"]}}}});const foreign=await issue();await finance.recordCommercialPayment(cashier,foreign.invoiceId,key(),pay("10"));
  const legacy=loadWith({"../lib/prisma.js":{prisma:adapter},"./field-engine.service.js":{getUserBusinessId:async()=>biz},"./tenant-scope.service.js":{resolveActorRole:async()=>"owner"},"./notification.service.js":{},"./audit.service.js":{}})("services/finance.service.ts");const result=await legacy.getFinanceDashboard(actor.userId);assert.equal(result.currency,"INR");assert.equal(result.kpis.totalInvoiced,236);assert.equal(result.kpis.totalPaid,138);assert.equal(result.kpis.outstanding,98);assert.equal(result.excludedCommercialCurrencyCount,1);assert.equal((await db.invoice.findUnique({where:{id:foreign.invoiceId}})).currency,"USD");assert.equal((await finance.getCommercialInvoice(cashier,foreign.invoiceId)).outstandingBalance,"108.00");
 });
+
+// Catalog additions use the same disposable DB, real auth chain and synthetic actors.
+test("quotation catalog HTTP requires exact workspace and returns scoped searchable details",async()=>{
+ const token=jwt.sign({userId:owner.userId,tv:0,portal:"customer"},"synthetic-jwt-signature-only-32-characters");
+ const get=async(path,business)=>{const r=await fetch(origin+path,{headers:{authorization:"Bearer "+token,...(business?{"x-business-id":business}:{})},signal:AbortSignal.timeout(10000)});return{status:r.status,body:await r.json()};};
+ assert.equal((await get("/api/quotations/search")).status,403);
+ assert.equal((await get("/api/quotations/search","phasec-B")).status,403);
+ const made=await quotes.createQuotation(owner,key(),input());
+ const page=await get("/api/quotations/search?search="+encodeURIComponent(made.number),owner.businessId);assert.equal(page.status,200);
+ const row=page.body.data.items.find(x=>x.id===made.quotationId);assert(row);assert.equal(row.number,made.number);assert.equal(row.status,"draft");assert.equal(row.total,"118.00");assert(row.customer);assert.equal(row.currency,"INR");
+ const refs=await get("/api/quotations/references?kind=contact",owner.businessId);assert.equal(refs.status,200);assert(refs.body.data.some(x=>x.id==="phasec-contact-A"));assert(!refs.body.data.some(x=>x.id==="phasec-contact-B"));
+ const bad=await get("/api/quotations/references?kind=deal&contactId=phasec-contact-B",owner.businessId);assert.equal(bad.status,404);
+ assert.equal((await get("/api/quotations/search?status=paid",owner.businessId)).status,400);
+});

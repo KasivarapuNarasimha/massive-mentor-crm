@@ -218,3 +218,18 @@ test("trusted issuer checks retain tenant and restore caller pin without trustin
   await assert.rejects(service.authorizeInvoiceIssuer(tx,{...actor,businessId:"B"},"finance"),/Pinned workspace mismatch/);
  });assert.equal(strict.getStrictRequestContext(actor.userId),undefined);assert(checked.every(([,b])=>b==="A"));assert(checked.some(([u,,a])=>u==="finance"&&a==="invoice.issue"));
 });
+
+for(const [label,change,business,status] of [
+ ["valid catalog",()=>{},"A",200],
+ ["missing workspace",()=>{},null,403],
+ ["foreign workspace",()=>{},"B",403],
+ ["missing action",s=>s.actions=[],"A",403],
+ ["disabled actor",s=>s.disabled=true,"A",401],
+ ["inactive business",s=>s.status="inactive","A",403]
+])test("catalog real HTTP middleware: "+label,async()=>{
+ const h=await httpFixture(change);try{
+ const r=await fetch(h.url+"/quotations/search",{headers:{Authorization:"Bearer synthetic",...(business?{"x-business-id":business}:{})},signal:AbortSignal.timeout(5000)});
+ assert.equal(r.status,status);if(status===200)assert.deepEqual((await r.json()).data,{items:[],nextCursor:null});
+ assert.equal(h.state.repairs,0);assert.equal(h.f.state().sequence,0);assert.equal(h.f.state().audits.length,0);
+ }finally{await h.close();}
+});
