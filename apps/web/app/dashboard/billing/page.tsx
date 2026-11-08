@@ -20,6 +20,7 @@ import {
   displayPlanName,
   isEnterprisePlan,
   isProfessionalPlan,
+  perUserUnit,
   planCycle,
   planFamily,
   quotePlanDisplay,
@@ -287,7 +288,7 @@ export default function BillingPage() {
   const [busyCode, setBusyCode] = useState<string | null>(null);
   const [coupon, setCoupon] = useState("");
   const [cycle, setCycle] = useState<BillingCycleFilter>("monthly");
-  const [userCounts, setUserCounts] = useState({ starter: 3, professional: 10 });
+  const [userCounts, setUserCounts] = useState<{ starter: number | ""; professional: number | "" }>({ starter: "", professional: "" });
   const [confirm, setConfirm] = useState<CheckoutConfirm | null>(null);
   const [uiMode, setUiMode] = useState<UiMode>("main");
   const [success, setSuccess] = useState<PaySuccess | null>(null);
@@ -825,7 +826,8 @@ export default function BillingPage() {
                   const p = (data?.plans || []).find((x) => x.code === failure.planCode);
                   if (p) {
                     const family = familyOf(p.code, p.name);
-                    const count = family === "professional" ? userCounts.professional : userCounts.starter;
+                    const rawCount = family === "professional" ? userCounts.professional : userCounts.starter;
+                    const count = typeof rawCount === "number" && rawCount >= 1 ? rawCount : 1;
                     void openServerPreview(p, failure.purpose || "checkout", count);
                   }
                   else setFailure(null);
@@ -1031,15 +1033,24 @@ export default function BillingPage() {
             (!currentCycle || currentCycle === cycle);
           const purpose =
             biz?.isTrial || biz?.planStatus === "trial" ? "checkout" : "upgrade";
-          const selectedUsers =
+          const rawUsers =
             family === "professional" ? userCounts.professional : userCounts.starter;
+          const isValidUserCount =
+            typeof rawUsers === "number" &&
+            Number.isInteger(rawUsers) &&
+            rawUsers >= 1 &&
+            rawUsers <= 500;
+          const selectedUsers = rawUsers;
+          const unitPrice =
+            family === "enterprise" ? 0 : perUserUnit(family, cycle);
+          const hasSetupFee = !biz?.setupFeePaid;
           const offer =
-            family === "enterprise"
+            family === "enterprise" || !isValidUserCount
               ? null
               : quotePlanDisplay({
                   tier: family,
                   cycle,
-                  userCount: selectedUsers,
+                  userCount: rawUsers,
                   setupFeePaid: !!biz?.setupFeePaid,
                   purpose,
                 });
@@ -1129,35 +1140,37 @@ export default function BillingPage() {
                     </span>
                     <p className="mt-1 text-sm text-muted-foreground">Tailored for your organization</p>
                   </div>
-                ) : offer ? (
+                ) : (
                   <>
                     <div className="flex items-baseline gap-1.5 flex-wrap">
                       <span className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground tabular-nums">
-                        {formatCurrency(offer.unitPrice, p.currency)}
+                        {formatCurrency(unitPrice, p.currency)}
                       </span>
                       <span className="text-sm text-muted-foreground">
                         / user / {cycle === "annual" ? "year" : "month"}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-foreground tabular-nums">
-                      {selectedUsers} × {formatCurrency(offer.unitPrice, p.currency)} ={" "}
-                      {formatCurrency(offer.subscriptionBase, p.currency)}
-                      <span className="text-muted-foreground">
-                        {" "}
-                        / {cycle === "annual" ? "year" : "month"}
-                      </span>
-                    </p>
+                    {isValidUserCount && offer && (
+                      <p className="mt-1 text-sm text-foreground tabular-nums">
+                        {selectedUsers} × {formatCurrency(offer.unitPrice, p.currency)} ={" "}
+                        {formatCurrency(offer.subscriptionBase, p.currency)}
+                        <span className="text-muted-foreground">
+                          {" "}
+                          / {cycle === "annual" ? "year" : "month"}
+                        </span>
+                      </p>
+                    )}
                     <p className="mt-1 text-xs text-muted-foreground">
                       + 18% GST
-                      {offer.setupFee > 0
-                        ? ` · one-time setup ${formatCurrency(offer.setupFee, p.currency)} + 18% GST`
+                      {hasSetupFee
+                        ? ` · one-time setup ${formatCurrency(SETUP_FEE_INR, p.currency)} + 18% GST`
                         : " · setup fee already paid"}
                     </p>
                   </>
-                ) : null}
+                )}
               </div>
 
-              {!enterprise && offer && (
+              {!enterprise && (
                 <div className="mt-4 space-y-2 rounded-lg border border-border bg-background/50 p-3.5">
                   <label className="flex flex-col gap-1 text-sm" htmlFor={`users-${p.code}`}>
                     <span className="text-muted-foreground">Users</span>
@@ -1167,16 +1180,29 @@ export default function BillingPage() {
                       min={1}
                       max={500}
                       inputMode="numeric"
-                      value={selectedUsers}
+                      placeholder="Enter number of users"
+                      value={selectedUsers === "" ? "" : selectedUsers}
                       onChange={(e) => {
-                        const next = Math.max(1, Math.min(500, Math.floor(Number(e.target.value) || 1)));
-                        setUserCounts((prev) =>
-                          family === "professional"
-                            ? { ...prev, professional: next }
-                            : { ...prev, starter: next }
-                        );
+                        const raw = e.target.value.trim();
+                        if (raw === "") {
+                          setUserCounts((prev) =>
+                            family === "professional"
+                              ? { ...prev, professional: "" }
+                              : { ...prev, starter: "" }
+                          );
+                          return;
+                        }
+                        const num = Number(raw);
+                        if (!Number.isNaN(num)) {
+                          const next = Math.max(1, Math.min(500, Math.floor(num)));
+                          setUserCounts((prev) =>
+                            family === "professional"
+                              ? { ...prev, professional: next }
+                              : { ...prev, starter: next }
+                          );
+                        }
                       }}
-                      className="bg-background border border-border rounded-md px-3 py-2 text-sm min-h-9 w-28 focus-ring"
+                      className="bg-background border border-border rounded-md px-3 py-2 text-sm min-h-9 w-full sm:w-52 focus-ring"
                     />
                   </label>
                   <p className="text-xs text-muted-foreground">
@@ -1225,16 +1251,27 @@ export default function BillingPage() {
                   </ul>
                   <button
                     type="button"
-                    disabled={isCurrent || busy}
-                    onClick={() => void openServerPreview(p, purpose, selectedUsers)}
+                    disabled={isCurrent || busy || !isValidUserCount}
+                    onClick={() => {
+                      if (isValidUserCount && typeof selectedUsers === "number") {
+                        void openServerPreview(p, purpose, selectedUsers);
+                      }
+                    }}
                     aria-busy={busy}
+                    title={
+                      !isValidUserCount && !isCurrent
+                        ? "Enter number of users to continue"
+                        : undefined
+                    }
                     className={[
                       "mt-8 min-h-9 rounded-lg text-sm font-semibold transition-all focus-ring button-active disabled:cursor-not-allowed",
                       isCurrent
                         ? "border border-border bg-muted/50 text-muted-foreground"
-                        : popular
-                          ? "bg-primary text-primary-foreground  "
-                          : "bg-primary text-primary-foreground hover:bg-primary-hover",
+                        : !isValidUserCount
+                          ? "border border-border bg-muted/50 text-muted-foreground cursor-not-allowed opacity-60"
+                          : popular
+                            ? "bg-primary text-primary-foreground hover:bg-primary-hover"
+                            : "bg-primary text-primary-foreground hover:bg-primary-hover",
                       busy ? "opacity-70" : "",
                     ].join(" ")}
                   >
@@ -1498,8 +1535,10 @@ export default function BillingPage() {
                               const p = (data?.plans || []).find((x) => x.code === code);
                               if (p) {
                                 const family = familyOf(p.code, p.name);
-                                const count =
+                                const rawCount =
                                   family === "professional" ? userCounts.professional : userCounts.starter;
+                                const count =
+                                  typeof rawCount === "number" && rawCount >= 1 ? rawCount : 1;
                                 void openServerPreview(p, "retry", count);
                               }
                             }}
