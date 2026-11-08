@@ -10,18 +10,19 @@ import { formatCurrency } from "@/lib/currency";
 import { PageShell } from "@/components/ui/PageShell";
 import { usePlan } from "@/lib/plan-context";
 import {
-  ANNUAL_DISCOUNT_PCT,
   COMPARISON_ROWS,
   DEMO_MAILTO,
   PLAN_FEATURE_LISTS,
   PLAN_PRICING_META,
   SALES_EMAIL,
   SALES_MAILTO,
+  SETUP_FEE_INR,
   displayPlanName,
   isEnterprisePlan,
   isProfessionalPlan,
   planCycle,
   planFamily,
+  quotePlanDisplay,
   sortPlanFamilies,
   type BillingCycleFilter,
 } from "@/lib/plan-entitlements";
@@ -62,6 +63,7 @@ type Overview = {
     renewalDate?: string | null;
     renewalDaysRemaining?: number | null;
     maxUsers?: number;
+    setupFeePaid?: boolean;
     createdAt?: string | null;
     currentPlan?: {
       name?: string;
@@ -72,6 +74,18 @@ type Overview = {
     } | null;
   };
   plans: Plan[];
+  pricing?: {
+    setupFee?: number;
+    gstRate?: number;
+    annualDiscountPct?: number;
+  };
+  contract?: {
+    pricingVersion?: string | null;
+    renewalBase?: number | null;
+    userCount?: number | null;
+    planCode?: string | null;
+    setupFeePaid?: boolean;
+  } | null;
   payments: Array<{
     id: string;
     amount: number;
@@ -96,6 +110,28 @@ type Overview = {
 type CheckoutConfirm = {
   plan: Plan;
   purpose: string;
+  userCount: number;
+  unitPrice: number;
+  subscriptionBase: number;
+  setupFee: number;
+  discountAmount: number;
+  prorationCredit: number;
+  gst: number;
+  total: number;
+  amountPaise: number;
+};
+
+type ServerCheckoutPreview = {
+  purpose: string;
+  userCount: number;
+  unitPrice: number;
+  subscriptionBase: number;
+  setupFee: number;
+  discountAmount: number;
+  prorationCredit: number;
+  gst: number;
+  total: number;
+  amountPaise: number;
 };
 
 type PaySuccess = {
@@ -251,6 +287,7 @@ export default function BillingPage() {
   const [busyCode, setBusyCode] = useState<string | null>(null);
   const [coupon, setCoupon] = useState("");
   const [cycle, setCycle] = useState<BillingCycleFilter>("monthly");
+  const [userCounts, setUserCounts] = useState({ starter: 3, professional: 10 });
   const [confirm, setConfirm] = useState<CheckoutConfirm | null>(null);
   const [uiMode, setUiMode] = useState<UiMode>("main");
   const [success, setSuccess] = useState<PaySuccess | null>(null);
@@ -304,7 +341,13 @@ export default function BillingPage() {
 
   const runCheckout = async (
     planCode: string,
-    opts?: { purpose?: string; previousPaymentId?: string; couponCode?: string }
+    opts?: {
+      purpose?: string;
+      previousPaymentId?: string;
+      couponCode?: string;
+      userCount?: number;
+      shownAmountPaise?: number;
+    }
   ) => {
     if (!token) return;
     if (!data?.razorpayEnabled) {
@@ -319,7 +362,17 @@ export default function BillingPage() {
       amount: number;
       currency: string;
       paymentId: string;
-      plan: { name: string; total: number };
+      plan: {
+        name: string;
+        total: number;
+        gst?: number;
+        setupFee?: number;
+        subscriptionBase?: number;
+        unitPrice?: number;
+        userCount?: number;
+        couponDiscount?: number;
+        prorationCredit?: number;
+      };
       prefill: { name: string; email: string };
     }>(
       "/billing/checkout/order",
@@ -328,6 +381,7 @@ export default function BillingPage() {
         purpose: opts?.purpose || "checkout",
         previousPaymentId: opts?.previousPaymentId,
         couponCode: coupon || opts?.couponCode,
+        userCount: opts?.userCount,
       },
       token
     );
@@ -345,6 +399,30 @@ export default function BillingPage() {
     }
 
     const o = orderRes.data;
+    if (
+      opts?.shownAmountPaise != null &&
+      (o.amount !== opts.shownAmountPaise || o.plan.total == null)
+    ) {
+      setConfirm((current) =>
+        current
+          ? {
+              ...current,
+              userCount: o.plan.userCount ?? current.userCount,
+              unitPrice: o.plan.unitPrice ?? current.unitPrice,
+              subscriptionBase: o.plan.subscriptionBase ?? current.subscriptionBase,
+              setupFee: o.plan.setupFee ?? current.setupFee,
+              discountAmount: o.plan.couponDiscount ?? current.discountAmount,
+              prorationCredit: o.plan.prorationCredit ?? current.prorationCredit,
+              gst: o.plan.gst ?? current.gst,
+              total: o.plan.total,
+              amountPaise: o.amount,
+            }
+          : current
+      );
+      toast.message("The payable amount was recalculated. Review the server total before continuing.");
+      setBusyCode(null);
+      return;
+    }
     if (!window.Razorpay) {
       setFailure({
         reason: "Razorpay SDK not loaded. Refresh and try again.",
@@ -448,9 +526,41 @@ export default function BillingPage() {
     rzp.open();
   };
 
-  const requestSubscribe = (plan: Plan, purpose: string) => {
+  const openServerPreview = async (plan: Plan, purpose: string, userCount: number) => {
+    if (!token) return;
     if (isEnterprisePlan(plan.code, plan.name)) return;
-    setConfirm({ plan, purpose });
+    const family = familyOf(plan.code, plan.name);
+    if (family === "enterprise") return;
+    setBusyCode(plan.code);
+    const preview = await api.post<ServerCheckoutPreview>(
+      "/billing/checkout/preview",
+      {
+        planCode: plan.code,
+        purpose,
+        userCount,
+        couponCode: coupon || undefined,
+      },
+      token
+    );
+    setBusyCode(null);
+    if (!preview.success || !preview.data) {
+      toast.error(preview.error || "Could not calculate the payable amount");
+      return;
+    }
+    const priced = preview.data;
+    setConfirm({
+      plan,
+      purpose: priced.purpose || purpose,
+      userCount: priced.userCount,
+      unitPrice: priced.unitPrice,
+      subscriptionBase: priced.subscriptionBase,
+      setupFee: priced.setupFee,
+      discountAmount: priced.discountAmount,
+      prorationCredit: priced.prorationCredit,
+      gst: priced.gst,
+      total: priced.total,
+      amountPaise: priced.amountPaise,
+    });
   };
 
   const downloadInvoice = async (paymentId: string, invoiceNumber?: string | null) => {
@@ -713,7 +823,11 @@ export default function BillingPage() {
                 onClick={() => {
                   setUiMode("main");
                   const p = (data?.plans || []).find((x) => x.code === failure.planCode);
-                  if (p) setConfirm({ plan: p, purpose: failure.purpose || "checkout" });
+                  if (p) {
+                    const family = familyOf(p.code, p.name);
+                    const count = family === "professional" ? userCounts.professional : userCounts.starter;
+                    void openServerPreview(p, failure.purpose || "checkout", count);
+                  }
                   else setFailure(null);
                 }}
                 className="flex-1 min-h-9 rounded-lg bg-primary text-sm font-semibold text-primary-foreground focus-ring button-active"
@@ -781,8 +895,28 @@ export default function BillingPage() {
             </div>
             <p className="mt-3 max-w-xl mm-secondary leading-relaxed">
               Manage your subscription, compare packages, and upgrade when your team is ready to
-              scale.
+              scale. A new subscription uses the per-user prices below. An existing subscription
+              keeps its current price, seats, and invoices.
             </p>
+            {data?.contract?.pricingVersion === "legacy" && data.contract.renewalBase != null && (
+              <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                <p className="text-sm text-muted-foreground">
+                  Current price {formatCurrency(data.contract.renewalBase, "INR")} + 18% GST. Renewal does not add the setup fee.
+                </p>
+                <button
+                  type="button"
+                  className="mm-btn mm-btn-secondary"
+                  onClick={() => {
+                    const code = data?.contract?.planCode || biz?.currentPlan?.code || "";
+                    const plan = (data?.plans || []).find((item) => item.code === code);
+                    if (!plan || data?.contract?.renewalBase == null) return;
+                    void openServerPreview(plan, "renewal", data.contract.userCount || 1);
+                  }}
+                >
+                  Renew at current price
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex flex-col sm:flex-row lg:flex-col gap-2 shrink-0">
             {heroUpgradeTarget && (
@@ -828,7 +962,8 @@ export default function BillingPage() {
             Choose your plan
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Toggle billing cycle — only matching packages are shown.
+            Prices are per user. Annual billing is 12 × the monthly rate, with no extra discount.
+            One-time setup, onboarding and technical training is {formatCurrency(SETUP_FEE_INR, "INR")} + 18% GST, charged once.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -854,11 +989,6 @@ export default function BillingPage() {
                   ].join(" ")}
                 >
                   {c === "annual" ? "Annual" : "Monthly"}
-                  {c === "annual" && (
-                    <span className="ml-1.5 text-[10px] font-bold text-emerald-200/90">
-                      Save {ANNUAL_DISCOUNT_PCT}%
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -901,16 +1031,18 @@ export default function BillingPage() {
             (!currentCycle || currentCycle === cycle);
           const purpose =
             biz?.isTrial || biz?.planStatus === "trial" ? "checkout" : "upgrade";
-          const includedUsers = meta.includedUsers || p.maxUsers || 3;
-          const listPrice =
-            cycle === "annual" && meta.annualListPrice != null
-              ? meta.annualListPrice
-              : null;
-          const addOnPrice =
-            cycle === "annual"
-              ? meta.additionalUserAnnual
-              : meta.additionalUserMonthly;
-          const addOnUnit = cycle === "annual" ? "Year" : "Month";
+          const selectedUsers =
+            family === "professional" ? userCounts.professional : userCounts.starter;
+          const offer =
+            family === "enterprise"
+              ? null
+              : quotePlanDisplay({
+                  tier: family,
+                  cycle,
+                  userCount: selectedUsers,
+                  setupFeePaid: !!biz?.setupFeePaid,
+                  purpose,
+                });
 
           let ctaLabel = "Subscribe";
           if (isCurrent) ctaLabel = "Current Plan";
@@ -982,7 +1114,7 @@ export default function BillingPage() {
               <h3 className="mt-1 text-2xl sm:text-[1.75rem] font-semibold tracking-tight text-foreground">
                 {title}
               </h3>
-              {p.description && (
+              {enterprise && p.description && (
                 <p className="mt-2 text-sm text-muted-foreground leading-relaxed line-clamp-2">
                   {p.description}
                 </p>
@@ -997,50 +1129,60 @@ export default function BillingPage() {
                     </span>
                     <p className="mt-1 text-sm text-muted-foreground">Tailored for your organization</p>
                   </div>
-                ) : (
+                ) : offer ? (
                   <>
-                    {cycle === "annual" && listPrice != null && (
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <span className="inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-300">
-                          🎉 Save {ANNUAL_DISCOUNT_PCT}%
-                        </span>
-                        <span className="text-sm text-muted-foreground line-through tabular-nums">
-                          {formatCurrency(listPrice, p.currency)}
-                        </span>
-                      </div>
-                    )}
                     <div className="flex items-baseline gap-1.5 flex-wrap">
                       <span className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground tabular-nums">
-                        {formatCurrency(p.price, p.currency)}
+                        {formatCurrency(offer.unitPrice, p.currency)}
                       </span>
                       <span className="text-sm text-muted-foreground">
-                        / {cycle === "annual" ? "Year" : "Month"}
+                        / user / {cycle === "annual" ? "year" : "month"}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">+ 18% GST · exclusive of taxes</p>
+                    <p className="mt-1 text-sm text-foreground tabular-nums">
+                      {selectedUsers} × {formatCurrency(offer.unitPrice, p.currency)} ={" "}
+                      {formatCurrency(offer.subscriptionBase, p.currency)}
+                      <span className="text-muted-foreground">
+                        {" "}
+                        / {cycle === "annual" ? "year" : "month"}
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      + 18% GST
+                      {offer.setupFee > 0
+                        ? ` · one-time setup ${formatCurrency(offer.setupFee, p.currency)} + 18% GST`
+                        : " · setup fee already paid"}
+                    </p>
                   </>
-                )}
+                ) : null}
               </div>
 
-              {/* Users + additional seats — always visible for paid tiers */}
-              {!enterprise && (
+              {!enterprise && offer && (
                 <div className="mt-4 space-y-2 rounded-lg border border-border bg-background/50 p-3.5">
-                  <div className="flex items-center justify-between gap-2 text-sm">
-                    <span className="text-muted-foreground">Users included</span>
-                    <span className="font-semibold text-foreground">
-                      Up to {includedUsers} Users
-                    </span>
-                  </div>
-                  {addOnPrice != null && (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pt-2 border-t border-border/80">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Additional Users
-                      </span>
-                      <span className="text-sm font-semibold text-primary tabular-nums">
-                        {formatCurrency(addOnPrice, p.currency)} / User / {addOnUnit}
-                      </span>
-                    </div>
-                  )}
+                  <label className="flex flex-col gap-1 text-sm" htmlFor={`users-${p.code}`}>
+                    <span className="text-muted-foreground">Users</span>
+                    <input
+                      id={`users-${p.code}`}
+                      type="number"
+                      min={1}
+                      max={500}
+                      inputMode="numeric"
+                      value={selectedUsers}
+                      onChange={(e) => {
+                        const next = Math.max(1, Math.min(500, Math.floor(Number(e.target.value) || 1)));
+                        setUserCounts((prev) =>
+                          family === "professional"
+                            ? { ...prev, professional: next }
+                            : { ...prev, starter: next }
+                        );
+                      }}
+                      className="bg-background border border-border rounded-md px-3 py-2 text-sm min-h-9 w-28 focus-ring"
+                    />
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(meta.perUserMonthly || 0, p.currency)} per user / month
+                    {cycle === "annual" ? " × 12, billed yearly" : ""}. No annual discount.
+                  </p>
                 </div>
               )}
 
@@ -1084,7 +1226,7 @@ export default function BillingPage() {
                   <button
                     type="button"
                     disabled={isCurrent || busy}
-                    onClick={() => requestSubscribe(p, purpose)}
+                    onClick={() => void openServerPreview(p, purpose, selectedUsers)}
                     aria-busy={busy}
                     className={[
                       "mt-8 min-h-9 rounded-lg text-sm font-semibold transition-all focus-ring button-active disabled:cursor-not-allowed",
@@ -1354,11 +1496,12 @@ export default function BillingPage() {
                                 filteredPlans[0]?.code ||
                                 "";
                               const p = (data?.plans || []).find((x) => x.code === code);
-                              if (p)
-                                setConfirm({
-                                  plan: p,
-                                  purpose: "retry",
-                                });
+                              if (p) {
+                                const family = familyOf(p.code, p.name);
+                                const count =
+                                  family === "professional" ? userCounts.professional : userCounts.starter;
+                                void openServerPreview(p, "retry", count);
+                              }
                             }}
                           >
                             Retry
@@ -1419,13 +1562,56 @@ export default function BillingPage() {
               {cycle === "annual" ? "Annual" : "Monthly"}
             </h2>
             <p className="mt-3 text-3xl font-bold text-foreground tabular-nums">
-              {formatCurrency(confirm.plan.price, confirm.plan.currency)}
-              <span className="text-sm font-normal text-muted-foreground">
-                {" "}
-                / {cycle === "annual" ? "year" : "month"}
-              </span>
+              {formatCurrency(confirm.total, confirm.plan.currency)}
+              <span className="text-sm font-normal text-muted-foreground"> payable</span>
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">+ 18% GST applied at checkout</p>
+            <ul className="mt-3 space-y-1 text-sm text-muted-foreground">
+              <li className="flex justify-between gap-3">
+                <span>
+                  Subscription · {confirm.userCount} × {formatCurrency(confirm.unitPrice, confirm.plan.currency)}
+                </span>
+                <span className="tabular-nums text-foreground">
+                  {formatCurrency(confirm.subscriptionBase, confirm.plan.currency)}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3">
+                <span>Setup fee</span>
+                <span className="tabular-nums text-foreground">
+                  {formatCurrency(confirm.setupFee, confirm.plan.currency)}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3">
+                <span>Discount</span>
+                <span className="tabular-nums text-foreground">
+                  {confirm.discountAmount > 0
+                    ? `−${formatCurrency(confirm.discountAmount, confirm.plan.currency)}`
+                    : formatCurrency(0, confirm.plan.currency)}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3">
+                <span>Proration credit</span>
+                <span className="tabular-nums text-foreground">
+                  {confirm.prorationCredit > 0
+                    ? `−${formatCurrency(confirm.prorationCredit, confirm.plan.currency)}`
+                    : formatCurrency(0, confirm.plan.currency)}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3">
+                <span>GST 18%</span>
+                <span className="tabular-nums text-foreground">
+                  {formatCurrency(confirm.gst, confirm.plan.currency)}
+                </span>
+              </li>
+              <li className="flex justify-between gap-3 border-t border-border pt-1 font-medium">
+                <span>Final payable</span>
+                <span className="tabular-nums text-foreground">
+                  {formatCurrency(confirm.total, confirm.plan.currency)}
+                </span>
+              </li>
+            </ul>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Calculated by the server. GST is added separately. A paid setup fee is not charged again.
+            </p>
             <div className="mt-5 rounded-md border border-border bg-background/50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
                 Included
@@ -1457,6 +1643,8 @@ export default function BillingPage() {
                 onClick={() =>
                   void runCheckout(confirm.plan.code, {
                     purpose: confirm.purpose,
+                    userCount: confirm.userCount,
+                    shownAmountPaise: confirm.amountPaise,
                   })
                 }
                 className="flex-1 min-h-9 rounded-md bg-primary text-sm font-semibold text-primary-foreground focus-ring button-active disabled:opacity-70"

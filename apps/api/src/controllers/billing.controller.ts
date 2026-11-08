@@ -5,6 +5,7 @@ import { evaluateBillingAccess } from "../services/billing-access.service.js";
 import { listActivePlans } from "../services/subscription-plan.service.js";
 import { processRazorpayWebhook } from "../services/billing-webhook.service.js";
 import { validateCoupon } from "../services/billing-coupon.service.js";
+import { defaultUserCount, parsePlanCode, quoteSaasCharge } from "../services/saas-pricing.js";
 import { prisma } from "../lib/prisma.js";
 import fs from "node:fs";
 
@@ -153,18 +154,46 @@ export async function listPlans(_req: AuthenticatedRequest, res: Response) {
   }
 }
 
+export async function previewCheckout(req: AuthenticatedRequest, res: Response) {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
+    const planCode = String(req.body?.planCode || "");
+    if (!planCode) return res.status(400).json({ success: false, error: "planCode is required" });
+    const purpose = req.body?.purpose as billing.CheckoutPurpose | undefined;
+    const rawUsers = req.body?.userCount;
+    const userCount =
+      rawUsers == null || rawUsers === ""
+        ? undefined
+        : Number(rawUsers);
+    const data = await billing.previewCheckout(req.user.id, planCode, {
+      couponCode: req.body?.couponCode ? String(req.body.couponCode) : undefined,
+      purpose: purpose || "checkout",
+      userCount,
+    });
+    res.json({ success: true, data });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e instanceof Error ? e.message : "Failed" });
+  }
+}
+
 export async function createOrder(req: AuthenticatedRequest, res: Response) {
   try {
     if (!req.user) return res.status(401).json({ success: false, error: "Not authenticated" });
     const planCode = String(req.body?.planCode || "");
     if (!planCode) return res.status(400).json({ success: false, error: "planCode is required" });
     const purpose = req.body?.purpose as billing.CheckoutPurpose | undefined;
+    const rawUsers = req.body?.userCount;
+    const userCount =
+      rawUsers == null || rawUsers === ""
+        ? undefined
+        : Number(rawUsers);
     const data = await billing.createCheckoutOrder(req.user.id, planCode, {
       couponCode: req.body?.couponCode ? String(req.body.couponCode) : undefined,
       purpose: purpose || "checkout",
       previousPaymentId: req.body?.previousPaymentId
         ? String(req.body.previousPaymentId)
         : undefined,
+      userCount,
     });
     res.status(201).json({ success: true, data });
   } catch (e) {
@@ -216,11 +245,25 @@ export async function validateCouponHandler(req: AuthenticatedRequest, res: Resp
     const plans = await listActivePlans();
     const plan = plans.find((p) => p.code === planCode);
     if (!plan) return res.status(400).json({ success: false, error: "Invalid plan" });
-    const { toMoneyNumber } = await import("../lib/money.js");
+    const parsed = parsePlanCode(plan.code);
+    if (!parsed || parsed.tier === "enterprise") {
+      return res.status(400).json({ success: false, error: "Enterprise pricing is custom. Contact sales." });
+    }
+    const rawUsers = req.body?.userCount;
+    const userCount =
+      rawUsers == null || rawUsers === ""
+        ? defaultUserCount(parsed.tier)
+        : Number(rawUsers);
+    const quote = quoteSaasCharge({
+      planCode: plan.code,
+      purpose: "checkout",
+      userCount,
+      setupFeePaid: true,
+    });
     const data = await validateCoupon({
       code,
       planCode,
-      basePrice: toMoneyNumber(plan.price),
+      basePrice: quote.subscriptionBase,
     });
     res.json({ success: data.ok, data, error: data.error });
   } catch (e) {

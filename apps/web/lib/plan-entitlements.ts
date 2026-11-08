@@ -33,7 +33,11 @@ export type FeatureKey =
   | "backups"
   | "white_label"
   | "automation"
-  | "security";
+  | "security"
+  | "dialer"
+  | "team_chat"
+  | "whatsapp"
+  | "erp";
 
 export type BillingCycleFilter = "monthly" | "annual";
 
@@ -78,42 +82,76 @@ export const PLAN_FEATURE_LISTS: Record<
   ],
 };
 
-/** Display-only packaging meta (users, add-on seats, annual list price). */
+/**
+ * Display rate card for new subscriptions. Annual is 12 × monthly with no
+ * extra discount. Must stay aligned with apps/api/src/services/saas-pricing.ts.
+ * Existing subscriptions are not repriced here.
+ */
+export const GST_RATE = 0.18;
+export const SETUP_FEE_INR = 30000;
+export const ANNUAL_MONTHS = 12;
+export const PER_USER_MONTHLY_INR = { starter: 300, professional: 600 } as const;
+
 export type PlanPricingMeta = {
-  includedUsers: number;
-  additionalUserMonthly: number | null;
-  additionalUserAnnual: number | null;
-  /** Full year list price before 10% discount (annual cards only) */
-  annualListPrice: number | null;
+  defaultUsers: number;
+  includedUsers?: number;
+  annualListPrice?: number;
+  additionalUserMonthly?: number;
+  perUserMonthly: number | null;
   badge: string;
 };
 
 export const PLAN_PRICING_META: Record<"starter" | "professional" | "enterprise", PlanPricingMeta> =
   {
     starter: {
-      includedUsers: 3,
-      additionalUserMonthly: 300,
-      additionalUserAnnual: 3240,
-      annualListPrice: 17988, // ₹1,499 × 12
+      defaultUsers: 3,
+      perUserMonthly: PER_USER_MONTHLY_INR.starter,
       badge: "Best for Small Teams",
     },
     professional: {
-      includedUsers: 10,
-      additionalUserMonthly: 600,
-      additionalUserAnnual: 6480,
-      annualListPrice: 83988, // ₹6,999 × 12
+      defaultUsers: 10,
+      perUserMonthly: PER_USER_MONTHLY_INR.professional,
       badge: "⭐ Most Popular",
     },
     enterprise: {
-      includedUsers: 0,
-      additionalUserMonthly: null,
-      additionalUserAnnual: null,
-      annualListPrice: null,
+      defaultUsers: 0,
+      perUserMonthly: null,
       badge: "Best for Large Organizations",
     },
   };
 
-export const ANNUAL_DISCOUNT_PCT = 10;
+export function perUserUnit(
+  tier: "starter" | "professional",
+  cycle: "monthly" | "annual"
+): number {
+  const monthly = PER_USER_MONTHLY_INR[tier];
+  return cycle === "annual" ? monthly * ANNUAL_MONTHS : monthly;
+}
+
+/** Pre-tax quote for a new subscription. Renewal is priced on the server. */
+export function quotePlanDisplay(input: {
+  tier: "starter" | "professional";
+  cycle: "monthly" | "annual";
+  userCount: number;
+  setupFeePaid: boolean;
+  purpose: string;
+}): {
+  unitPrice: number;
+  subscriptionBase: number;
+  setupFee: number;
+  taxable: number;
+  gst: number;
+  total: number;
+} {
+  const users = Math.max(1, Math.floor(input.userCount));
+  const unitPrice = perUserUnit(input.tier, input.cycle);
+  const subscriptionBase = Math.round(users * unitPrice * 100) / 100;
+  const setupFee = input.purpose !== "renewal" && !input.setupFeePaid ? SETUP_FEE_INR : 0;
+  const taxable = Math.round((subscriptionBase + setupFee) * 100) / 100;
+  const gst = Math.round(taxable * GST_RATE * 100) / 100;
+  const total = Math.round((taxable + gst) * 100) / 100;
+  return { unitPrice, subscriptionBase, setupFee, taxable, gst, total };
+}
 
 const STARTER_FEATURES: FeatureKey[] = [
   "leads",
@@ -132,6 +170,10 @@ const STARTER_FEATURES: FeatureKey[] = [
   "billing",
   "health",
   "activity",
+  "dialer",
+  "team_chat",
+  "whatsapp",
+  "erp",
 ];
 
 const PROFESSIONAL_FEATURES: FeatureKey[] = [
@@ -192,6 +234,10 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   backups: "Backups & Restore",
   white_label: "White Label CRM",
   automation: "Email Automation",
+  dialer: "Cloud Telephony Dialer",
+  team_chat: "Team Chat",
+  whatsapp: "WhatsApp Conversation Center",
+  erp: "ERP System",
 };
 
 /** Minimum tier required for a feature */
@@ -239,6 +285,19 @@ export const ROUTE_FEATURE: Record<string, FeatureKey> = {
   "/dashboard/approvals": "approvals",
   "/dashboard/roadmap": "roadmap",
   "/dashboard/backups": "backups",
+  "/dashboard/dialer": "dialer",
+  "/dashboard/team-chat": "team_chat",
+  "/dashboard/whatsapp": "whatsapp",
+  "/dashboard/erp": "erp",
+  "/dashboard/erp/products": "erp",
+  "/dashboard/erp/inventory": "erp",
+  "/dashboard/erp/warehouses": "erp",
+  "/dashboard/erp/vendors": "erp",
+  "/dashboard/erp/purchases": "erp",
+  "/dashboard/erp/sales-orders": "erp",
+  "/dashboard/settings/appearance": "profile",
+  "/dashboard/settings/custom-fields": "security",
+  "/dashboard/settings/telephony/browser-dialer-poc": "dialer",
 };
 
 const TIER_RANK: Record<PlanTier, number> = {

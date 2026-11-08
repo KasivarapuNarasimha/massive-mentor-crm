@@ -23,8 +23,22 @@ import {
 import { evaluateBillingAccess } from "./billing-access.service.js";
 import { validateCoupon } from "./billing-coupon.service.js";
 import { notifySuperAdmins } from "./billing-notify.service.js";
-
-const GST_RATE = 0.18;
+import {
+  contractFromPaidMetadata,
+  paidContractFromMetadata,
+  publicRateCard,
+  quoteSaasCharge,
+  type PaidContract,
+  type PriceQuote,
+} from "./saas-pricing.js";
+import { applyDueScheduledPlanChanges } from "./billing-schedule.service.js";
+import {
+  decideCapturedActivation,
+  expectedAmountPaise,
+  orderAmountPaise,
+  readCapturedPaise,
+  compareCapturedAmount,
+} from "./razorpay-amount.js";
 
 export function trialDaysDefault(): number {
   return env.TRIAL_DAYS ?? 3;
@@ -185,11 +199,27 @@ export async function getBillingOverview(userId: string) {
       gracePeriodDays: biz.gracePeriodDays,
       maxUsers: biz.maxUsers,
       billingEmail: biz.billingEmail,
+      setupFeePaid: biz.setupFeePaid,
       currency: "INR",
       currentPlan: biz.currentPlan,
       createdAt: biz.createdAt,
     },
     plans,
+    pricing: publicRateCard(),
+    contract: (() => {
+      const paid = payments.find((p) => p.status === "paid");
+      if (!paid && !biz.currentPlan) {
+        return {
+          pricingVersion: null,
+          renewalBase: null,
+          userCount: null,
+          planCode: null,
+          setupFeePaid: biz.setupFeePaid,
+        };
+      }
+      const resolved = contractFromPaidMetadata(paid?.metadata, biz.currentPlan?.code || null);
+      return { ...resolved, setupFeePaid: biz.setupFeePaid };
+    })(),
     payments,
     subscriptions,
     timeline,
@@ -201,22 +231,31 @@ export async function getBillingOverview(userId: string) {
 
 export type CheckoutPurpose = "checkout" | "upgrade" | "downgrade" | "renewal" | "retry";
 
-/**
- * Create a NEW Razorpay order (never reuse old orders on retry).
- */
-export async function createCheckoutOrder(
+type CheckoutQuoteInput = {
+  couponCode?: string;
+  purpose?: CheckoutPurpose;
+  /** Seat quantity for a new per-user subscription. Ignored for a legacy renewal. */
+  userCount?: number;
+};
+
+type ResolvedCheckout = {
+  businessId: string;
+  purpose: CheckoutPurpose;
+  plan: NonNullable<Awaited<ReturnType<typeof getPlanByCode>>>;
+  quote: PriceQuote;
+  couponId: string | null;
+  couponMeta: Record<string, unknown>;
+  amountPaise: number;
+  prefillName: string;
+  prefillEmail: string;
+  businessName: string;
+};
+
+async function resolveCheckoutQuote(
   userId: string,
   planCode: string,
-  opts?: {
-    couponCode?: string;
-    purpose?: CheckoutPurpose;
-    /** For retry: cancel previous created payment */
-    previousPaymentId?: string;
-  }
-) {
-  if (!razorpayConfigured()) {
-    throw new Error("Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
-  }
+  opts?: CheckoutQuoteInput
+): Promise<ResolvedCheckout> {
   const businessId = await getUserBusinessId(userId);
   if (!businessId) throw new Error("Business context required");
 
@@ -231,7 +270,152 @@ export async function createCheckoutOrder(
 
   const purpose: CheckoutPurpose = opts?.purpose || "checkout";
 
-  // Cancel prior unpaid payment if retry
+  const latestPaid = await prisma.billingPayment.findFirst({
+    where: { businessId, status: "paid" },
+    orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
+  });
+  const paidContract: PaidContract | null = latestPaid
+    ? paidContractFromMetadata(latestPaid.metadata)
+    : null;
+
+  const existingPaidSubscription =
+    !biz.isTrial && biz.plan !== "trial" && (biz.planStatus === "active" || biz.planStatus === "past_due");
+  const listQuote = quoteSaasCharge({
+    planCode: plan.code,
+    purpose,
+    userCount: opts?.userCount,
+    setupFeePaid: biz.setupFeePaid,
+    paidContract,
+    existingPaidSubscription,
+  });
+
+  let discountAmount = 0;
+  let couponId: string | null = null;
+  let couponMeta: Record<string, unknown> = {};
+
+  // Credit remaining time on the contracted price. Legacy contracts use the
+  // frozen plan row, not the new per-user rate.
+  let prorationCredit = 0;
+  if (
+    purpose === "upgrade" &&
+    biz.currentPlan &&
+    biz.subscriptionEndsAt &&
+    new Date(biz.subscriptionEndsAt).getTime() > Date.now()
+  ) {
+    const remainingMs = new Date(biz.subscriptionEndsAt).getTime() - Date.now();
+    const remainingDays = Math.max(0, remainingMs / 86400000);
+    const cycleDays = biz.currentPlan.billingCycle === "annual" ? 365 : 30;
+    const contracted =
+      paidContract?.pricingVersion === "2026-per-user" && paidContract.subscriptionBase != null
+        ? paidContract.subscriptionBase
+        : Number(biz.currentPlan.price);
+    prorationCredit = Math.round((contracted / cycleDays) * remainingDays * 100) / 100;
+  }
+
+  if (opts?.couponCode) {
+    const v = await validateCoupon({
+      code: opts.couponCode,
+      planCode: plan.code,
+      basePrice: listQuote.subscriptionBase,
+      businessId,
+    });
+    if (!v.ok) throw new Error(v.error || "Invalid coupon");
+    discountAmount = v.discountAmount || 0;
+    couponId = v.couponId || null;
+    couponMeta = { couponCode: v.code, discountType: v.discountType };
+  }
+
+  const quote = quoteSaasCharge({
+    planCode: plan.code,
+    purpose,
+    userCount: opts?.userCount,
+    setupFeePaid: biz.setupFeePaid,
+    paidContract,
+    existingPaidSubscription,
+    discountAmount,
+    prorationCredit,
+  });
+  const amountPaise = orderAmountPaise(quote.total);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { email: true, name: true },
+  });
+
+  return {
+    businessId,
+    purpose,
+    plan,
+    quote,
+    couponId,
+    couponMeta,
+    amountPaise,
+    prefillName: user?.name || biz.name || "",
+    prefillEmail: user?.email || biz.billingEmail || "",
+    businessName: biz.name || "Massive Mentor CRM",
+  };
+}
+
+export type CheckoutBreakdown = {
+  planCode: string;
+  planName: string;
+  purpose: CheckoutPurpose;
+  userCount: number;
+  unitPrice: number;
+  subscriptionBase: number;
+  setupFee: number;
+  discountAmount: number;
+  prorationCredit: number;
+  gst: number;
+  total: number;
+  amountPaise: number;
+  currency: string;
+  pricingVersion: PriceQuote["pricingVersion"];
+};
+
+function breakdownOf(resolved: ResolvedCheckout): CheckoutBreakdown {
+  const quote = resolved.quote;
+  return {
+    planCode: resolved.plan.code,
+    planName: resolved.plan.name,
+    purpose: resolved.purpose,
+    userCount: quote.userCount,
+    unitPrice: quote.unitPrice,
+    subscriptionBase: quote.subscriptionBase,
+    setupFee: quote.setupFee,
+    discountAmount: quote.discountAmount,
+    prorationCredit: quote.prorationCredit,
+    gst: quote.gst,
+    total: quote.total,
+    amountPaise: resolved.amountPaise,
+    currency: resolved.plan.currency || "INR",
+    pricingVersion: quote.pricingVersion,
+  };
+}
+
+/** Server quote for the confirmation modal. Does not create a payment or call Razorpay. */
+export async function previewCheckout(
+  userId: string,
+  planCode: string,
+  opts?: CheckoutQuoteInput
+): Promise<CheckoutBreakdown> {
+  return breakdownOf(await resolveCheckoutQuote(userId, planCode, opts));
+}
+
+/**
+ * Create a NEW Razorpay order (never reuse old orders on retry).
+ * The preview and this order use the same quote.
+ */
+export async function createCheckoutOrder(
+  userId: string,
+  planCode: string,
+  opts?: CheckoutQuoteInput & { previousPaymentId?: string }
+) {
+  if (!razorpayConfigured()) {
+    throw new Error("Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
+  }
+  const resolved = await resolveCheckoutQuote(userId, planCode, opts);
+  const { businessId, purpose, plan, quote, couponId, couponMeta, amountPaise } = resolved;
+
   if (opts?.previousPaymentId) {
     await prisma.billingPayment.updateMany({
       where: {
@@ -243,46 +427,6 @@ export async function createCheckoutOrder(
     });
   }
 
-  let basePrice = Number(plan.price);
-  let discountAmount = 0;
-  let couponId: string | null = null;
-  let couponMeta: Record<string, unknown> = {};
-
-  // Simple proration credit on upgrade (remaining days of current paid period)
-  let prorationCredit = 0;
-  if (
-    purpose === "upgrade" &&
-    biz.currentPlan &&
-    biz.subscriptionEndsAt &&
-    new Date(biz.subscriptionEndsAt).getTime() > Date.now()
-  ) {
-    const remainingMs = new Date(biz.subscriptionEndsAt).getTime() - Date.now();
-    const remainingDays = Math.max(0, remainingMs / 86400000);
-    const cycleDays = biz.currentPlan.billingCycle === "annual" ? 365 : 30;
-    const currentPrice = Number(biz.currentPlan.price);
-    prorationCredit =
-      Math.round((currentPrice / cycleDays) * remainingDays * 100) / 100;
-    prorationCredit = Math.min(prorationCredit, basePrice * 0.9);
-  }
-
-  if (opts?.couponCode) {
-    const v = await validateCoupon({
-      code: opts.couponCode,
-      planCode: plan.code,
-      basePrice,
-      businessId,
-    });
-    if (!v.ok) throw new Error(v.error || "Invalid coupon");
-    discountAmount = v.discountAmount || 0;
-    couponId = v.couponId || null;
-    couponMeta = { couponCode: v.code, discountType: v.discountType };
-  }
-
-  const afterDiscount = Math.max(0, basePrice - discountAmount - prorationCredit);
-  const gst = Math.round(afterDiscount * GST_RATE * 100) / 100;
-  const total = Math.round((afterDiscount + gst) * 100) / 100;
-  const amountPaise = Math.max(100, Math.round(total * 100)); // Razorpay min ~₹1
-
   const invoiceNumber = await nextInvoiceNumber();
   const payment = await prisma.billingPayment.create({
     data: {
@@ -291,17 +435,25 @@ export async function createCheckoutOrder(
       planId: plan.id,
       couponId,
       billingCycle: plan.billingCycle,
-      amount: total,
-      gst,
-      discountAmount: discountAmount + prorationCredit,
+      amount: quote.total,
+      gst: quote.gst,
+      discountAmount: quote.discountAmount + quote.prorationCredit,
       currency: plan.currency || "INR",
       invoiceNumber,
       status: "created",
       purpose,
       metadata: {
+        pricingVersion: quote.pricingVersion,
         planCode: plan.code,
-        basePrice: Number(plan.price),
-        prorationCredit,
+        userCount: quote.userCount,
+        unitPrice: quote.unitPrice,
+        subscriptionBase: quote.subscriptionBase,
+        setupFee: quote.setupFee,
+        basePrice: quote.subscriptionBase,
+        prorationCredit: quote.prorationCredit,
+        discountAmount: quote.discountAmount,
+        expectedAmountPaise: amountPaise,
+        lines: quote.lines,
         ...couponMeta,
       },
     },
@@ -351,16 +503,12 @@ export async function createCheckoutOrder(
     data: { razorpayOrderId: orderJson.id },
   });
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { email: true, name: true },
-  });
-
+  const priced = breakdownOf(resolved);
   return {
     keyId: env.RAZORPAY_KEY_ID,
     orderId: orderJson.id,
     amount: amountPaise,
-    currency: plan.currency || "INR",
+    currency: priced.currency,
     paymentId: payment.id,
     invoiceNumber,
     purpose,
@@ -368,18 +516,37 @@ export async function createCheckoutOrder(
       id: plan.id,
       code: plan.code,
       name: plan.name,
-      price: plan.price,
-      gst,
-      total,
-      discountAmount: discountAmount + prorationCredit,
+      price: quote.subscriptionBase,
+      unitPrice: priced.unitPrice,
+      userCount: priced.userCount,
+      setupFee: priced.setupFee,
+      subscriptionBase: priced.subscriptionBase,
+      gst: priced.gst,
+      total: priced.total,
+      discountAmount: priced.discountAmount + priced.prorationCredit,
+      couponDiscount: priced.discountAmount,
+      prorationCredit: priced.prorationCredit,
       billingCycle: plan.billingCycle,
+      pricingVersion: priced.pricingVersion,
     },
     prefill: {
-      name: user?.name || biz.name || "",
-      email: user?.email || biz.billingEmail || "",
+      name: resolved.prefillName,
+      email: resolved.prefillEmail,
     },
-    businessName: biz.name || "Massive Mentor CRM",
+    businessName: resolved.businessName,
   };
+}
+
+async function lookupRazorpayCapturedPaise(razorpayPaymentId: string): Promise<number | null> {
+  if (!razorpayConfigured() || !razorpayPaymentId) return null;
+  const auth = Buffer.from(`${env.RAZORPAY_KEY_ID}:${env.RAZORPAY_KEY_SECRET}`).toString("base64");
+  const response = await fetch(
+    `https://api.razorpay.com/v1/payments/${encodeURIComponent(razorpayPaymentId)}`,
+    { headers: { Authorization: `Basic ${auth}` } }
+  );
+  if (!response.ok) return null;
+  const body = (await response.json()) as unknown;
+  return readCapturedPaise(body);
 }
 
 function verifyRazorpaySignature(
@@ -409,6 +576,10 @@ export async function acknowledgeCheckoutPayment(
     razorpay_payment_id: string;
     razorpay_signature: string;
     paymentId?: string;
+  },
+  deps?: {
+    /** Test hook. Production looks up the captured paise from Razorpay. */
+    lookupCapturedPaise?: (razorpayPaymentId: string) => Promise<number | null>;
   }
 ) {
   const ok = verifyRazorpaySignature(
@@ -442,7 +613,21 @@ export async function acknowledgeCheckoutPayment(
     };
   }
 
-  // Mark authorized — waiting for webhook
+  const lookup = deps?.lookupCapturedPaise ?? lookupRazorpayCapturedPaise;
+  const capturedPaise = await lookup(input.razorpay_payment_id);
+  const expectedPaise = expectedAmountPaise(Number(payment.amount), payment.metadata);
+  const capture = decideCapturedActivation({
+    eventAlreadyProcessed: false,
+    paymentFound: true,
+    paymentStatus: payment.status,
+    activated: false,
+    comparison: compareCapturedAmount(expectedPaise, capturedPaise),
+  });
+  if (!capture.activate) {
+    throw new Error("Payment amount does not match the order");
+  }
+
+  // Mark authorized — waiting for webhook. Amount already matched the stored order.
   await prisma.billingPayment.update({
     where: { id: payment.id },
     data: {
@@ -519,9 +704,11 @@ export async function retryPayment(userId: string, previousPaymentId: string) {
   });
   if (!prev?.plan) throw new Error("Previous payment not found");
   if (prev.status === "paid") throw new Error("Payment already completed");
+  const previous = paidContractFromMetadata(prev.metadata);
   return createCheckoutOrder(userId, prev.plan.code, {
-    purpose: "retry",
+    purpose: prev.purpose === "renewal" ? "renewal" : "retry",
     previousPaymentId: prev.id,
+    userCount: previous?.userCount ?? undefined,
   });
 }
 
@@ -610,6 +797,9 @@ export async function runDailyBillingJobs(): Promise<{
   lockedSubs: number;
   reminders: number;
   renewalReminders: number;
+  scheduledPlansApplied: number;
+  scheduledPlansSkipped: number;
+  scheduledPlansFailed: number;
 }> {
   const now = new Date();
   let lockedTrials = 0;
@@ -795,5 +985,15 @@ export async function runDailyBillingJobs(): Promise<{
     }
   }
 
-  return { lockedTrials, lockedSubs, reminders, renewalReminders };
+  const scheduled = await applyDueScheduledPlanChanges(now);
+
+  return {
+    lockedTrials,
+    lockedSubs,
+    reminders,
+    renewalReminders,
+    scheduledPlansApplied: scheduled.applied,
+    scheduledPlansSkipped: scheduled.skipped,
+    scheduledPlansFailed: scheduled.failed,
+  };
 }

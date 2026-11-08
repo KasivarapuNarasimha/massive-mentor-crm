@@ -3,6 +3,7 @@
  */
 import { prisma } from "../lib/prisma.js";
 import { toMoneyNumber } from "../lib/money.js";
+import { monthlyRecurringAmount } from "./saas-pricing.js";
 
 function startOfDay(d = new Date()) {
   const x = new Date(d);
@@ -111,12 +112,32 @@ export async function getSaaSRevenueDashboard() {
     }),
   ]);
 
-  // MRR: sum monthly-equivalent of active paid plans
+  // MRR: legacy subscriptions stay on the frozen plan price. A per-user
+  // payment stores its own subscription base and is not read from the catalog.
+  const linkedPayments = activeSubs.length
+    ? await prisma.billingPayment.findMany({
+        where: {
+          status: "paid",
+          subscriptionId: { in: activeSubs.map((s) => s.id) },
+        },
+        select: { subscriptionId: true, metadata: true, paidAt: true, createdAt: true },
+        orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
+      })
+    : [];
+  const metaBySubscription = new Map<string, unknown>();
+  for (const payment of linkedPayments) {
+    if (payment.subscriptionId && !metaBySubscription.has(payment.subscriptionId)) {
+      metaBySubscription.set(payment.subscriptionId, payment.metadata);
+    }
+  }
   let mrr = 0;
   for (const s of activeSubs) {
     if (!s.plan) continue;
-    const price = toMoneyNumber(s.plan.price);
-    mrr += s.plan.billingCycle === "annual" ? price / 12 : price;
+    mrr += monthlyRecurringAmount({
+      billingCycle: s.plan.billingCycle,
+      planPrice: toMoneyNumber(s.plan.price),
+      metadata: metaBySubscription.get(s.id),
+    });
   }
   mrr = Math.round(mrr * 100) / 100;
   const arr = Math.round(mrr * 12 * 100) / 100;

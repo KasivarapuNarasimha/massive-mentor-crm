@@ -16,6 +16,8 @@ import { generateBillingInvoicePdf } from "./billing-invoice-pdf.service.js";
 import { notifySuperAdmins } from "./billing-notify.service.js";
 import fs from "node:fs";
 import { recordCouponRedemption } from "./billing-coupon.service.js";
+import { SAAS_PRICING_VERSION } from "./saas-pricing.js";
+import { scheduledPlanSettings } from "./billing-schedule.js";
 
 function addMonths(d: Date, n: number): Date {
   const x = new Date(d);
@@ -198,6 +200,13 @@ export async function activateSubscriptionFromPayment(opts: {
     });
 
     const planKey = plan.code.split("_")[0] || "professional";
+    const paymentMeta =
+      payment.metadata && typeof payment.metadata === "object"
+        ? (payment.metadata as Record<string, unknown>)
+        : {};
+    const perUserPurchase = paymentMeta.pricingVersion === SAAS_PRICING_VERSION;
+    const purchasedUsers = Number(paymentMeta.userCount);
+    const setupCharged = Number(paymentMeta.setupFee) > 0;
     // Downgrade scheduled: keep current plan until start if start > now
     const applyNow = purpose !== "downgrade" || start.getTime() <= now.getTime();
     if (applyNow) {
@@ -211,8 +220,17 @@ export async function activateSubscriptionFromPayment(opts: {
           licenseStatus: "active",
           subscriptionEndsAt: end,
           currentPlanId: plan.id,
-          maxUsers: plan.maxUsers,
-          setupFeePaid: true,
+          maxUsers:
+            perUserPurchase && Number.isInteger(purchasedUsers) && purchasedUsers > 0
+              ? purchasedUsers
+              : plan.maxUsers,
+          // Legacy payments have no pricingVersion and no setup-fee line.
+          // They keep the previous activation behavior and set setupFeePaid
+          // true. Changing that would add a new ₹30,000 charge on the next
+          // checkout. This assignment does not rewrite existing businesses,
+          // payments, or invoices. A per-user charge sets the flag only when
+          // this invoice collected setup, or when it was already paid.
+          setupFeePaid: perUserPurchase ? biz.setupFeePaid || setupCharged : true,
         },
       });
     } else {
@@ -221,11 +239,18 @@ export async function activateSubscriptionFromPayment(opts: {
         data: {
           planStatus: "active",
           isLocked: false,
-          // Keep current plan until period end; store next plan in settings
+          // Keep current plan until period end; store next plan in settings.
+          // A per-user invoice that collected setup must mark it paid even when
+          // the plan change itself waits until the current period ends.
+          ...(perUserPurchase && setupCharged ? { setupFeePaid: true } : {}),
           settings: {
             ...((biz.settings as object) || {}),
-            scheduledPlanCode: plan.code,
-            scheduledPlanAt: start.toISOString(),
+            ...scheduledPlanSettings({
+              planCode: plan.code,
+              effectiveAt: start.toISOString(),
+              paymentId: paid.id,
+              subscriptionId: sub.id,
+            }),
           },
         },
       });

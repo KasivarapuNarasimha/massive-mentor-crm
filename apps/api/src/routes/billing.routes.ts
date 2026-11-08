@@ -14,6 +14,7 @@ router.get("/stream", requireAuth, ctrl.subscriptionStream);
 router.head("/stream", requireAuth, ctrl.subscriptionStreamHead);
 router.get("/overview", requireAuth, ctrl.getOverview);
 router.get("/plans", requireAuth, ctrl.listPlans);
+router.post("/checkout/preview", requireAuth, ctrl.previewCheckout);
 router.post("/checkout/order", requireAuth, ctrl.createOrder);
 router.post("/checkout/verify", requireAuth, ctrl.verifyPayment);
 router.get("/payments/:id/status", requireAuth, ctrl.paymentStatus);

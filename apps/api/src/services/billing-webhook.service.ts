@@ -8,6 +8,12 @@ import { env } from "../config/env.js";
 import { activateSubscriptionFromPayment } from "./billing-activation.service.js";
 import { recordAudit } from "./audit.service.js";
 import { notifySuperAdmins } from "./billing-notify.service.js";
+import {
+  compareCapturedAmount,
+  decideCapturedActivation,
+  expectedAmountPaise,
+  readCapturedPaise,
+} from "./razorpay-amount.js";
 
 export function verifyWebhookSignature(rawBody: Buffer | string, signature: string): boolean {
   // Production: require dedicated webhook secret (never fall back to API key secret)
@@ -121,19 +127,46 @@ export async function processRazorpayWebhook(opts: {
 
       if (!payment) {
         result = "payment_not_found";
-      } else if (payment.status === "paid" && payment.activatedAt) {
-        result = "already_activated";
       } else {
-        await activateSubscriptionFromPayment({
-          paymentId: payment.id,
-          razorpayPaymentId: razorpayPaymentId.startsWith("pay_")
-            ? razorpayPaymentId
-            : payment.razorpayPaymentId || razorpayPaymentId,
-          razorpayOrderId: orderId || payment.razorpayOrderId || undefined,
-          activatedBy: "webhook",
-          webhookEventId: eventId,
+        const capturedPaise = readCapturedPaise(paymentEntity) ?? readCapturedPaise(orderEntity);
+        const expectedPaise = expectedAmountPaise(Number(payment.amount), payment.metadata);
+        const capture = decideCapturedActivation({
+          eventAlreadyProcessed: false,
+          paymentFound: true,
+          paymentStatus: payment.status,
+          activated: !!(payment.status === "paid" && payment.activatedAt),
+          comparison: compareCapturedAmount(expectedPaise, capturedPaise),
         });
-        result = "activated";
+        if (!capture.activate) {
+          result = capture.reason;
+          if (!capture.duplicate && payment.status !== "paid") {
+            await prisma.billingPayment.update({
+              where: { id: payment.id },
+              data: {
+                metadata: {
+                  ...((payment.metadata as object) || {}),
+                  amountCheck: {
+                    expectedPaise,
+                    capturedPaise,
+                    result: capture.reason,
+                    webhookEventId: eventId,
+                  },
+                },
+              },
+            });
+          }
+        } else {
+          await activateSubscriptionFromPayment({
+            paymentId: payment.id,
+            razorpayPaymentId: razorpayPaymentId.startsWith("pay_")
+              ? razorpayPaymentId
+              : payment.razorpayPaymentId || razorpayPaymentId,
+            razorpayOrderId: orderId || payment.razorpayOrderId || undefined,
+            activatedBy: "webhook",
+            webhookEventId: eventId,
+          });
+          result = "activated";
+        }
       }
     } else if (eventType === "payment.failed") {
       const entity = payload.payload?.payment?.entity;

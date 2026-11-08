@@ -7,6 +7,7 @@ import { prisma } from "../lib/prisma.js";
 import { env } from "../config/env.js";
 import { toMoneyNumber } from "../lib/money.js";
 import { formatCurrency, formatIndianNumber } from "../lib/currency.js";
+import { invoiceLinesFromMetadata } from "./saas-pricing.js";
 
 function invoicesDir(): string {
   const base = env.BACKUP_DIR || path.join(process.cwd(), "storage");
@@ -92,11 +93,32 @@ export async function generateBillingInvoicePdf(paymentId: string): Promise<{
 
   const planName = payment.plan?.name || "Subscription";
   const cycle = payment.billingCycle || payment.plan?.billingCycle || "—";
+  const lines = invoiceLinesFromMetadata(payment.metadata, {
+    description: planName,
+    amount: base,
+  });
   doc.fillColor("#3f3f46");
-  doc.text(planName, 50);
-  doc.text(String(cycle), 280, doc.y - 12);
-  doc.text(formatIndianNumber(base), 420, doc.y - 12, { width: 120, align: "right" });
-  doc.moveDown(0.5);
+  const hasStoredLines =
+    !!payment.metadata &&
+    typeof payment.metadata === "object" &&
+    Array.isArray((payment.metadata as { lines?: unknown }).lines) &&
+    (payment.metadata as { lines: unknown[] }).lines.length > 0;
+  if (!hasStoredLines) {
+    doc.text(planName, 50);
+    doc.text(String(cycle), 280, doc.y - 12);
+    doc.text(formatIndianNumber(base), 420, doc.y - 12, { width: 120, align: "right" });
+    doc.moveDown(0.5);
+  } else {
+    for (const line of lines) {
+      const qty =
+        line.quantity === 1 ? line.description : `${line.description} × ${line.quantity}`;
+      doc.text(qty, 50, doc.y, { width: 220 });
+      const rowY = doc.y - 12;
+      doc.text(String(cycle), 280, rowY);
+      doc.text(formatIndianNumber(line.amount), 420, rowY, { width: 120, align: "right" });
+      doc.moveDown(0.4);
+    }
+  }
 
   if (discountN > 0) {
     doc.text("Discount", 50);
